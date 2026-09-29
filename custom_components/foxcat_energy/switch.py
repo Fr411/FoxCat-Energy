@@ -18,9 +18,9 @@ def _device_for(key: str) -> str:
         return "pri"
     if key in {"washer_enabled", "dryer_enabled", "dishwasher_enabled"}:
         return "machines"
-    if key == "solar_advisor_enabled":
+    if key in {"solar_advisor_enabled", "solar_forecast_arbitrage"}:
         return "ai"
-    if key.startswith("dynamic_") or key.startswith("economic_"):
+    if key == "predictive_pricing_enabled" or key.startswith("dynamic_") or key.startswith("economic_"):
         return "pricing"
     return "ems"
 
@@ -42,6 +42,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class FoxCatSettingSwitch(FoxCatEntity, SwitchEntity):
     def __init__(self, coordinator: FoxCatEnergyCoordinator, key: str, name: str, icon: str) -> None:
         super().__init__(coordinator, key, name, icon, _device_for(key))
+        if key == "predictive_pricing_enabled":
+            self._attr_suggested_object_id = "foxcat_predictive_pricing_enabled"
+        elif key == "solar_forecast_arbitrage":
+            self._attr_suggested_object_id = "foxcat_solar_forecast_arbitrage"
 
     @property
     def is_on(self) -> bool:

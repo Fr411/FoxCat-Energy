@@ -64,4 +64,18 @@ def decide_zero(snapshot:EnergySnapshot,current_level:int,settings:dict[str,obje
         0.0,0.0,diag)
 
 def decide_dynamic(snapshot:EnergySnapshot,current_level:int,settings:dict[str,object],injection_price:float|None,boiler_absorbing:bool)->PriDecision:
+    """PRI dynamique basé sur la valeur SIGNÉE de l'export.
+
+    ``injection_price`` est normalisé par FoxCat : positif = recette d'export,
+    négatif = coût d'export. Le kill-switch restaure le comportement zéro-
+    injection historique sans toucher aux autres régimes.
+    """
+    current_level=int(clamp(current_level,0,100))
+    if bool(settings.get("predictive_pricing_enabled",True)) and injection_price is not None and float(injection_price)>0.0:
+        return PriDecision(
+            "remontee" if current_level<100 else "maintien",
+            current_level,100,
+            f"Dynamique : export valorisé à {float(injection_price):.4f} €/kWh, PRI libéré à 100 %.",
+            0.0,0.0,100,
+        )
     return decide_zero(snapshot,current_level,settings)

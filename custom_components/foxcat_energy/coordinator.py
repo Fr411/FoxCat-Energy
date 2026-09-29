@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON
 from homeassistant.core import Event, HomeAssistant, callback
@@ -27,6 +28,9 @@ from .const import (
     CONF_BOILER_BINARY,
     CONF_BOILER_CLIMATE,
     CONF_BOILER_POWER_SENSOR,
+    CONF_BOILER_VOLUME,
+    CONF_BOILER_ELEMENT_POWER,
+    CONF_BOILER_COLD_WATER_TEMP,
     CONF_BOILER_RESISTANCE_TEMP_SENSOR,
     CONF_BOILER_TEMP_SENSOR,
     CONF_DISHWASHER_CYCLE,
@@ -78,6 +82,7 @@ from .const import (
     CONF_DYNAMIC_EXPORT_SIGN_CONVENTION,
     DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE,
     DYNAMIC_EXPORT_POSITIVE_IS_REVENUE,
+    DYNAMIC_ARBITRAGE_HORIZON_HOURS,
     CONF_TARIFF_HP_START_1,
     CONF_TARIFF_HP_END_1,
     CONF_TARIFF_HP_START_2,
@@ -283,6 +288,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._boiler_command_task: asyncio.Task | None = None
         self._execution_task: asyncio.Task | None = None
         self._learning_save_task: asyncio.Task | None = None
+        self._status_notification_task: asyncio.Task | None = None
+        self._status_notification_last_signature: tuple[Any, ...] | None = None
         self._pv_below_since: datetime | None = None
         self._last_boiler_command_at: datetime | None = None
         self._high_load_since: datetime | None = None
@@ -315,6 +322,130 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def installation_name(self) -> str:
         return str(self.config.get(CONF_INSTALLATION_NAME) or self.entry.title or "FoxCat Energy")
+
+
+    def _financial_status_view(self, data: dict[str, Any]) -> dict[str, str]:
+        """Retourne un état financier court et stable pour l'utilisateur.
+
+        Cet indicateur résume la décision économique déjà calculée. Il ne
+        commande aucun équipement et ne publie rien sur Energy Bus.
+        """
+        decision = dict(data.get("economic", {}).get("decision", {}) or {})
+        code = str(decision.get("code") or "INCONNU")
+        mapping = {
+            "COMPENSATION_MAX_PV": ("COMPENSATION", "Production libre — compensation active"),
+            "ABSORBER_SURPLUS": ("EXPORT DÉFAVORABLE", "Autoconsommation prioritaire"),
+            "EXPORTER_ET_REPORTER": ("EXPORT FAVORABLE", "Réinjection rémunératrice"),
+            "AUTOCONSOMMER": ("FAVORABLE", "Autoconsommation économiquement préférable"),
+            "PRIX_ACHAT_NEGATIF": ("TRÈS FAVORABLE", "Consommation réseau avantageuse"),
+            "ATTENDRE_MEILLEUR_PRIX": ("ATTENDRE", "Meilleur prix attendu"),
+            "CONSOMMER_MAINTENANT": ("FAVORABLE", "Prix actuel intéressant"),
+            "CONSOMMER_HC": ("FAVORABLE", "Heures creuses actives"),
+            "ATTENDRE_HC": ("ATTENDRE", "Heures creuses recommandées"),
+            "HP_ACCEPTABLE": ("ACCEPTABLE", "Consommation possible si nécessaire"),
+            "PRIX_INDISPONIBLE": ("INDÉTERMINÉ", "Tarif indisponible"),
+            "DESACTIVE": ("NON ÉVALUÉ", "Optimisation économique désactivée"),
+        }
+        status, detail = mapping.get(code, ("INFORMATION", str(decision.get("label") or code)))
+        return {"status": status, "detail": detail, "code": code}
+
+    def _status_notification_signature(self, data: dict[str, Any]) -> tuple[Any, ...]:
+        """Empreinte des seules informations utiles à la notification persistante."""
+        summary = data.get("status_summary", {})
+        prices = data.get("prices", {})
+        accounting = data.get("accounting", {}).get("today", {})
+        return (
+            summary.get("mode"),
+            summary.get("network_policy"),
+            summary.get("financial_status"),
+            summary.get("economic_decision"),
+            prices.get("regime"),
+            prices.get("period"),
+            round(float(prices.get("active_buy") or 0.0), 4),
+            round(float(prices.get("export_value") or 0.0), 4),
+            round(float(accounting.get("net_grid_cost_eur") or 0.0), 2),
+        )
+
+    async def async_refresh_persistent_status_notification(
+        self, data: dict[str, Any] | None = None, *, force: bool = False
+    ) -> None:
+        """Crée ou remplace le résumé EMS persistant sans générer de doublons."""
+        notification_id = f"foxcat_energy_status_{self.entry.entry_id}"
+        if not bool(self.settings.get("persistent_status_notification_enabled", True)):
+            persistent_notification.async_dismiss(self.hass, notification_id)
+            self._status_notification_last_signature = None
+            return
+
+        payload = data or self.data or self._build_data()
+        signature = self._status_notification_signature(payload)
+        if not force and signature == self._status_notification_last_signature:
+            return
+
+        self._status_notification_last_signature = signature
+        summary = payload.get("status_summary", {})
+        prices = payload.get("prices", {})
+        accounting = payload.get("accounting", {}).get("today", {})
+        mode = str(summary.get("mode") or "Indisponible")
+        policy = str(summary.get("network_policy") or "Indisponible")
+        financial = str(summary.get("financial_status") or "Indéterminé")
+        decision = str(summary.get("economic_decision") or "Indisponible")
+        regime = str(prices.get("regime") or "Indisponible")
+        period = str(prices.get("period") or "—")
+        buy = prices.get("active_buy")
+        export_value = prices.get("export_value")
+        net_cost = float(accounting.get("net_grid_cost_eur") or 0.0)
+
+        def euro_kwh(value: Any) -> str:
+            try:
+                return f"{float(value):.3f} €/kWh"
+            except (TypeError, ValueError):
+                return "Indisponible"
+
+        message = (
+            f"**Mode EMS :** {mode}\n\n"
+            f"**Politique réseau :** {policy}\n\n"
+            f"**État financier :** {financial}\n\n"
+            f"**Décision économique :** {decision}\n\n"
+            f"**Tarification :** {regime} — {period}\n\n"
+            f"**Prix d'achat :** {euro_kwh(buy)}\n\n"
+            f"**Valeur de réinjection :** {euro_kwh(export_value)}\n\n"
+            f"**Coût net aujourd'hui :** {net_cost:.2f} €"
+        )
+        persistent_notification.async_create(
+            self.hass,
+            message,
+            title=f"⚡ {self.installation_name} — Statut EMS",
+            notification_id=notification_id,
+        )
+
+    @callback
+    def async_set_updated_data(self, data: dict[str, Any]) -> None:
+        """Met à jour les entités puis synchronise le résumé persistant."""
+        # Ajout du résumé financier avant publication afin que le capteur, le
+        # dashboard et la notification lisent exactement la même information.
+        financial = self._financial_status_view(data)
+        data.setdefault("status_summary", {})
+        data["status_summary"].update(
+            {
+                "mode": data.get("settings", {}).get("mode", MODE_ECO),
+                "network_policy": data.get("settings", {}).get("network_policy", NETWORK_POLICY_COMPENSATION),
+                "financial_status": financial["status"],
+                "financial_detail": financial["detail"],
+                "financial_code": financial["code"],
+                "economic_decision": data.get("economic", {}).get("decision", {}).get("label", "Indisponible"),
+            }
+        )
+        super().async_set_updated_data(data)
+        if not bool(self.settings.get("persistent_status_notification_enabled", True)):
+            return
+        signature = self._status_notification_signature(data)
+        if signature == self._status_notification_last_signature:
+            return
+        if self._status_notification_task and not self._status_notification_task.done():
+            self._status_notification_task.cancel()
+        self._status_notification_task = self.hass.async_create_task(
+            self.async_refresh_persistent_status_notification(data)
+        )
 
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
@@ -373,6 +504,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._boiler_command_task.cancel()
         if self._execution_task and not self._execution_task.done():
             self._execution_task.cancel()
+        if self._status_notification_task and not self._status_notification_task.done():
+            self._status_notification_task.cancel()
         await self._async_save()
 
     def _migrate_legacy_defaults(self) -> None:
@@ -1046,6 +1179,49 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             },
         )
 
+    def _boiler_thermal_view(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
+        """Modèle thermique physique du Boiler, destiné à l'arbitrage DYNAMIQUE.
+
+        Ce calcul est purement descriptif hors régime dynamique : il n'altère
+        ni HP/HC, ni les sécurités, ni la comptabilité. La constante 1.163
+        représente l'énergie en Wh nécessaire pour élever 1 litre d'eau de 1 °C.
+        """
+        snap = snapshot or self.snapshot()
+        try:
+            volume_l = max(float(self.config.get(CONF_BOILER_VOLUME, 250.0)), 0.0)
+        except (TypeError, ValueError):
+            volume_l = 250.0
+        try:
+            element_power_w = max(
+                float(self.config.get(CONF_BOILER_ELEMENT_POWER, self.settings.get("boiler_power_w", 2000.0))),
+                0.0,
+            )
+        except (TypeError, ValueError):
+            element_power_w = max(float(self.settings.get("boiler_power_w", 2000.0)), 0.0)
+        try:
+            cold_water_c = float(self.config.get(CONF_BOILER_COLD_WATER_TEMP, 15.0))
+        except (TypeError, ValueError):
+            cold_water_c = 15.0
+
+        target_c = max(float(self.settings.get("boiler_temp_normal_c", 45.0)), 0.0)
+        measured_c = float(snap.boiler_temp_c)
+        delta_c = max(target_c - measured_c, 0.0)
+        energy_missing_kwh = max(volume_l * 1.163 * delta_c / 1000.0, 0.0)
+        heating_duration_h = (energy_missing_kwh / (element_power_w / 1000.0)) if element_power_w > 0 else None
+        capacity_comfort_kwh = max(volume_l * 1.163 * max(target_c - cold_water_c, 0.0) / 1000.0, 0.0)
+
+        return {
+            "volume_l": round(volume_l, 3),
+            "element_power_w": round(element_power_w, 3),
+            "cold_water_temp_c": round(cold_water_c, 3),
+            "measured_temp_c": round(measured_c, 3),
+            "target_temp_c": round(target_c, 3),
+            "comfort_min_c": float(self.settings.get("boiler_temp_start_c", 43.0)),
+            "energy_missing_kwh": round(energy_missing_kwh, 5),
+            "heating_duration_h": round(heating_duration_h, 5) if heating_duration_h is not None else None,
+            "thermal_capacity_comfort_kwh": round(capacity_comfort_kwh, 5),
+        }
+
     def _boiler_on_seconds(self) -> float:
         """Return trusted physical ON duration for the boiler.
 
@@ -1186,8 +1362,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _economic_import_points(
         self, prices: dict[str, Any], now: datetime
     ) -> list[PricePoint]:
-        horizon = int(float(self.settings.get("economic_horizon_hours", 24.0)))
         regime = str(prices.get("regime", TARIFF_TOU))
+        horizon = (
+            DYNAMIC_ARBITRAGE_HORIZON_HOURS
+            if regime == TARIFF_DYNAMIC
+            else int(float(self.settings.get("economic_horizon_hours", 24.0)))
+        )
         if regime == TARIFF_TOU:
             return build_hphc_points(
                 now,
@@ -1215,8 +1395,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, prices: dict[str, Any], now: datetime
     ) -> list[PricePoint]:
         """Retourne la VALEUR économique de l'export, positive = recette."""
-        horizon = int(float(self.settings.get("economic_horizon_hours", 24.0)))
         regime = str(prices.get("regime", TARIFF_TOU))
+        horizon = (
+            DYNAMIC_ARBITRAGE_HORIZON_HOURS
+            if regime == TARIFF_DYNAMIC
+            else int(float(self.settings.get("economic_horizon_hours", 24.0)))
+        )
         if regime == TARIFF_TOU:
             value = prices.get("export_value")
             if not isinstance(value, (int, float)):
@@ -1259,12 +1443,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         tariff = prices or self.prices()
         import_points = self._economic_import_points(tariff, now)
         export_points = self._economic_export_points(tariff, now)
+        boiler_thermal = self._boiler_thermal_view(snap)
         decision = evaluate_market(
             now=now,
             snapshot=snap,
             prices=tariff,
             settings=self.settings,
             import_points=import_points,
+            boiler_thermal=boiler_thermal,
         ).as_dict()
 
         learning = self.machine_learning.view()
@@ -1284,6 +1470,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 duration_hours=(float(duration_s) / 3600.0) if isinstance(duration_s, (int, float)) and duration_s > 0 else None,
                 energy_kwh=(float(energy_wh) / 1000.0) if isinstance(energy_wh, (int, float)) and energy_wh > 0 else None,
                 active=bool(cycle.get("protected", False)),
+                market_decision=decision,
             )
             recommendations[machine.machine_id]["name"] = machine.name
             recommendations[machine.machine_id]["profile_cycles"] = int(profile.get("total_cycles", 0) or 0)
@@ -1292,6 +1479,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         worst_export = min(export_points, key=lambda p: p.price) if export_points else None
         return {
             "decision": decision,
+            "boiler_thermal": boiler_thermal,
             "machines": recommendations,
             "forecast": {
                 "import_points": len(import_points),
@@ -1306,6 +1494,109 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             },
         }
 
+
+    def _apply_dynamic_boiler_arbitrage(
+        self, snapshot: EnergySnapshot, intent: BoilerIntent, economic_view: dict[str, Any]
+    ) -> BoilerIntent:
+        """Applique l'arbitrage Day-Ahead au Boiler, uniquement en mode DYNAMIQUE.
+
+        Les sécurités CORE et les overrides utilisateur sont traités avant cet
+        appel. Lorsque le kill-switch prédictif est coupé ou que le moteur est en
+        repli standard, l'intention historique est restituée sans modification.
+        """
+        if str(self.settings.get("mode")) != MODE_DYNAMIC:
+            return intent
+        if str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC:
+            return intent
+        if not bool(self.settings.get("predictive_pricing_enabled", True)):
+            return intent
+        decision = dict(economic_view.get("decision", {}) or {})
+        if bool(decision.get("dynamic_fallback")) or not decision.get("dynamic_price_band"):
+            return intent
+        if intent.origin in {"SECURITE", "UTILISATEUR"}:
+            return intent
+
+        normal = float(self.settings.get("boiler_temp_normal_c", 45.0))
+        minimum = float(self.settings.get("boiler_temp_start_c", 43.0))
+        element_w = float((economic_view.get("boiler_thermal") or {}).get("element_power_w") or self.settings.get("boiler_power_w", 1800.0))
+        band = str(decision.get("dynamic_price_band"))
+        index = decision.get("dynamic_price_index")
+        current_buy = decision.get("current_buy_eur_kwh")
+        negative_threshold = float(self.settings.get("dynamic_grid_charge_threshold_eur_kwh", 0.0))
+        negative_enabled = bool(self.settings.get("dynamic_negative_price_charge_enabled", True))
+        negative_price = isinstance(current_buy, (int, float)) and float(current_buy) < negative_threshold
+
+        # Confort ECS minimum : priorité absolue, même en haut de courbe.
+        if snapshot.boiler_temp_c < minimum:
+            return BoilerIntent(
+                BOILER_HEAT_45,
+                f"Dynamique Day-Ahead : confort ECS prioritaire ({snapshot.boiler_temp_c:.1f} °C < {minimum:.1f} °C), indice={index}.",
+                "DYNAMIC_ECS_PRIORITE",
+            )
+
+        # Compatibilité V1.6.156 : le réglage historique « charge réseau si
+        # prix dynamique négatif » reste souverain dans le régime dynamique.
+        # S'il est autorisé, on conserve l'intention historique (y compris le
+        # stockage 65 °C). S'il est interdit, un prix négatif ne peut pas, à lui
+        # seul, provoquer une charge réseau via la nouvelle réservation Day-Ahead.
+        if negative_price and negative_enabled and intent.origin == "PRIX_NEGATIF_RESEAU":
+            return intent
+
+        if snapshot.boiler_temp_c >= normal:
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique Day-Ahead : température ECS de confort atteinte.",
+                "DYNAMIC_DAY_AHEAD",
+            )
+
+        if negative_price and not negative_enabled:
+            if snapshot.export_w >= max(element_w, 1.0):
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Prix dynamique sous le seuil mais charge réseau négative désactivée : surplus local {snapshot.export_w:.0f} W suffisant pour la résistance {element_w:.0f} W.",
+                    "DYNAMIC_SURPLUS_STRICT",
+                )
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Prix dynamique sous le seuil mais charge réseau négative désactivée : attente sans prélèvement réseau.",
+                "DYNAMIC_NEGATIVE_DISABLED",
+            )
+
+        if bool(decision.get("boiler_charge_now")):
+            return BoilerIntent(
+                BOILER_HEAT_45,
+                f"Dynamique Day-Ahead : créneau Boiler réservé actif (indice={index}, plage={band}).",
+                "DYNAMIC_RESERVATION",
+            )
+
+        if band == "MEDIAN":
+            if snapshot.export_w >= max(element_w, 1.0):
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Dynamique médiane : surplus local {snapshot.export_w:.0f} W couvre la résistance {element_w:.0f} W.",
+                    "DYNAMIC_SURPLUS_STRICT",
+                )
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique médiane : surplus insuffisant, aucune charge réseau du Boiler.",
+                "DYNAMIC_SURPLUS_STRICT",
+            )
+
+        if band == "HAUT":
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                f"Dynamique Day-Ahead : haut de courbe (indice={index}), charge réseau Boiler interdite hors confort minimum.",
+                "DYNAMIC_PRIX_HAUT",
+            )
+
+        # Bas de courbe mais hors bloc réservé : attendre le bloc le moins cher.
+        if band == "BAS":
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique Day-Ahead : bas de courbe mais hors créneau Boiler réservé, attente du bloc optimal.",
+                "DYNAMIC_RESERVATION",
+            )
+        return intent
 
     def _set_core_phase(self, phase: str, reason: str = "") -> None:
         valid = {PHASE_ACQUISITION, PHASE_DECISION, PHASE_WAIT_ACK}
@@ -1385,6 +1676,22 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                 "Régime tarifaire quitté : arrêt de la charge financière dynamique en cours.",
                                 "PRIX_BLOQUE",
                             )
+
+        if key in {"predictive_pricing_enabled", "solar_forecast_arbitrage"}:
+            # Kill-switches dédiés au régime dynamique : aucun effet sur HP/HC.
+            if (
+                str(self.settings.get("mode")) == MODE_DYNAMIC
+                and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
+            ):
+                self.reset_core(f"Option dynamique {key}={bool(value)} : nouvelle acquisition demandée.")
+                if str(self.settings.get("mode")) != MODE_MANUAL:
+                    await self.async_reconcile_machines()
+
+        if key == "persistent_status_notification_enabled" and not bool(value):
+            persistent_notification.async_dismiss(
+                self.hass, f"foxcat_energy_status_{self.entry.entry_id}"
+            )
+            self._status_notification_last_signature = None
 
         await self._async_save()
 
@@ -1812,6 +2119,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if mode == MODE_MANUAL:
                 self.reset_core("Mode Manuel : stratégies automatiques en sommeil, sécurités actives.")
                 return
+            tariff_context = self.prices()
+            solar_for_mode = self.solar_forecast
+            if (
+                mode == MODE_DYNAMIC
+                and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
+                and not bool(self.settings.get("solar_forecast_arbitrage", True))
+            ):
+                # Le kill-switch neutralise uniquement l'influence de la prévision
+                # solaire sur l'arbitrage DYNAMIQUE; la télémétrie IA reste intacte.
+                solar_for_mode = SolarForecast()
             intent = evaluate_mode(
                 mode,
                 snapshot,
@@ -1820,9 +2137,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 dt_util.now(),
                 self._boiler_on_seconds(),
                 str(self.core_state.get("boiler_demand", BOILER_NONE)),
-                self.prices(),
-                self.solar_forecast,
+                tariff_context,
+                solar_for_mode,
             )
+            if mode == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC:
+                intent = self._apply_dynamic_boiler_arbitrage(
+                    snapshot, intent, self._economic_view(snapshot, prices=tariff_context)
+                )
 
         if (
             intent.origin != "UTILISATEUR"
@@ -2863,12 +3184,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self._update_pri_pv_comparator(snapshot, current)
         policy = str(self.settings.get("network_policy", NETWORK_POLICY_COMPENSATION))
+        tariff_context = self.prices()
         decision = self.inverter_core.decide(
             snapshot,
             current,
             self.settings,
             policy,
             self.energy_bus.view(),
+            tariff_regime=str(tariff_context.get("regime")),
+            dynamic_export_value_eur_kwh=(
+                float(tariff_context["export_value"])
+                if isinstance(tariff_context.get("export_value"), (int, float))
+                else None
+            ),
         )
 
         target = max(0, min(100, int(decision.target_level)))
@@ -3091,6 +3419,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         self.pri_state["code"] = rrcr_code
         prices = self.prices()
         economic = self._economic_view(snap, prices=prices)
+        financial = self._financial_status_view({"economic": economic})
         return {
             "snapshot": snap,
             "settings": dict(self.settings),
@@ -3103,6 +3432,15 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "solar": self.solar_forecast,
             "prices": prices,
             "economic": economic,
+            "boiler_thermal": self._boiler_thermal_view(snap),
+            "status_summary": {
+                "mode": self.settings.get("mode", MODE_ECO),
+                "network_policy": self.settings.get("network_policy", NETWORK_POLICY_COMPENSATION),
+                "financial_status": financial["status"],
+                "financial_detail": financial["detail"],
+                "financial_code": financial["code"],
+                "economic_decision": economic.get("decision", {}).get("label", "Indisponible"),
+            },
             "accounting": self.accounting.view(),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),

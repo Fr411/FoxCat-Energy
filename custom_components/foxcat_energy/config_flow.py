@@ -15,6 +15,9 @@ from .const import (
     CONF_BOILER_BINARY,
     CONF_BOILER_CLIMATE,
     CONF_BOILER_POWER_SENSOR,
+    CONF_BOILER_VOLUME,
+    CONF_BOILER_ELEMENT_POWER,
+    CONF_BOILER_COLD_WATER_TEMP,
     CONF_BOILER_RESISTANCE_TEMP_SENSOR,
     CONF_BOILER_TEMP_SENSOR,
     CONF_DISHWASHER_CYCLE,
@@ -164,6 +167,24 @@ def _boiler_schema() -> vol.Schema:
             _required(CONF_BOILER_TEMP_SENSOR, "sensor.garage_boiler_sonde_temperature_temperature"): _entity("sensor"),
             _optional(CONF_BOILER_RESISTANCE_TEMP_SENSOR): _entity("sensor"),
             _required(CONF_BOILER_POWER_SENSOR, "sensor.boiler_puissance"): _entity("sensor"),
+            vol.Optional(CONF_BOILER_VOLUME, default=250.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=20, max=2000, step=10, unit_of_measurement="L",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(CONF_BOILER_ELEMENT_POWER, default=1800.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=100, max=15000, step=50, unit_of_measurement="W",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(CONF_BOILER_COLD_WATER_TEMP, default=15.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=35, step=0.5, unit_of_measurement="°C",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
             _required(CONF_BOILER_BINARY, "binary_sensor.boiler"): _entity("binary_sensor"),
         }
     )

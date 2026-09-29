@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.6.155"
+VERSION = "1.6.157"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "button"]
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
@@ -49,6 +49,9 @@ CONF_BOILER_CLIMATE = "boiler_climate"
 CONF_BOILER_TEMP_SENSOR = "boiler_temp_sensor"
 CONF_BOILER_RESISTANCE_TEMP_SENSOR = "boiler_resistance_temp_sensor"
 CONF_BOILER_POWER_SENSOR = "boiler_power_sensor"
+CONF_BOILER_VOLUME = "boiler_volume"
+CONF_BOILER_ELEMENT_POWER = "boiler_element_power"
+CONF_BOILER_COLD_WATER_TEMP = "boiler_cold_water_temp"
 CONF_INVERTER_POWER_SENSOR = "inverter_power_sensor"
 CONF_BOILER_BINARY = "boiler_binary"
 CONF_PRI_L1 = "pri_l1"
@@ -95,6 +98,12 @@ CONF_PRICE_FORECAST_EXPORT = "price_forecast_export"
 CONF_DYNAMIC_EXPORT_SIGN_CONVENTION = "dynamic_export_sign_convention"
 DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE = "negative_is_revenue"
 DYNAMIC_EXPORT_POSITIVE_IS_REVENUE = "positive_is_revenue"
+
+# Arbitrage dynamique Day-Ahead. Ces constantes ne s'appliquent jamais aux
+# régimes HP/HC ou fixes.
+DYNAMIC_ARBITRAGE_HORIZON_HOURS = 24
+DYNAMIC_POSITION_LOW = 0.35
+DYNAMIC_POSITION_HIGH = 0.70
 
 # Configuration des plages tarifaires fixes / compensation.
 CONF_TARIFF_HP_START_1 = "tariff_hp_start_1"
@@ -196,6 +205,9 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "solar_advisor_enabled": True,
     "dynamic_negative_price_charge_enabled": True,
     "economic_optimizer_enabled": True,
+    "predictive_pricing_enabled": True,
+    "solar_forecast_arbitrage": True,
+    "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
     "tariff_regime": TARIFF_TOU,
     "network_policy": NETWORK_POLICY_COMPENSATION,
@@ -338,6 +350,9 @@ SWITCH_DEFINITIONS = {
     "solar_advisor_enabled": ("Analyse prédictive IA", "mdi:brain"),
     "dynamic_negative_price_charge_enabled": ("Charge réseau si prix dynamique négatif", "mdi:transmission-tower-import"),
     "economic_optimizer_enabled": ("Optimisation économique des charges flexibles", "mdi:finance"),
+    "predictive_pricing_enabled": ("Prédictif prix dynamique", "mdi:chart-timeline-variant-shimmer"),
+    "solar_forecast_arbitrage": ("Arbitrage prévision solaire", "mdi:weather-sunny-clock"),
+    "persistent_status_notification_enabled": ("Résumé EMS persistant", "mdi:bell-badge-outline"),
     "high_load_shed_enabled": ("Délestage haute consommation", "mdi:home-lightning-bolt-outline"),
 }
 
