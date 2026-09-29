@@ -26,20 +26,26 @@
       },
       "boiler": {
         "title": "FoxCat Energy – 2/7 • Boiler",
-        "description": "Associez le chauffe-eau et ses mesures. La température de référence sert à la régulation ECS; la température Résistance devient la sécurité thermique prioritaire lorsqu’elle est configurée.",
+        "description": "Configuration physique et sécurité du Boiler. Les paramètres volume/puissance/eau froide calibrent uniquement l’arbitrage tarifaire DYNAMIQUE. La sécurité Résistance à 68 °C reste souveraine.",
         "data": {
           "boiler_climate": "Thermostat du boiler",
           "boiler_temp_sensor": "Température de référence du boiler",
           "boiler_power_sensor": "Puissance du boiler",
           "boiler_binary": "État physique du boiler",
-          "boiler_resistance_temp_sensor": "Température Résistance / sécurité"
+          "boiler_resistance_temp_sensor": "Température Résistance / sécurité",
+          "boiler_volume": "Volume du Boiler (L)",
+          "boiler_element_power": "Puissance nominale de la résistance (W)",
+          "boiler_cold_water_temp": "Température eau froide réseau (°C)"
         },
         "data_description": {
           "boiler_climate": "Entité climate réellement commandée par FoxCat.",
           "boiler_temp_sensor": "Température d’eau de référence utilisée pour la régulation normale du Boiler.",
           "boiler_resistance_temp_sensor": "Sonde placée sur ou au plus près de la résistance. Au-delà du seuil de sécurité FoxCat (68 °C par défaut), toute chauffe est interdite et un arrêt est demandé.",
           "boiler_power_sensor": "Puissance électrique instantanée du Boiler, utilisée pour confirmer son état physique et la comptabilité énergétique.",
-          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible."
+          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible.",
+          "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
+          "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
+          "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
         }
       },
       "pri": {
@@ -208,20 +214,26 @@
       },
       "boiler": {
         "title": "Boiler • Capteurs et sécurité",
-        "description": "Configuration physique du chauffe-eau. La sonde Résistance, lorsqu’elle est configurée, est prioritaire pour la sécurité thermique. Enregistrer ramène au menu principal.",
+        "description": "Configuration physique et sécurité du Boiler. Les paramètres volume/puissance/eau froide calibrent uniquement l’arbitrage tarifaire DYNAMIQUE. La sécurité Résistance à 68 °C reste souveraine.",
         "data": {
           "boiler_climate": "Thermostat du boiler",
           "boiler_temp_sensor": "Température de référence du boiler",
           "boiler_power_sensor": "Puissance du boiler",
           "boiler_binary": "État physique du boiler",
-          "boiler_resistance_temp_sensor": "Température Résistance / sécurité"
+          "boiler_resistance_temp_sensor": "Température Résistance / sécurité",
+          "boiler_volume": "Volume du Boiler (L)",
+          "boiler_element_power": "Puissance nominale de la résistance (W)",
+          "boiler_cold_water_temp": "Température eau froide réseau (°C)"
         },
         "data_description": {
           "boiler_climate": "Entité climate réellement commandée par FoxCat.",
           "boiler_temp_sensor": "Température d’eau de référence utilisée pour la régulation normale du Boiler.",
           "boiler_resistance_temp_sensor": "Sonde placée sur ou au plus près de la résistance. Au-delà du seuil de sécurité FoxCat (68 °C par défaut), toute chauffe est interdite et un arrêt est demandé.",
           "boiler_power_sensor": "Puissance électrique instantanée du Boiler, utilisée pour confirmer son état physique et la comptabilité énergétique.",
-          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible."
+          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible.",
+          "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
+          "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
+          "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
         }
       },
       "pri": {
@@ -445,7 +457,7 @@
       },
       "pricing_dynamic": {
         "title": "Tarification dynamique",
-        "description": "Prix actuels, prochains et séries futures utilisés par le comparateur économique. Enregistrer ramène au menu Tarification.",
+        "description": "Tarification dynamique Day-Ahead. FoxCat positionne le prix actuel sur l’horizon 24 h et réserve les blocs les moins chers pour les besoins thermiques du Boiler.",
         "data": {
           "price_current": "Prix dynamique actuel",
           "price_next": "Prix dynamique heure suivante",

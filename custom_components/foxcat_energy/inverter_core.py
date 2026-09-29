@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .const import TARIFF_DYNAMIC
+
 NETWORK_COMPENSATION = "Compensation"
 NETWORK_BILLED_EXPORT = "Injection facturée"
 
@@ -79,6 +81,9 @@ class InverterCore:
         settings: dict[str, Any],
         network_policy: str,
         bus_state: dict[str, Any] | None = None,
+        *,
+        tariff_regime: str | None = None,
+        dynamic_export_value_eur_kwh: float | None = None,
     ) -> InverterDecision:
         inverter_w = max(float(settings.get("inverter_power_w", 4000.0)), 1.0)
         step_pct = max(int(round(float(settings.get("pri_step_percent", 10.0)))), 10)
@@ -108,6 +113,29 @@ class InverterCore:
                 limit_w, ratio, pv_at_limit, more_possible, max_solar,
             )
 
+        # DYNAMIQUE uniquement : la valeur économique normalisée de l'export
+        # remplace le simple état binaire « Injection facturée ». Une valeur
+        # positive signifie une recette pour l'utilisateur; une valeur négative
+        # signifie qu'il paie pour injecter. Le kill-switch permet un repli
+        # immédiat sur le comportement prédictif historique.
+        if (
+            tariff_regime == TARIFF_DYNAMIC
+            and bool(settings.get("predictive_pricing_enabled", True))
+            and dynamic_export_value_eur_kwh is not None
+            and dynamic_export_value_eur_kwh > 0.0
+        ):
+            target = 100
+            return InverterDecision(
+                current, target,
+                "LIBERATION" if target > current else "MAINTIEN",
+                f"Dynamique : export valorisé à {dynamic_export_value_eur_kwh:.4f} €/kWh, PRI libéré à 100 %.",
+                limit_w, ratio, pv_at_limit, more_possible, max_solar,
+            )
+
+        # Si la valeur dynamique d'export est négative, ou si elle est nulle/
+        # indisponible, le moteur prédictif ci-dessous conserve sa cible locale
+        # de quasi-zéro injection. Les régimes non dynamiques passent également
+        # exactement par ce chemin historique.
         # Injection facturée : calcul prédictif du meilleur palier.
         export_limit = max(float(settings.get("network_billed_export_max_w", 50.0)), 0.0)
         import_target = max(float(settings.get("network_billed_import_target_w", 100.0)), 0.0)

@@ -63,6 +63,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "temperature_resistance_boiler", "Température résistance de sécurité", "mdi:thermometer-alert", "boiler", lambda d: d["snapshot"].raw.get("boiler_resistance_temp_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
         FoxCatValueSensor(c, "source_securite_thermique_boiler", "Source sécurité thermique", "mdi:shield-thermometer-outline", "boiler", lambda d: d["snapshot"].raw.get("boiler_safety_source", "REFERENCE")),
         FoxCatNumericSensor(c, "puissance_boiler", "Puissance chauffe-eau", "mdi:water-boiler", "boiler", lambda d: d["snapshot"].boiler_power_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
+        FoxCatNumericSensor(c, "boiler_volume", "Boiler • Volume", "mdi:water-boiler", "boiler", lambda d: d.get("boiler_thermal", {}).get("volume_l"), "L", suggested_object_id="foxcat_boiler_volume"),
+        FoxCatNumericSensor(c, "boiler_puissance_resistance", "Boiler • Puissance nominale résistance", "mdi:flash", "boiler", lambda d: d.get("boiler_thermal", {}).get("element_power_w"), UnitOfPower.WATT, SensorDeviceClass.POWER, suggested_object_id="foxcat_boiler_puissance_resistance"),
+        FoxCatNumericSensor(c, "boiler_temperature_eau_froide", "Boiler • Température eau froide réseau", "mdi:coolant-temperature", "boiler", lambda d: d.get("boiler_thermal", {}).get("cold_water_temp_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, suggested_object_id="foxcat_boiler_temperature_eau_froide"),
+        FoxCatNumericSensor(c, "boiler_energie_thermique_manquante", "Boiler • Énergie thermique manquante", "mdi:water-thermometer-outline", "boiler", lambda d: d.get("boiler_thermal", {}).get("energy_missing_kwh"), UnitOfEnergy.KILO_WATT_HOUR, suggested_object_id="foxcat_boiler_energie_thermique_manquante"),
+        FoxCatNumericSensor(c, "boiler_duree_chauffe_estimee", "Boiler • Durée de chauffe estimée", "mdi:timer-heat-outline", "boiler", lambda d: d.get("boiler_thermal", {}).get("heating_duration_h"), "h", suggested_object_id="foxcat_boiler_duree_chauffe_estimee"),
+        FoxCatNumericSensor(c, "boiler_capacite_thermique_confort", "Boiler • Capacité thermique confort", "mdi:water-boiler-auto", "boiler", lambda d: d.get("boiler_thermal", {}).get("thermal_capacity_comfort_kwh"), UnitOfEnergy.KILO_WATT_HOUR, suggested_object_id="foxcat_boiler_capacite_thermique_confort"),
         FoxCatNumericSensor(c, "puissance_onduleur_snapshot", "Puissance onduleur au dernier snapshot", "mdi:solar-power", "pri", lambda d: d["snapshot"].inverter_power_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "pri_niveau_actuel", "Niveau de puissance PRI actuel", "mdi:solar-power-variant", "pri", lambda d: d["pri"]["current_level"], PERCENTAGE),
         FoxCatNumericSensor(c, "pri_niveau_cible", "Niveau de puissance PRI cible", "mdi:target", "pri", lambda d: d["pri"]["target_level"], PERCENTAGE),
@@ -111,6 +117,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "valeur_reinjection_instantanee", "Valeur instantanée de la réinjection", "mdi:cash-plus", "pricing", lambda d: d["prices"].get("export_value_rate_eur_h"), "€/h"),
         FoxCatNumericSensor(c, "solde_reseau_instantane", "Solde financier instantané réseau", "mdi:scale-balance", "pricing", lambda d: d["prices"].get("net_cost_rate_eur_h"), "€/h"),
         FoxCatEconomicDecisionSensor(c),
+        FoxCatValueSensor(c, "etat_financier_ems", "État financier EMS", "mdi:finance", "pricing", lambda d: d.get("status_summary", {}).get("financial_status", "Indéterminé")),
+        FoxCatValueSensor(c, "detail_financier_ems", "Détail financier EMS", "mdi:text-box-search-outline", "pricing", lambda d: d.get("status_summary", {}).get("financial_detail", "Indisponible")),
         FoxCatNumericSensor(c, "economique_meilleur_prix_futur", "Meilleur prix d'achat futur", "mdi:cash-clock", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("best_future_buy_eur_kwh"), "€/kWh"),
         FoxCatNumericSensor(c, "economique_economie_potentielle", "Économie potentielle en reportant", "mdi:piggy-bank-outline", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("saving_vs_now_eur_kwh"), "€/kWh"),
         FoxCatValueSensor(c, "economique_meilleur_creneau", "Meilleur créneau économique", "mdi:calendar-clock", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("best_future_at") or "Maintenant"),
@@ -253,6 +261,18 @@ class FoxCatEconomicDecisionSensor(FoxCatEntity, SensorEntity):
             "horizon_heures": decision.get("horizon_hours"),
             "points_prix": decision.get("forecast_points"),
             "application": decision.get("application"),
+            "indice_tarifaire_relatif": decision.get("dynamic_price_index"),
+            "plage_tarifaire_dynamique": decision.get("dynamic_price_band"),
+            "prix_min_day_ahead_eur_kwh": decision.get("dynamic_price_min_eur_kwh"),
+            "prix_max_day_ahead_eur_kwh": decision.get("dynamic_price_max_eur_kwh"),
+            "boiler_energie_manquante_kwh": decision.get("boiler_energy_missing_kwh"),
+            "boiler_duree_chauffe_h": decision.get("boiler_heating_duration_h"),
+            "boiler_creneau_reserve_debut": decision.get("boiler_reserved_start"),
+            "boiler_creneau_reserve_fin": decision.get("boiler_reserved_end"),
+            "boiler_prix_moyen_creneau_eur_kwh": decision.get("boiler_reserved_avg_price_eur_kwh"),
+            "boiler_charge_maintenant": decision.get("boiler_charge_now"),
+            "priorite_confort_ecs": decision.get("boiler_comfort_priority"),
+            "repli_dynamique_standard": decision.get("dynamic_fallback"),
             "prevision": economic.get("forecast", {}),
             "machines": economic.get("machines", {}),
         }
@@ -306,8 +326,10 @@ class FoxCatValueSensor(FoxCatEntity, SensorEntity):
 class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], unit: str | None = None, device_class=None, state_class=None, device_name: str | None = None, device_identifier: str | None = None):
+    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], unit: str | None = None, device_class=None, state_class=None, device_name: str | None = None, device_identifier: str | None = None, suggested_object_id: str | None = None):
         super().__init__(coordinator, key, name, icon, device)
+        if suggested_object_id:
+            self._attr_suggested_object_id = suggested_object_id
         self._getter = getter
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class

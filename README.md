@@ -2,11 +2,26 @@
 
 **EMS local pour Home Assistant — énergie, onduleur, Boiler, machines, tarification et optimisation économique.**
 
-Version actuelle : **1.6.155**  
-Base de développement : **1.6.153**  
+Version actuelle : **1.6.157**  
+Base de développement : **1.6.156 Professional**  
 Fonctionnement : **100 % local dans Home Assistant**
 
 ---
+
+
+## V1.6.157 — Arbitrage dynamique Day-Ahead & modèle thermique Boiler
+
+Cette version ne modifie que le comportement du régime **Dynamique**. Les chemins HP/HC et fixe restent sur leur logique validée.
+
+- Modèle thermique Boiler configurable : volume, puissance de résistance et température d’eau froide.
+- Calcul de l’énergie thermique manquante et de la durée de chauffe estimée.
+- Arbitrage Day-Ahead 24 h par indice relatif : bas `< 0,35`, médiane `0,35–0,70`, haut `> 0,70`.
+- Réservation des blocs horaires consécutifs les moins chers pour le confort ECS.
+- Prix d’export dynamique signé : export valorisé `> 0` libère le PRI à 100 %, export coûteux `< 0` conserve le bridage vers zéro injection.
+- Deux kill-switches dédiés : prédictif prix dynamique et arbitrage prévision solaire.
+- Le réglage historique « Charge réseau si prix dynamique négatif » est conservé : désactivé, un prix négatif ne suffit jamais à provoquer une charge réseau du Boiler; activé, le comportement de stockage négatif historique reste disponible.
+- Une réservation Boiler n'autorise une charge réseau que dans le bas de courbe; en médiane le surplus local reste obligatoire, et en haut de courbe la charge réseau reste interdite hors confort ECS minimal.
+- Sécurité Résistance 68 °C, cycles machines protégés et priorité ECS minimale inchangés/sanctuarisés.
 
 ## 1. Présentation
 
@@ -172,7 +187,35 @@ Cette collecte est **strictement passive** dans la branche actuelle et ne modifi
 
 ---
 
-## 8. Registre FoxCat
+
+## 8. Notification persistante EMS
+
+FoxCat peut maintenant maintenir une **notification persistante unique** dans Home Assistant. Elle est mise à jour sous le même identifiant et ne crée donc pas une nouvelle notification à chaque trame.
+
+Le résumé contient :
+
+- le **mode EMS** actif ;
+- la **politique réseau** : Compensation ou Injection facturée ;
+- l'**état financier EMS** ;
+- la décision économique courante ;
+- le régime et la période tarifaire ;
+- le prix d'achat actuel ;
+- la valeur de réinjection ;
+- le coût net réseau du jour.
+
+Le switch **Résumé EMS persistant** permet de désactiver cette fonction. Lorsqu'il est coupé, FoxCat supprime immédiatement sa notification persistante.
+
+L'état financier est également exposé comme capteur afin d'être réutilisable dans le dashboard :
+
+- `pricing.financial_status` ;
+- `pricing.financial_detail` ;
+- `ems.persistent_status_notification`.
+
+Cette fonction est purement informative : elle ne modifie ni EMS Core, ni Onduleur Core, ni Energy Bus, ni les décisions économiques.
+
+---
+
+## 9. Registre FoxCat
 
 Le dashboard et les composants doivent utiliser des rôles sémantiques plutôt que des `entity_id` FoxCat écrits en dur.
 
@@ -193,7 +236,7 @@ Les entités natives sont résolues par leur `unique_id` Home Assistant. Les sou
 
 ---
 
-## 9. Installation
+## 10. Installation
 
 ### HACS / dépôt personnalisé
 
@@ -219,7 +262,7 @@ Après une mise à jour importante, ouvrir **Configurer** et vérifier les nouve
 
 ---
 
-## 10. Principes de sécurité et de stabilité
+## 11. Principes de sécurité et de stabilité
 
 - La puissance réseau signée reste souveraine pour le cadencement des cœurs.
 - Une mesure PV, Boiler ou Onduleur plus rapide ne devient pas automatiquement une seconde horloge.
@@ -231,6 +274,16 @@ Après une mise à jour importante, ouvrir **Configurer** et vérifier les nouve
 ---
 
 # Historique des versions
+
+## 1.6.156 — Résumé EMS persistant et état financier
+
+- Ajout d'une **notification persistante FoxCat unique**, remplacée en place au lieu de créer du spam.
+- Affichage du mode EMS, de la politique réseau, de l'état financier, de la décision économique, du tarif courant, de la valeur de réinjection et du coût net du jour.
+- Ajout du switch **Résumé EMS persistant** pour activer/désactiver cette fonction.
+- Ajout des capteurs **État financier EMS** et **Détail financier EMS**.
+- Ajout des rôles de registre `pricing.financial_status`, `pricing.financial_detail` et `ems.persistent_status_notification`.
+- Fonction purement informative : aucun changement du PRI, d'InverterCore, d'Energy Bus, du Machine Learning ou de l'algorithme économique.
+- Audit anti-régression : **337 → 342 fonctions/méthodes, 5 ajoutées, 0 supprimée**.
 
 ## 1.6.155 — Fin solaire sans bascule automatique en ECS solaire
 
