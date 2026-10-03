@@ -41,6 +41,7 @@ from .const import (
     CONF_PRICE_MIN_TODAY,
     CONF_PRICE_MIN_TOMORROW,
     CONF_PRICE_NEXT,
+    CONF_PRICE_TOMORROW_AVAILABLE,
     CONF_PRICE_FORECAST_IMPORT,
     CONF_PRICE_FORECAST_EXPORT,
     CONF_PRI_L1,
@@ -227,11 +228,16 @@ _native("pricing.period", "Tarification", "periode_tarifaire")
 _native("pricing.status", "Tarification", "statut_prix")
 _native("pricing.active_buy", "Tarification", "prix_achat_actif")
 _native("pricing.next_buy", "Tarification", "prix_achat_suivant")
+_native("pricing.dynamic_curve_position", "Tarification", "position_courbe_dynamique")
+_native("pricing.dynamic_curve_rank", "Tarification", "rang_courbe_dynamique")
+_native("pricing.dynamic_curve_trend", "Tarification", "tendance_courbe_dynamique")
 _native("pricing.active_label", "Tarification", "libelle_prix_actif")
 _native("pricing.next_label", "Tarification", "libelle_prix_suivant")
 _native("pricing.export_sign_convention", "Tarification", "convention_prix_reinjection")
 _native("pricing.cost_today", "Tarification", "bilan_cout_reseau_jour")
 _native("pricing.export_value_today", "Tarification", "bilan_valeur_injection_jour")
+_native("pricing.export_revenue_today", "Tarification", "bilan_revenu_injection_jour")
+_native("pricing.export_cost_today", "Tarification", "bilan_cout_injection_jour")
 _native("pricing.net_today", "Tarification", "bilan_cout_net_jour")
 _native("pricing.solar_gain_today", "Tarification", "bilan_gain_solaire_jour")
 _native("pricing.economic_decision", "Tarification", "decision_economique_ems")
@@ -242,20 +248,39 @@ _native("pricing.financial_detail", "Tarification", "detail_financier_ems")
 _native("pricing.economic_best_future", "Tarification", "economique_meilleur_prix_futur")
 _native("pricing.economic_best_slot", "Tarification", "economique_meilleur_creneau")
 _native("pricing.economic_saving", "Tarification", "economique_economie_potentielle")
-_config("pricing.source.current", "Tarification", CONF_PRICE_CURRENT, "sensor.luminus_luminus_comfyflex_wallonia_prix_actuel")
-_config("pricing.source.next", "Tarification", CONF_PRICE_NEXT)
-_config("pricing.source.injection", "Tarification", CONF_PRICE_INJECTION)
-_config("pricing.source.min_today", "Tarification", CONF_PRICE_MIN_TODAY)
-_config("pricing.source.max_today", "Tarification", CONF_PRICE_MAX_TODAY)
-_config("pricing.source.avg_today", "Tarification", CONF_PRICE_AVG_TODAY)
-_config("pricing.source.min_tomorrow", "Tarification", CONF_PRICE_MIN_TOMORROW)
-_config("pricing.source.max_tomorrow", "Tarification", CONF_PRICE_MAX_TOMORROW)
-_config("pricing.source.avg_tomorrow", "Tarification", CONF_PRICE_AVG_TOMORROW)
-_config("pricing.source.hp", "Tarification", CONF_TARIFF_HP_PRICE_SENSOR)
-_config("pricing.source.hc", "Tarification", CONF_TARIFF_HC_PRICE_SENSOR)
-_config("pricing.source.fixed_injection", "Tarification", CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR)
+# V1.6.159 — Day-Ahead Dynamic uniquement.
+_native("pricing.day_ahead.threshold", "Tarification", "dynamic_favorable_position_pct")
+_native("pricing.day_ahead.peak_threshold", "Tarification", "dynamic_high_position_pct")
+_native("pricing.day_ahead.favorable", "Tarification", "fenetre_prix_favorable_day_ahead")
+_native("pricing.day_ahead.plan", "Tarification", "day_ahead_plan")
+_native("pricing.day_ahead.next_valley", "Tarification", "day_ahead_prochain_creux")
+_native("pricing.day_ahead.next_peak", "Tarification", "day_ahead_prochain_pic")
+_native("pricing.day_ahead.horizon", "Tarification", "day_ahead_horizon")
+_native("accounting.dynamic.import_today", "Tarification", "bilan_dynamic_import_jour")
+_native("accounting.dynamic.export_today", "Tarification", "bilan_dynamic_export_jour")
+_native("accounting.dynamic.import_cost_today", "Tarification", "bilan_dynamic_cout_achat_jour")
+_native("accounting.dynamic.export_revenue_today", "Tarification", "bilan_dynamic_revenu_injection_jour")
+_native("accounting.dynamic.export_cost_today", "Tarification", "bilan_dynamic_cout_injection_jour")
+_native("accounting.dynamic.net_cost_today", "Tarification", "bilan_dynamic_cout_net_jour")
+_native("accounting.hphc.hp.import_today", "Tarification", "bilan_hp_import_jour")
+_native("accounting.hphc.hp.export_today", "Tarification", "bilan_hp_export_jour")
+_native("accounting.hphc.hc.import_today", "Tarification", "bilan_hc_import_jour")
+_native("accounting.hphc.hc.export_today", "Tarification", "bilan_hc_export_jour")
+_config("pricing.source.current", "Tarification", CONF_PRICE_CURRENT, "sensor.luminus_luminus_dynamic_wallonia_prix_actuel")
+_config("pricing.source.next", "Tarification", CONF_PRICE_NEXT, "sensor.luminus_luminus_dynamic_wallonia_prix_heure_suivante")
+_config("pricing.source.injection", "Tarification", CONF_PRICE_INJECTION, "sensor.luminus_luminus_dynamic_wallonia_prix_d_injection")
+_config("pricing.source.min_today", "Tarification", CONF_PRICE_MIN_TODAY, "sensor.luminus_luminus_dynamic_wallonia_minimum_aujourd_hui")
+_config("pricing.source.max_today", "Tarification", CONF_PRICE_MAX_TODAY, "sensor.luminus_luminus_dynamic_wallonia_maximum_aujourd_hui")
+_config("pricing.source.avg_today", "Tarification", CONF_PRICE_AVG_TODAY, "sensor.luminus_luminus_dynamic_wallonia_moyenne_aujourd_hui")
+_config("pricing.source.min_tomorrow", "Tarification", CONF_PRICE_MIN_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_minimum_demain")
+_config("pricing.source.max_tomorrow", "Tarification", CONF_PRICE_MAX_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_maximum_demain")
+_config("pricing.source.avg_tomorrow", "Tarification", CONF_PRICE_AVG_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_moyenne_demain")
+_config("pricing.source.hp", "Tarification", CONF_TARIFF_HP_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_pleines_jour")
+_config("pricing.source.hc", "Tarification", CONF_TARIFF_HC_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_creuses_nuit")
+_config("pricing.source.fixed_injection", "Tarification", CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_d_injection")
 _config("pricing.source.forecast_import", "Tarification", CONF_PRICE_FORECAST_IMPORT)
 _config("pricing.source.forecast_export", "Tarification", CONF_PRICE_FORECAST_EXPORT)
+_config("pricing.source.tomorrow_available", "Tarification", CONF_PRICE_TOMORROW_AVAILABLE, "binary_sensor.luminus_luminus_dynamic_wallonia_prix_de_demain_disponibles")
 
 # Métronome
 _native("metronome.status", "Métronome", "metronome_statut")
@@ -486,6 +511,9 @@ def resolve_registry(
                 resolved[f"machines.{machine.machine_id}.user_start"] = native[start_key]
             if native.get(stop_key):
                 resolved[f"machines.{machine.machine_id}.user_stop"] = native[stop_key]
+            day_ahead_key = f"day_ahead_{safe_key}_plan"
+            if native.get(day_ahead_key):
+                resolved[f"machines.{machine.machine_id}.day_ahead_plan"] = native[day_ahead_key]
 
             # V1.6.154 : rôles dédiés Machine Learning, distincts des capteurs
             # opérationnels Machines. Aucun de ces rôles ne pilote l'EMS.

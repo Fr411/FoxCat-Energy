@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.6.157"
+VERSION = "1.6.159"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "button"]
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
@@ -101,7 +101,9 @@ DYNAMIC_EXPORT_POSITIVE_IS_REVENUE = "positive_is_revenue"
 
 # Arbitrage dynamique Day-Ahead. Ces constantes ne s'appliquent jamais aux
 # régimes HP/HC ou fixes.
-DYNAMIC_ARBITRAGE_HORIZON_HOURS = 24
+DYNAMIC_ARBITRAGE_HORIZON_HOURS = 36
+# V1.6.159 : seuil bas pilotable par l'utilisateur. La constante reste le
+# fallback de sécurité; le moteur lit dynamic_favorable_position_pct.
 DYNAMIC_POSITION_LOW = 0.35
 DYNAMIC_POSITION_HIGH = 0.70
 
@@ -143,7 +145,8 @@ TARIFF_TOU = "Bi-horaire HP/HC"
 TARIFF_REGIMES = [TARIFF_TOU, TARIFF_DYNAMIC]
 
 NETWORK_POLICY_COMPENSATION = "Compensation"
-NETWORK_POLICY_BILLED_EXPORT = "Injection facturée"
+NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"
+NETWORK_POLICY_LEGACY_BILLED_EXPORT = "Injection facturée"
 NETWORK_POLICIES = [NETWORK_POLICY_COMPENSATION, NETWORK_POLICY_BILLED_EXPORT]
 MODE_ALIASES = {
     "Economie énergie": MODE_ECO,
@@ -206,6 +209,8 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "dynamic_negative_price_charge_enabled": True,
     "economic_optimizer_enabled": True,
     "predictive_pricing_enabled": True,
+    "dynamic_favorable_position_pct": 30.0,
+    "dynamic_high_position_pct": 70.0,
     "solar_forecast_arbitrage": True,
     "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
@@ -264,7 +269,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "solar_confidence_min_percent": 70.0,
     "solar_window_min_minutes": 30.0,
     "dynamic_price_significant_delta": 0.01,
-    "dynamic_injection_lucrative_threshold": -0.0001,
+    "dynamic_injection_lucrative_threshold": 0.0001,
     "dynamic_grid_charge_threshold_eur_kwh": 0.0,
     "economic_horizon_hours": 24.0,
     "economic_min_saving_eur_kwh": 0.02,
@@ -324,6 +329,8 @@ NUMBER_DEFINITIONS = {
     "solar_confidence_min_percent": ("Confiance solaire minimale", 0, 100, 1, "%", "mdi:weather-sunny-alert"),
     "solar_window_min_minutes": ("Durée minimale fenêtre solaire", 5, 240, 5, "min", "mdi:timeline-clock-outline"),
     "dynamic_price_significant_delta": ("Écart de prix significatif", 0, 1, 0.001, "€/kWh", "mdi:cash-sync"),
+    "dynamic_favorable_position_pct": ("Seuil prix favorable Day-Ahead", 5, 60, 1, "%", "mdi:tune-variant"),
+    "dynamic_high_position_pct": ("Seuil zone pic Day-Ahead", 60, 95, 1, "%", "mdi:chart-line-variant"),
     "dynamic_injection_lucrative_threshold": ("Seuil injection rémunératrice", -1, 1, 0.0001, "€/kWh", "mdi:cash-plus"),
     "dynamic_grid_charge_threshold_eur_kwh": ("Seuil charge réseau prix négatif", -1, 0, 0.001, "€/kWh", "mdi:transmission-tower-import"),
     "economic_horizon_hours": ("Horizon comparateur économique", 1, 48, 1, "h", "mdi:timeline-clock-outline"),

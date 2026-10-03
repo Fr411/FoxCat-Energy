@@ -92,11 +92,11 @@
       },
       "pricing": {
         "title": "FoxCat Energy – 5/7 • Tarification dynamique",
-        "description": "Sources tarifaires dynamiques. Les séries futures optionnelles servent uniquement au comparateur économique et ne publient rien sur Energy Bus.",
+        "description": "Luminus Dynamic est la référence financière du régime dynamique. FoxCat lit la courbe all-in aujourd’hui/demain et la valeur de réinjection ; Nord Pool/ENTSO-E restent des indicateurs temporels externes.",
         "data": {
-          "price_current": "Prix dynamique actuel",
-          "price_next": "Prix dynamique heure suivante",
-          "price_injection": "Prix dynamique de réinjection brut",
+          "price_current": "Luminus Dynamic • Prix actuel",
+          "price_next": "Luminus Dynamic • Prix heure suivante",
+          "price_injection": "Luminus Dynamic • Prix de réinjection",
           "price_min_today": "Prix minimum aujourd’hui",
           "price_max_today": "Prix maximum aujourd’hui",
           "price_avg_today": "Prix moyen aujourd’hui",
@@ -106,7 +106,7 @@
           "price_tomorrow_available": "Disponibilité des prix de demain",
           "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
           "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
-          "dynamic_export_sign_convention": "Convention du signe du prix de réinjection dynamique"
+          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
         }
       },
       "solar": {
@@ -129,7 +129,7 @@
       },
       "hphc": {
         "title": "FoxCat Energy – 6/7 • Tarifs HP/HC",
-        "description": "Tarifs ComfyFlex HP/HC, prix de reprise et plages horaires utilisés par le comparateur économique.",
+        "description": "Tarifs ComfyFlex réservés au régime HP/HC, prix de réinjection et plages horaires utilisés par le comparateur économique.",
         "data": {
           "tariff_hp_price_sensor": "Capteur prix heures pleines (HP)",
           "tariff_hc_price_sensor": "Capteur prix heures creuses (HC)",
@@ -459,9 +459,9 @@
         "title": "Tarification dynamique",
         "description": "Tarification dynamique Day-Ahead. FoxCat positionne le prix actuel sur l’horizon 24 h et réserve les blocs les moins chers pour les besoins thermiques du Boiler.",
         "data": {
-          "price_current": "Prix dynamique actuel",
-          "price_next": "Prix dynamique heure suivante",
-          "price_injection": "Prix dynamique de réinjection brut",
+          "price_current": "Luminus Dynamic • Prix actuel",
+          "price_next": "Luminus Dynamic • Prix heure suivante",
+          "price_injection": "Luminus Dynamic • Prix de réinjection",
           "price_min_today": "Prix minimum aujourd’hui",
           "price_max_today": "Prix maximum aujourd’hui",
           "price_avg_today": "Prix moyen aujourd’hui",
@@ -471,7 +471,7 @@
           "price_tomorrow_available": "Disponibilité des prix de demain",
           "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
           "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
-          "dynamic_export_sign_convention": "Convention du signe du prix de réinjection dynamique"
+          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
         }
       }
     }

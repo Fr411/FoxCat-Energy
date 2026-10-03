@@ -269,8 +269,8 @@ def _dynamic_export_sign_selector() -> selector.SelectSelector:
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
             options=[
-                {"value": DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE, "label": "Luminus : négatif = rémunération"},
-                {"value": DYNAMIC_EXPORT_POSITIVE_IS_REVENUE, "label": "Positif = rémunération"},
+                {"value": DYNAMIC_EXPORT_POSITIVE_IS_REVENUE, "label": "Luminus Dynamic : positif = rémunération"},
+                {"value": DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE, "label": "Autre source : négatif = rémunération"},
             ],
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
@@ -292,7 +292,7 @@ def _pricing_schema() -> vol.Schema:
             _optional(CONF_PRICE_TOMORROW_AVAILABLE, "binary_sensor.luminus_luminus_dynamic_wallonia_prix_de_demain_disponibles"): _entity("binary_sensor"),
             _optional(CONF_PRICE_FORECAST_IMPORT): _entity("sensor"),
             _optional(CONF_PRICE_FORECAST_EXPORT): _entity("sensor"),
-            vol.Required(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, default=DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE): _dynamic_export_sign_selector(),
+            vol.Required(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, default=DYNAMIC_EXPORT_POSITIVE_IS_REVENUE): _dynamic_export_sign_selector(),
         }
     )
 
@@ -313,9 +313,9 @@ def _hphc_schema() -> vol.Schema:
     """Fixed / dual-rate tariff values configured by the installer/user."""
     return vol.Schema(
         {
-            _optional(CONF_TARIFF_HP_PRICE_SENSOR): _entity("sensor"),
-            _optional(CONF_TARIFF_HC_PRICE_SENSOR): _entity("sensor"),
-            _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor"),
+            _optional(CONF_TARIFF_HP_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_pleines_jour"): _entity("sensor"),
+            _optional(CONF_TARIFF_HC_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_creuses_nuit"): _entity("sensor"),
+            _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_d_injection"): _entity("sensor"),
             vol.Optional(CONF_TARIFF_FIXED_INJECTION_PRICE, default=0.0): _price_number(0.0, -1.0, 2.0),
             vol.Optional(CONF_TARIFF_HP_START_1, default="07:00:00"): selector.TimeSelector(),
             vol.Optional(CONF_TARIFF_HP_END_1, default="11:00:00"): selector.TimeSelector(),

@@ -687,7 +687,7 @@ views:
                      ========================================================== */
 
                   const buyPrice = numberOf(E.buyPrice,
-                    numberOf('[[foxcat:pricing.source.current]]', 0));
+                    numberOf('[[foxcat:pricing.active_buy]]', 0));
                   const tariffPeriod = stateOf(E.tariffPeriod, '—');
                   const priceStatus = stateOf(E.priceStatus, '—');
 
@@ -1431,6 +1431,39 @@ views:
                     - width: 46px
                     - color: '#c4b5fd'
                     - filter: drop-shadow(0 0 10px rgba(196,181,253,.35))
+                  name:
+                    - font-size: 19px
+                    - font-weight: 900
+                    - color: white
+                  label:
+                    - font-size: 10px
+                    - font-weight: 600
+                    - color: rgba(255,255,255,.45)
+              - type: custom:button-card
+                name: Day-Ahead
+                icon: mdi:chart-timeline-variant-shimmer
+                label: Dynamic · Prix · Planning
+                show_label: true
+                tap_action:
+                  action: navigate
+                  navigation_path: |-
+                    [[[
+                      const base = window.location.pathname.replace(/\/[^\/]*$/, '');
+                      return `${base}/day-ahead`;
+                    ]]]
+                styles:
+                  card:
+                    - height: 150px
+                    - border-radius: 26px
+                    - padding: 20px
+                    - background: radial-gradient(circle at 100% 0%,rgba(34,211,238,.18),transparent 46%),linear-gradient(145deg,#070b14,#101827 55%,#080d16)
+                    - border: 1px solid rgba(34,211,238,.20)
+                  grid:
+                    - grid-template-areas: '"i" "n" "l"'
+                    - grid-template-rows: 58px 28px 1fr
+                  icon:
+                    - width: 46px
+                    - color: '#22d3ee'
                   name:
                     - font-size: 19px
                     - font-weight: 900
@@ -2587,10 +2620,12 @@ views:
                      ========================================================== */
 
                   const grossDailyCost = Math.max(numberOf('[[foxcat:pricing.cost_today]]', 0), 0);
-                  const exportDailyValue = Math.max(numberOf('[[foxcat:pricing.export_value_today]]', 0), 0);
-                  const dailyNetCost = numberOf('[[foxcat:pricing.net_today]]', grossDailyCost - exportDailyValue);
-                  const photovoltaicBenefit = Math.max(numberOf('[[foxcat:pricing.solar_gain_today]]', 0), 0);
-                  const solarDailySaving = Math.max(photovoltaicBenefit - exportDailyValue, 0);
+                  const exportDailyValue = numberOf('[[foxcat:pricing.export_value_today]]', 0);
+                  const exportDailyRevenue = Math.max(numberOf('[[foxcat:pricing.export_revenue_today]]', Math.max(exportDailyValue, 0)), 0);
+                  const exportDailyCost = Math.max(numberOf('[[foxcat:pricing.export_cost_today]]', Math.max(-exportDailyValue, 0)), 0);
+                  const dailyNetCost = numberOf('[[foxcat:pricing.net_today]]', grossDailyCost + exportDailyCost - exportDailyRevenue);
+                  const photovoltaicBenefit = numberOf('[[foxcat:pricing.solar_gain_today]]', 0);
+                  const solarDailySaving = Math.max(photovoltaicBenefit - exportDailyRevenue + exportDailyCost, 0);
                   const theoreticalWithoutPv = Math.max(grossDailyCost + solarDailySaving, 0);
                   const compensatedEnergy = isCompensation ? Math.min(importDay, exportDay) : 0;
                   const netGridDay = importDay - exportDay;
@@ -5107,7 +5142,7 @@ views:
                             ${
                               isCompensation
                                 ? 'VALEUR COMPENSÉE'
-                                : 'VALEUR RÉINJECTION'
+                                : 'SOLDE RÉINJECTION'
                             }
 
                           </div>
@@ -5648,7 +5683,7 @@ views:
                     external: {
 
                       prix_luminus_fallback:
-                        '[[foxcat:pricing.source.current]]'
+                        '[[foxcat:pricing.active_buy]]'
 
                     },
 
@@ -15947,7 +15982,7 @@ views:
                     '#35e59d';
 
                   if (
-                    norm(policy).includes('injection facturee')
+                    (norm(policy).includes('injection tarifee') || norm(policy).includes('injection facturee'))
                   )
                     policyColor = '#facc15';
 
@@ -20565,4 +20600,248 @@ views:
                 name: Réseau attendu
               - entity: [[foxcat:legacy.input_number_ems_ack_error]]
                 name: Erreur ACK
+    cards: []
+  - type: sections
+    max_columns: 4
+    title: Day-Ahead
+    path: day-ahead
+    icon: mdi:chart-timeline-variant-shimmer
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Dynamic · Marché & tendance
+            heading_style: title
+            icon: mdi:chart-line
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            triggers_update: all
+            custom_fields:
+              content: |
+                [[[
+                  const BUY='sensor.luminus_luminus_dynamic_wallonia_prix_actuel';
+                  const NEXT='sensor.luminus_luminus_dynamic_wallonia_prix_heure_suivante';
+                  const TOMORROW='binary_sensor.luminus_luminus_dynamic_wallonia_prix_de_demain_disponibles';
+                  const POS='[[foxcat:pricing.dynamic_curve_position]]';
+                  const PLAN='[[foxcat:pricing.day_ahead.plan]]';
+                  const buy=states[BUY], next=states[NEXT], tomorrow=states[TOMORROW];
+                  const pos=Number(states[POS]?.state);
+                  const plan=states[PLAN];
+                  const now=Date.now();
+                  const rows=[...(buy?.attributes?.today||[]),...(buy?.attributes?.tomorrow||[])]
+                    .map(r=>({time:new Date(r.start).getTime(),price:Number(r.all_in)}))
+                    .filter(r=>Number.isFinite(r.time)&&Number.isFinite(r.price)).sort((a,b)=>a.time-b.time);
+                  const currentPrice=Number(buy?.state), nextPrice=Number(next?.state);
+                  const future=rows.filter(r=>r.time>=now);
+                  let trend='Stable', trendIcon='→';
+                  if(Number.isFinite(currentPrice)&&future.length){
+                    const u=future.slice(0,3).map(r=>r.price);
+                    const mean=u.reduce((a,b)=>a+b,0)/u.length;
+                    const delta=currentPrice!==0?(mean-currentPrice)/Math.abs(currentPrice):0;
+                    if(delta>0.04){trend='Hausse';trendIcon='↗';}
+                    else if(delta<-0.04){trend='Baisse';trendIcon='↘';}
+                  }
+                  const low=plan?.attributes?.prochain_creux;
+                  const high=plan?.attributes?.prochain_pic;
+                  const fmt=v=>Number.isFinite(v)?v.toFixed(3).replace('.',',')+' €/kWh':'—';
+                  const pct=v=>Number.isFinite(v)?v.toFixed(1).replace('.',',')+' %':'—';
+                  const hour=v=>{const raw=(v&&typeof v==='object')?v.start:v;if(!raw)return '—';const d=new Date(raw);return Number.isNaN(d.getTime())?'—':d.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});};
+                  const tomorrowText=tomorrow?.state==='on'?'Demain disponible':'Demain en attente';
+                  const favorable=plan?.attributes?.prix_favorable===true?'FAVORABLE':'ATTENTE';
+                  return `<div class="main">
+                    <div class="title">MARCHÉ & TENDANCE</div>
+                    <div class="subtitle">Luminus Dynamic · référence financière FoxCat</div>
+                    <div class="price-zone"><div class="label">PRIX ACTUEL</div><div class="price">${fmt(currentPrice)}</div><div class="source">LUMINUS DYNAMIC</div></div>
+                    <div class="grid">
+                      <div class="box"><div class="label">HEURE SUIVANTE</div><div class="value">${fmt(nextPrice)}</div><div class="note">Luminus Dynamic</div></div>
+                      <div class="box"><div class="label">POSITION DAY-AHEAD</div><div class="value">${pct(pos)}</div><div class="note">FoxCat · courbe Luminus</div></div>
+                      <div class="box"><div class="label">PROCHAIN CREUX</div><div class="value">${hour(low)}</div><div class="note">fenêtre favorable</div></div>
+                      <div class="box"><div class="label">PROCHAIN PIC</div><div class="value">${hour(high)}</div><div class="note">zone à éviter</div></div>
+                      <div class="box"><div class="label">TENDANCE</div><div class="value">${trendIcon} ${trend}</div><div class="note">Luminus Dynamic</div></div>
+                      <div class="box"><div class="label">DAY-AHEAD</div><div class="value small">${tomorrowText}</div><div class="note">${favorable}</div></div>
+                    </div></div>`;
+                ]]]
+            styles:
+              card:
+                - padding: 24px
+                - border-radius: 24px
+                - background: linear-gradient(145deg,rgba(25,28,34,.98),rgba(12,14,18,.98))
+                - border: 1px solid rgba(255,255,255,.08)
+              custom_fields:
+                content:
+                  - width: 100%
+                  - text-align: center
+            extra_styles: |
+              .main{width:100%;display:flex;flex-direction:column;align-items:center;text-align:center}.title{width:100%;font-size:22px;font-weight:800;letter-spacing:1.4px}.subtitle{width:100%;margin-top:6px;font-size:11px;opacity:.48}.price-zone{width:100%;padding:26px 0 24px}.label{width:100%;font-size:10px;opacity:.52;letter-spacing:1px}.price{width:100%;margin-top:6px;font-size:35px;font-weight:800}.source{width:100%;margin-top:5px;font-size:10px;opacity:.42}.grid{width:100%;max-width:540px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:0 auto}.box{min-height:94px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:18px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}.value{width:100%;margin-top:6px;font-size:19px;font-weight:750}.value.small{font-size:15px}.note{width:100%;margin-top:4px;font-size:10px;opacity:.42}
+          - type: entities
+            title: Réglages Day-Ahead · Dynamic uniquement
+            show_header_toggle: false
+            state_color: true
+            entities:
+              - entity: '[[foxcat:pricing.day_ahead.threshold]]'
+                name: Seuil prix favorable
+              - entity: '[[foxcat:pricing.day_ahead.peak_threshold]]'
+                name: Seuil zone pic
+              - entity: '[[foxcat:pricing.day_ahead.favorable]]'
+                name: Fenêtre prix favorable
+              - entity: '[[foxcat:pricing.day_ahead.plan]]'
+                name: Planificateur
+              - entity: '[[foxcat:pricing.day_ahead.next_valley]]'
+                name: Prochain creux
+              - entity: '[[foxcat:pricing.day_ahead.next_peak]]'
+                name: Prochain pic
+              - entity: '[[foxcat:pricing.day_ahead.horizon]]'
+                name: Horizon analysé
+      - type: grid
+        cards:
+          - type: heading
+            heading: Courbe Luminus Dynamic
+            heading_style: title
+            icon: mdi:chart-areaspline
+          - type: custom:apexcharts-card
+            update_interval: 1min
+            graph_span: 2d
+            span:
+              start: day
+            now:
+              show: true
+              label: Maintenant
+            header:
+              show: true
+              title: Prix achat & réinjection
+              show_states: false
+            yaxis:
+              - decimals: 3
+            apex_config:
+              chart:
+                height: 350
+                toolbar:
+                  show: true
+                zoom:
+                  enabled: true
+              legend:
+                show: true
+                position: bottom
+              grid:
+                borderColor: rgba(255,255,255,0.08)
+              stroke:
+                curve: smooth
+                dashArray: [0, 6, 5, 0]
+              markers:
+                size: [0, 0, 0, 7]
+                strokeWidth: 3
+              xaxis:
+                type: datetime
+                labels:
+                  datetimeUTC: false
+              tooltip:
+                shared: true
+                x:
+                  format: dd/MM HH:mm
+            series:
+              - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
+                name: Achat
+                type: area
+                unit: €/kWh
+                stroke_width: 3
+                opacity: 0.18
+                float_precision: 3
+                show:
+                  in_header: false
+                  extremas: true
+                data_generator: |
+                  const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+                  return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new Date(r.start).getTime(),Number(r.all_in)]);
+              - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
+                name: Tendance
+                type: line
+                unit: €/kWh
+                stroke_width: 2
+                opacity: 0.75
+                float_precision: 3
+                show:
+                  in_header: false
+                data_generator: |
+                  const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]
+                    .filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>({time:new Date(r.start).getTime(),price:Number(r.all_in)})).sort((a,b)=>a.time-b.time);
+                  return rows.map((r,i)=>{const w=rows.slice(Math.max(0,i-1),Math.min(rows.length,i+2));return [r.time,w.reduce((s,x)=>s+x.price,0)/w.length];});
+              - entity: sensor.luminus_luminus_dynamic_wallonia_prix_d_injection
+                name: Réinjection
+                type: line
+                unit: €/kWh
+                stroke_width: 2
+                opacity: 0.75
+                float_precision: 3
+                show:
+                  in_header: false
+                data_generator: |
+                  const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+                  return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new Date(r.start).getTime(),Number(r.injection)]);
+              - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
+                name: Maintenant
+                type: line
+                unit: €/kWh
+                stroke_width: 0
+                opacity: 1
+                float_precision: 3
+                show:
+                  in_header: false
+                data_generator: |
+                  const value=Number(entity.state);if(!Number.isFinite(value))return [];return [[Date.now(),value]];
+      - type: grid
+        cards:
+          - type: heading
+            heading: Planification appareils
+            heading_style: title
+            icon: mdi:washing-machine
+          - type: entities
+            title: Fenêtres optimales · plages utilisateur souveraines
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:machines.washer.day_ahead_plan]]'
+                name: Lave-linge
+              - entity: '[[foxcat:machines.dryer.day_ahead_plan]]'
+                name: Sèche-linge
+              - entity: '[[foxcat:machines.dishwasher.day_ahead_plan]]'
+                name: Lave-vaisselle
+          - type: markdown
+            content: |
+              **Règle 1.6.159**  
+              Le planificateur est actif **uniquement en mode Dynamique**. Il respecte d'abord les plages horaires utilisateur et la durée apprise du cycle. Un cycle déjà démarré reste protégé. Sous le seuil Day-Ahead, le complément réseau peut être autorisé si le solaire est insuffisant.
+      - type: grid
+        cards:
+          - type: heading
+            heading: Bilan Dynamic · aujourd'hui
+            heading_style: title
+            icon: mdi:calculator-variant
+          - type: entities
+            title: Totaux physiques
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:energy.today.pv]]'
+                name: PV total jour
+              - entity: '[[foxcat:energy.today.house]]'
+                name: Consommation totale jour
+              - entity: '[[foxcat:energy.today.import]]'
+                name: Import réseau total jour
+              - entity: '[[foxcat:energy.today.export]]'
+                name: Réinjection totale jour
+          - type: entities
+            title: Ventilation Dynamic
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:accounting.dynamic.import_today]]'
+                name: Import Dynamic
+              - entity: '[[foxcat:accounting.dynamic.export_today]]'
+                name: Réinjection Dynamic
+              - entity: '[[foxcat:accounting.dynamic.import_cost_today]]'
+                name: Coût achat Dynamic
+              - entity: '[[foxcat:accounting.dynamic.export_revenue_today]]'
+                name: Revenu réinjection Dynamic
+              - entity: '[[foxcat:accounting.dynamic.export_cost_today]]'
+                name: Coût réinjection Dynamic
+              - entity: '[[foxcat:accounting.dynamic.net_cost_today]]'
+                name: Coût net Dynamic
     cards: []

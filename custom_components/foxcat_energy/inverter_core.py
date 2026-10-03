@@ -6,7 +6,7 @@ from typing import Any
 from .const import TARIFF_DYNAMIC
 
 NETWORK_COMPENSATION = "Compensation"
-NETWORK_BILLED_EXPORT = "Injection facturée"
+NETWORK_BILLED_EXPORT = "Injection tarifée"
 
 
 @dataclass(slots=True)
@@ -32,7 +32,7 @@ class InverterDecision:
 class InverterCore:
     """Second cœur FoxCat : uniquement responsable de la puissance onduleur.
 
-    Depuis 1.5.5, la politique ``Injection facturée`` n'avance plus d'un palier
+    Depuis 1.5.5, la politique ``Injection tarifée`` n'avance plus d'un palier
     à chaque battement. Le métronome garantit uniquement une trame fraîche.
     Sur cette trame, le moteur simule tous les paliers RRCR disponibles
     (0, 10, ..., 100 %) et commande directement le meilleur compromis réseau.
@@ -113,30 +113,28 @@ class InverterCore:
                 limit_w, ratio, pv_at_limit, more_possible, max_solar,
             )
 
-        # DYNAMIQUE uniquement : la valeur économique normalisée de l'export
-        # remplace le simple état binaire « Injection facturée ». Une valeur
-        # positive signifie une recette pour l'utilisateur; une valeur négative
-        # signifie qu'il paie pour injecter. Le kill-switch permet un repli
-        # immédiat sur le comportement prédictif historique.
+        # V1.6.158 — règle financière souveraine, quel que soit le régime :
+        # si la réinjection est rémunératrice, FoxCat ne détruit jamais une
+        # production solaire ayant une valeur. Le PRI est donc libéré à 100 %.
+        # Cette règle n'est PAS désactivée par le kill-switch prédictif : celui-ci
+        # ne concerne que l'anticipation Day-Ahead, pas la valeur économique
+        # instantanée de l'export.
         if (
-            tariff_regime == TARIFF_DYNAMIC
-            and bool(settings.get("predictive_pricing_enabled", True))
-            and dynamic_export_value_eur_kwh is not None
+            dynamic_export_value_eur_kwh is not None
             and dynamic_export_value_eur_kwh > 0.0
         ):
             target = 100
+            regime_label = "Dynamique" if tariff_regime == TARIFF_DYNAMIC else "HP/HC"
             return InverterDecision(
                 current, target,
                 "LIBERATION" if target > current else "MAINTIEN",
-                f"Dynamique : export valorisé à {dynamic_export_value_eur_kwh:.4f} €/kWh, PRI libéré à 100 %.",
+                f"{regime_label} : export rémunérateur à {dynamic_export_value_eur_kwh:.4f} €/kWh, PRI libéré à 100 %.",
                 limit_w, ratio, pv_at_limit, more_possible, max_solar,
             )
 
-        # Si la valeur dynamique d'export est négative, ou si elle est nulle/
-        # indisponible, le moteur prédictif ci-dessous conserve sa cible locale
-        # de quasi-zéro injection. Les régimes non dynamiques passent également
-        # exactement par ce chemin historique.
-        # Injection facturée : calcul prédictif du meilleur palier.
+        # Si la valeur d'export est négative, nulle ou indisponible, le moteur
+        # prédictif ci-dessous conserve sa cible locale de quasi-zéro injection.
+        # Injection tarifée : calcul prédictif du meilleur palier.
         export_limit = max(float(settings.get("network_billed_export_max_w", 50.0)), 0.0)
         import_target = max(float(settings.get("network_billed_import_target_w", 100.0)), 0.0)
         import_high = max(float(settings.get("network_billed_import_max_w", 250.0)), import_target)
