@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON
 from homeassistant.core import Event, HomeAssistant, callback
@@ -27,6 +28,10 @@ from .const import (
     CONF_BOILER_BINARY,
     CONF_BOILER_CLIMATE,
     CONF_BOILER_POWER_SENSOR,
+    CONF_BOILER_VOLUME,
+    CONF_BOILER_ELEMENT_POWER,
+    CONF_BOILER_COLD_WATER_TEMP,
+    CONF_BOILER_RESISTANCE_TEMP_SENSOR,
     CONF_BOILER_TEMP_SENSOR,
     CONF_DISHWASHER_CYCLE,
     CONF_DISHWASHER_SOCKET,
@@ -54,6 +59,10 @@ from .const import (
     CONF_GRID_EXPORT_SENSOR,
     CONF_GRID_IMPORT_SENSOR,
     CONF_GRID_LEGACY_SENSOR,
+    CONF_GRID_SIGNED_SENSOR,
+    CONF_GRID_SIGN_CONVENTION,
+    GRID_SIGN_IMPORT_POSITIVE,
+    GRID_SIGN_EXPORT_POSITIVE,
     CONF_METRONOME_SENSOR,
     CONF_METRONOME_FALLBACK_SENSOR,
     CONF_HOUSE_SENSOR,
@@ -68,6 +77,12 @@ from .const import (
     CONF_PRICE_MIN_TODAY,
     CONF_PRICE_MIN_TOMORROW,
     CONF_PRICE_NEXT,
+    CONF_PRICE_FORECAST_IMPORT,
+    CONF_PRICE_FORECAST_EXPORT,
+    CONF_DYNAMIC_EXPORT_SIGN_CONVENTION,
+    DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE,
+    DYNAMIC_EXPORT_POSITIVE_IS_REVENUE,
+    DYNAMIC_ARBITRAGE_HORIZON_HOURS,
     CONF_TARIFF_HP_START_1,
     CONF_TARIFF_HP_END_1,
     CONF_TARIFF_HP_START_2,
@@ -80,6 +95,7 @@ from .const import (
     CONF_PRI_L2,
     CONF_PRI_L3,
     CONF_PRI_L4,
+    CONF_INVERTER_POWER_SENSOR,
     CONF_PV_SENSOR,
     CONF_WASHER_CYCLE,
     CONF_WASHER_SOCKET,
@@ -107,18 +123,28 @@ from .const import (
     TARIFF_COMPENSATION,
     NETWORK_POLICY_COMPENSATION,
     NETWORK_POLICY_BILLED_EXPORT,
+    NETWORK_POLICY_BILLED_EXPORT_LEGACY,
     TARIFF_DYNAMIC,
     TARIFF_TOU,
 )
-from .engine import EnergySnapshot, SolarForecast, decide_dynamic, decide_zero, evaluate_mode
+from .engine import BoilerIntent, EnergySnapshot, SolarForecast, decide_dynamic, decide_zero, evaluate_mode
 from .engine.load_guard import (
     boiler_surplus_before_load_w,
     protected_cycle_boiler_allowed,
     protected_cycle_boiler_allowed_stable,
 )
 from .engine.tariff import price_status, tariff_boundaries, tariff_period
+from .economic_optimizer import (
+    PricePoint,
+    build_hphc_points,
+    evaluate_market,
+    extract_price_points,
+    merge_price_points,
+    recommend_flexible_load,
+)
 from .machines import MachineDefinition, machine_allowed, machine_definitions, schedule_boundaries
 from .machine_cycle import MachineCycleManager
+from .machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
 from .inverter_core import InverterCore
 from .accounting import EnergyAccounting
@@ -139,6 +165,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.energy_bus = EnergyBus()
         self.inverter_core = InverterCore()
         self.machine_cycle_manager = MachineCycleManager()
+        # V1.6.152 : collecte passive des signatures machines. Cette couche ne
+        # participe à aucune décision EMS/PRI et n'agit sur aucun équipement.
+        self.machine_learning = MachineLearningRecorder()
         self.settings: dict[str, Any] = dict(DEFAULT_SETTINGS)
         self.core_state: dict[str, Any] = {
             "phase": PHASE_ACQUISITION,
@@ -154,11 +183,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "last_action": None,
             "boiler_demand": BOILER_NONE,
             "boiler_origin": "AUCUNE",
+            "boiler_user_override": "AUTO",
             "execution_status": "IDLE",
             "execution_command": "NONE",
             "execution_retries": 0,
             "execution_failure_reason": "",
-            "boiler_user_status": "AUCUNE DEMANDE UTILISATEUR",
+            "fsm_status": "OK",
+            "fsm_transition_count": 0,
+            "fsm_last_transition_at": None,
+            "fsm_last_transition": "INITIALISATION -> ACQUISITION",
+            "bus_message_id": None,
+            "last_frame_id": 0,
+            "last_frame_received_at": None,
+            "processed_frame_count": 0,
+            "last_bus_decision_id": None,
         }
         self.pri_state: dict[str, Any] = {
             "current_level": 100,
@@ -178,6 +216,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "last_reason": "PRI initialisé.",
             "frame_id": 0,
             "pending_frame_id": None,
+            "pending_frame_serial": None,
             "pending_level": None,
             "pending_pv_before": None,
             "solar_state": "PV_UNKNOWN",
@@ -189,13 +228,24 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "engine_run_count": 0,
             "decision_tick_count": 0,
             "last_decision_at": None,
+            "last_frame_received_at": None,
+            "processed_frame_count": 0,
+            "actuator_status": "IDLE",
+            "actuator_target_level": None,
+            "actuator_last_error": "",
         }
-        # FoxCat 1.5.6 : horloge réseau synchronisée sur un capteur physique.
+        # FoxCat 1.5.5 : horloge réseau synchronisée sur un capteur physique.
         # Le capteur Smappee choisi donne la phase; un capteur de secours peut
         # prendre le relais. Le métronome ne dépend donc plus d'une variation
         # de valeur : les republications identiques restent des battements.
-        primary_clock = self.config.get(CONF_METRONOME_SENSOR) or self.config.get(CONF_GRID_IMPORT_SENSOR)
-        fallback_clock = self.config.get(CONF_METRONOME_FALLBACK_SENSOR) or self.config.get(CONF_GRID_EXPORT_SENSOR)
+        primary_clock = (
+            self.config.get(CONF_GRID_SIGNED_SENSOR)
+            or self.config.get(CONF_METRONOME_SENSOR)
+            or self.config.get(CONF_GRID_IMPORT_SENSOR)
+        )
+        fallback_clock = self.config.get(CONF_METRONOME_FALLBACK_SENSOR)
+        if not fallback_clock and not self.config.get(CONF_GRID_SIGNED_SENSOR):
+            fallback_clock = self.config.get(CONF_GRID_EXPORT_SENSOR)
         if fallback_clock == primary_clock:
             fallback_clock = None
         self.metronome_state: dict[str, Any] = {
@@ -213,46 +263,43 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "period_s": float(self.settings.get("metronome_period_s", 30.0)),
             "next_due_at": None,
             "last_reason": "Métronome réseau en attente de synchronisation.",
+            "counter_date": dt_util.as_local(dt_util.now()).date().isoformat(),
+            "last_daily_reset_at": None,
+            "previous_day_pulse_count": 0,
+            "previous_day_primary_report_count": 0,
+            "previous_day_fallback_report_count": 0,
+            "previous_day_frame_count": 0,
+            "previous_day_message_count": 0,
         }
         self._metronome_lock = asyncio.Lock()
         self._metronome_pulse_lock = asyncio.Lock()
+        self._frame_dispatch_lock = asyncio.Lock()
         self._metronome_last_seen_report: dict[str, datetime] = {}
-        # V1.5.6 : chaque publication de mesure est une trame PRI, y compris
-        # une republication de valeur identique. Le dictionnaire ne déduplique
-        # que le même événement vu à la fois par le listener et le watchdog.
-        self._pri_last_seen_report: dict[str, datetime] = {}
-        self.measurement_state: dict[str, Any] = {
-            "valid": False,
-            "quality": "INITIALISATION",
-            "pv_source": "AUCUNE",
-            "house_source": "AUCUNE",
-            "grid_export_source": "AUCUNE",
-            "grid_import_source": "AUCUNE",
-            "house_input_w": None,
-            "house_calculated_w": None,
-            "house_delta_w": None,
-            "last_snapshot_at": None,
-            "last_pri_report_at": None,
-            "last_pri_report_entity": None,
-            "pri_report_count": 0,
-        }
         self.solar_forecast = SolarForecast()
         self._unsubs: list[Any] = []
+        # V1.6.150 : les deux corps sont cadencés par la même publication réseau
+        # mais ne partagent plus aucun verrou d'exécution.
         self._core_lock = asyncio.Lock()
-        # 1.4.8 : la réduction puissance onduleur possède son propre verrou.
-        # Un boiler, une machine ou une attente du CORE ne peut donc jamais
-        # retarder le tick physique de 30 secondes.
         self._inverter_reduction_lock = asyncio.Lock()
-        # Le chemin physique RRCR est totalement indépendant des actions CORE.
-        self._rrcr_action_lock = asyncio.Lock()
-        self._action_lock = asyncio.Lock()
+        self._ems_action_lock = asyncio.Lock()
+        self._inverter_action_lock = asyncio.Lock()
         self._pri_task: asyncio.Task | None = None
+        self._pri_actuator_task: asyncio.Task | None = None
+        self._pri_requested: dict[str, Any] | None = None
+        self._boiler_command_task: asyncio.Task | None = None
         self._execution_task: asyncio.Task | None = None
+        self._learning_save_task: asyncio.Task | None = None
+        self._status_notification_task: asyncio.Task | None = None
+        self._status_notification_last_signature: tuple[Any, ...] | None = None
         self._pv_below_since: datetime | None = None
         self._last_boiler_command_at: datetime | None = None
         self._high_load_since: datetime | None = None
         self._high_load_below_since: datetime | None = None
         self._frame_id = 0
+        # Compteur interne monotone : ne doit jamais être remis à zéro à minuit,
+        # car il protège la validation PRI N+1. _frame_id reste le numéro
+        # journalier visible par l’utilisateur.
+        self._frame_serial = 0
         self._high_load_high_frames = 0
         self._high_load_low_frames = 0
         self._sensor_reset_active = False
@@ -277,11 +324,136 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def installation_name(self) -> str:
         return str(self.config.get(CONF_INSTALLATION_NAME) or self.entry.title or "FoxCat Energy")
 
+
+    def _financial_status_view(self, data: dict[str, Any]) -> dict[str, str]:
+        """Retourne un état financier court et stable pour l'utilisateur.
+
+        Cet indicateur résume la décision économique déjà calculée. Il ne
+        commande aucun équipement et ne publie rien sur Energy Bus.
+        """
+        decision = dict(data.get("economic", {}).get("decision", {}) or {})
+        code = str(decision.get("code") or "INCONNU")
+        mapping = {
+            "COMPENSATION_MAX_PV": ("COMPENSATION", "Production libre — compensation active"),
+            "ABSORBER_SURPLUS": ("EXPORT DÉFAVORABLE", "Autoconsommation prioritaire"),
+            "EXPORTER_ET_REPORTER": ("EXPORT FAVORABLE", "Réinjection rémunératrice"),
+            "AUTOCONSOMMER": ("FAVORABLE", "Autoconsommation économiquement préférable"),
+            "PRIX_ACHAT_NEGATIF": ("TRÈS FAVORABLE", "Consommation réseau avantageuse"),
+            "ATTENDRE_MEILLEUR_PRIX": ("ATTENDRE", "Meilleur prix attendu"),
+            "CONSOMMER_MAINTENANT": ("FAVORABLE", "Prix actuel intéressant"),
+            "CONSOMMER_HC": ("FAVORABLE", "Heures creuses actives"),
+            "ATTENDRE_HC": ("ATTENDRE", "Heures creuses recommandées"),
+            "HP_ACCEPTABLE": ("ACCEPTABLE", "Consommation possible si nécessaire"),
+            "PRIX_INDISPONIBLE": ("INDÉTERMINÉ", "Tarif indisponible"),
+            "DESACTIVE": ("NON ÉVALUÉ", "Optimisation économique désactivée"),
+        }
+        status, detail = mapping.get(code, ("INFORMATION", str(decision.get("label") or code)))
+        return {"status": status, "detail": detail, "code": code}
+
+    def _status_notification_signature(self, data: dict[str, Any]) -> tuple[Any, ...]:
+        """Empreinte des seules informations utiles à la notification persistante."""
+        summary = data.get("status_summary", {})
+        prices = data.get("prices", {})
+        accounting = data.get("accounting", {}).get("today", {})
+        return (
+            summary.get("mode"),
+            summary.get("network_policy"),
+            summary.get("financial_status"),
+            summary.get("economic_decision"),
+            prices.get("regime"),
+            prices.get("period"),
+            round(float(prices.get("active_buy") or 0.0), 4),
+            round(float(prices.get("export_value") or 0.0), 4),
+            round(float(accounting.get("net_grid_cost_eur") or 0.0), 2),
+        )
+
+    async def async_refresh_persistent_status_notification(
+        self, data: dict[str, Any] | None = None, *, force: bool = False
+    ) -> None:
+        """Crée ou remplace le résumé EMS persistant sans générer de doublons."""
+        notification_id = f"foxcat_energy_status_{self.entry.entry_id}"
+        if not bool(self.settings.get("persistent_status_notification_enabled", True)):
+            persistent_notification.async_dismiss(self.hass, notification_id)
+            self._status_notification_last_signature = None
+            return
+
+        payload = data or self.data or self._build_data()
+        signature = self._status_notification_signature(payload)
+        if not force and signature == self._status_notification_last_signature:
+            return
+
+        self._status_notification_last_signature = signature
+        summary = payload.get("status_summary", {})
+        prices = payload.get("prices", {})
+        accounting = payload.get("accounting", {}).get("today", {})
+        mode = str(summary.get("mode") or "Indisponible")
+        policy = str(summary.get("network_policy") or "Indisponible")
+        financial = str(summary.get("financial_status") or "Indéterminé")
+        decision = str(summary.get("economic_decision") or "Indisponible")
+        regime = str(prices.get("regime") or "Indisponible")
+        period = str(prices.get("period") or "—")
+        buy = prices.get("active_buy")
+        export_value = prices.get("export_value")
+        net_cost = float(accounting.get("net_grid_cost_eur") or 0.0)
+
+        def euro_kwh(value: Any) -> str:
+            try:
+                return f"{float(value):.3f} €/kWh"
+            except (TypeError, ValueError):
+                return "Indisponible"
+
+        message = (
+            f"**Mode EMS :** {mode}\n\n"
+            f"**Politique réseau :** {policy}\n\n"
+            f"**État financier :** {financial}\n\n"
+            f"**Décision économique :** {decision}\n\n"
+            f"**Tarification :** {regime} — {period}\n\n"
+            f"**Prix d'achat :** {euro_kwh(buy)}\n\n"
+            f"**Valeur de réinjection :** {euro_kwh(export_value)}\n\n"
+            f"**Coût net aujourd'hui :** {net_cost:.2f} €"
+        )
+        persistent_notification.async_create(
+            self.hass,
+            message,
+            title=f"⚡ {self.installation_name} — Statut EMS",
+            notification_id=notification_id,
+        )
+
+    @callback
+    def async_set_updated_data(self, data: dict[str, Any]) -> None:
+        """Met à jour les entités puis synchronise le résumé persistant."""
+        # Ajout du résumé financier avant publication afin que le capteur, le
+        # dashboard et la notification lisent exactement la même information.
+        financial = self._financial_status_view(data)
+        data.setdefault("status_summary", {})
+        data["status_summary"].update(
+            {
+                "mode": data.get("settings", {}).get("mode", MODE_ECO),
+                "network_policy": data.get("settings", {}).get("network_policy", NETWORK_POLICY_COMPENSATION),
+                "financial_status": financial["status"],
+                "financial_detail": financial["detail"],
+                "financial_code": financial["code"],
+                "economic_decision": data.get("economic", {}).get("decision", {}).get("label", "Indisponible"),
+            }
+        )
+        super().async_set_updated_data(data)
+        if not bool(self.settings.get("persistent_status_notification_enabled", True)):
+            return
+        signature = self._status_notification_signature(data)
+        if signature == self._status_notification_last_signature:
+            return
+        if self._status_notification_task and not self._status_notification_task.done():
+            self._status_notification_task.cancel()
+        self._status_notification_task = self.hass.async_create_task(
+            self.async_refresh_persistent_status_notification(data)
+        )
+
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
         if isinstance(stored, dict):
             self.settings.update(stored.get("settings", {}))
             self.accounting.restore(stored.get("accounting"))
+            self.machine_learning.restore(stored.get("machine_learning"))
             sf = stored.get("solar_forecast")
             if isinstance(sf, dict):
                 self.solar_forecast = SolarForecast(**{k: sf.get(k, getattr(SolarForecast(), k)) for k in SolarForecast.__dataclass_fields__})
@@ -309,9 +481,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.settings.setdefault(machine.setting_key, machine.automatic_default)
 
         self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
-        # V1.5.6 : migration automatique de toute ancienne configuration ayant
-        # désactivé le PRI selon le mode. Le PRI souverain reste toujours armé.
-        self.settings["pri_enabled"] = True
+        if str(self.settings.get("network_policy")) == NETWORK_POLICY_BILLED_EXPORT_LEGACY:
+            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
         self.metronome_state["period_s"] = float(self.settings.get("metronome_period_s", 30.0))
         self._register_listeners()
         await self.async_config_entry_first_refresh()
@@ -330,8 +501,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._unsubs.clear()
         if self._pri_task and not self._pri_task.done():
             self._pri_task.cancel()
+        if self._pri_actuator_task and not self._pri_actuator_task.done():
+            self._pri_actuator_task.cancel()
+        if self._boiler_command_task and not self._boiler_command_task.done():
+            self._boiler_command_task.cancel()
         if self._execution_task and not self._execution_task.done():
             self._execution_task.cancel()
+        if self._status_notification_task and not self._status_notification_task.done():
+            self._status_notification_task.cancel()
         await self._async_save()
 
     def _migrate_legacy_defaults(self) -> None:
@@ -355,6 +532,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             {
                 "settings": self.settings,
                 "accounting": self.accounting.dump(),
+                "machine_learning": self.machine_learning.dump(),
                 "solar_forecast": {
                     "available": self.solar_forecast.available,
                     "start": self.solar_forecast.start,
@@ -368,43 +546,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
         )
 
-    def _pri_measurement_entities(self) -> list[str]:
-        """Toutes les sources dont chaque publication doit réveiller le PRI."""
-        return list(dict.fromkeys(
-            str(eid)
-            for eid in [
-                self.config.get(CONF_PV_SENSOR),
-                self.config.get(CONF_HOUSE_SENSOR),
-                self.config.get(CONF_GRID_EXPORT_SENSOR),
-                self.config.get(CONF_GRID_IMPORT_SENSOR),
-                self.config.get(CONF_GRID_LEGACY_SENSOR),
-                self.metronome_state.get("primary_entity"),
-                self.metronome_state.get("fallback_entity"),
-            ]
-            if eid
-        ))
-
     def _register_listeners(self) -> None:
-        # V1.5.6 — PRI souverain : chaque publication d'une mesure utile est
-        # une trame PRI. Cela inclut les republications à valeur identique quand
-        # Home Assistant expose state_reported. Aucun throttle n'est appliqué.
-        pri_entities = self._pri_measurement_entities()
-        if pri_entities:
-            track_report = getattr(event_helper, "async_track_state_report_event", None)
-            if callable(track_report):
-                try:
-                    self._unsubs.append(
-                        track_report(self.hass, pri_entities, self._on_pri_measurement_report)
-                    )
-                except (TypeError, AttributeError):
-                    self._unsubs.append(
-                        async_track_state_change_event(self.hass, pri_entities, self._on_pri_measurement_report)
-                    )
-            else:
-                self._unsubs.append(
-                    async_track_state_change_event(self.hass, pri_entities, self._on_pri_measurement_report)
-                )
-        # FoxCat 1.5.6 : métronome réseau interne.
+        # FoxCat 1.5.5 : métronome réseau interne.
         #
         # Le capteur choisi (Smappee consommation réseau recommandé) fournit le
         # battement physique. Sur les versions HA qui exposent state_reported,
@@ -445,10 +588,24 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         )
 
+        # V1.6.1-101 : les compteurs visibles repartent chaque jour à zéro.
+        # Le reset est purement journalier/diagnostic : les séquences techniques
+        # internes utilisées pour les ACK N+1 restent monotones.
+        self._unsubs.append(
+            async_track_time_change(
+                self.hass,
+                self._on_daily_counter_reset,
+                hour=0,
+                minute=0,
+                second=0,
+            )
+        )
+
         # Les changements import/export restent de la télémétrie immédiate.
         # Quand le métronome est actif, ils ne créent jamais une seconde marche PRI.
         grid_entities = list(dict.fromkeys(
             eid for eid in [
+                self.config.get(CONF_GRID_SIGNED_SENSOR),
                 self.config.get(CONF_GRID_EXPORT_SENSOR),
                 self.config.get(CONF_GRID_IMPORT_SENSOR),
                 self.config.get(CONF_GRID_LEGACY_SENSOR),
@@ -460,9 +617,34 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
         machine_cycle_entities = [m.cycle_entity for m in self.machines if m.cycle_entity]
-        safety_entities = [x for x in [self.config.get(CONF_BOILER_TEMP_SENSOR), self.config.get(CONF_BOILER_BINARY), self.config.get(CONF_BOILER_POWER_SENSOR), *machine_cycle_entities] if x]
+        safety_entities = [x for x in [
+            self.config.get(CONF_BOILER_TEMP_SENSOR),
+            self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR),
+            self.config.get(CONF_BOILER_BINARY),
+            self.config.get(CONF_BOILER_POWER_SENSOR),
+            *machine_cycle_entities,
+        ] if x]
         if safety_entities:
             self._unsubs.append(async_track_state_change_event(self.hass, safety_entities, self._on_safety_event))
+
+        # V1.6.152 : télémétrie passive des prises machines. Les événements
+        # alimentent uniquement l'historique d'apprentissage et ne cadencent
+        # ni EMS Core ni Onduleur Core.
+        machine_telemetry_entities = list(dict.fromkeys(
+            entity_id
+            for machine in self.machines
+            for entity_id in (
+                machine.switch_entity, machine.power_sensor,
+                machine.current_sensor, machine.voltage_sensor,
+            )
+            if entity_id
+        ))
+        if machine_telemetry_entities:
+            self._unsubs.append(
+                async_track_state_change_event(
+                    self.hass, machine_telemetry_entities, self._on_machine_telemetry_event
+                )
+            )
 
         pv = self.config.get(CONF_PV_SENSOR)
         if pv:
@@ -486,6 +668,22 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if price_entities:
             self._unsubs.append(async_track_state_change_event(self.hass, price_entities, self._on_price_event))
 
+        # V1.6.153 : les séries de prix futurs alimentent uniquement le
+        # comparateur économique. Elles ne créent aucune trame EMS/PRI et ne
+        # publient rien sur Energy Bus.
+        economic_price_entities = [
+            eid for eid in [
+                self.config.get(CONF_PRICE_FORECAST_IMPORT),
+                self.config.get(CONF_PRICE_FORECAST_EXPORT),
+            ] if eid and eid not in price_entities
+        ]
+        if economic_price_entities:
+            self._unsubs.append(
+                async_track_state_change_event(
+                    self.hass, economic_price_entities, self._on_economic_price_event
+                )
+            )
+
         # Les bornes HP/HC sont configurables. Chaque transition force une
         # nouvelle acquisition pour éviter une décision sur l'ancien tarif.
         for hour, minute in sorted(tariff_boundaries(self.settings)):
@@ -496,7 +694,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for hour, minute in sorted(self._machine_schedule_boundaries()):
             self._unsubs.append(async_track_time_change(self.hass, self._on_machine_schedule, hour=hour, minute=minute, second=0))
 
-        # EMS 2 schedule.
+        # IA prédictive schedule.
         for hour, minute, label in (
             (7, 0, "STRATÉGIE JOUR - TRANSITION HP 07:00"),
             (10, 30, "CONFIRMATION SOLAIRE 10:30"),
@@ -506,33 +704,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             (22, 0, "RÉÉVALUATION - TRANSITION HC NUIT 22:00"),
         ):
             self._unsubs.append(async_track_time_change(self.hass, lambda now, lbl=label: self.hass.async_create_task(self.async_analyze_solar(lbl)), hour=hour, minute=minute, second=0))
-
-    @callback
-    def _on_pri_measurement_report(self, event: Event) -> None:
-        """Chaque publication de capteur = une trame PRI, même valeur identique."""
-        entity_id = str(event.data.get("entity_id", ""))
-        if not entity_id:
-            return
-        state = event.data.get("new_state") or self.hass.states.get(entity_id)
-        reported_at = self._state_report_at(state) or dt_util.now()
-        self.hass.async_create_task(
-            self._async_pri_measurement_report(entity_id, reported_at, "event")
-        )
-
-    async def _async_pri_measurement_report(
-        self, entity_id: str, reported_at: datetime, origin: str
-    ) -> None:
-        """Traite exactement une fois une publication physique donnée."""
-        previous = self._pri_last_seen_report.get(entity_id)
-        if previous is not None and reported_at <= previous:
-            return
-        self._pri_last_seen_report[entity_id] = reported_at
-        self.measurement_state.update({
-            "last_pri_report_at": reported_at,
-            "last_pri_report_entity": entity_id,
-            "pri_report_count": int(self.measurement_state.get("pri_report_count", 0)) + 1,
-        })
-        await self.async_handle_inverter_grid_frame(f"{origin}:{entity_id}")
 
     @callback
     def _on_house_event(self, event: Event) -> None:
@@ -562,6 +733,48 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return (now - reported_at).total_seconds() <= timeout_s
 
     @callback
+    def _on_daily_counter_reset(self, now: datetime) -> None:
+        """Déclenche le reset journalier des compteurs visibles à minuit."""
+        self.hass.async_create_task(self._async_daily_counter_reset(now))
+
+    async def _async_daily_counter_reset(self, now: datetime) -> None:
+        """Réinitialise les séquences journalières sans casser les ACK internes."""
+        local_now = dt_util.as_local(now)
+        today = local_now.date().isoformat()
+        previous_date = str(self.metronome_state.get("counter_date") or "")
+        if previous_date == today:
+            return
+
+        previous_pulses = int(self.metronome_state.get("pulse_count", 0))
+        previous_primary = int(self.metronome_state.get("primary_report_count", 0))
+        previous_fallback = int(self.metronome_state.get("fallback_report_count", 0))
+        previous_frames = int(self._frame_id)
+        bus_summary = self.energy_bus.reset_daily_counters(local_now)
+
+        self.metronome_state.update({
+            "counter_date": today,
+            "last_daily_reset_at": local_now,
+            "previous_day_pulse_count": previous_pulses,
+            "previous_day_primary_report_count": previous_primary,
+            "previous_day_fallback_report_count": previous_fallback,
+            "previous_day_frame_count": previous_frames,
+            "previous_day_message_count": int(bus_summary.get("previous_day_message_count", 0)),
+            "pulse_count": 0,
+            "primary_report_count": 0,
+            "fallback_report_count": 0,
+            "last_reason": (
+                "Métronome : reset journalier à minuit — "
+                f"{previous_pulses} battement(s), {previous_frames} trame(s), "
+                f"{int(bus_summary.get('previous_day_message_count', 0))} message(s) archivés."
+            ),
+        })
+        self._frame_id = 0
+        self.pri_state["frame_id"] = 0
+        self.core_state["bus_message_id"] = None
+        self.async_set_updated_data(self._build_data())
+        await self._async_save()
+
+    @callback
     def _on_metronome_report(self, event: Event) -> None:
         """Capture un heartbeat du capteur principal ou de secours."""
         entity_id = str(event.data.get("entity_id", ""))
@@ -579,21 +792,23 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_metronome_watchdog(self, now: datetime) -> None:
         """Surveille la fraîcheur, détecte les republications et gère le fallback."""
+        local_today = dt_util.as_local(now).date().isoformat()
+        if str(self.metronome_state.get("counter_date") or "") != local_today:
+            await self._async_daily_counter_reset(now)
+
+        expired_frames = self.energy_bus.expire_frames(now=now, timeout_s=10.0)
+        if expired_frames:
+            self.metronome_state["last_reason"] = (
+                "Watchdog : trame(s) non clôturée(s) détectée(s) et marquée(s) TIMEOUT : "
+                + ", ".join(f"{fid}/{core}" for fid, core in expired_frames)
+            )
+
         primary = str(self.metronome_state.get("primary_entity") or "")
         fallback = str(self.metronome_state.get("fallback_entity") or "")
 
         # last_reported évolue même quand la valeur numérique ne change pas sur
-        # les versions HA récentes. Le watchdog récupère aussi toute publication
-        # PRI qui aurait échappé au listener direct ; aucun intervalle de 30 s ne
-        # limite ces trames PRI.
-        for entity_id in self._pri_measurement_entities():
-            state = self.hass.states.get(entity_id)
-            reported_at = self._state_report_at(state)
-            if isinstance(reported_at, datetime):
-                previous = self._pri_last_seen_report.get(entity_id)
-                if previous is None or reported_at > previous:
-                    await self._async_pri_measurement_report(entity_id, reported_at, "watchdog")
-
+        # les versions HA récentes. Cela ferme précisément le cas 100 -> 90 puis
+        # blocage sur une réinjection stable.
         for entity_id in (primary, fallback):
             if not entity_id:
                 continue
@@ -611,36 +826,39 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         primary_fresh = self._metronome_entity_fresh(primary, now, primary_timeout)
         fallback_fresh = self._metronome_entity_fresh(fallback, now, fallback_timeout)
 
-        last_pulse = self.metronome_state.get("last_pulse_at")
-        pulse_age = (now - last_pulse).total_seconds() if isinstance(last_pulse, datetime) else 1e9
-
         if not primary_fresh and fallback_fresh:
             self.metronome_state["status"] = "FALLBACK"
             self.metronome_state["source"] = "SECOURS"
-            self.metronome_state["last_reason"] = "Capteur principal muet : synchronisation sur le capteur de secours."
-            # Si le fallback ne change pas de valeur mais reste fraîchement
-            # publié, le métronome interne garantit quand même la cadence.
-            if pulse_age >= period:
-                await self._async_metronome_pulse(fallback, "fallback_interne", now)
+            self.metronome_state["last_reason"] = (
+                "Capteur principal muet : fallback armé. Seule une publication réelle "
+                "du capteur de secours déclenche une nouvelle trame."
+            )
             return
 
         if primary_fresh:
             self.metronome_state["status"] = "SYNCHRONISE"
             self.metronome_state["source"] = "PRINCIPAL"
-            if pulse_age >= period:
-                await self._async_metronome_pulse(primary, "principal_interne", now)
+            self.metronome_state["last_reason"] = (
+                "Source principale fraîche : Watchdog actif, aucune trame synthétique."
+            )
             return
 
-        # Aucun capteur frais : le CORE périodique attend. Le PRI n'est pas
-        # "bloqué" : il repart instantanément à la toute prochaine publication
-        # d'une mesure valide, quelle que soit sa valeur.
+        # Aucun capteur frais : on gèle les décisions plutôt que d'utiliser
+        # aveuglément des données réseau anciennes.
         self.metronome_state["status"] = "PERDU"
         self.metronome_state["source"] = "AUCUNE"
-        self.metronome_state["last_reason"] = "Principal et secours périmés : attente de la prochaine publication capteur."
+        self.metronome_state["last_reason"] = "Principal et secours périmés : aucune publication réseau, EMS/PRI gelés par sécurité."
+        self.pri_state["guard_reason"] = "metronome_perdu"
         self.async_set_updated_data(self._build_data())
 
     async def _async_metronome_report(self, entity_id: str, reported_at: datetime, origin: str) -> None:
-        """Enregistre une publication et transforme le heartbeat en battement régulé."""
+        """Traite chaque publication physique comme une trame réseau souveraine.
+
+        V1.6.150 : aucune temporisation de 30 s n'est appliquée aux publications
+        réelles. Le métronome est un Watchdog de fraîcheur, pas une horloge de
+        décision. Une publication acceptée cadence simultanément EMS Core et
+        Onduleur Core sur le même snapshot.
+        """
         async with self._metronome_lock:
             previous = self._metronome_last_seen_report.get(entity_id)
             if previous is not None and reported_at <= previous:
@@ -667,70 +885,129 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             report_age = max((now - reported_at).total_seconds(), 0.0)
             if source == "principal" and report_age > primary_timeout:
-                self.metronome_state["last_reason"] = "Heartbeat principal trop ancien : attente du capteur de secours."
+                self.metronome_state["last_reason"] = "Publication principale trop ancienne : attente du fallback."
                 return
             if source == "secours" and report_age > fallback_timeout:
-                self.metronome_state["last_reason"] = "Heartbeat secours trop ancien : aucune synchronisation autorisée."
+                self.metronome_state["last_reason"] = "Publication fallback trop ancienne : trame rejetée."
                 return
 
             primary_fresh = self._metronome_entity_fresh(primary, now, primary_timeout)
             if source == "secours" and primary_fresh:
-                # Le fallback est chaud et prêt, mais ne cadence pas tant que le
-                # principal est sain. Cela évite tout double pas PRI.
-                self.metronome_state["last_reason"] = "Heartbeat secours reçu; principal toujours souverain."
+                self.metronome_state["last_reason"] = "Publication fallback reçue; principal toujours souverain."
                 self.async_set_updated_data(self._build_data())
                 return
 
-            last_pulse = self.metronome_state.get("last_pulse_at")
-            pulse_age = (now - last_pulse).total_seconds() if isinstance(last_pulse, datetime) else 1e9
-            # Fenêtre anti-double-pulse : une grappe de capteurs Smappee peut
-            # republier plusieurs états quasi simultanément.
-            if pulse_age < period:
-                return
-
-            await self._async_metronome_pulse(entity_id, f"{source}_{origin}", now)
+        # Le verrou métronome est libéré AVANT les deux corps. Le dispatch crée
+        # une seule photographie puis lance les deux moteurs indépendamment.
+        await self._async_metronome_pulse(entity_id, f"{source}_{origin}", now)
 
     async def _async_metronome_pulse(self, entity_id: str, source: str, pulse_at: datetime) -> None:
-        """Un battement = une acquisition CORE + une décision PRI au maximum."""
-        async with self._metronome_pulse_lock:
-            last_pulse = self.metronome_state.get("last_pulse_at")
-            period = max(float(self.settings.get("metronome_period_s", 30.0)), 10.0)
-            if isinstance(last_pulse, datetime) and (pulse_at - last_pulse).total_seconds() < period:
-                return
-
+        """Transforme une publication réseau en UNE trame partagée par les deux corps."""
+        async with self._frame_dispatch_lock:
             self.metronome_state.update({
                 "status": "FALLBACK" if "fallback" in source or "secours" in source else "SYNCHRONISE",
                 "source": "SECOURS" if "fallback" in source or "secours" in source else "PRINCIPAL",
                 "last_pulse_at": pulse_at,
                 "last_pulse_source": source,
                 "pulse_count": int(self.metronome_state.get("pulse_count", 0)) + 1,
-                "period_s": period,
-                "next_due_at": pulse_at + timedelta(seconds=period),
-                "last_reason": f"Battement réseau synchronisé sur {entity_id} ({source}).",
+                "period_s": float(self.settings.get("metronome_period_s", 30.0)),
+                "next_due_at": None,
+                "last_reason": f"Publication réseau {entity_id} ({source}) : trame immédiate.",
             })
 
-            # Laisser une très courte fenêtre à la grappe Smappee pour publier ses
-            # autres grandeurs de la même trame avant l'acquisition globale.
-            await asyncio.sleep(0.20)
+            # Une seule séquence de trame et un seul snapshot pour EMS + Onduleur.
+            self._frame_id += 1
+            self._frame_serial += 1
+            frame_id = self._frame_id
+            frame_serial = self._frame_serial
+            snapshot = self.snapshot()
+            # La collecte machine est alimentée par la même photographie réseau,
+            # mais reste strictement observatrice.
+            self._record_machine_learning(snapshot=snapshot, now=pulse_at, source="GRID_FRAME")
+            machine_context = self._machine_bus_context(pulse_at)
+            self.energy_bus.on_grid_frame(
+                frame_id, pulse_at, source=entity_id, frame_serial=frame_serial,
+                grid_net_w=snapshot.grid_net_w, pv_w=snapshot.pv_w, house_w=snapshot.house_w,
+                import_w=snapshot.import_w, export_w=snapshot.export_w, valid=snapshot.valid,
+                boiler_power_w=snapshot.boiler_power_w, boiler_temp_c=snapshot.boiler_temp_c,
+                boiler_on=snapshot.boiler_on, machine_active=snapshot.machine_active,
+                machine_context=machine_context,
+                mode=str(self.settings.get("mode")),
+                network_policy=str(self.settings.get("network_policy")),
+            )
 
-            # Le CORE garde son métronome. Le PRI, lui, est cadencé directement
-            # par chaque publication de capteur. Un battement purement interne
-            # sert uniquement de fallback si aucun callback physique exploitable
-            # n'a été reçu pendant la période.
-            if "interne" in source:
-                self.hass.async_create_task(
-                    self.async_handle_inverter_grid_frame(f"metronome_fallback:{entity_id}:{source}")
-                )
-            self.hass.async_create_task(self.async_handle_house_frame())
+        # Les deux tasks partent du même snapshot mais n'attendent jamais l'autre.
+        self.hass.async_create_task(
+            self._run_dispatched_core(
+                "ONDULEUR", frame_id,
+                self.async_handle_inverter_grid_frame(
+                    f"{entity_id}:{source}", snapshot=snapshot, frame_id=frame_id,
+                    frame_serial=frame_serial, frame_at=pulse_at,
+                ),
+            )
+        )
+        self.hass.async_create_task(
+            self._run_dispatched_core(
+                "EMS", frame_id,
+                self.async_handle_house_frame(
+                    snapshot=snapshot, frame_id=frame_id, frame_serial=frame_serial,
+                    frame_at=pulse_at, source_entity=f"{entity_id}:{source}",
+                ),
+            )
+        )
+
+    async def _run_dispatched_core(self, core: str, frame_id: int, task: Any) -> None:
+        """Garantit qu'une exception de moteur ne laisse jamais une trame PENDING."""
+        try:
+            await task
+        except asyncio.CancelledError:
+            self.energy_bus.mark_frame_core(
+                frame_id, core, "CANCELLED", now=dt_util.now(), reason="Task annulée."
+            )
+            raise
+        except Exception as err:  # pragma: no cover - garde runtime HA
+            _LOGGER.exception("FoxCat %s Core frame %s error: %s", core, frame_id, err)
+            self.energy_bus.mark_frame_core(
+                frame_id, core, "ERROR", now=dt_util.now(), reason=str(err)
+            )
+            if core == "EMS":
+                self.core_state["last_reason"] = f"EMS Core : erreur trame {frame_id} : {err}"
+            else:
+                self.pri_state["last_reason"] = f"Onduleur Core : erreur trame {frame_id} : {err}"
+            self.async_set_updated_data(self._build_data())
 
     @callback
     def _on_grid_event(self, event: Event) -> None:
-        """Télémétrie CORE. Le PRI possède son listener publication dédié."""
-        self.hass.async_create_task(self.async_handle_grid_change())
+        entity_id = str(event.data.get("entity_id", ""))
+        signed_id = str(self.config.get(CONF_GRID_SIGNED_SENSOR) or "")
+        export_id = str(self.config.get(CONF_GRID_EXPORT_SENSOR) or "")
+        legacy_id = str(self.config.get(CONF_GRID_LEGACY_SENSOR) or "")
+        inverter_clock = signed_id or export_id or legacy_id
+
+        # Le métronome synchronisé reste l'unique horloge PRI. Les événements
+        # réseau mettent immédiatement les données à jour sans créer un second
+        # battement. La voie historique n'est utilisée que sans métronome.
+        metronome_clock = str(self.metronome_state.get("primary_entity") or "")
+        if not metronome_clock and entity_id and entity_id == inverter_clock:
+            # Compatibilité legacy : même sans métronome configuré, une
+            # publication réseau cadence désormais LES DEUX corps.
+            self.hass.async_create_task(
+                self._async_metronome_pulse(entity_id, "legacy_event", dt_util.now())
+            )
+        else:
+            self.hass.async_create_task(self.async_handle_grid_change())
 
     @callback
     def _on_safety_event(self, event: Event) -> None:
         self.hass.async_create_task(self.async_handle_safety_change())
+
+    @callback
+    def _on_machine_telemetry_event(self, event: Event) -> None:
+        """Collecte passive : aucun appel de décision ni commande physique."""
+        now = dt_util.now()
+        snapshot = self.snapshot()
+        self._record_machine_learning(snapshot=snapshot, now=now, source="TELEMETRY_EVENT")
+        self.async_set_updated_data(self._build_data(snapshot))
 
     @callback
     def _on_pv_event(self, event: Event) -> None:
@@ -739,6 +1016,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     @callback
     def _on_price_event(self, event: Event) -> None:
         self.hass.async_create_task(self.async_handle_price_change())
+
+    @callback
+    def _on_economic_price_event(self, event: Event) -> None:
+        """Rafraîchit uniquement le comparateur économique hors Energy Bus."""
+        self.async_set_updated_data(self._build_data())
 
     @callback
     def _on_tariff_boundary(self, now: datetime) -> None:
@@ -786,79 +1068,87 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self._optional_float_state(entity_id) is not None
 
     def snapshot(self) -> EnergySnapshot:
-        """Construit les mesures FoxCat normalisées à partir des capteurs source.
+        """Build the sovereign FoxCat energy snapshot.
 
-        Les entités FoxCat exposées à Home Assistant utilisent ce snapshot plutôt
-        que les capteurs bruts. Import/export peuvent être reconstruits depuis le
-        capteur réseau signé historique et la consommation maison peut être
-        reconstruite par bilan PV + import - export si son capteur direct manque.
+        V1.6.0 uses two mandatory physical measurements:
+        - signed grid power;
+        - photovoltaic production.
+
+        Import, export and house consumption are derived by FoxCat.  Existing
+        pre-1.6 installations without ``grid_signed_sensor`` keep the legacy
+        four-sensor path until the Sources énergétiques page is saved.
         """
         pv_id = self.config.get(CONF_PV_SENSOR)
-        house_id = self.config.get(CONF_HOUSE_SENSOR)
-        export_id = self.config.get(CONF_GRID_EXPORT_SENSOR)
-        import_id = self.config.get(CONF_GRID_IMPORT_SENSOR)
-        legacy_id = self.config.get(CONF_GRID_LEGACY_SENSOR)
+        pv = max(self._float_state(pv_id), 0.0)
 
-        pv_raw = self._optional_float_state(pv_id)
-        house_raw = self._optional_float_state(house_id)
-        export_raw = self._optional_float_state(export_id)
-        import_raw = self._optional_float_state(import_id)
-        legacy_raw = self._optional_float_state(legacy_id)
+        primary_grid_id = self.config.get(CONF_GRID_SIGNED_SENSOR)
+        fallback_grid_id = self.config.get(CONF_METRONOME_FALLBACK_SENSOR)
+        signed_grid_id = primary_grid_id
+        now = dt_util.now()
+        primary_fresh = self._metronome_entity_fresh(
+            primary_grid_id,
+            now,
+            float(self.settings.get("metronome_primary_timeout_s", 45.0)),
+        ) if primary_grid_id else False
+        fallback_fresh = self._metronome_entity_fresh(
+            fallback_grid_id,
+            now,
+            float(self.settings.get("metronome_fallback_timeout_s", 90.0)),
+        ) if fallback_grid_id else False
 
-        pv_valid = pv_raw is not None
-        pv = max(float(pv_raw or 0.0), 0.0)
+        # Le fallback V1.6 est lui aussi une puissance réseau signée. Quand le
+        # principal n'est plus frais, valeur + cadence basculent ensemble.
+        if fallback_grid_id and fallback_fresh and (
+            self.metronome_state.get("source") == "SECOURS" or not primary_fresh
+        ):
+            signed_grid_id = fallback_grid_id
 
-        if export_raw is not None:
-            export = max(float(export_raw), 0.0)
-            export_source = str(export_id or "capteur export")
-        elif legacy_raw is not None:
-            export = max(float(legacy_raw), 0.0)
-            export_source = str(legacy_id or "réseau signé")
+        if signed_grid_id:
+            raw_grid = self._float_state(signed_grid_id)
+            convention = str(self.config.get(CONF_GRID_SIGN_CONVENTION, GRID_SIGN_IMPORT_POSITIVE))
+            if convention == GRID_SIGN_EXPORT_POSITIVE:
+                export = max(raw_grid, 0.0)
+                imp = max(-raw_grid, 0.0)
+            else:
+                imp = max(raw_grid, 0.0)
+                export = max(-raw_grid, 0.0)
+            # Conservation of power at the point of common coupling.
+            house = max(pv + imp - export, 0.0)
+            active_fresh = fallback_fresh if signed_grid_id == fallback_grid_id else primary_fresh
+            valid = (
+                self._numeric_valid(pv_id)
+                and self._numeric_valid(signed_grid_id)
+                and active_fresh
+            )
         else:
-            export = 0.0
-            export_source = "INDISPONIBLE"
-
-        if import_raw is not None:
-            imp = max(float(import_raw), 0.0)
-            import_source = str(import_id or "capteur import")
-        elif legacy_raw is not None:
-            imp = max(-float(legacy_raw), 0.0)
-            import_source = str(legacy_id or "réseau signé")
-        else:
-            imp = 0.0
-            import_source = "INDISPONIBLE"
-
-        grid_valid = (export_raw is not None or legacy_raw is not None) and (
-            import_raw is not None or legacy_raw is not None
-        )
-        house_calculated = max(pv + imp - export, 0.0) if pv_valid and grid_valid else None
-
-        if house_raw is not None:
-            house = max(float(house_raw), 0.0)
-            house_source = str(house_id or "capteur maison")
-        elif house_calculated is not None:
-            house = float(house_calculated)
-            house_source = "CALCUL FOXCAT: PV + import - export"
-        else:
-            house = 0.0
-            house_source = "INDISPONIBLE"
-
-        house_delta = (
-            float(house_raw) - float(house_calculated)
-            if house_raw is not None and house_calculated is not None
-            else None
-        )
-        valid = bool(pv_valid and grid_valid and (house_raw is not None or house_calculated is not None))
-        quality = "OK" if valid else "INCOMPLET"
-        if valid and house_raw is None:
-            quality = "FALLBACK_CALCULE"
-        elif valid and house_delta is not None and abs(house_delta) > 500.0:
-            quality = "ECART_MAISON_RESEAU"
+            # Migration fallback for installations created before 1.6.0.
+            house_id = self.config.get(CONF_HOUSE_SENSOR)
+            export_id = self.config.get(CONF_GRID_EXPORT_SENSOR)
+            import_id = self.config.get(CONF_GRID_IMPORT_SENSOR)
+            house = max(self._float_state(house_id), 0.0)
+            export = max(self._float_state(export_id), 0.0)
+            imp = max(self._float_state(import_id), 0.0)
+            valid = all(self._numeric_valid(eid) for eid in [pv_id, house_id, export_id, import_id])
 
         boiler_power = max(self._float_state(self.config.get(CONF_BOILER_POWER_SENSOR)), 0.0)
         boiler_binary = self._is_on(self.config.get(CONF_BOILER_BINARY))
         boiler_on = boiler_binary or boiler_power > 200
         boiler_temp = self._float_state(self.config.get(CONF_BOILER_TEMP_SENSOR))
+
+        # V1.6.154 : la sonde placée sur la résistance est la référence de
+        # sécurité thermique lorsqu'elle est configurée et valide. La sonde
+        # boiler historique reste la référence de régulation ECS et le secours
+        # de sécurité pour garantir la compatibilité des installations existantes.
+        resistance_id = self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR)
+        resistance_temp = self._optional_float_state(resistance_id) if resistance_id else None
+        boiler_safety_temp = resistance_temp if resistance_temp is not None else boiler_temp
+        boiler_safety_source = "RESISTANCE" if resistance_temp is not None else "REFERENCE"
+
+        # La puissance physique onduleur est lue au moment du snapshot mais ne
+        # cadence jamais EMS Core ni Onduleur Core. Le rôle de registre direct
+        # reste disponible au dashboard pour un affichage réellement live.
+        inverter_power = max(self._float_state(self.config.get(CONF_INVERTER_POWER_SENSOR)), 0.0)
+
         climate = self.hass.states.get(self.config.get(CONF_BOILER_CLIMATE)) if self.config.get(CONF_BOILER_CLIMATE) else None
         try:
             setpoint = float(climate.attributes.get("temperature", self.settings["boiler_temp_normal_c"])) if climate else float(self.settings["boiler_temp_normal_c"])
@@ -869,45 +1159,71 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             for machine in self.machines
             if machine.cycle_entity
         )
-
-        now = dt_util.now()
-        self.measurement_state.update({
-            "valid": valid,
-            "quality": quality,
-            "pv_source": str(pv_id or "INDISPONIBLE") if pv_valid else "INDISPONIBLE",
-            "house_source": house_source,
-            "grid_export_source": export_source,
-            "grid_import_source": import_source,
-            "house_input_w": house_raw,
-            "house_calculated_w": house_calculated,
-            "house_delta_w": house_delta,
-            "last_snapshot_at": now,
-        })
-
         return EnergySnapshot(
-            timestamp=now,
+            timestamp=dt_util.now(),
             pv_w=pv,
             house_w=house,
             export_w=export,
             import_w=imp,
+            # Internal historical FoxCat convention: + export / - import.
             grid_net_w=export - imp,
             boiler_temp_c=boiler_temp,
+            boiler_safety_temp_c=boiler_safety_temp,
             boiler_power_w=boiler_power,
+            inverter_power_w=inverter_power,
             boiler_on=boiler_on,
             boiler_setpoint_c=setpoint,
             machine_active=machine_active,
             valid=valid,
             raw={
-                "pv_source": pv_id,
-                "house_source": house_source,
-                "house_input_w": house_raw,
-                "house_calculated_w": house_calculated,
-                "house_delta_w": house_delta,
-                "export_source": export_source,
-                "import_source": import_source,
-                "quality": quality,
+                "boiler_resistance_temp_c": resistance_temp,
+                "boiler_safety_source": boiler_safety_source,
+                "inverter_power_w": inverter_power,
             },
         )
+
+    def _boiler_thermal_view(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
+        """Modèle thermique physique du Boiler, destiné à l'arbitrage DYNAMIQUE.
+
+        Ce calcul est purement descriptif hors régime dynamique : il n'altère
+        ni HP/HC, ni les sécurités, ni la comptabilité. La constante 1.163
+        représente l'énergie en Wh nécessaire pour élever 1 litre d'eau de 1 °C.
+        """
+        snap = snapshot or self.snapshot()
+        try:
+            volume_l = max(float(self.config.get(CONF_BOILER_VOLUME, 250.0)), 0.0)
+        except (TypeError, ValueError):
+            volume_l = 250.0
+        try:
+            element_power_w = max(
+                float(self.config.get(CONF_BOILER_ELEMENT_POWER, self.settings.get("boiler_power_w", 2000.0))),
+                0.0,
+            )
+        except (TypeError, ValueError):
+            element_power_w = max(float(self.settings.get("boiler_power_w", 2000.0)), 0.0)
+        try:
+            cold_water_c = float(self.config.get(CONF_BOILER_COLD_WATER_TEMP, 15.0))
+        except (TypeError, ValueError):
+            cold_water_c = 15.0
+
+        target_c = max(float(self.settings.get("boiler_temp_normal_c", 45.0)), 0.0)
+        measured_c = float(snap.boiler_temp_c)
+        delta_c = max(target_c - measured_c, 0.0)
+        energy_missing_kwh = max(volume_l * 1.163 * delta_c / 1000.0, 0.0)
+        heating_duration_h = (energy_missing_kwh / (element_power_w / 1000.0)) if element_power_w > 0 else None
+        capacity_comfort_kwh = max(volume_l * 1.163 * max(target_c - cold_water_c, 0.0) / 1000.0, 0.0)
+
+        return {
+            "volume_l": round(volume_l, 3),
+            "element_power_w": round(element_power_w, 3),
+            "cold_water_temp_c": round(cold_water_c, 3),
+            "measured_temp_c": round(measured_c, 3),
+            "target_temp_c": round(target_c, 3),
+            "comfort_min_c": float(self.settings.get("boiler_temp_start_c", 43.0)),
+            "energy_missing_kwh": round(energy_missing_kwh, 5),
+            "heating_duration_h": round(heating_duration_h, 5) if heating_duration_h is not None else None,
+            "thermal_capacity_comfort_kwh": round(capacity_comfort_kwh, 5),
+        }
 
     def _boiler_on_seconds(self) -> float:
         """Return trusted physical ON duration for the boiler.
@@ -927,20 +1243,45 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def prices(self) -> dict[str, Any]:
         """Build the tariff context used by modes and tariff sensors."""
-        current = self._optional_float_state(self.config.get(CONF_PRICE_CURRENT))
-        next_price = self._optional_float_state(self.config.get(CONF_PRICE_NEXT))
-        injection = self._optional_float_state(self.config.get(CONF_PRICE_INJECTION))
-        pmin = self._optional_float_state(self.config.get(CONF_PRICE_MIN_TODAY))
-        pmax = self._optional_float_state(self.config.get(CONF_PRICE_MAX_TODAY))
-        avg = self._optional_float_state(self.config.get(CONF_PRICE_AVG_TODAY))
+        # Une ancienne configuration pouvait avoir pointé les clés dynamiques
+        # vers ComfyFlex. 1.6.158 refuse ce mélange : toute source ComfyFlex
+        # rencontrée dans le bloc Dynamique est remplacée par Luminus Dynamic.
+        configured_dynamic_current = str(self.config.get(CONF_PRICE_CURRENT) or "")
+        configured_dynamic_next = str(self.config.get(CONF_PRICE_NEXT) or "")
+        configured_dynamic_injection = str(self.config.get(CONF_PRICE_INJECTION) or "")
+        configured_dynamic_min = str(self.config.get(CONF_PRICE_MIN_TODAY) or "")
+        configured_dynamic_max = str(self.config.get(CONF_PRICE_MAX_TODAY) or "")
+        configured_dynamic_avg = str(self.config.get(CONF_PRICE_AVG_TODAY) or "")
+
+        dynamic_current_id = configured_dynamic_current if configured_dynamic_current and "comfyflex" not in configured_dynamic_current.lower() else "sensor.luminus_luminus_dynamic_wallonia_prix_actuel"
+        dynamic_next_id = configured_dynamic_next if configured_dynamic_next and "comfyflex" not in configured_dynamic_next.lower() else "sensor.luminus_luminus_dynamic_wallonia_prix_heure_suivante"
+        dynamic_injection_id = configured_dynamic_injection if configured_dynamic_injection and "comfyflex" not in configured_dynamic_injection.lower() else "sensor.luminus_luminus_dynamic_wallonia_prix_d_injection"
+        dynamic_min_id = configured_dynamic_min if configured_dynamic_min and "comfyflex" not in configured_dynamic_min.lower() else "sensor.luminus_luminus_dynamic_wallonia_minimum_aujourd_hui"
+        dynamic_max_id = configured_dynamic_max if configured_dynamic_max and "comfyflex" not in configured_dynamic_max.lower() else "sensor.luminus_luminus_dynamic_wallonia_maximum_aujourd_hui"
+        dynamic_avg_id = configured_dynamic_avg if configured_dynamic_avg and "comfyflex" not in configured_dynamic_avg.lower() else "sensor.luminus_luminus_dynamic_wallonia_moyenne_aujourd_hui"
+
+        current = self._optional_float_state(dynamic_current_id)
+        next_price = self._optional_float_state(dynamic_next_id)
+        injection = self._optional_float_state(dynamic_injection_id)
+        pmin = self._optional_float_state(dynamic_min_id)
+        pmax = self._optional_float_state(dynamic_max_id)
+        avg = self._optional_float_state(dynamic_avg_id)
         regime = str(self.settings.get("tariff_regime", TARIFF_TOU))
         period = tariff_period(dt_util.now(), self.settings)
 
         fixed_injection_manual = float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE, 0.0))
 
-        hp_sensor_id = self.config.get(CONF_TARIFF_HP_PRICE_SENSOR)
-        hc_sensor_id = self.config.get(CONF_TARIFF_HC_PRICE_SENSOR)
-        fixed_injection_sensor_id = self.config.get(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR)
+        # Séparation stricte des familles tarifaires :
+        # - Dynamique -> Luminus Dynamic
+        # - HP/HC -> Luminus ComfyFlex
+        # Les fallbacks couvrent les installations migrées dont les options
+        # existaient avant l'ajout des valeurs par défaut 1.6.158.
+        configured_hp = str(self.config.get(CONF_TARIFF_HP_PRICE_SENSOR) or "")
+        configured_hc = str(self.config.get(CONF_TARIFF_HC_PRICE_SENSOR) or "")
+        configured_hphc_injection = str(self.config.get(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR) or "")
+        hp_sensor_id = configured_hp if configured_hp and "dynamic" not in configured_hp.lower() else "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_pleines_jour"
+        hc_sensor_id = configured_hc if configured_hc and "dynamic" not in configured_hc.lower() else "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_creuses_nuit"
+        fixed_injection_sensor_id = configured_hphc_injection if configured_hphc_injection and "dynamic" not in configured_hphc_injection.lower() else "sensor.luminus_luminus_comfyflex_wallonia_prix_d_injection"
         hp_price = self._optional_float_state(hp_sensor_id)
         hc_price = self._optional_float_state(hc_sensor_id)
         fixed_injection_from_entity = self._optional_float_state(fixed_injection_sensor_id)
@@ -954,10 +1295,23 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         export_value: float | None
         if regime == TARIFF_DYNAMIC:
             active_buy = current
-            # Luminus Dynamic expose historiquement un prix d'injection signé :
-            # une valeur négative signifie une rémunération. On normalise ici
-            # en valeur économique positive pour les capteurs de coût.
-            export_value = -injection if injection is not None else None
+            # Luminus Dynamic expose une valeur d'injection signée :
+            # positif = recette, négatif = coût pour injecter. Cette convention
+            # est souveraine pour la source Luminus. Les sources externes peuvent
+            # encore utiliser le sélecteur de convention explicite.
+            injection_entity = str(dynamic_injection_id)
+            is_luminus_dynamic = "luminus_luminus_dynamic" in injection_entity.lower()
+            export_sign = (
+                DYNAMIC_EXPORT_POSITIVE_IS_REVENUE
+                if is_luminus_dynamic
+                else str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_POSITIVE_IS_REVENUE))
+            )
+            if injection is None:
+                export_value = None
+            elif export_sign == DYNAMIC_EXPORT_POSITIVE_IS_REVENUE:
+                export_value = injection
+            else:
+                export_value = -injection
             status = price_status(current, pmin, pmax, avg)
             model = "DYNAMIQUE"
         else:
@@ -969,6 +1323,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 status = f"{status} · HIÉRARCHIE SANS PRIX"
 
         snap = self.snapshot()
+        # Prix affichés génériques : le dashboard n'a plus à deviner le régime.
+        # En dynamique, H+1 vient du fournisseur. En bi-horaire, le prochain
+        # tarif est simplement l'autre période HP/HC.
+        if regime == TARIFF_DYNAMIC:
+            next_buy = next_price
+            active_label = "DYNAMIQUE"
+            next_label = "HEURE SUIVANTE"
+        else:
+            next_buy = hc_price if period == "HP" else hp_price
+            active_label = period
+            next_label = "HC" if period == "HP" else "HP"
+
         import_cost_rate = (snap.import_w / 1000.0 * active_buy) if active_buy is not None else None
         export_value_rate = (snap.export_w / 1000.0 * export_value) if export_value is not None else None
         net_cost_rate = None
@@ -989,15 +1355,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "min_today": pmin,
             "max_today": pmax,
             "avg_today": avg,
-            "min_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW)),
-            "max_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW)),
-            "avg_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),
+            "min_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW) or "sensor.luminus_luminus_dynamic_wallonia_minimum_demain"),
+            "max_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW) or "sensor.luminus_luminus_dynamic_wallonia_maximum_demain"),
+            "avg_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW) or "sensor.luminus_luminus_dynamic_wallonia_moyenne_demain"),
             "regime": regime,
             "period": period,
             "status": status,
             "cost_model": model,
             "active_buy": active_buy,
+            "next_buy": next_buy,
+            "active_buy_label": active_label,
+            "next_buy_label": next_label,
             "export_value": export_value,
+            "export_sign_convention": export_sign if regime == TARIFF_DYNAMIC else DYNAMIC_EXPORT_POSITIVE_IS_REVENUE,
             "negative_purchase": bool(regime == TARIFF_DYNAMIC and active_buy is not None and active_buy < negative_threshold),
             "dynamic_compatible": regime == TARIFF_DYNAMIC,
             "import_cost_rate_eur_h": import_cost_rate,
@@ -1006,15 +1376,344 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
 
+    def _economic_series_from_entity(
+        self,
+        entity_id: str | None,
+        *,
+        source: str,
+        now: datetime,
+        horizon_hours: int,
+        price_keys: tuple[str, ...] | None = None,
+    ) -> list[PricePoint]:
+        """Lit une série de prix depuis les attributs d'une entité HA.
+
+        Aucun événement n'est publié sur Energy Bus. Le format est volontairement
+        générique afin de rester compatible avec plusieurs intégrations tarifaires.
+        """
+        if not entity_id:
+            return []
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return []
+        raw: dict[str, Any] = dict(state.attributes)
+        # Certaines intégrations exposent la série dans l'état lui-même sous
+        # forme JSON/list; dans ce cas on laisse également le parseur l'essayer.
+        raw["entity_state"] = state.state
+        return extract_price_points(
+            raw, now, source=source, horizon_hours=horizon_hours, price_keys=price_keys
+        )
+
+    def _economic_import_points(
+        self, prices: dict[str, Any], now: datetime
+    ) -> list[PricePoint]:
+        regime = str(prices.get("regime", TARIFF_TOU))
+        horizon = (
+            DYNAMIC_ARBITRAGE_HORIZON_HOURS
+            if regime == TARIFF_DYNAMIC
+            else int(float(self.settings.get("economic_horizon_hours", 24.0)))
+        )
+        if regime == TARIFF_TOU:
+            return build_hphc_points(
+                now,
+                self.settings,
+                prices.get("hp_price") if isinstance(prices.get("hp_price"), (int, float)) else None,
+                prices.get("hc_price") if isinstance(prices.get("hc_price"), (int, float)) else None,
+                horizon_hours=horizon,
+            )
+
+        # Source financière dynamique souveraine : Luminus Dynamic. Les séries
+        # Nord Pool / ENTSO-E éventuelles restent des indicateurs de timing et ne
+        # remplacent jamais le prix client dans une décision FoxCat.
+        source_entity = (
+            self.config.get(CONF_PRICE_CURRENT)
+            if self.config.get(CONF_PRICE_CURRENT) and "comfyflex" not in str(self.config.get(CONF_PRICE_CURRENT)).lower()
+            else "sensor.luminus_luminus_dynamic_wallonia_prix_actuel"
+        )
+        series = self._economic_series_from_entity(
+            source_entity, source="DYNAMIC_IMPORT", now=now, horizon_hours=horizon,
+            price_keys=("all_in", "price", "value", "total", "price_eur_kwh", "eur_kwh", "eur_per_kwh", "import_price", "marketprice", "prijs"),
+        )
+        current = prices.get("active_buy")
+        nxt = prices.get("next_buy")
+        manual: list[PricePoint] = []
+        slot = now.replace(minute=0, second=0, microsecond=0)
+        if isinstance(current, (int, float)):
+            manual.append(PricePoint(slot, float(current), "DYNAMIC_CURRENT"))
+        if isinstance(nxt, (int, float)):
+            manual.append(PricePoint(slot + timedelta(hours=1), float(nxt), "DYNAMIC_NEXT"))
+        return merge_price_points(series, manual)
+
+    def _economic_export_points(
+        self, prices: dict[str, Any], now: datetime
+    ) -> list[PricePoint]:
+        """Retourne la VALEUR économique de l'export, positive = recette."""
+        regime = str(prices.get("regime", TARIFF_TOU))
+        horizon = (
+            DYNAMIC_ARBITRAGE_HORIZON_HOURS
+            if regime == TARIFF_DYNAMIC
+            else int(float(self.settings.get("economic_horizon_hours", 24.0)))
+        )
+        if regime == TARIFF_TOU:
+            value = prices.get("export_value")
+            if not isinstance(value, (int, float)):
+                return []
+            return [
+                PricePoint(now + timedelta(hours=hour), float(value), "HP_HC_EXPORT")
+                for hour in range(horizon + 1)
+            ]
+
+        # La courbe de réinjection utilisée financièrement vient du contrat
+        # Luminus Dynamic. Une autre courbe de marché ne peut pas se substituer
+        # à la rémunération/coût réellement appliqué au client.
+        source_entity = (
+            self.config.get(CONF_PRICE_INJECTION)
+            if self.config.get(CONF_PRICE_INJECTION) and "comfyflex" not in str(self.config.get(CONF_PRICE_INJECTION)).lower()
+            else "sensor.luminus_luminus_dynamic_wallonia_prix_d_injection"
+        )
+        raw = self._economic_series_from_entity(
+            source_entity, source="DYNAMIC_EXPORT_RAW", now=now, horizon_hours=horizon,
+            price_keys=("injection", "export_price", "price", "value", "total", "price_eur_kwh", "eur_kwh", "eur_per_kwh"),
+        )
+        # Même convention que prices(). Luminus Dynamic est explicitement
+        # positif = recette / négatif = coût.
+        is_luminus_dynamic = "luminus_luminus_dynamic" in str(source_entity).lower()
+        export_sign = (
+            DYNAMIC_EXPORT_POSITIVE_IS_REVENUE
+            if is_luminus_dynamic
+            else str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_POSITIVE_IS_REVENUE))
+        )
+        factor = 1.0 if export_sign == DYNAMIC_EXPORT_POSITIVE_IS_REVENUE else -1.0
+        normalised = [PricePoint(p.at, factor * float(p.price), "DYNAMIC_EXPORT") for p in raw]
+        current = prices.get("export_value")
+        if isinstance(current, (int, float)):
+            normalised.append(
+                PricePoint(now.replace(minute=0, second=0, microsecond=0), float(current), "DYNAMIC_EXPORT_CURRENT")
+            )
+        return merge_price_points(normalised)
+
+    def _economic_view(
+        self,
+        snapshot: EnergySnapshot | None = None,
+        *,
+        prices: dict[str, Any] | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Construit la décision économique hors Energy Bus.
+
+        Cette couche peut autoriser/report­er le NOUVEAU démarrage automatique
+        d'une charge flexible. Elle ne modifie ni PRI, ni Onduleur Core, ni
+        machine à états des cycles et ne publie aucun message inter-cœurs.
+        """
+        now = now or dt_util.now()
+        snap = snapshot or self.snapshot()
+        tariff = prices or self.prices()
+        import_points = self._economic_import_points(tariff, now)
+        export_points = self._economic_export_points(tariff, now)
+        boiler_thermal = self._boiler_thermal_view(snap)
+        decision = evaluate_market(
+            now=now,
+            snapshot=snap,
+            prices=tariff,
+            settings=self.settings,
+            import_points=import_points,
+            export_points=export_points,
+            boiler_thermal=boiler_thermal,
+        ).as_dict()
+
+        learning = self.machine_learning.view()
+        cycles = self.machine_cycle_manager.snapshot(now)
+        recommendations: dict[str, Any] = {}
+        for machine in self.machines:
+            profile = learning.get(machine.machine_id, {})
+            duration_s = profile.get("average_duration_s_10")
+            energy_wh = profile.get("average_energy_wh_10")
+            cycle = cycles.get(machine.machine_id, {})
+            recommendations[machine.machine_id] = recommend_flexible_load(
+                now=now,
+                snapshot=snap,
+                prices=tariff,
+                settings=self.settings,
+                import_points=import_points,
+                duration_hours=(float(duration_s) / 3600.0) if isinstance(duration_s, (int, float)) and duration_s > 0 else None,
+                energy_kwh=(float(energy_wh) / 1000.0) if isinstance(energy_wh, (int, float)) and energy_wh > 0 else None,
+                active=bool(cycle.get("protected", False)),
+                market_decision=decision,
+            )
+            recommendations[machine.machine_id]["name"] = machine.name
+            recommendations[machine.machine_id]["profile_cycles"] = int(profile.get("total_cycles", 0) or 0)
+
+        best_export = max(export_points, key=lambda p: p.price) if export_points else None
+        worst_export = min(export_points, key=lambda p: p.price) if export_points else None
+        return {
+            "decision": decision,
+            "boiler_thermal": boiler_thermal,
+            "machines": recommendations,
+            "forecast": {
+                "import_points": len(import_points),
+                "export_points": len(export_points),
+                # La même courbe normalisée alimente désormais le moteur économique
+                # ET le dashboard. Il n'existe donc plus une courbe « visuelle »
+                # différente de celle utilisée pour décider.
+                "import_curve": [
+                    {"at": point.at.isoformat(), "price": float(point.price), "source": point.source}
+                    for point in import_points
+                ],
+                "export_curve": [
+                    {"at": point.at.isoformat(), "price": float(point.price), "source": point.source}
+                    for point in export_points
+                ],
+                "current_at": now.isoformat(),
+                "current_buy_eur_kwh": tariff.get("active_buy"),
+                "current_export_value_eur_kwh": tariff.get("export_value"),
+                "curve_position_pct": decision.get("dynamic_curve_position_pct"),
+                "curve_band": decision.get("dynamic_price_band"),
+                "regime": tariff.get("regime"),
+                "period": tariff.get("period"),
+                "best_export_value_eur_kwh": best_export.price if best_export else None,
+                "best_export_at": best_export.at.isoformat() if best_export else None,
+                "worst_export_value_eur_kwh": worst_export.price if worst_export else None,
+                "worst_export_at": worst_export.at.isoformat() if worst_export else None,
+                "horizon_hours": int(float(self.settings.get("economic_horizon_hours", 24.0))),
+                "source_import": (
+                    "HP/HC calculé depuis ComfyFlex"
+                    if str(tariff.get("regime")) == TARIFF_TOU
+                    else "Luminus Dynamic · all_in"
+                ),
+                "source_export": (
+                    "ComfyFlex · réinjection"
+                    if str(tariff.get("regime")) == TARIFF_TOU
+                    else "Luminus Dynamic · injection"
+                ),
+            },
+        }
+
+
+    def _apply_dynamic_boiler_arbitrage(
+        self, snapshot: EnergySnapshot, intent: BoilerIntent, economic_view: dict[str, Any]
+    ) -> BoilerIntent:
+        """Applique l'arbitrage Day-Ahead au Boiler, uniquement en mode DYNAMIQUE.
+
+        Les sécurités CORE et les overrides utilisateur sont traités avant cet
+        appel. Lorsque le kill-switch prédictif est coupé ou que le moteur est en
+        repli standard, l'intention historique est restituée sans modification.
+        """
+        if str(self.settings.get("mode")) != MODE_DYNAMIC:
+            return intent
+        if str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC:
+            return intent
+        if not bool(self.settings.get("predictive_pricing_enabled", True)):
+            return intent
+        decision = dict(economic_view.get("decision", {}) or {})
+        if bool(decision.get("dynamic_fallback")) or not decision.get("dynamic_price_band"):
+            return intent
+        if intent.origin in {"SECURITE", "UTILISATEUR"}:
+            return intent
+
+        normal = float(self.settings.get("boiler_temp_normal_c", 45.0))
+        minimum = float(self.settings.get("boiler_temp_start_c", 43.0))
+        element_w = float((economic_view.get("boiler_thermal") or {}).get("element_power_w") or self.settings.get("boiler_power_w", 1800.0))
+        band = str(decision.get("dynamic_price_band"))
+        index = decision.get("dynamic_price_index")
+        current_buy = decision.get("current_buy_eur_kwh")
+        negative_threshold = float(self.settings.get("dynamic_grid_charge_threshold_eur_kwh", 0.0))
+        negative_enabled = bool(self.settings.get("dynamic_negative_price_charge_enabled", True))
+        negative_price = isinstance(current_buy, (int, float)) and float(current_buy) < negative_threshold
+
+        # Confort ECS minimum : priorité absolue, même en haut de courbe.
+        if snapshot.boiler_temp_c < minimum:
+            return BoilerIntent(
+                BOILER_HEAT_45,
+                f"Dynamique Day-Ahead : confort ECS prioritaire ({snapshot.boiler_temp_c:.1f} °C < {minimum:.1f} °C), indice={index}.",
+                "DYNAMIC_ECS_PRIORITE",
+            )
+
+        # Compatibilité V1.6.156 : le réglage historique « charge réseau si
+        # prix dynamique négatif » reste souverain dans le régime dynamique.
+        # S'il est autorisé, on conserve l'intention historique (y compris le
+        # stockage 65 °C). S'il est interdit, un prix négatif ne peut pas, à lui
+        # seul, provoquer une charge réseau via la nouvelle réservation Day-Ahead.
+        if negative_price and negative_enabled and intent.origin == "PRIX_NEGATIF_RESEAU":
+            return intent
+
+        if snapshot.boiler_temp_c >= normal:
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique Day-Ahead : température ECS de confort atteinte.",
+                "DYNAMIC_DAY_AHEAD",
+            )
+
+        if negative_price and not negative_enabled:
+            if snapshot.export_w >= max(element_w, 1.0):
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Prix dynamique sous le seuil mais charge réseau négative désactivée : surplus local {snapshot.export_w:.0f} W suffisant pour la résistance {element_w:.0f} W.",
+                    "DYNAMIC_SURPLUS_STRICT",
+                )
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Prix dynamique sous le seuil mais charge réseau négative désactivée : attente sans prélèvement réseau.",
+                "DYNAMIC_NEGATIVE_DISABLED",
+            )
+
+        if bool(decision.get("boiler_charge_now")):
+            return BoilerIntent(
+                BOILER_HEAT_45,
+                f"Dynamique Day-Ahead : créneau Boiler réservé actif (indice={index}, plage={band}).",
+                "DYNAMIC_RESERVATION",
+            )
+
+        if band == "MEDIAN":
+            if snapshot.export_w >= max(element_w, 1.0):
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Dynamique médiane : surplus local {snapshot.export_w:.0f} W couvre la résistance {element_w:.0f} W.",
+                    "DYNAMIC_SURPLUS_STRICT",
+                )
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique médiane : surplus insuffisant, aucune charge réseau du Boiler.",
+                "DYNAMIC_SURPLUS_STRICT",
+            )
+
+        if band == "HAUT":
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                f"Dynamique Day-Ahead : haut de courbe (indice={index}), charge réseau Boiler interdite hors confort minimum.",
+                "DYNAMIC_PRIX_HAUT",
+            )
+
+        # Bas de courbe mais hors bloc réservé : attendre le bloc le moins cher.
+        if band == "BAS":
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique Day-Ahead : bas de courbe mais hors créneau Boiler réservé, attente du bloc optimal.",
+                "DYNAMIC_RESERVATION",
+            )
+        return intent
+
+    def _set_core_phase(self, phase: str, reason: str = "") -> None:
+        valid = {PHASE_ACQUISITION, PHASE_DECISION, PHASE_WAIT_ACK}
+        previous = str(self.core_state.get("phase", PHASE_ACQUISITION))
+        if phase not in valid:
+            self.core_state["fsm_status"] = "ERREUR_PHASE"
+            phase = PHASE_ACQUISITION
+        if previous != phase:
+            self.core_state["fsm_transition_count"] = int(self.core_state.get("fsm_transition_count", 0)) + 1
+            self.core_state["fsm_last_transition_at"] = dt_util.now()
+            self.core_state["fsm_last_transition"] = f"{previous} -> {phase}"
+        self.core_state["phase"] = phase
+        self.core_state["fsm_status"] = "OK"
+        if reason:
+            self.core_state["last_reason"] = reason
+
     def reset_core(self, reason: str) -> None:
+        self._set_core_phase(PHASE_ACQUISITION, reason)
         self.core_state.update(
             {
-                "phase": PHASE_ACQUISITION,
                 "ack": ACK_IDLE,
                 "pending_action": "NONE",
                 "pending_delta": 0.0,
                 "ack_error": 0.0,
-                "last_reason": reason,
             }
         )
 
@@ -1023,34 +1722,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_set_mode(str(value))
             return
 
-        if key == "boiler_user_hold":
-            if bool(value):
-                await self.async_user_start_boiler()
-            else:
-                await self.async_user_stop_boiler()
-            return
-
-        # V1.5.6 : le PRI est un cœur souverain. L'ancien switch est conservé
-        # pour compatibilité d'entités mais ne peut plus désarmer le moteur.
-        if key == "pri_enabled":
-            self.settings["pri_enabled"] = True
-            self.pri_state["guard_reason"] = "SOUVERAIN_AUCUN_BLOCAGE"
-            self.pri_state["last_reason"] = (
-                "PRI souverain V1.5.6 : le moteur reste actif et recalcule chaque trame."
-            )
-            await self._async_save()
-            self.async_set_updated_data(self._build_data())
-            return
-
         self.settings[key] = value
 
         if key == "regulation_active":
             if value:
-                self.reset_core("Régulation CORE FoxCat activée : acquisition requise. PRI inchangé et souverain.")
+                self.reset_core("Régulation FoxCat activée : acquisition requise.")
+                await self.async_release_pri_100("Activation de la régulation : point de départ sûr à 100 %.")
                 if str(self.settings.get("mode")) != MODE_MANUAL:
                     await self.async_reconcile_machines()
             else:
-                self.reset_core("Régulation CORE FoxCat désactivée : PRI reste souverain et actif.")
+                self.reset_core("Régulation FoxCat désactivée.")
+                if self._pri_task and not self._pri_task.done():
+                    self._pri_task.cancel()
+                await self.async_release_pri_100("Régulation désactivée : onduleur libéré à 100 %.")
 
         if key == "high_load_shed_enabled" and not value:
             self._high_load_since = None
@@ -1059,29 +1743,55 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.load_shed_state.update({"active": False, "reason": "Délestage désactivé", "triggered_at": None})
                 if str(self.settings.get("mode")) != MODE_MANUAL:
                     await self.async_reconcile_machines()
-                if bool(self.settings.get("boiler_user_hold")):
-                    await self.async_user_start_boiler(resume=True)
+
+        if key == "pri_enabled" and not value:
+            if self._pri_task and not self._pri_task.done():
+                self._pri_task.cancel()
+            await self.async_release_pri_100("PRI désactivé par l'utilisateur.")
 
         if key in {"washer_enabled", "dryer_enabled", "dishwasher_enabled"}:
             await self.async_reconcile_machines()
 
         if key == "tariff_regime":
-            self.reset_core(f"Régime tarifaire modifié vers {value} : nouvelle acquisition CORE demandée; PRI inchangé.")
+            self.reset_core(f"Régime tarifaire modifié vers {value} : nouvelle acquisition demandée.")
+            if str(self.settings.get("mode")) == MODE_DYNAMIC:
+                if str(value) == TARIFF_DYNAMIC:
+                    self.settings["pri_enabled"] = True
+                else:
+                    self.settings["pri_enabled"] = False
+                    if self._pri_task and not self._pri_task.done():
+                        self._pri_task.cancel()
+                    if bool(self.settings.get("regulation_active")):
+                        await self.async_release_pri_100("Prix dynamique incompatible avec le régime tarifaire : onduleur libéré à 100 %.")
+                        if self.snapshot().boiler_on:
+                            await self.async_command_boiler(
+                                BOILER_STOP,
+                                "Régime tarifaire quitté : arrêt de la charge financière dynamique en cours.",
+                                "PRIX_BLOQUE",
+                            )
+
+        if key in {"predictive_pricing_enabled", "solar_forecast_arbitrage"}:
+            # Kill-switches dédiés au régime dynamique : aucun effet sur HP/HC.
             if (
                 str(self.settings.get("mode")) == MODE_DYNAMIC
-                and str(value) != TARIFF_DYNAMIC
-                and self.snapshot().boiler_on
-                and not bool(self.settings.get("boiler_user_hold"))
+                and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
             ):
-                await self.async_command_boiler(
-                    BOILER_STOP,
-                    "Régime tarifaire quitté : arrêt de la charge financière dynamique en cours.",
-                    "PRIX_BLOQUE",
-                )
+                self.reset_core(f"Option dynamique {key}={bool(value)} : nouvelle acquisition demandée.")
+                if str(self.settings.get("mode")) != MODE_MANUAL:
+                    await self.async_reconcile_machines()
+
+        if key == "persistent_status_notification_enabled" and not bool(value):
+            persistent_notification.async_dismiss(
+                self.hass, f"foxcat_energy_status_{self.entry.entry_id}"
+            )
+            self._status_notification_last_signature = None
 
         await self._async_save()
 
-        # HP/HC prices are configuration-backed since V1.2.2.
+        # HP/HC prices are configuration-backed since V1.2.2.  Keep the
+        # editable number entities for backwards compatibility, but mirror any
+        # change they make into ConfigEntry options so the dedicated tariff
+        # page and the entities always survive restarts with the same value.
         if key in {CONF_TARIFF_FIXED_INJECTION_PRICE}:
             options = dict(self.entry.options)
             if options.get(key) != value:
@@ -1094,36 +1804,48 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_set_mode(self, mode: str) -> None:
         canonical = MODE_ALIASES.get(mode, mode)
         self.settings["mode"] = canonical
-        self.settings["pri_enabled"] = True
-        self.reset_core(
-            f"Mode EMS modifié vers {canonical}. CORE réinitialisé; PRI souverain inchangé."
-        )
+        self.reset_core(f"Mode EMS modifié vers {canonical}. Cycle ACK annulé et nouvelle acquisition demandée.")
         self.core_state["boiler_demand"] = BOILER_NONE
 
-        # Les modes ne possèdent plus le droit de désactiver, temporiser ou
-        # libérer arbitrairement le PRI. Ils continuent à piloter CORE/boiler/
-        # machines selon leur sémantique propre.
+        if self._pri_task and not self._pri_task.done():
+            self._pri_task.cancel()
+
         if canonical == MODE_MANUAL:
-            self.core_state["last_reason"] = (
-                "Mode Manuel : stratégies CORE automatiques en sommeil; PRI reste souverain."
-            )
+            # Handover complet : pas de PRI, pas de planning machines, pas de
+            # stratégie boiler. Le fail-safe met seulement le PRI à 100 % au
+            # moment de la transition, puis l'utilisateur peut le forcer via
+            # le sélecteur manuel 0..100 %.
+            self.settings["pri_enabled"] = False
+            if bool(self.settings.get("regulation_active")):
+                await self.async_release_pri_100("Mode Manuel : remise initiale PRI à 100 %, puis main à l'utilisateur.")
+            self.core_state["last_reason"] = "Mode Manuel : pilotages automatiques désactivés, sécurité thermique conservée."
+
+        elif canonical == MODE_ECS:
+            self.settings["pri_enabled"] = False
+            if bool(self.settings.get("regulation_active")):
+                await self.async_release_pri_100("Mode ECS solaire : PRI libéré à 100 %.")
+                await self.async_reconcile_machines()
+
         elif canonical == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC:
-            self.core_state["last_reason"] = (
-                "Prix dynamique : régime tarifaire non dynamique. CORE prix bloqué; PRI reste souverain."
-            )
-        elif bool(self.settings.get("regulation_active")):
-            await self.async_reconcile_machines()
+            self.settings["pri_enabled"] = False
+            if bool(self.settings.get("regulation_active")):
+                await self.async_release_pri_100("Mode Prix dynamique bloqué : régime tarifaire non dynamique.")
+                await self.async_reconcile_machines()
+            self.core_state["last_reason"] = "Prix dynamique bloqué : sélectionner le régime tarifaire Dynamique."
+
+        elif canonical in {MODE_ECO, MODE_ZERO, MODE_DYNAMIC}:
+            self.settings["pri_enabled"] = True
+            if bool(self.settings.get("regulation_active")):
+                # Repartir d'un état déterministe avant que la stratégie PRI
+                # du nouveau mode ne reprenne la main.
+                await self.async_release_pri_100(f"Mode {canonical} : initialisation PRI à 100 %.")
+                await self.async_reconcile_machines()
 
         await self._async_save()
         self.async_set_updated_data(self._build_data())
 
     async def async_set_pri_manual_level(self, level: int) -> None:
-        """Applique immédiatement un niveau manuel; la prochaine trame PRI reste souveraine.
-
-        Cette commande de maintenance n'installe volontairement aucun verrou :
-        dès la prochaine publication énergétique, le moteur recalcule et peut
-        remplacer ce niveau.
-        """
+        """Force un niveau RRCR uniquement lorsque le mode Manuel est actif."""
         if str(self.settings.get("mode")) != MODE_MANUAL:
             self.core_state["last_reason"] = "Commande PRI manuelle refusée : le mode EMS n'est pas Manuel."
             self.async_set_updated_data(self._build_data())
@@ -1134,9 +1856,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.async_set_updated_data(self._build_data())
             return
         ok = await self._apply_rrcr_level(level)
-        code = self._rrcr_code()
         expected = RRCR_LEVEL_TO_CODE[level]
-        if ok and code == expected:
+        confirmed = ok and await self._wait_rrcr_code(expected, timeout=5.0)
+        code = self._rrcr_code()
+        if confirmed and code == expected:
             self.pri_state.update({
                 "current_level": level,
                 "target_level": level,
@@ -1151,40 +1874,122 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.pri_state["last_reason"] = f"Échec commande manuelle PRI {level} % : code lu {code}, attendu {expected}."
         self.async_set_updated_data(self._build_data())
 
-    async def async_handle_inverter_grid_frame(self, source_entity: str = "") -> None:
-        """EMS Onduleur : exactement une décision par nouvelle trame réseau."""
-        async with self._inverter_reduction_lock:
-            snapshot = self.snapshot()
-            now = dt_util.now()
-            self._frame_id += 1
-            frame_id = self._frame_id
-            self.energy_bus.on_grid_frame(frame_id, now)
+    async def async_handle_inverter_grid_frame(
+        self,
+        source_entity: str = "",
+        *,
+        snapshot: EnergySnapshot | None = None,
+        frame_id: int | None = None,
+        frame_serial: int | None = None,
+        frame_at: datetime | None = None,
+    ) -> None:
+        """Onduleur Core : une décision immédiate pour chaque publication réseau.
 
-            self.pri_state["last_sensor_frame_at"] = now
-            self.pri_state["frame_id"] = frame_id
+        La décision ne contient plus d'attente de commande physique : le moteur
+        RRCR possède son propre worker et converge vers la dernière consigne.
+        Ainsi aucune trame réseau ne reste derrière une commutation de relais.
+        """
+        if snapshot is None:
+            snapshot = self.snapshot()
+        now = frame_at or dt_util.now()
+        if frame_id is None or frame_serial is None:
+            # Voie legacy sans métronome : crée une trame autonome.
+            async with self._frame_dispatch_lock:
+                self._frame_id += 1
+                self._frame_serial += 1
+                frame_id = self._frame_id
+                frame_serial = self._frame_serial
+                self.energy_bus.on_grid_frame(
+                    frame_id, now, source=source_entity or "legacy", frame_serial=frame_serial,
+                    grid_net_w=snapshot.grid_net_w, pv_w=snapshot.pv_w, house_w=snapshot.house_w,
+                    import_w=snapshot.import_w, export_w=snapshot.export_w, valid=snapshot.valid,
+                    boiler_power_w=snapshot.boiler_power_w, boiler_temp_c=snapshot.boiler_temp_c,
+                    boiler_on=snapshot.boiler_on, machine_active=snapshot.machine_active,
+                    mode=str(self.settings.get("mode")),
+                    network_policy=str(self.settings.get("network_policy")),
+                )
+
+        async with self._inverter_reduction_lock:
+            # Le numéro de série courant suit la trame réellement traitée pour ACK N+1.
+            self.pri_state["last_30s_tick"] = now
+            self.pri_state["frame_id"] = int(frame_id)
             self.pri_state["decision_tick_count"] = int(self.pri_state.get("decision_tick_count", 0)) + 1
             self.pri_state["frame_source"] = source_entity or "réseau"
             self.pri_state["last_grid_frame_at"] = now
+            self.pri_state["last_frame_received_at"] = dt_util.now()
+            self.pri_state["processed_frame_count"] = int(self.pri_state.get("processed_frame_count", 0)) + 1
+
+            pending_bus_ids: list[int] = []
+            while (pending_bus := self.energy_bus.pending_for("ONDULEUR")) is not None:
+                pending_bus_ids.append(pending_bus.message_id)
+                self.energy_bus.acknowledge_pending(
+                    target="ONDULEUR", now=dt_util.now(), processed=False,
+                    reason=f"Message reçu sur trame {frame_id}.",
+                )
 
             if not snapshot.valid:
                 self.pri_state["guard_reason"] = "snapshot_invalide"
-                self.pri_state["last_reason"] = "Trame réseau reçue : snapshot énergétique invalide."
+                self.pri_state["last_reason"] = "Onduleur Core : trame reçue, snapshot énergétique invalide."
+                for pending_bus_id in pending_bus_ids:
+                    self.energy_bus.mark_nok(
+                        pending_bus_id, by="ONDULEUR", now=dt_util.now(),
+                        reason="Snapshot énergétique invalide.", busy=True,
+                    )
                 self.energy_bus.publish_inverter_state(
                     status="SNAPSHOT_INVALIDE", frame_id=frame_id, frame_at=now
+                )
+                self.energy_bus.mark_frame_core(
+                    frame_id, "ONDULEUR", "NOK", now=dt_util.now(),
+                    reason=self.pri_state["last_reason"],
                 )
                 self.async_set_updated_data(self._build_data(snapshot))
                 return
 
-            # N+1 : valider l'ordre précédent puis calculer obligatoirement la
-            # nouvelle décision sur CETTE trame.
-            await self._validate_pending_pri_on_frame(snapshot)
-            await self._run_pri_frame(snapshot)
-            self.pri_state["last_decision_at"] = now
+            # Validation N+1 puis nouvelle décision, toujours sur le snapshot de CETTE trame.
+            await self._validate_pending_pri_on_frame(snapshot, frame_serial=int(frame_serial))
+            pri_result = await self._run_pri_frame(
+                snapshot, frame_id=int(frame_id), frame_serial=int(frame_serial)
+            )
+
+            for pending_bus_id in pending_bus_ids:
+                if pri_result == "PROCESSED":
+                    self.energy_bus.mark_processed(
+                        pending_bus_id, by="ONDULEUR", now=dt_util.now(),
+                        reason=f"Message traité sur trame {frame_id}; décision PRI calculée.",
+                    )
+                else:
+                    self.energy_bus.mark_nok(
+                        pending_bus_id, by="ONDULEUR", now=dt_util.now(),
+                        reason=f"Message reçu mais non traitable : {pri_result}.", busy=True,
+                    )
+
+            # Le corps Onduleur annonce sa décision au corps EMS via Energy Bus.
+            self.energy_bus.publish_message(
+                source="ONDULEUR", target="EMS", action=f"PRI_{pri_result}", delta_w=0.0,
+                now=dt_util.now(), frame_id=int(frame_id),
+                current_level=self.pri_state.get("current_level"),
+                target_level=self.pri_state.get("target_level"),
+                direction=self.pri_state.get("direction"),
+                reason=self.pri_state.get("last_reason", ""),
+            )
+            self.energy_bus.mark_frame_core(
+                int(frame_id), "ONDULEUR", pri_result, now=dt_util.now(),
+                reason=str(self.pri_state.get("last_reason", "")),
+            )
+            self.pri_state["last_decision_at"] = dt_util.now()
             self.async_set_updated_data(self._build_data(snapshot))
 
 
-    async def async_handle_house_frame(self) -> None:
-        """Traite uniquement une trame énergétique complète et valide.
+    async def async_handle_house_frame(
+        self,
+        *,
+        snapshot: EnergySnapshot | None = None,
+        frame_id: int | None = None,
+        frame_serial: int | None = None,
+        frame_at: datetime | None = None,
+        source_entity: str = "",
+    ) -> None:
+        """EMS Core : traite la même trame/snapshot que le corps Onduleur.
 
         Les resets périodiques Smappee peuvent rendre brièvement les capteurs
         unknown/unavailable. Ces événements ne sont pas des trames EMS :
@@ -1198,7 +2003,21 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         exigée avant de reprendre les décisions énergétiques.
         """
         async with self._core_lock:
-            snapshot = self.snapshot()
+            if snapshot is None:
+                snapshot = self.snapshot()
+            now = frame_at or dt_util.now()
+            effective_frame_id = int(frame_id or self._frame_id)
+            self.core_state["last_frame_id"] = effective_frame_id
+            self.core_state["last_frame_received_at"] = dt_util.now()
+            self.core_state["processed_frame_count"] = int(self.core_state.get("processed_frame_count", 0)) + 1
+
+            pending_bus_ids: list[int] = []
+            while (pending_bus := self.energy_bus.pending_for("EMS")) is not None:
+                pending_bus_ids.append(pending_bus.message_id)
+                self.energy_bus.acknowledge_pending(
+                    target="EMS", now=dt_util.now(), processed=False,
+                    reason=f"Message reçu sur trame {effective_frame_id}.",
+                )
 
             if not snapshot.valid:
                 self._sensor_reset_active = True
@@ -1210,6 +2029,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.pri_state["last_reason"] = (
                     "Mesures transitoirement invalides : PRI conservé, "
                     "état PRI conservé, attente d'une trame complète."
+                )
+                for pending_bus_id in pending_bus_ids:
+                    self.energy_bus.mark_nok(
+                        pending_bus_id, by="EMS", now=dt_util.now(),
+                        reason="Snapshot énergétique invalide.", busy=True,
+                    )
+                self.energy_bus.mark_frame_core(
+                    effective_frame_id, "EMS", "NOK", now=dt_util.now(),
+                    reason=self.core_state["last_reason"],
                 )
                 self.async_set_updated_data(self._build_data(snapshot))
                 return
@@ -1224,6 +2052,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
                     self.pri_state["last_reason"] = (
                         "Reprise capteurs : stabilisation N0, PRI inchangé."
+                    )
+                    for pending_bus_id in pending_bus_ids:
+                        self.energy_bus.mark_processed(
+                            pending_bus_id, by="EMS", now=dt_util.now(),
+                            reason=f"Trame {effective_frame_id} utilisée comme stabilisation.",
+                        )
+                    self.energy_bus.publish_message(
+                        source="EMS", target="ONDULEUR", action="CORE_STABILISATION", delta_w=0.0,
+                        now=dt_util.now(), frame_id=effective_frame_id,
+                        reason=self.core_state["last_reason"],
+                    )
+                    self.energy_bus.mark_frame_core(
+                        effective_frame_id, "EMS", "STABILISATION", now=dt_util.now(),
+                        reason=self.core_state["last_reason"],
                     )
                     self.async_set_updated_data(self._build_data(snapshot))
                     return
@@ -1245,20 +2087,37 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.hass.async_create_task(self._async_save())
 
             if bool(self.settings.get("regulation_active")):
-                # CORE EMS uniquement. Le PRI possède sa propre boucle événementielle
-                # souveraine et traite chaque publication énergétique exploitable.
+                # CORE EMS uniquement. Le corps Onduleur traite le même snapshot
+                # dans une task indépendante déclenchée par la même publication.
                 await self._evaluate_high_load(snapshot)
                 await self._core_process_frame(snapshot)
             else:
-                self.core_state["last_reason"] = (
-                    "Régulation CORE inactive : télémétrie CORE seulement; "
-                    "PRI souverain inchangé et toujours actif."
-                )
+                self.core_state["last_reason"] = "Régulation inactive : télémétrie seulement."
+                self.pri_state["guard_reason"] = "regulation_inactive"
 
+            # Le corps EMS accuse le message reçu puis publie sa propre décision.
+            for pending_bus_id in pending_bus_ids:
+                self.energy_bus.mark_processed(
+                    pending_bus_id, by="EMS", now=dt_util.now(),
+                    reason=f"Décision EMS traitée sur trame {effective_frame_id}.",
+                )
+            decision_id = self.energy_bus.publish_message(
+                source="EMS", target="ONDULEUR", action="CORE_DECISION", delta_w=0.0,
+                now=dt_util.now(), frame_id=effective_frame_id,
+                phase=self.core_state.get("phase"),
+                pending_action=self.core_state.get("pending_action"),
+                ack=self.core_state.get("ack"),
+                reason=self.core_state.get("last_reason", ""),
+            )
+            self.core_state["last_bus_decision_id"] = decision_id
+            self.energy_bus.mark_frame_core(
+                effective_frame_id, "EMS", "PROCESSED", now=dt_util.now(),
+                reason=str(self.core_state.get("last_reason", "")),
+            )
             self.async_set_updated_data(self._build_data(snapshot))
 
     async def async_handle_grid_change(self) -> None:
-        """Télémétrie CORE; le PRI est déclenché par chaque publication capteur."""
+        """Télémétrie secondaire; la publication réseau souveraine déclenche les deux corps."""
         self.async_set_updated_data(self._build_data())
 
     async def _core_process_frame(self, snapshot: EnergySnapshot) -> None:
@@ -1268,9 +2127,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Le délestage haute consommation est prioritaire sur les stratégies
         # énergétiques normales, mais reste inactif en mode Manuel.
-        if self.load_shed_state.get("active"):
-            if bool(self.settings.get("boiler_user_hold")):
-                self.core_state["boiler_user_status"] = "DÉLESTAGE EN COURS — DEMANDE MÉMORISÉE"
+        if self.load_shed_state.get("active") and str(self.settings.get("mode")) != MODE_MANUAL:
             if snapshot.boiler_on:
                 await self.async_command_boiler(
                     BOILER_STOP,
@@ -1282,29 +2139,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         # Immediate thermal safety remains active in every mode.
-        if snapshot.boiler_on and snapshot.boiler_temp_c >= float(self.settings["boiler_temp_safety_c"]):
+        if snapshot.boiler_on and snapshot.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
             await self.async_command_boiler(BOILER_STOP, "SÉCURITÉ CORE : température boiler maximale atteinte.", "SECURITE")
-            return
-
-        # V1.5.6 : une marche demandée explicitement par l'utilisateur est
-        # persistante. Les optimisations énergétiques et cycles machines ne
-        # peuvent pas l'annuler. Le délestage et la sécurité thermique restent
-        # les seules interruptions autorisées.
-        if bool(self.settings.get("boiler_user_hold")):
-            if self.load_shed_state.get("active"):
-                self.core_state["boiler_user_status"] = "DÉLESTAGE EN COURS — DEMANDE MÉMORISÉE"
-                self.reset_core("Boiler utilisateur suspendu par délestage; redémarrage automatique prévu.")
-                return
-            self.core_state["boiler_user_status"] = "MARCHE UTILISATEUR MAINTENUE"
-            if not snapshot.boiler_on:
-                await self.async_command_boiler(
-                    BOILER_HEAT_45,
-                    "Commande utilisateur persistante : démarrage boiler prioritaire.",
-                    "UTILISATEUR",
-                    force=True,
-                )
-            else:
-                self.reset_core("Commande utilisateur persistante : boiler maintenu en marche.")
             return
 
         # Un cycle machine protégé conserve la priorité, mais il ne condamne
@@ -1326,7 +2162,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         phase = self.core_state["phase"]
         if phase == PHASE_ACQUISITION:
             self.core_state["t0"] = snapshot
-            self.core_state["phase"] = PHASE_DECISION
+            self._set_core_phase(PHASE_DECISION)
             self.core_state["ack"] = ACK_IDLE
             self.core_state["last_reason"] = (
                 f"ACQUISITION : réseau={snapshot.grid_net_w:.0f} W "
@@ -1336,9 +2172,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         if phase == PHASE_WAIT_ACK:
+            if str(self.core_state.get("execution_status")) in {"QUEUED", "EXECUTION"}:
+                self.core_state["last_reason"] = (
+                    "WAIT_ACK : commande physique en cours hors trame; nouvelle trame enregistrée sans blocage."
+                )
+                return
             self._validate_core_ack(snapshot)
             self.core_state["t0"] = snapshot
-            self.core_state["phase"] = PHASE_ACQUISITION
+            self._set_core_phase(PHASE_ACQUISITION)
             self.core_state["pending_action"] = "NONE"
             self.core_state["pending_delta"] = 0.0
             return
@@ -1359,24 +2200,47 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         mode = str(self.settings.get("mode"))
-        if mode == MODE_MANUAL:
-            self.reset_core("Mode Manuel : stratégies automatiques en sommeil, sécurités actives.")
-            return
-
-        intent = evaluate_mode(
-            mode,
-            snapshot,
-            t0,
-            self.settings,
-            dt_util.now(),
-            self._boiler_on_seconds(),
-            str(self.core_state.get("boiler_demand", BOILER_NONE)),
-            self.prices(),
-            self.solar_forecast,
-        )
+        user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
+        if user_override == "FORCE_ON":
+            if snapshot.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
+                intent = BoilerIntent(BOILER_STOP, "Utilisateur : démarrage Boiler bloqué par sécurité température.", "UTILISATEUR")
+            else:
+                intent = BoilerIntent(BOILER_HEAT_45, "Utilisateur : démarrage Boiler forcé.", "UTILISATEUR")
+        elif user_override == "FORCE_OFF":
+            intent = BoilerIntent(BOILER_STOP, "Utilisateur : arrêt Boiler forcé.", "UTILISATEUR")
+        else:
+            if mode == MODE_MANUAL:
+                self.reset_core("Mode Manuel : stratégies automatiques en sommeil, sécurités actives.")
+                return
+            tariff_context = self.prices()
+            solar_for_mode = self.solar_forecast
+            if (
+                mode == MODE_DYNAMIC
+                and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
+                and not bool(self.settings.get("solar_forecast_arbitrage", True))
+            ):
+                # Le kill-switch neutralise uniquement l'influence de la prévision
+                # solaire sur l'arbitrage DYNAMIQUE; la télémétrie IA reste intacte.
+                solar_for_mode = SolarForecast()
+            intent = evaluate_mode(
+                mode,
+                snapshot,
+                t0,
+                self.settings,
+                dt_util.now(),
+                self._boiler_on_seconds(),
+                str(self.core_state.get("boiler_demand", BOILER_NONE)),
+                tariff_context,
+                solar_for_mode,
+            )
+            if mode == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC:
+                intent = self._apply_dynamic_boiler_arbitrage(
+                    snapshot, intent, self._economic_view(snapshot, prices=tariff_context)
+                )
 
         if (
-            intent.action in {BOILER_HEAT_45, BOILER_BOOST_65}
+            intent.origin != "UTILISATEUR"
+            and intent.action in {BOILER_HEAT_45, BOILER_BOOST_65}
             and str(self.settings.get("network_policy", NETWORK_POLICY_COMPENSATION)) != NETWORK_POLICY_COMPENSATION
             and snapshot.machine_active
             and not protected_cycle_boiler_allowed_stable(snapshot, t0, self.settings)
@@ -1442,61 +2306,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             f"attendu={expected:.0f} W, réel={snapshot.grid_net_w:.0f} W, erreur={error:.0f} W."
         )
 
-    async def async_user_start_boiler(self, resume: bool = False) -> None:
-        """Mémorise une marche utilisateur et démarre dès que possible."""
-        self.settings["boiler_user_hold"] = True
-        snap = self.snapshot()
-        if self.load_shed_state.get("active"):
-            self.core_state["boiler_user_status"] = "DÉLESTAGE EN COURS — DEMANDE MÉMORISÉE"
-            self.core_state["last_reason"] = (
-                "Demande boiler utilisateur enregistrée; démarrage suspendu pendant le délestage."
+    async def _async_ems_service_call(
+        self, domain: str, service: str, data: dict[str, Any], *, timeout: float = 3.0
+    ) -> bool:
+        """Appel Home Assistant borné : EMS Core ne peut jamais rester bloqué indéfiniment."""
+        try:
+            await asyncio.wait_for(
+                self.hass.services.async_call(domain, service, data, blocking=True),
+                timeout=max(float(timeout), 0.5),
             )
-        elif snap.boiler_temp_c >= float(self.settings["boiler_temp_safety_c"]):
-            self.core_state["boiler_user_status"] = "SÉCURITÉ THERMIQUE — DEMANDE MÉMORISÉE"
-            self.core_state["last_reason"] = "Demande boiler utilisateur suspendue par sécurité thermique."
-        else:
-            self.core_state["boiler_user_status"] = (
-                "REPRISE APRÈS DÉLESTAGE" if resume else "MARCHE UTILISATEUR DEMANDÉE"
-            )
-            await self.async_command_boiler(
-                BOILER_HEAT_45,
-                "Reprise boiler utilisateur après délestage." if resume else "Démarrage boiler demandé par l'utilisateur.",
-                "UTILISATEUR",
-                force=True,
-            )
-        await self._async_save()
-        self.async_set_updated_data(self._build_data())
+            return True
+        except asyncio.TimeoutError:
+            self.core_state["execution_status"] = "TIMEOUT"
+            self.core_state["execution_failure_reason"] = f"Timeout {domain}.{service} après {timeout:.1f} s."
+            return False
+        except Exception as err:  # pragma: no cover
+            self.core_state["execution_status"] = "FAILED"
+            self.core_state["execution_failure_reason"] = f"{domain}.{service}: {err}"
+            return False
 
-    async def async_user_stop_boiler(self) -> None:
-        """Annule explicitement la marche persistante et arrête le boiler."""
-        self.settings["boiler_user_hold"] = False
-        self.core_state["boiler_user_status"] = "ARRÊT UTILISATEUR"
-        await self.async_command_boiler(
-            BOILER_STOP,
-            "Arrêt boiler demandé par l'utilisateur.",
-            "UTILISATEUR_STOP",
-            force=True,
-        )
-        await self._async_save()
-        self.async_set_updated_data(self._build_data())
-
-    async def async_command_boiler(self, action: str, reason: str, origin: str, force: bool = False) -> None:
-        if not bool(self.settings.get("regulation_active")) and not force:
+    async def async_command_boiler(self, action: str, reason: str, origin: str) -> None:
+        if not bool(self.settings.get("regulation_active")) and origin not in {"UTILISATEUR", "SECURITE"}:
             return
-
-        # Une demande utilisateur persistante ne peut être coupée par une
-        # stratégie énergétique ordinaire. Seuls délestage, sécurité thermique
-        # ou arrêt utilisateur explicite sont autorisés à envoyer OFF.
-        if (
-            action == BOILER_STOP
-            and bool(self.settings.get("boiler_user_hold"))
-            and origin not in {"DELESTAGE", "SECURITE", "UTILISATEUR_STOP"}
-        ):
-            self.core_state["boiler_user_status"] = "MARCHE UTILISATEUR MAINTENUE"
-            self.core_state["last_reason"] = f"Arrêt ignoré pendant marche utilisateur : {reason}"
-            self.async_set_updated_data(self._build_data())
-            return
-
         climate = self.config.get(CONF_BOILER_CLIMATE)
         if not climate:
             self.core_state["execution_status"] = "FAILED"
@@ -1510,14 +2341,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Communication immédiate vers EMS Onduleur. Le second cœur n'exécute
         # sa réponse physique qu'à la prochaine trame réseau.
         delta_bus = -power if action == BOILER_STOP else float(self.settings["boiler_power_w"])
-        self.energy_bus.publish_ems_intent(
+        bus_message_id = self.energy_bus.publish_ems_intent(
             source="boiler",
+            target="ONDULEUR",
             action=action,
             delta_w=delta_bus,
             now=dt_util.now(),
+            frame_id=self._frame_id,
             origin=origin,
             reason=reason,
         )
+        self.core_state["bus_message_id"] = bus_message_id
         if action == BOILER_STOP:
             expected = reference + power
             pending = "BOILER_OFF_STRATEGY"
@@ -1550,25 +2384,56 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "boiler_origin": origin,
                 "last_reason": reason,
                 "execution_command": pending,
-                "execution_status": "EXECUTION",
+                "execution_status": "QUEUED",
                 "execution_retries": 0,
                 "execution_failure_reason": "",
             }
         )
 
-        async with self._action_lock:
-            if action == BOILER_STOP:
-                await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "off"}, blocking=True)
-            else:
-                target = float(self.settings["boiler_temp_normal_c"] if action == BOILER_HEAT_45 else self.settings["boiler_temp_boost_c"])
-                await self.hass.services.async_call("climate", "set_temperature", {"entity_id": climate, "temperature": target}, blocking=True)
-                await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "heat"}, blocking=True)
+        # La commande physique ne vit jamais dans la task de trame EMS.
+        # Une sécurité plus récente peut préempter une ancienne commande.
+        if self._boiler_command_task and not self._boiler_command_task.done():
+            self._boiler_command_task.cancel()
+        self._boiler_command_task = self.hass.async_create_task(
+            self._execute_boiler_command(action, pending, climate)
+        )
 
-        self._last_boiler_command_at = dt_util.now()
+    async def _execute_boiler_command(self, action: str, pending: str, climate: str) -> None:
+        """Worker physique Boiler indépendant du cadenceur EMS."""
+        try:
+            self.core_state["execution_status"] = "EXECUTION"
+            async with self._ems_action_lock:
+                if action == BOILER_STOP:
+                    ok = await self._async_ems_service_call(
+                        "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "off"}
+                    )
+                else:
+                    target = float(self.settings["boiler_temp_normal_c"] if action == BOILER_HEAT_45 else self.settings["boiler_temp_boost_c"])
+                    ok = await self._async_ems_service_call(
+                        "climate", "set_temperature", {"entity_id": climate, "temperature": target}
+                    )
+                    if ok:
+                        ok = await self._async_ems_service_call(
+                            "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "heat"}
+                        )
+            if not ok:
+                self.energy_bus.publish_message(
+                    source="EMS", target="ONDULEUR", action="BOILER_COMMAND_TIMEOUT", delta_w=0.0,
+                    now=dt_util.now(), frame_id=self._frame_id,
+                    reason=self.core_state.get("execution_failure_reason", "Commande boiler non exécutée."),
+                )
+                self.async_set_updated_data(self._build_data())
+                return
 
-        if self._execution_task and not self._execution_task.done():
-            self._execution_task.cancel()
-        self._execution_task = self.hass.async_create_task(self._verify_boiler_execution(pending))
+            self._last_boiler_command_at = dt_util.now()
+            self.core_state["execution_status"] = "SENT"
+            if self._execution_task and not self._execution_task.done():
+                self._execution_task.cancel()
+            self._execution_task = self.hass.async_create_task(self._verify_boiler_execution(pending))
+            self.async_set_updated_data(self._build_data())
+        except asyncio.CancelledError:
+            self.core_state["execution_status"] = "CANCELLED"
+            raise
 
     async def _verify_boiler_execution(self, command: str) -> None:
         try:
@@ -1618,12 +2483,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         command_on = not (command.startswith("BOILER_OFF") or command == "ECS_MODULE_OFF")
         if not command_on:
             return False
-        if snap.boiler_temp_c >= float(self.settings["boiler_temp_safety_c"]):
+        if not bool(self.settings["boiler_enabled"]) or snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
             return True
-        if bool(self.settings.get("boiler_user_hold")):
-            return bool(self.load_shed_state.get("active"))
-        if not bool(self.settings["boiler_enabled"]):
-            return True
+        # Un démarrage utilisateur garde la priorité sur les stratégies EMS et
+        # les cycles machines. La sécurité thermique reste souveraine.
+        if str(self.core_state.get("boiler_user_override", "AUTO")) == "FORCE_ON":
+            return False
         if snap.machine_active and not protected_cycle_boiler_allowed(snap, self.settings):
             return True
         if str(self.settings.get("mode")) == MODE_MANUAL:
@@ -1631,51 +2496,41 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return False
 
     async def _retry_boiler_command(self, command: str) -> None:
-        if not bool(self.settings.get("regulation_active")) and not bool(self.settings.get("boiler_user_hold")):
+        if (
+            not bool(self.settings.get("regulation_active"))
+            and str(self.core_state.get("boiler_user_override", "AUTO")) != "FORCE_ON"
+        ):
             return
         climate = self.config.get(CONF_BOILER_CLIMATE)
         if not climate:
             return
-        async with self._action_lock:
+        async with self._ems_action_lock:
             if command.startswith("BOILER_OFF") or command == "ECS_MODULE_OFF":
-                await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "off"}, blocking=True)
+                await self._async_ems_service_call(
+                    "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "off"}
+                )
             else:
                 boost = command in {"ECS_MODULE_ON_65", "ECS_MODULE_UPGRADE_65", "ECS_MODULE_SET_65"}
                 temp = float(self.settings["boiler_temp_boost_c"] if boost else self.settings["boiler_temp_normal_c"])
-                await self.hass.services.async_call("climate", "set_temperature", {"entity_id": climate, "temperature": temp}, blocking=True)
-                await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "heat"}, blocking=True)
+                if await self._async_ems_service_call(
+                    "climate", "set_temperature", {"entity_id": climate, "temperature": temp}
+                ):
+                    await self._async_ems_service_call(
+                        "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "heat"}
+                    )
 
     async def async_handle_safety_change(self) -> None:
         snap = self.snapshot()
-
-        # Sécurité thermique dure : active même si le CORE est désactivé.
-        if snap.boiler_on and snap.boiler_temp_c >= float(self.settings["boiler_temp_safety_c"]):
-            self.core_state["boiler_user_status"] = "SÉCURITÉ THERMIQUE"
-            await self.async_command_boiler(
-                BOILER_STOP,
-                "SÉCURITÉ : température boiler maximale atteinte.",
-                "SECURITE",
-                force=True,
-            )
-            self.async_set_updated_data(self._build_data(snap))
-            return
-
-        # La marche utilisateur est restaurée immédiatement si une source
-        # externe ou une ancienne automatisation a coupé le boiler.
-        if bool(self.settings.get("boiler_user_hold")):
-            if self.load_shed_state.get("active"):
-                self.core_state["boiler_user_status"] = "DÉLESTAGE EN COURS — DEMANDE MÉMORISÉE"
-            elif not snap.boiler_on:
-                await self.async_user_start_boiler(resume=True)
-            else:
-                self.core_state["boiler_user_status"] = "MARCHE UTILISATEUR MAINTENUE"
-            self.async_set_updated_data(self._build_data(snap))
-            return
-
-        if bool(self.settings.get("regulation_active")):
+        # Sécurité thermique toujours souveraine, y compris régulation désactivée
+        # et override utilisateur actif.
+        if snap.boiler_on and snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
+            await self.async_command_boiler(BOILER_STOP, "SÉCURITÉ : température boiler maximale atteinte.", "SECURITE")
+        elif bool(self.settings.get("regulation_active")):
             mode = str(self.settings.get("mode"))
+            user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
             if (
-                mode != MODE_MANUAL
+                user_override == "AUTO"
+                and mode != MODE_MANUAL
                 and snap.boiler_on
                 and snap.machine_active
                 and not protected_cycle_boiler_allowed(snap, self.settings)
@@ -1714,23 +2569,101 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _machine_schedule_boundaries(self) -> set[tuple[int, int]]:
         return schedule_boundaries(self.machines)
 
-    def _tariff_start_favorable(self) -> bool:
-        """Hiérarchie de démarrage automatique, indépendante des prix manuels."""
+    def _tariff_start_favorable(self, machine: MachineDefinition | None = None, economic_view: dict[str, Any] | None = None) -> bool:
+        """Décide si une NOUVELLE charge flexible peut démarrer.
+
+        V1.6.153 : le comparateur économique est consulté directement, sans
+        passer par Energy Bus. Les cycles déjà actifs/protégés restent gérés
+        par la règle souveraine de ``async_reconcile_machines``. Si
+        l'optimiseur est désactivé, le comportement historique est conservé.
+        """
         prices = self.prices()
         regime = str(self.settings.get("tariff_regime", TARIFF_TOU))
-        if regime == TARIFF_DYNAMIC:
-            current = prices.get("current")
-            nxt = prices.get("next")
-            avg = prices.get("avg_today")
-            if not isinstance(current, (int, float)):
-                return False
-            if isinstance(nxt, (int, float)) and current > nxt:
-                return False
-            if isinstance(avg, (int, float)) and current > avg:
-                return False
-            return True
-        # HP/HC : HC favorable, HP défavorable.
-        return str(prices.get("period")) == "HC"
+        if not bool(self.settings.get("economic_optimizer_enabled", True)):
+            if regime == TARIFF_DYNAMIC:
+                current = prices.get("current")
+                nxt = prices.get("next")
+                avg = prices.get("avg_today")
+                if not isinstance(current, (int, float)):
+                    return False
+                if isinstance(nxt, (int, float)) and current > nxt:
+                    return False
+                if isinstance(avg, (int, float)) and current > avg:
+                    return False
+                return True
+            return str(prices.get("period")) == "HC"
+
+        view = economic_view or self._economic_view(self.snapshot(), prices=prices)
+        if machine is not None:
+            rec = view.get("machines", {}).get(machine.machine_id)
+            if isinstance(rec, dict):
+                return bool(rec.get("allow_start", False))
+        return bool(view.get("decision", {}).get("flexible_start", False))
+
+    def _schedule_learning_save(self) -> None:
+        if self._learning_save_task is None or self._learning_save_task.done():
+            self._learning_save_task = self.hass.async_create_task(self._async_save())
+
+    def _record_machine_learning(
+        self, *, snapshot: EnergySnapshot, now: datetime, source: str
+    ) -> None:
+        """Observe les machines sans modifier leur machine à états."""
+        if not self.machines:
+            return
+        prices = self.prices()
+        cycle_snapshot = self.machine_cycle_manager.snapshot(now)
+        context = {
+            "grid_w": snapshot.grid_net_w,
+            "pv_w": snapshot.pv_w,
+            "house_w": snapshot.house_w,
+            "price": prices.get("active_buy"),
+            "tariff": prices.get("period") if prices.get("regime") != TARIFF_DYNAMIC else "DYNAMIQUE",
+        }
+        save_requested = False
+        for machine in self.machines:
+            cycle = cycle_snapshot.get(machine.machine_id, {})
+            save_requested = self.machine_learning.observe(
+                machine_id=machine.machine_id,
+                name=machine.name,
+                now=now,
+                power_w=self._optional_float_state(machine.power_sensor),
+                current_a=self._optional_float_state(machine.current_sensor),
+                voltage_v=self._optional_float_state(machine.voltage_sensor),
+                switch_on=self._is_on(machine.switch_entity),
+                cycle_state=str(cycle.get("state", "IDLE")),
+                cycle_origin=str(cycle.get("origin", "NONE")),
+                cycle_protected=bool(cycle.get("protected", False)),
+                start_w=machine.cycle_start_w,
+                end_w=machine.cycle_end_w,
+                end_confirm_s=machine.cycle_end_confirm_minutes * 60.0,
+                context=context,
+                source=source,
+            ) or save_requested
+        if save_requested:
+            self._schedule_learning_save()
+
+    def _machine_bus_context(self, now: datetime) -> list[dict[str, Any]]:
+        """Contexte machine transporté dans la trame, sans effet décisionnel."""
+        cycles = self.machine_cycle_manager.snapshot(now)
+        learning = self.machine_learning.view()
+        result: list[dict[str, Any]] = []
+        for machine in self.machines:
+            cycle = cycles.get(machine.machine_id, {})
+            profile = learning.get(machine.machine_id, {})
+            result.append({
+                "id": machine.machine_id,
+                "name": machine.name,
+                "switch_on": self._is_on(machine.switch_entity),
+                "power_w": self._optional_float_state(machine.power_sensor),
+                "current_a": self._optional_float_state(machine.current_sensor),
+                "voltage_v": self._optional_float_state(machine.voltage_sensor),
+                "cycle_state": cycle.get("state", "IDLE"),
+                "cycle_protected": bool(cycle.get("protected", False)),
+                "cycle_origin": cycle.get("origin", "NONE"),
+                "learning_cycle_active": bool((profile.get("current") or {}).get("active", False)),
+                "learning_cycles_collected": int(profile.get("total_cycles", 0)),
+            })
+        return result
 
     def _refresh_machine_cycles(self) -> None:
         now = dt_util.now()
@@ -1759,7 +2692,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "switch": machine.switch_entity,
                 "cycle_entity": machine.cycle_entity,
                 "power_sensor": machine.power_sensor,
+                "current_sensor": machine.current_sensor,
+                "voltage_sensor": machine.voltage_sensor,
                 "power_w": self._optional_float_state(machine.power_sensor),
+                "current_a": self._optional_float_state(machine.current_sensor),
+                "voltage_v": self._optional_float_state(machine.voltage_sensor),
                 "cycle_active": self.machine_cycle_manager.is_protected(machine.machine_id),
                 "foxcat_cycle_state": self.machine_cycle_manager.state_for(machine.machine_id).state,
                 "foxcat_cycle_origin": self.machine_cycle_manager.state_for(machine.machine_id).origin,
@@ -1780,6 +2717,115 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data())
 
+    async def _async_user_switch_call(self, entity_id: str, turn_on: bool) -> bool:
+        """Commande utilisateur bornée, sans polluer l'état d'exécution Boiler."""
+        try:
+            await asyncio.wait_for(
+                self.hass.services.async_call(
+                    "switch", "turn_on" if turn_on else "turn_off",
+                    {"entity_id": entity_id}, blocking=True,
+                ),
+                timeout=3.0,
+            )
+            return True
+        except (asyncio.TimeoutError, Exception) as err:
+            _LOGGER.warning("FoxCat user switch command failed for %s: %s", entity_id, err)
+            return False
+
+    async def async_user_start_machine(self, machine_id: str) -> bool:
+        """Démarrage utilisateur : priorité au cycle protégé, sans attendre l'EMS."""
+        machine = next((item for item in self.machines if item.machine_id == machine_id), None)
+        if machine is None or not machine.switch_entity:
+            return False
+        now = dt_util.now()
+        self.machine_cycle_manager.force_start(
+            machine.machine_id, now,
+            duration_minutes=machine.cycle_duration_minutes,
+            margin_minutes=machine.cycle_margin_minutes,
+            origin="USER_BUTTON",
+        )
+        ok = await self._async_user_switch_call(machine.switch_entity, True)
+        if not ok:
+            # Une commande physique refusée ne doit pas laisser un faux cycle
+            # protégé pendant plusieurs heures.
+            self.machine_cycle_manager.force_finish(machine.machine_id)
+        message_id = self.energy_bus.publish_message(
+            source="UTILISATEUR", target="EMS", action=f"MACHINE_START:{machine.machine_id}",
+            delta_w=0.0, now=now, frame_id=self._frame_id, machine=machine.name,
+            reason="Démarrage utilisateur : cycle protégé.",
+        )
+        self.energy_bus.mark_processed(
+            message_id, by="EMS", now=dt_util.now(),
+            reason="Commande machine utilisateur prise en charge." if ok else "Commande machine utilisateur en échec.",
+        )
+        self.core_state["last_reason"] = (
+            f"Utilisateur : démarrage {machine.name} {'envoyé' if ok else 'échoué'} ; cycle protégé actif."
+        )
+        self.async_set_updated_data(self._build_data())
+        return ok
+
+    async def async_user_stop_machine(self, machine_id: str) -> bool:
+        """Arrêt utilisateur explicite : termine la protection puis coupe la prise."""
+        machine = next((item for item in self.machines if item.machine_id == machine_id), None)
+        if machine is None or not machine.switch_entity:
+            return False
+        self.machine_cycle_manager.force_finish(machine.machine_id)
+        ok = await self._async_user_switch_call(machine.switch_entity, False)
+        message_id = self.energy_bus.publish_message(
+            source="UTILISATEUR", target="EMS", action=f"MACHINE_STOP:{machine.machine_id}",
+            delta_w=0.0, now=dt_util.now(), frame_id=self._frame_id, machine=machine.name,
+            reason="Arrêt utilisateur explicite.",
+        )
+        self.energy_bus.mark_processed(
+            message_id, by="EMS", now=dt_util.now(),
+            reason="Arrêt machine utilisateur pris en charge." if ok else "Arrêt machine utilisateur en échec.",
+        )
+        self.core_state["last_reason"] = f"Utilisateur : arrêt {machine.name} {'envoyé' if ok else 'échoué'}."
+        self.async_set_updated_data(self._build_data())
+        return ok
+
+    async def async_user_boiler_override(self, state: str) -> bool:
+        """Commande utilisateur Boiler : FORCE_ON, FORCE_OFF ou AUTO."""
+        state = str(state).upper()
+        if state not in {"FORCE_ON", "FORCE_OFF", "AUTO"}:
+            return False
+        self.core_state["boiler_user_override"] = state
+        now = dt_util.now()
+        if state == "AUTO":
+            self.reset_core("Utilisateur : Boiler rendu à l'EMS automatique.")
+            action = "BOILER_AUTO"
+            ok = True
+        elif state == "FORCE_OFF":
+            action = "BOILER_USER_STOP"
+            await self.async_command_boiler(BOILER_STOP, "Utilisateur : arrêt Boiler forcé.", "UTILISATEUR")
+            ok = True
+        else:
+            snap = self.snapshot()
+            if not bool(self.settings.get("boiler_enabled")):
+                self.core_state["last_reason"] = "Utilisateur : démarrage Boiler refusé car la fonction Boiler est désactivée."
+                self.core_state["boiler_user_override"] = "AUTO"
+                action = "BOILER_USER_START_BLOCKED"
+                ok = False
+            elif snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
+                self.core_state["last_reason"] = "Utilisateur : démarrage Boiler refusé par sécurité température."
+                self.core_state["boiler_user_override"] = "AUTO"
+                action = "BOILER_USER_START_BLOCKED"
+                ok = False
+            else:
+                action = "BOILER_USER_START"
+                await self.async_command_boiler(BOILER_HEAT_45, "Utilisateur : démarrage Boiler forcé.", "UTILISATEUR")
+                ok = True
+        message_id = self.energy_bus.publish_message(
+            source="UTILISATEUR", target="EMS", action=action, delta_w=0.0, now=now,
+            frame_id=self._frame_id, reason=f"Override Boiler={state}.",
+        )
+        self.energy_bus.mark_processed(
+            message_id, by="EMS", now=dt_util.now(),
+            reason="Commande utilisateur Boiler enregistrée." if ok else "Commande utilisateur Boiler refusée par sécurité.",
+        )
+        self.async_set_updated_data(self._build_data())
+        return ok
+
     async def async_reconcile_machines(self) -> None:
         if not bool(self.settings.get("regulation_active")):
             return
@@ -1788,6 +2834,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         now = dt_util.now()
         self._refresh_machine_cycles()
+        economic_view = (
+            self._economic_view(self.snapshot(), prices=self.prices(), now=now)
+            if bool(self.settings.get("economic_optimizer_enabled", True)) else None
+        )
         for machine in self.machines:
             socket = machine.switch_entity
             if not socket:
@@ -1799,7 +2849,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Pendant un délestage, seules les machines explicitement délestables
             # et sans cycle protégé actif sont coupées.
             high_load_block = bool(self.load_shed_state.get("active")) and machine.sheddable and not cycle_active
-            tariff_ok = self._tariff_start_favorable()
+            tariff_ok = self._tariff_start_favorable(machine, economic_view=economic_view)
             # Un cycle utilisateur/protégé reste prioritaire. Seul un NOUVEAU
             # démarrage automatique est bloqué en période défavorable.
             should_on = cycle_active or (management and allowed and tariff_ok and not high_load_block)
@@ -1810,25 +2860,23 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER.warning("FoxCat machine socket command failed for %s (%s): %s", machine.name, socket, err)
 
     async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
-        """Délestage synchronisé sur les trames maison CORE.
+        """Délestage synchronisé sur chaque publication réseau.
 
         2 trames hautes consécutives déclenchent. 5 trames basses réarment.
         Une mesure maison invalide gèle l'état et n'est jamais assimilée à 0 W.
         """
-        if not snapshot.valid or self.measurement_state.get("house_source") == "INDISPONIBLE":
-            self.load_shed_state["reason"] = "Puissance maison FoxCat inconnue : état de délestage conservé."
+        if not snapshot.valid:
+            self.load_shed_state["reason"] = "Bilan énergétique invalide : état de délestage conservé."
             self._high_load_high_frames = 0
             self._high_load_low_frames = 0
             return
         self.load_shed_state["house_w"] = snapshot.house_w
         enabled=bool(self.settings.get("high_load_shed_enabled"))
-        # Le délestage, lorsqu'il est explicitement activé, est une protection
-        # de charge indépendante du mode EMS. Il peut interrompre temporairement
-        # une marche boiler utilisateur, sans effacer cette demande.
-        if not enabled:
+        automatic=str(self.settings.get("mode")) != MODE_MANUAL
+        if not enabled or not automatic:
             self._high_load_high_frames=self._high_load_low_frames=0
             if self.load_shed_state.get("active"):
-                self.load_shed_state.update({"active":False,"reason":"Délestage désactivé","triggered_at":None})
+                self.load_shed_state.update({"active":False,"reason":"Délestage indisponible ou mode Manuel","triggered_at":None})
                 await self.async_reconcile_machines()
             return
         trigger=float(self.settings.get("high_load_trigger_w",5000.0))
@@ -1847,13 +2895,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._high_load_low_frames=0
                 self.reset_core("Fin délestage : 5 trames basses confirmées.")
                 await self.async_reconcile_machines()
-                if bool(self.settings.get("boiler_user_hold")):
-                    await self.async_user_start_boiler(resume=True)
 
     async def _activate_high_load_shed(self, snapshot: EnergySnapshot, trigger_w: float) -> None:
         self.load_shed_state.update({
             "active": True,
-            "reason": f"DÉLESTAGE EN COURS — puissance maison {snapshot.house_w:.0f} W >= {trigger_w:.0f} W",
+            "reason": f"Puissance maison {snapshot.house_w:.0f} W >= {trigger_w:.0f} W",
             "triggered_at": dt_util.now(),
             "house_w": snapshot.house_w,
         })
@@ -1861,10 +2907,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._high_load_below_since = None
         self.reset_core("Délestage haute consommation déclenché.")
 
-        # Le délestage agit sur les charges, jamais sur le droit du PRI à
-        # recalculer. Le palier onduleur est donc laissé au cœur PRI souverain.
-        if bool(self.settings.get("boiler_user_hold")):
-            self.core_state["boiler_user_status"] = "DÉLESTAGE EN COURS — DEMANDE MÉMORISÉE"
+        if self._pri_task and not self._pri_task.done():
+            self._pri_task.cancel()
+        # En forte demande, EMS informe Onduleur Core via Energy Bus et pousse
+        # une cible 100 % au worker physique sans bloquer la trame EMS.
+        self.energy_bus.publish_message(
+            source="EMS", target="ONDULEUR", action="DELESTAGE_LIBERATION_100", delta_w=0.0,
+            now=dt_util.now(), frame_id=self._frame_id,
+            reason="Délestage haute consommation : libération onduleur demandée.",
+        )
+        self._queue_pri_target(
+            100, frame_id=self._frame_id, frame_serial=self._frame_serial,
+            pv_before=snapshot.pv_w, reason="Délestage haute consommation.",
+        )
 
         if snapshot.boiler_on:
             await self.async_command_boiler(
@@ -1886,7 +2941,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # stable avec la mesure courante puis on évalue la stratégie.
             self.reset_core("Nouvelle trame tarifaire dynamique : réévaluation immédiate.")
             self.core_state["t0"] = snap
-            self.core_state["phase"] = PHASE_DECISION
+            self._set_core_phase(PHASE_DECISION)
             await self._core_process_frame(snap)
             self._maybe_start_pri(snap)
         self.async_set_updated_data(self._build_data(snap))
@@ -1916,19 +2971,39 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self._pv_below_since is None:
                 self._pv_below_since = now
             elif (now - self._pv_below_since).total_seconds() >= float(self.settings["pri_end_solar_confirm_s"]):
-                # La fin solaire peut changer la stratégie CORE, mais n'a plus
-                # le droit de commander ou de suspendre le PRI souverain.
-                await self.async_set_mode(MODE_ECS)
-                self.core_state["last_reason"] = "Fin solaire confirmée : passage CORE en ECS solaire; PRI inchangé."
+                if self._pri_task and not self._pri_task.done():
+                    self._pri_task.cancel()
+                await self.async_release_pri_100("Fin solaire confirmée : onduleur libéré à 100 %.")
+                self.core_state["last_reason"] = (
+                    "Fin solaire confirmée : onduleur libéré à 100 %, "
+                    f"mode EMS conservé ({mode})."
+                )
                 self._pv_below_since = None
         else:
             self._pv_below_since = None
 
     async def _watchdog(self) -> None:
+        now = dt_util.now()
+        valid_phases = {PHASE_ACQUISITION, PHASE_DECISION, PHASE_WAIT_ACK}
+        if self.core_state.get("phase") not in valid_phases:
+            self.core_state["fsm_status"] = "ERREUR_PHASE"
+            self.reset_core("Watchdog : phase EMS invalide, machine à états réinitialisée.")
+        else:
+            self.core_state["fsm_status"] = "OK"
+
+        bus_timeout = max(float(self.settings.get("metronome_period_s", 30.0)) * 1.5, 45.0)
+        expired = self.energy_bus.expire_pending(now=now, timeout_s=bus_timeout)
+        if expired:
+            self.core_state["last_reason"] = (
+                "Energy Bus : ACK inter-corps expiré pour message(s) "
+                + ", ".join(str(item) for item in expired)
+                + "."
+            )
+
         last = self.core_state.get("last_frame")
         if not isinstance(last, datetime):
             return
-        age = (dt_util.now() - last).total_seconds()
+        age = (now - last).total_seconds()
         if age > float(self.settings["watchdog_timeout_s"]):
             if self.core_state.get("phase") != PHASE_ACQUISITION:
                 self.reset_core(f"Watchdog : aucune nouvelle trame depuis {age:.0f} s, machine d'états réinitialisée.")
@@ -1950,8 +3025,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return
 
     def _pri_guard(self) -> bool:
-        """Compatibilité API : en V1.5.6 aucune garde EMS ne bloque le PRI."""
-        self.pri_state["guard_reason"] = "SOUVERAIN_AUCUN_BLOCAGE"
+        """Garde minimale de la réduction puissance onduleur."""
+        if not bool(self.settings.get("regulation_active")):
+            self.pri_state["guard_reason"] = "regulation_inactive"
+            return False
+        if not bool(self.settings.get("pri_enabled")):
+            self.pri_state["guard_reason"] = "reduction_onduleur_desactivee"
+            return False
+        if str(self.settings.get("mode")) not in {MODE_ECO, MODE_ZERO, MODE_DYNAMIC}:
+            self.pri_state["guard_reason"] = f"mode_{self.settings.get('mode')}"
+            return False
+        self.pri_state["guard_reason"] = "OK"
         return True
 
 
@@ -1969,15 +3053,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return RRCR_CODE_TO_LEVEL.get(self._rrcr_code(), -1)
 
     async def _apply_rrcr_level(self, level: int) -> bool:
+        """Envoie une commande RRCR sans jamais bloquer Onduleur Core."""
         code = RRCR_LEVEL_TO_CODE.get(int(level))
         if code is None:
             return False
         entities = [self.config.get(CONF_PRI_L4), self.config.get(CONF_PRI_L3), self.config.get(CONF_PRI_L2), self.config.get(CONF_PRI_L1)]
         if not all(entities):
             return False
-        async with self._rrcr_action_lock:
+        async with self._inverter_action_lock:
             for entity_id, bit in zip(entities, code, strict=True):
-                await self.hass.services.async_call("switch", "turn_on" if bit == "1" else "turn_off", {"entity_id": entity_id}, blocking=True)
+                try:
+                    # blocking=False : la décision PRI ne dépend jamais d'une réponse
+                    # de service Home Assistant. L'état réel est contrôlé ensuite.
+                    await asyncio.wait_for(
+                        self.hass.services.async_call(
+                            "switch", "turn_on" if bit == "1" else "turn_off",
+                            {"entity_id": entity_id}, blocking=False,
+                        ),
+                        timeout=2.0,
+                    )
+                except asyncio.TimeoutError:
+                    self.pri_state["actuator_last_error"] = f"Timeout service RRCR {entity_id}."
+                    return False
         return True
 
     async def _wait_rrcr_code(self, code: str, timeout: float = 5.0) -> bool:
@@ -1988,18 +3085,130 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await asyncio.sleep(0.25)
         return self._rrcr_code() == code
 
+    def _queue_pri_target(
+        self,
+        level: int,
+        *,
+        frame_id: int,
+        frame_serial: int,
+        pv_before: float,
+        reason: str,
+    ) -> None:
+        """Mémorise uniquement la dernière consigne physique demandée.
+
+        Toutes les trames sont calculées immédiatement. Le worker RRCR ne crée
+        donc jamais une file de vieilles trames : il converge vers la consigne
+        issue de la publication la plus récente.
+        """
+        self._pri_requested = {
+            "level": int(level),
+            "frame_id": int(frame_id),
+            "frame_serial": int(frame_serial),
+            "pv_before": float(pv_before),
+            "reason": str(reason),
+            "requested_at": dt_util.now(),
+        }
+        self.pri_state["actuator_target_level"] = int(level)
+        self.pri_state["actuator_status"] = "QUEUED"
+        if self._pri_actuator_task is None or self._pri_actuator_task.done():
+            self._pri_actuator_task = self.hass.async_create_task(self._pri_actuator_loop())
+
+    async def _pri_actuator_loop(self) -> None:
+        """Applique la dernière consigne RRCR avec timeout et sans bloquer les trames."""
+        try:
+            while self._pri_requested is not None:
+                request = self._pri_requested
+                self._pri_requested = None
+                target = int(request["level"])
+                current = self._rrcr_level()
+                self.pri_state["actuator_status"] = "EXECUTION"
+                self.pri_state["actuator_target_level"] = target
+                self.pri_state["actuator_last_error"] = ""
+
+                if current == target:
+                    self.pri_state["actuator_status"] = "OK"
+                    continue
+
+                try:
+                    sent = await asyncio.wait_for(self._apply_rrcr_level(target), timeout=4.0)
+                except asyncio.TimeoutError:
+                    sent = False
+                    self.pri_state["actuator_last_error"] = f"Timeout global commande RRCR {target} %."
+
+                # Si une trame plus récente a changé la cible pendant l'envoi,
+                # on ne perd pas de temps à valider une consigne déjà obsolète.
+                if self._pri_requested is not None and int(self._pri_requested.get("level", target)) != target:
+                    self.pri_state["actuator_status"] = "SUPERSEDED"
+                    continue
+
+                confirmed = sent and await self._wait_rrcr_code(RRCR_LEVEL_TO_CODE[target], timeout=5.0)
+                if not confirmed:
+                    self.pri_state["ack_rrcr"] = "FAILED"
+                    self.pri_state["actuator_status"] = "FAILED"
+                    if not self.pri_state.get("actuator_last_error"):
+                        self.pri_state["actuator_last_error"] = f"RRCR {target} % non confirmé avant timeout."
+                    # Pas de rollback bloquant : la prochaine publication reste
+                    # souveraine et peut immédiatement demander une autre cible.
+                    continue
+
+                # Si plusieurs trames ont demandé la même cible pendant la
+                # commutation, rattacher l'ACK physique à la plus récente.
+                if self._pri_requested is not None and int(self._pri_requested.get("level", -1)) == target:
+                    request = self._pri_requested
+                    self._pri_requested = None
+
+                self.pri_state.update({
+                    "current_level": target,
+                    "ack_rrcr": "PENDING",
+                    "ack_inverter": "PENDING",
+                    "ack_grid": "PENDING",
+                    "pending_level": target,
+                    "pending_frame_id": int(request["frame_id"]),
+                    "pending_frame_serial": int(request["frame_serial"]),
+                    "pending_pv_before": float(request["pv_before"]),
+                    "actuator_status": "OK",
+                })
+                self.async_set_updated_data(self._build_data())
+        except asyncio.CancelledError:
+            self.pri_state["actuator_status"] = "CANCELLED"
+            raise
+        except Exception as err:  # pragma: no cover - defensive HA runtime
+            _LOGGER.exception("FoxCat PRI actuator error: %s", err)
+            self.pri_state["actuator_status"] = "FAILED"
+            self.pri_state["actuator_last_error"] = str(err)
+
     async def async_release_pri_100(self, reason: str) -> None:
         entities = [self.config.get(CONF_PRI_L1), self.config.get(CONF_PRI_L2), self.config.get(CONF_PRI_L3), self.config.get(CONF_PRI_L4)]
         if not all(entities):
             self.pri_state.update({"current_level": 100, "target_level": 100, "code": "0000", "last_reason": f"{reason} Relais PRI non configurés."})
             return
         try:
-            await self._apply_rrcr_level(100)
+            sent = await self._apply_rrcr_level(100)
+            confirmed = sent and await self._wait_rrcr_code(RRCR_LEVEL_TO_CODE[100], timeout=5.0)
+            if not confirmed:
+                raise RuntimeError(f"RRCR 100 % non confirmé (code={self._rrcr_code()}).")
             self.pri_state.update({"current_level": 100, "target_level": 100, "code": "0000", "direction": "maintien", "last_reason": reason, "ack_rrcr": "OK"})
         except Exception as err:  # pragma: no cover
             _LOGGER.warning("Unable to release PRI to 100%%: %s", err)
             self.pri_state["ack_rrcr"] = "FAILED"
             self.pri_state["last_reason"] = f"Échec fail-safe 100 % : {err}"
+
+    def _classify_pri_grid(self, snapshot: EnergySnapshot) -> str:
+        """Classe le résultat réseau PRI sans lever d'exception.
+
+        Le réseau signé FoxCat est positif en prélèvement et négatif en
+        réinjection. L'ACK est OK tant que la trame reste dans l'enveloppe
+        configurable ; sinon la cause est explicitement indiquée.
+        """
+        if not snapshot.valid:
+            return "NOK_DONNEES"
+        export_limit = max(float(self.settings.get("pri_export_acceptable_w", 150.0)), 0.0)
+        import_limit = max(float(self.settings.get("pri_import_acceptable_w", 200.0)), 0.0)
+        if snapshot.export_w > export_limit:
+            return "NOK_REINJECTION"
+        if snapshot.import_w > import_limit:
+            return "NOK_PRELEVEMENT"
+        return "OK"
 
     def _update_pri_pv_comparator(self, snapshot: EnergySnapshot, level: int) -> None:
         max_w=float(self.settings.get("pri_step_w",400.0))*10.0
@@ -2021,12 +3230,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.pri_state.update({"solar_state":state,"solar_potential_min_w":potential,
                                "pv_limit_w":limit,"pv_limit_error_w":err})
 
-    async def _validate_pending_pri_on_frame(self, snapshot: EnergySnapshot) -> None:
+    async def _validate_pending_pri_on_frame(self, snapshot: EnergySnapshot, *, frame_serial: int | None = None) -> None:
         if not snapshot.valid:
             return
         pending=self.pri_state.get("pending_level")
         pending_frame=self.pri_state.get("pending_frame_id")
-        if pending is None or pending_frame is None or self._frame_id <= int(pending_frame):
+        pending_serial=self.pri_state.get("pending_frame_serial")
+        current_serial = int(frame_serial if frame_serial is not None else self._frame_serial)
+        if pending is None or pending_frame is None or pending_serial is None or current_serial <= int(pending_serial):
             return
         level=self._rrcr_level()
         if level != int(pending):
@@ -2039,46 +3250,46 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.pri_state["ack_grid"]=self._classify_pri_grid(snapshot)
         self.pri_state["pending_level"]=None
         self.pri_state["pending_frame_id"]=None
+        self.pri_state["pending_frame_serial"]=None
         self.pri_state["pending_pv_before"]=None
 
-    async def _run_pri_frame(self, snapshot: EnergySnapshot) -> None:
-        """EMS Onduleur 1.5.6 : recalcul souverain à chaque trame capteur."""
+    async def _run_pri_frame(
+        self, snapshot: EnergySnapshot, *, frame_id: int | None = None, frame_serial: int | None = None
+    ) -> str:
+        """Onduleur Core 1.6.150 : décision immédiate, action RRCR asynchrone."""
         self.pri_state["last_engine_run"] = dt_util.now()
         self.pri_state["engine_run_count"] = int(self.pri_state.get("engine_run_count", 0)) + 1
 
         if not snapshot.valid:
-            # Seule impossibilité logique admise : aucune mesure exploitable à
-            # calculer. Aucune condition EMS ne transforme une trame valide en
-            # trame bloquée.
-            self.pri_state["guard_reason"] = "MESURES_PHYSIQUES_INDISPONIBLES"
-            self.pri_state["last_reason"] = "EMS Onduleur : snapshot énergétique physiquement incomplet."
-            return
+            self.pri_state["last_reason"] = "EMS Onduleur : snapshot énergétique incomplet."
+            return "SNAPSHOT_INVALIDE"
+        if not self._pri_guard():
+            self.pri_state["last_reason"] = (
+                "EMS Onduleur non exécuté : "
+                f"{self.pri_state.get('guard_reason', 'raison inconnue')}."
+            )
+            return "GARDE_PRI_ACTIVE"
 
-        self.pri_state["guard_reason"] = "SOUVERAIN_AUCUN_BLOCAGE"
         current = self._rrcr_level()
         if current < 0:
-            # Un retour RRCR transitoirement inconnu n'annule pas la trame. On
-            # repart du dernier niveau logique connu, puis on réécrit le palier
-            # calculé. La prochaine trame vérifiera le retour physique.
-            fallback_level = self.pri_state.get("current_level", self.pri_state.get("target_level", 100))
-            try:
-                current = int(fallback_level)
-            except (TypeError, ValueError):
-                current = 100
-            current = max(0, min(100, int(round(current / 10.0) * 10)))
-            self.pri_state["ack_rrcr"] = "FAILED"
-            self.pri_state["last_reason"] = (
-                f"Retour RRCR inconnu : recalcul poursuivi depuis le dernier niveau logique {current} %."
-            )
+            self.pri_state.update({"ack_rrcr":"FAILED","last_reason":"EMS Onduleur : code RRCR inconnu."})
+            return "RRCR_INCONNU"
 
         self._update_pri_pv_comparator(snapshot, current)
         policy = str(self.settings.get("network_policy", NETWORK_POLICY_COMPENSATION))
+        tariff_context = self.prices()
         decision = self.inverter_core.decide(
             snapshot,
             current,
             self.settings,
             policy,
             self.energy_bus.view(),
+            tariff_regime=str(tariff_context.get("regime")),
+            dynamic_export_value_eur_kwh=(
+                float(tariff_context["export_value"])
+                if isinstance(tariff_context.get("export_value"), (int, float))
+                else None
+            ),
         )
 
         target = max(0, min(100, int(decision.target_level)))
@@ -2104,7 +3315,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         })
         self.energy_bus.publish_inverter_state(
             status=decision.action,
-            frame_id=self._frame_id,
+            frame_id=int(frame_id if frame_id is not None else self._frame_id),
             frame_at=dt_util.now(),
             current_level=current,
             target_level=target,
@@ -2125,29 +3336,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             reason=decision.reason,
         )
 
+        effective_frame_id = int(frame_id if frame_id is not None else self._frame_id)
+        effective_serial = int(frame_serial if frame_serial is not None else self._frame_serial)
+
         if target == current:
+            # Une cible physique précédente devenue obsolète est remplacée par
+            # le maintien demandé par la trame la plus récente.
+            if self._pri_requested is not None and int(self._pri_requested.get("level", current)) != current:
+                self._queue_pri_target(
+                    current, frame_id=effective_frame_id, frame_serial=effective_serial,
+                    pv_before=snapshot.pv_w, reason="Nouvelle trame : maintien prioritaire.",
+                )
             self.pri_state["ack_grid"] = self._classify_pri_grid(snapshot)
-            return
+            return "PROCESSED"
 
-        # V1.5.6 : la trame courante commande, elle n'attend jamais un ACK.
-        # La trame suivante vérifie le résultat N+1 puis recalcule quoi qu'il
-        # arrive. Un ACK lent ou mauvais ne peut donc plus bloquer le PRI.
-        command_sent = await self._apply_rrcr_level(target)
-        if not command_sent:
-            self.pri_state["ack_rrcr"] = "FAILED"
-            self.pri_state["last_reason"] = (
-                f"EMS Onduleur : commande RRCR {target}% impossible (relais non configurés)."
-            )
-            return
-
-        self.pri_state.update({
-            "ack_rrcr":"PENDING",
-            "ack_inverter":"PENDING",
-            "ack_grid":"PENDING",
-            "pending_level":target,
-            "pending_frame_id":self._frame_id,
-            "pending_pv_before":snapshot.pv_w,
-        })
+        # La décision de CETTE trame est terminée ici. La commande physique est
+        # confiée au worker RRCR et ne retarde jamais les publications suivantes.
+        self.pri_state.update({"ack_rrcr": "QUEUED", "ack_inverter": "PENDING", "ack_grid": "PENDING"})
+        self._queue_pri_target(
+            target, frame_id=effective_frame_id, frame_serial=effective_serial,
+            pv_before=snapshot.pv_w, reason=decision.reason,
+        )
+        return "PROCESSED"
 
 
     async def async_reset_cycle(self) -> None:
@@ -2160,21 +3370,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_diagnostic(self) -> None:
         snap = self.snapshot()
         missing = []
-        if not snap.valid:
-            if self._optional_float_state(self.config.get(CONF_PV_SENSOR)) is None:
-                missing.append("PV")
-            if self.measurement_state.get("house_source") == "INDISPONIBLE":
-                missing.append("maison")
-            if self.measurement_state.get("grid_export_source") == "INDISPONIBLE":
-                missing.append("export")
-            if self.measurement_state.get("grid_import_source") == "INDISPONIBLE":
-                missing.append("import")
+        if self.config.get(CONF_GRID_SIGNED_SENSOR):
+            for key, label in ((CONF_PV_SENSOR, "PV"), (CONF_GRID_SIGNED_SENSOR, "réseau signé")):
+                if not self._numeric_valid(self.config.get(key)):
+                    missing.append(label)
+        else:
+            for key, label in ((CONF_PV_SENSOR, "PV"), (CONF_HOUSE_SENSOR, "maison legacy"), (CONF_GRID_EXPORT_SENSOR, "export legacy"), (CONF_GRID_IMPORT_SENSOR, "import legacy")):
+                if not self._numeric_valid(self.config.get(key)):
+                    missing.append(label)
         legacy_on = [eid for eid in KNOWN_LEGACY_AUTOMATIONS if self._is_on(eid)]
         parts = []
         if missing:
             parts.append("Capteurs invalides : " + ", ".join(missing))
         else:
-            parts.append("Mesures principales valides")
+            parts.append("Sources énergétiques valides")
         if legacy_on:
             parts.append("automatisations legacy actives : " + ", ".join(legacy_on))
         parts.append(f"réseau={snap.grid_net_w:.0f} W")
@@ -2201,7 +3410,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 response = await self.hass.services.async_call(
                     "ai_task",
                     "generate_data",
-                    {"entity_id": ai_entity, "task_name": f"EMS 2 - Prévision solaire - {analysis_type}", "instructions": prompt, "structure": structure},
+                    {"entity_id": ai_entity, "task_name": f"FoxCat IA - Prévision solaire - {analysis_type}", "instructions": prompt, "structure": structure},
                     blocking=True,
                     return_response=True,
                 )
@@ -2224,7 +3433,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self.async_set_updated_data(self._build_data())
                     return
             except Exception as err:  # pragma: no cover
-                _LOGGER.warning("EMS 2 AI Task failed, deterministic fallback used: %s", err)
+                _LOGGER.warning("FoxCat IA : AI Task indisponible, fallback déterministe utilisé: %s", err)
         self._deterministic_solar_fallback(analysis_type)
         await self._async_save()
         self.async_set_updated_data(self._build_data())
@@ -2271,7 +3480,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             eid = self.config.get(key)
             state = self.hass.states.get(eid) if eid else None
             return state.state if state else "indisponible"
-        return f"""Tu es EMS 2, module prédictif solaire de FoxCat Energy. Tu es uniquement consultatif : ne commande aucun équipement et ne modifies aucune consigne. EMS 1 reste seul décisionnaire.
+        return f"""Tu es le module IA prédictif solaire de FoxCat Energy. Tu es uniquement consultatif : ne commande aucun équipement et ne modifies aucune consigne. L’EMS FoxCat reste seul décisionnaire.
 
 Analyse: {analysis_type}
 Date/heure: {dt_util.now().strftime('%d/%m/%Y %H:%M')}
@@ -2301,6 +3510,9 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         level = RRCR_CODE_TO_LEVEL.get(rrcr_code, -1)
         self.pri_state["current_level"] = level
         self.pri_state["code"] = rrcr_code
+        prices = self.prices()
+        economic = self._economic_view(snap, prices=prices)
+        financial = self._financial_status_view({"economic": economic})
         return {
             "snapshot": snap,
             "settings": dict(self.settings),
@@ -2308,10 +3520,20 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "pri": dict(self.pri_state),
             "energy_bus": self.energy_bus.view(),
             "metronome": dict(self.metronome_state),
-            "measurements": dict(self.measurement_state),
             "machine_cycles": self.machine_cycle_manager.snapshot(dt_util.now()),
+            "machine_learning": self.machine_learning.view(),
             "solar": self.solar_forecast,
-            "prices": self.prices(),
+            "prices": prices,
+            "economic": economic,
+            "boiler_thermal": self._boiler_thermal_view(snap),
+            "status_summary": {
+                "mode": self.settings.get("mode", MODE_ECO),
+                "network_policy": self.settings.get("network_policy", NETWORK_POLICY_COMPENSATION),
+                "financial_status": financial["status"],
+                "financial_detail": financial["detail"],
+                "financial_code": financial["code"],
+                "economic_decision": economic.get("decision", {}).get("label", "Indisponible"),
+            },
             "accounting": self.accounting.view(),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),

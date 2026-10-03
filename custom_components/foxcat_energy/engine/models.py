@@ -14,7 +14,9 @@ class EnergySnapshot:
     import_w: float
     grid_net_w: float
     boiler_temp_c: float
+    boiler_safety_temp_c: float
     boiler_power_w: float
+    inverter_power_w: float
     boiler_on: bool
     boiler_setpoint_c: float
     machine_active: bool

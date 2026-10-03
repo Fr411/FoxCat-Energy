@@ -39,6 +39,8 @@ class MachineDefinition:
     switch_entity: str
     cycle_entity: str | None = None
     power_sensor: str | None = None
+    current_sensor: str | None = None
+    voltage_sensor: str | None = None
     automatic_default: bool = True
     sheddable: bool = True
     on_1: str = DEFAULT_ON_1
@@ -64,6 +66,8 @@ class MachineDefinition:
             "switch": self.switch_entity,
             "cycle": self.cycle_entity or "",
             "power_sensor": self.power_sensor or "",
+            "current_sensor": self.current_sensor or "",
+            "voltage_sensor": self.voltage_sensor or "",
             "automatic": self.automatic_default,
             "sheddable": self.sheddable,
             "on_1": self.on_1,
@@ -100,6 +104,8 @@ def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
         switch_entity=switch,
         cycle_entity=_str(raw.get("cycle")).strip() or None,
         power_sensor=_str(raw.get("power_sensor")).strip() or None,
+        current_sensor=_str(raw.get("current_sensor")).strip() or None,
+        voltage_sensor=_str(raw.get("voltage_sensor")).strip() or None,
         automatic_default=bool(raw.get("automatic", True)),
         sheddable=bool(raw.get("sheddable", True)),
         legacy_setting_key=legacy_setting_key,

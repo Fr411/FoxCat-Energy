@@ -21,13 +21,22 @@ class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
     @property
     def device_info(self) -> DeviceInfo:
         names = {
+            "sources": "FoxCat Energy – Sources énergétiques",
+            "energy": "FoxCat Energy – Énergie",
+            "pri": "FoxCat Energy – Onduleur",
+            "inverter": "FoxCat Energy – Onduleur",
             "ems": "FoxCat Energy – EMS",
-            "boiler": "FoxCat Energy – Boiler",
-            "pri": "FoxCat Energy – PRI SolarEdge",
+            "energy_bus": "FoxCat Energy – Energy Bus",
             "machines": "FoxCat Energy – Machines",
-            "solar": "FoxCat Energy – EMS 2",
+            "machine_learning": "FoxCat Energy – Machine Learning",
+            "ai": "FoxCat Energy – IA",
+            "boiler": "FoxCat Energy – Boiler",
             "pricing": "FoxCat Energy – Tarification",
-            "hardware": "FoxCat Energy – Matériel installé",
+            "metronome": "FoxCat Energy – Métronome",
+            "diagnostic": "FoxCat Energy – Diagnostic",
+            "user_functions": "FoxCat Energy – Fonctions utilisateur",
+            "solar": "FoxCat Energy – IA",
+            "accounting": "FoxCat Energy – Énergie",
         }
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self.coordinator.entry.entry_id}:{self._device}")},

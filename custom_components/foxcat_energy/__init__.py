@@ -20,19 +20,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_initialize()
 
+    # Les plateformes sont chargées avant la génération du dashboard afin que
+    # le registre Home Assistant connaisse déjà les unique_id FoxCat.
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     # Génère le dashboard officiel uniquement s'il n'existe pas encore.
     # Un dashboard déjà personnalisé n'est jamais écrasé au démarrage.
     try:
-        created, dashboard_path = await async_ensure_dashboard(hass)
+        created, dashboard_path = await async_ensure_dashboard(hass, entry, coordinator.config)
         if created:
-            _LOGGER.info("Dashboard FoxCat Energy créé: %s", dashboard_path)
+            _LOGGER.info("Dashboard FoxCat Energy créé depuis le registre: %s", dashboard_path)
         else:
             _LOGGER.debug("Dashboard FoxCat Energy déjà présent: %s", dashboard_path)
     except (OSError, FileNotFoundError) as err:
         # Une erreur de dashboard ne doit jamais empêcher l'EMS de démarrer.
         _LOGGER.warning("Impossible de générer le dashboard FoxCat Energy: %s", err)
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(
         entry.add_update_listener(_async_reload_entry)

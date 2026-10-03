@@ -30,15 +30,18 @@ def evaluate_dynamic(
         )
     if not bool(settings["boiler_enabled"]):
         return BoilerIntent(BOILER_STOP, "Boiler désactivé dans FoxCat.", "SECURITE")
-    if snapshot.boiler_temp_c >= float(settings["boiler_temp_safety_c"]):
+    if snapshot.boiler_safety_temp_c >= float(settings["boiler_temp_safety_c"]):
         return BoilerIntent(BOILER_STOP, "Sécurité thermique boiler.", "SECURITE")
 
-    current = prices.get("current")
-    next_price = prices.get("next")
+    # Le mode dynamique consomme exclusivement le contexte tarifaire normalisé
+    # par le coordinator : achat Luminus Dynamic all-in et valeur économique
+    # signée de la réinjection. Aucune entité ComfyFlex n'entre ici.
+    current = prices.get("active_buy")
+    next_price = prices.get("next_buy")
     pmin = prices.get("min_today")
     pmax = prices.get("max_today")
     avg = prices.get("avg_today")
-    injection = prices.get("injection")
+    export_value = prices.get("export_value")
     if not isinstance(current, (int, float)) or not isinstance(pmin, (int, float)) or not isinstance(pmax, (int, float)):
         return BoilerIntent(BOILER_NONE, "Prix dynamiques invalides : régulation suspendue.", "PRIX")
     current = float(current)
@@ -46,7 +49,7 @@ def evaluate_dynamic(
     pmax = float(pmax)
     next_price = float(next_price) if isinstance(next_price, (int, float)) else current
     avg = float(avg) if isinstance(avg, (int, float)) else current
-    injection = float(injection) if isinstance(injection, (int, float)) else 0.0
+    export_value = float(export_value) if isinstance(export_value, (int, float)) else 0.0
 
     normal = float(settings["boiler_temp_normal_c"])
     start = float(settings["boiler_temp_start_c"])
@@ -77,7 +80,7 @@ def evaluate_dynamic(
     low = position <= 0.45 or current < avg
     very_high = position >= 0.80 or current >= pmax - 0.005
     significant = float(settings["dynamic_price_significant_delta"])
-    injection_lucrative = injection < float(settings["dynamic_injection_lucrative_threshold"])
+    injection_lucrative = export_value > 0.0
     boost_solar = normal <= snapshot.boiler_temp_c < boost and coverage_t0 >= 100 and coverage_now >= 100 and not injection_lucrative
     solar_future = solar.available and solar.confidence >= float(settings["solar_confidence_min_percent"]) and solar.potential in {"Moyen", "Bon", "Fort"}
     deadline = thermal_deadline(snapshot, settings, now)
@@ -103,5 +106,5 @@ def evaluate_dynamic(
     if snapshot.boiler_temp_c < normal and very_high:
         return BoilerIntent(BOILER_STOP, "Prix élevé évité.", "PRIX")
     if snapshot.boiler_temp_c < normal and solar_future and not deadline and not very_low:
-        return BoilerIntent(BOILER_STOP, "Attente solaire autorisée par EMS 2.", "EMS2")
+        return BoilerIntent(BOILER_STOP, "Attente solaire recommandée par IA.", "IA")
     return BoilerIntent(BOILER_NONE, "Surveillance dynamique : aucune action nécessaire.", "PRIX")

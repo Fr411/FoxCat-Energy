@@ -7,7 +7,11 @@ from typing import Any
 ZERO = {
     "house_kwh": 0.0, "pv_kwh": 0.0, "self_consumed_kwh": 0.0,
     "export_kwh": 0.0, "import_kwh": 0.0,
-    "import_cost_eur": 0.0, "export_value_eur": 0.0,
+    "import_cost_eur": 0.0,
+    # Compatibilité : export_value_eur reste le revenu brut de réinjection.
+    "export_value_eur": 0.0,
+    "export_revenue_eur": 0.0,
+    "export_cost_eur": 0.0,
     "solar_avoided_cost_eur": 0.0,
 }
 
@@ -58,6 +62,11 @@ class EnergyAccounting:
         bucket[key]=float(bucket.get(key,0.0))+max(float(value),0.0)
 
     @staticmethod
+    def _add_signed(bucket: dict[str,Any], key: str, value: float) -> None:
+        """Ajoute une valeur financière signée sans effacer les prix négatifs."""
+        bucket[key]=float(bucket.get(key,0.0))+float(value)
+
+    @staticmethod
     def _add_appliance(bucket: dict[str,Any], aid: str, name: str, energy: float,
                        solar: float, grid: float, cost: float) -> None:
         apps=bucket.setdefault("appliances",{})
@@ -102,15 +111,24 @@ class EnergyAccounting:
         buy=float(buy) if isinstance(buy,(int,float)) else None
         sell=float(sell) if isinstance(sell,(int,float)) else None
         import_cost=imported*buy if buy is not None else 0.0
-        export_value=exported*sell if sell is not None else 0.0
+        # Convention financière FoxCat : sell > 0 = revenu, sell < 0 = coût.
+        # On sépare explicitement les deux afin que l'Accounting ne perde plus
+        # les périodes où l'utilisateur paie pour réinjecter.
+        export_revenue=exported*max(sell,0.0) if sell is not None else 0.0
+        export_cost=exported*max(-sell,0.0) if sell is not None else 0.0
         avoided=self_used*buy if buy is not None else 0.0
 
         for b in (self.today,self.month,self.year,self.lifetime):
             for k,v in (("house_kwh",house),("pv_kwh",pv),("self_consumed_kwh",self_used),
                         ("export_kwh",exported),("import_kwh",imported),
-                        ("import_cost_eur",import_cost),("export_value_eur",export_value),
-                        ("solar_avoided_cost_eur",avoided)):
+                        ("export_value_eur",export_revenue),
+                        ("export_revenue_eur",export_revenue),
+                        ("export_cost_eur",export_cost)):
                 self._add(b,k,v)
+            # Les prix dynamiques peuvent être négatifs. Un prélèvement à prix
+            # négatif doit donc diminuer le coût cumulé au lieu d'être écrasé.
+            self._add_signed(b,"import_cost_eur",import_cost)
+            self._add_signed(b,"solar_avoided_cost_eur",avoided)
 
         solar_fraction=min(max(self_used/house if house>0 else 0.0,0.0),1.0)
         for app in appliances:
@@ -142,16 +160,25 @@ class EnergyAccounting:
         pv=float(b.get("pv_kwh",0)); house=float(b.get("house_kwh",0))
         selfuse=float(b.get("self_consumed_kwh",0))
         imp=float(b.get("import_kwh",0)); exp=float(b.get("export_kwh",0))
-        cost=float(b.get("import_cost_eur",0)); value=float(b.get("export_value_eur",0))
+        cost=float(b.get("import_cost_eur",0))
+        # Les buckets restaurés depuis <=1.6.157 ne possèdent pas encore les
+        # nouveaux champs : export_value_eur contenait alors le revenu brut.
+        revenue=float(b.get("export_revenue_eur", b.get("export_value_eur",0)))
+        export_cost=float(b.get("export_cost_eur",0))
         avoided=float(b.get("solar_avoided_cost_eur",0))
         return {
             **b,
+            "export_value_eur": revenue,
+            "export_revenue_eur": revenue,
+            "export_cost_eur": export_cost,
             "autoconsumption_pct": (100*selfuse/pv) if pv>0 else 0.0,
             "autonomy_pct": (100*selfuse/house) if house>0 else 0.0,
             "solar_coverage_pct": (100*selfuse/house) if house>0 else 0.0,
             "grid_share_pct": (100*imp/house) if house>0 else 0.0,
-            "net_grid_cost_eur": cost-value,
-            "solar_gain_eur": avoided+value,
+            # Solde financier réel : achats + coût d'export - revenus d'export.
+            "net_grid_cost_eur": cost + export_cost - revenue,
+            "net_export_value_eur": revenue - export_cost,
+            "solar_gain_eur": avoided + revenue - export_cost,
         }
 
     def view(self) -> dict[str,Any]:

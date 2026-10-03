@@ -4,6 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+from .registry import registry_diagnostics
 
 
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigEntry) -> dict:
@@ -37,5 +38,6 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: ConfigE
             "trend": coordinator.solar_forecast.trend,
             "reason": coordinator.solar_forecast.reason,
         },
+        "registry": registry_diagnostics(hass, entry, coordinator.config),
         "legacy_conflict": data["legacy_conflict"],
     }

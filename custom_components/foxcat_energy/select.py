@@ -8,13 +8,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN, MODE_MANUAL, MODES, TARIFF_REGIMES, NETWORK_POLICIES, NETWORK_POLICY_COMPENSATION
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
-from .hardware_catalog import (
-    INVERTER_BRANDS,
-    METER_BRANDS,
-    OTHER,
-    models_for_inverter,
-    models_for_meter,
-)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -25,10 +18,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatTariffRegimeSelect(coordinator),
             FoxCatNetworkPolicySelect(coordinator),
             FoxCatPriManualLevelSelect(coordinator),
-            FoxCatInverterBrandSelect(coordinator),
-            FoxCatInverterModelSelect(coordinator),
-            FoxCatMeterBrandSelect(coordinator),
-            FoxCatMeterModelSelect(coordinator),
         ]
     )
 
@@ -104,93 +93,3 @@ class FoxCatPriManualLevelSelect(FoxCatEntity, SelectEntity):
         except ValueError:
             return
         await self.coordinator.async_set_pri_manual_level(level)
-
-
-class FoxCatInverterBrandSelect(FoxCatEntity, SelectEntity):
-    """Marque de l'onduleur installé — information uniquement."""
-
-    _attr_options = [*INVERTER_BRANDS, OTHER]
-
-    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "materiel_marque_onduleur", "Matériel • Marque onduleur", "mdi:solar-power-variant", "hardware")
-
-    @property
-    def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("hardware_inverter_brand", "SolarEdge"))
-        return value if value in self._attr_options else OTHER
-
-    async def async_select_option(self, option: str) -> None:
-        if option not in self._attr_options:
-            return
-        await self.coordinator.async_set_setting("hardware_inverter_brand", option)
-        valid_models = models_for_inverter(option)
-        current_model = str(self.coordinator.settings.get("hardware_inverter_model", ""))
-        if current_model not in valid_models:
-            await self.coordinator.async_set_setting("hardware_inverter_model", valid_models[0] if valid_models else OTHER)
-
-
-class FoxCatInverterModelSelect(FoxCatEntity, SelectEntity):
-    """Modèle/famille de l'onduleur installé — information uniquement."""
-
-    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "materiel_modele_onduleur", "Matériel • Modèle onduleur", "mdi:solar-panel-large", "hardware")
-
-    @property
-    def options(self) -> list[str]:
-        brand = str(self.coordinator.settings.get("hardware_inverter_brand", "SolarEdge"))
-        return models_for_inverter(brand)
-
-    @property
-    def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("hardware_inverter_model", "SE4K"))
-        return value if value in self.options else OTHER
-
-    async def async_select_option(self, option: str) -> None:
-        if option not in self.options:
-            return
-        await self.coordinator.async_set_setting("hardware_inverter_model", option)
-
-
-class FoxCatMeterBrandSelect(FoxCatEntity, SelectEntity):
-    """Famille/fabricant du système de mesure principal — information uniquement."""
-
-    _attr_options = [*METER_BRANDS, OTHER]
-
-    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "materiel_marque_mesure_reseau", "Matériel • Système de mesure principal", "mdi:meter-electric-outline", "hardware")
-
-    @property
-    def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("hardware_meter_brand", "Smappee"))
-        return value if value in self._attr_options else OTHER
-
-    async def async_select_option(self, option: str) -> None:
-        if option not in self._attr_options:
-            return
-        await self.coordinator.async_set_setting("hardware_meter_brand", option)
-        valid_models = models_for_meter(option)
-        current_model = str(self.coordinator.settings.get("hardware_meter_model", ""))
-        if current_model not in valid_models:
-            await self.coordinator.async_set_setting("hardware_meter_model", valid_models[0] if valid_models else OTHER)
-
-
-class FoxCatMeterModelSelect(FoxCatEntity, SelectEntity):
-    """Modèle/interface de mesure principal — information uniquement."""
-
-    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "materiel_modele_mesure_reseau", "Matériel • Modèle / interface de mesure", "mdi:current-ac", "hardware")
-
-    @property
-    def options(self) -> list[str]:
-        brand = str(self.coordinator.settings.get("hardware_meter_brand", "Smappee"))
-        return models_for_meter(brand)
-
-    @property
-    def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("hardware_meter_model", "Infinity"))
-        return value if value in self.options else OTHER
-
-    async def async_select_option(self, option: str) -> None:
-        if option not in self.options:
-            return
-        await self.coordinator.async_set_setting("hardware_meter_model", option)

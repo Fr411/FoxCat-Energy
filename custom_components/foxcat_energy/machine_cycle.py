@@ -62,6 +62,18 @@ class MachineCycleManager:
                 if now-st.low_since>=timedelta(minutes=end_confirm_minutes): self._finish(st)
             else: st.low_since=None
         return st
+    def force_start(self, machine_id: str, now: datetime, *, duration_minutes: float, margin_minutes: float, origin: str = "USER_BUTTON") -> MachineCycleState:
+        """Démarre immédiatement un cycle protégé demandé par l'utilisateur."""
+        st = self.state_for(machine_id)
+        self._start(st, now, duration_minutes, margin_minutes, origin)
+        return st
+
+    def force_finish(self, machine_id: str) -> MachineCycleState:
+        """Termine explicitement un cycle à la demande de l'utilisateur."""
+        st = self.state_for(machine_id)
+        self._finish(st)
+        return st
+
     def snapshot(self,now:datetime)->dict[str,dict[str,Any]]:
         return {mid:{"state":st.state,"protected":st.protected,"origin":st.origin,"power_w":st.last_power_w,"started_at":st.started_at,"expected_end_at":st.expected_end_at,"timeout_at":st.timeout_at,"remaining_s":max((st.expected_end_at-now).total_seconds(),0) if st.expected_end_at and st.protected else None} for mid,st in self._states.items()}
     @staticmethod

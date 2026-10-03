@@ -14,14 +14,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     c: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [
-            FoxCatBinary(c, "donnees_valides", "Données énergétiques valides", "mdi:database-check-outline", "ems", lambda d: d["snapshot"].valid, BinarySensorDeviceClass.CONNECTIVITY),
+            FoxCatBinary(c, "donnees_valides", "Données énergétiques valides", "mdi:database-check-outline", "energy", lambda d: d["snapshot"].valid, BinarySensorDeviceClass.CONNECTIVITY),
             FoxCatBinary(c, "machine_protegee_active", "Machine protégée active", "mdi:shield-home-outline", "machines", lambda d: d["snapshot"].machine_active),
             FoxCatBinary(c, "haute_consommation_active", "Délestage haute consommation actif", "mdi:flash-alert", "ems", lambda d: d["load_shed"].get("active"), BinarySensorDeviceClass.PROBLEM),
             FoxCatBinary(c, "boiler_autorise_cycle_protege", "Chauffe-eau autorisé pendant cycle protégé", "mdi:shield-check-outline", "machines", lambda d: d["machine_guard"].get("boiler_allowed")),
             FoxCatBinary(c, "boiler_physique", "Boiler physique", "mdi:water-boiler", "boiler", lambda d: d["snapshot"].boiler_on, BinarySensorDeviceClass.POWER),
-            FoxCatBinary(c, "boiler_demande_utilisateur", "Boiler demandé par l'utilisateur", "mdi:hand-back-right-outline", "boiler", lambda d: d["settings"].get("boiler_user_hold", False)),
-            FoxCatBinary(c, "fenetre_solaire", "Fenêtre solaire exploitable", "mdi:weather-sunny", "solar", lambda d: d["solar"].available),
-            FoxCatBinary(c, "conflit_legacy", "Automatisation FoxCat legacy active", "mdi:alert-decagram-outline", "ems", lambda d: d["legacy_conflict"], BinarySensorDeviceClass.PROBLEM),
+            FoxCatBinary(c, "securite_thermique_boiler", "Sécurité thermique résistance", "mdi:thermometer-alert", "boiler", lambda d: d["snapshot"].boiler_safety_temp_c >= float(c.settings.get("boiler_temp_safety_c", 68.0)), BinarySensorDeviceClass.PROBLEM),
+            FoxCatBinary(c, "fenetre_solaire", "Fenêtre solaire exploitable", "mdi:weather-sunny", "ai", lambda d: d["solar"].available),
+            FoxCatBinary(c, "conflit_legacy", "Automatisation FoxCat legacy active", "mdi:alert-decagram-outline", "diagnostic", lambda d: d["legacy_conflict"], BinarySensorDeviceClass.PROBLEM),
             FoxCatBinary(c, "fenetre_machines", "Fenêtre alimentation machines", "mdi:clock-check-outline", "machines", lambda d: any(d["machine_window"].values())),
         ]
     )

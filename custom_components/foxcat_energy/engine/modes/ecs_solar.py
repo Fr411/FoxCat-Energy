@@ -30,7 +30,7 @@ def evaluate_ecs_solar(
 
     if not bool(settings["boiler_enabled"]):
         return BoilerIntent(BOILER_STOP, "Boiler désactivé dans FoxCat.", "SECURITE")
-    if snapshot.boiler_temp_c >= safety:
+    if snapshot.boiler_safety_temp_c >= safety:
         return BoilerIntent(BOILER_STOP, "Sécurité thermique atteinte.", "SECURITE")
     if snapshot.boiler_temp_c >= boost:
         return BoilerIntent(BOILER_STOP, "65 °C atteint : stockage thermique terminé.", "TEMPERATURE")

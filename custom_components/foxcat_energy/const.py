@@ -1,12 +1,44 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.5.7"
+VERSION = "1.6.158"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "button"]
+
+# Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
+# menus, le registre et les diagnostics et ne doit pas être réordonné.
+OFFICIAL_SECTION_ORDER = (
+    "Sources énergétiques",
+    "Énergie",
+    "Onduleur",
+    "EMS",
+    "Energy Bus",
+    "Machines",
+    "Boiler",
+    "Tarification",
+    "Métronome",
+    "Diagnostic",
+)
+OFFICIAL_MENU_STEPS = (
+    "sources",
+    "energy",
+    "inverter",
+    "ems",
+    "energy_bus",
+    "machines",
+    "boiler",
+    "pricing",
+    "metronome",
+    "diagnostic",
+    "finish",
+)
 
 # Configuration keys
 CONF_INSTALLATION_NAME = "installation_name"
 CONF_PV_SENSOR = "pv_sensor"
+CONF_GRID_SIGNED_SENSOR = "grid_signed_sensor"
+CONF_GRID_SIGN_CONVENTION = "grid_sign_convention"
+GRID_SIGN_IMPORT_POSITIVE = "import_positive"
+GRID_SIGN_EXPORT_POSITIVE = "export_positive"
 CONF_HOUSE_SENSOR = "house_sensor"
 CONF_GRID_EXPORT_SENSOR = "grid_export_sensor"
 CONF_GRID_IMPORT_SENSOR = "grid_import_sensor"
@@ -15,7 +47,12 @@ CONF_METRONOME_SENSOR = "metronome_sensor"
 CONF_METRONOME_FALLBACK_SENSOR = "metronome_fallback_sensor"
 CONF_BOILER_CLIMATE = "boiler_climate"
 CONF_BOILER_TEMP_SENSOR = "boiler_temp_sensor"
+CONF_BOILER_RESISTANCE_TEMP_SENSOR = "boiler_resistance_temp_sensor"
 CONF_BOILER_POWER_SENSOR = "boiler_power_sensor"
+CONF_BOILER_VOLUME = "boiler_volume"
+CONF_BOILER_ELEMENT_POWER = "boiler_element_power"
+CONF_BOILER_COLD_WATER_TEMP = "boiler_cold_water_temp"
+CONF_INVERTER_POWER_SENSOR = "inverter_power_sensor"
 CONF_BOILER_BINARY = "boiler_binary"
 CONF_PRI_L1 = "pri_l1"
 CONF_PRI_L2 = "pri_l2"
@@ -56,6 +93,17 @@ CONF_PRICE_MIN_TOMORROW = "price_min_tomorrow"
 CONF_PRICE_MAX_TOMORROW = "price_max_tomorrow"
 CONF_PRICE_AVG_TOMORROW = "price_avg_tomorrow"
 CONF_PRICE_TOMORROW_AVAILABLE = "price_tomorrow_available"
+CONF_PRICE_FORECAST_IMPORT = "price_forecast_import"
+CONF_PRICE_FORECAST_EXPORT = "price_forecast_export"
+CONF_DYNAMIC_EXPORT_SIGN_CONVENTION = "dynamic_export_sign_convention"
+DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE = "negative_is_revenue"
+DYNAMIC_EXPORT_POSITIVE_IS_REVENUE = "positive_is_revenue"
+
+# Arbitrage dynamique Day-Ahead. Ces constantes ne s'appliquent jamais aux
+# régimes HP/HC ou fixes.
+DYNAMIC_ARBITRAGE_HORIZON_HOURS = 24
+DYNAMIC_POSITION_LOW = 0.35
+DYNAMIC_POSITION_HIGH = 0.70
 
 # Configuration des plages tarifaires fixes / compensation.
 CONF_TARIFF_HP_START_1 = "tariff_hp_start_1"
@@ -95,7 +143,11 @@ TARIFF_TOU = "Bi-horaire HP/HC"
 TARIFF_REGIMES = [TARIFF_TOU, TARIFF_DYNAMIC]
 
 NETWORK_POLICY_COMPENSATION = "Compensation"
-NETWORK_POLICY_BILLED_EXPORT = "Injection facturée"
+NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"
+# Compatibilité ascendante : les installations <= 1.6.157 pouvaient avoir
+# persisté l'ancien libellé. Il est migré au chargement sans changer la
+# sémantique de la politique réseau.
+NETWORK_POLICY_BILLED_EXPORT_LEGACY = "Injection facturée"
 NETWORK_POLICIES = [NETWORK_POLICY_COMPENSATION, NETWORK_POLICY_BILLED_EXPORT]
 MODE_ALIASES = {
     "Economie énergie": MODE_ECO,
@@ -149,18 +201,17 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "mode": MODE_ECO,
     "boiler_enabled": True,
     "boiler_allow_hc": True,
-    "boiler_user_hold": False,
     "pri_enabled": True,
-    "hardware_inverter_brand": "SolarEdge",
-    "hardware_inverter_model": "SE4K",
-    "hardware_meter_brand": "Smappee",
-    "hardware_meter_model": "Infinity",
     "agressivite_ecs": False,
     "washer_enabled": True,
     "dryer_enabled": True,
     "dishwasher_enabled": True,
     "solar_advisor_enabled": True,
     "dynamic_negative_price_charge_enabled": True,
+    "economic_optimizer_enabled": True,
+    "predictive_pricing_enabled": True,
+    "solar_forecast_arbitrage": True,
+    "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
     "tariff_regime": TARIFF_TOU,
     "network_policy": NETWORK_POLICY_COMPENSATION,
@@ -219,6 +270,10 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "dynamic_price_significant_delta": 0.01,
     "dynamic_injection_lucrative_threshold": -0.0001,
     "dynamic_grid_charge_threshold_eur_kwh": 0.0,
+    "economic_horizon_hours": 24.0,
+    "economic_min_saving_eur_kwh": 0.02,
+    "economic_export_margin_eur_kwh": 0.01,
+    "economic_solar_surplus_min_w": 250.0,
     "pri_boiler_settle_s": 30.0,
     "high_load_trigger_w": 5000.0,
     "high_load_release_w": 3500.0,
@@ -236,7 +291,7 @@ NUMBER_DEFINITIONS = {
     "ack_tolerance_w": ("Tolérance ACK", 50, 3000, 50, "W", "mdi:check-decagram-outline"),
     "stability_tolerance_w": ("Tolérance stabilité T0/T1", 50, 3000, 50, "W", "mdi:chart-bell-curve-cumulative"),
     "watchdog_timeout_s": ("Délai watchdog trame", 30, 600, 10, "s", "mdi:timer-alert-outline"),
-    "metronome_period_s": ("Période métronome réseau", 10, 120, 5, "s", "mdi:metronome"),
+    "metronome_period_s": ("Fenêtre Watchdog réseau", 10, 120, 5, "s", "mdi:metronome"),
     "metronome_primary_timeout_s": ("Délai perte métronome principal", 15, 180, 5, "s", "mdi:timer-alert-outline"),
     "metronome_fallback_timeout_s": ("Délai perte capteur de secours", 30, 300, 5, "s", "mdi:timer-off-outline"),
     "inverter_power_w": ("Puissance nominale onduleur", 500, 30000, 100, "W", "mdi:solar-power"),
@@ -275,6 +330,10 @@ NUMBER_DEFINITIONS = {
     "dynamic_price_significant_delta": ("Écart de prix significatif", 0, 1, 0.001, "€/kWh", "mdi:cash-sync"),
     "dynamic_injection_lucrative_threshold": ("Seuil injection rémunératrice", -1, 1, 0.0001, "€/kWh", "mdi:cash-plus"),
     "dynamic_grid_charge_threshold_eur_kwh": ("Seuil charge réseau prix négatif", -1, 0, 0.001, "€/kWh", "mdi:transmission-tower-import"),
+    "economic_horizon_hours": ("Horizon comparateur économique", 1, 48, 1, "h", "mdi:timeline-clock-outline"),
+    "economic_min_saving_eur_kwh": ("Économie minimale pour reporter", 0, 1, 0.001, "€/kWh", "mdi:cash-clock"),
+    "economic_export_margin_eur_kwh": ("Marge export économique", 0, 1, 0.001, "€/kWh", "mdi:transmission-tower-export"),
+    "economic_solar_surplus_min_w": ("Surplus solaire minimum économique", 0, 5000, 50, "W", "mdi:solar-power-variant"),
     "tariff_fixed_injection_eur_kwh": ("Prix fixe de réinjection", -1, 2, 0.001, "€/kWh", "mdi:cash-plus"),
     "pri_boiler_settle_s": ("Temporisation PRI après action boiler", 0, 180, 5, "s", "mdi:timer-sync-outline"),
     "high_load_trigger_w": ("Seuil haute consommation", 1000, 20000, 100, "W", "mdi:flash-alert"),
@@ -287,14 +346,17 @@ SWITCH_DEFINITIONS = {
     "regulation_active": ("Régulation FoxCat active", "mdi:power"),
     "boiler_enabled": ("Boiler géré par FoxCat", "mdi:water-boiler"),
     "boiler_allow_hc": ("Boiler autorisé en heures creuses", "mdi:clock-check-outline"),
-    "boiler_user_hold": ("Boiler • Marche utilisateur maintenue", "mdi:hand-back-right-outline"),
-    "pri_enabled": ("PRI souverain — toujours actif", "mdi:solar-power-variant"),
+    "pri_enabled": ("Réduction de puissance onduleur", "mdi:solar-power-variant"),
     "agressivite_ecs": ("Agressivité ECS solaire", "mdi:water-boiler-auto"),
     "washer_enabled": ("Gestion lave-linge", "mdi:washing-machine"),
     "dryer_enabled": ("Gestion sèche-linge", "mdi:tumble-dryer"),
     "dishwasher_enabled": ("Gestion lave-vaisselle", "mdi:dishwasher"),
-    "solar_advisor_enabled": ("Conseiller solaire EMS 2", "mdi:weather-sunny-alert"),
+    "solar_advisor_enabled": ("Analyse prédictive IA", "mdi:brain"),
     "dynamic_negative_price_charge_enabled": ("Charge réseau si prix dynamique négatif", "mdi:transmission-tower-import"),
+    "economic_optimizer_enabled": ("Optimisation économique des charges flexibles", "mdi:finance"),
+    "predictive_pricing_enabled": ("Prédictif prix dynamique", "mdi:chart-timeline-variant-shimmer"),
+    "solar_forecast_arbitrage": ("Arbitrage prévision solaire", "mdi:weather-sunny-clock"),
+    "persistent_status_notification_enabled": ("Résumé EMS persistant", "mdi:bell-badge-outline"),
     "high_load_shed_enabled": ("Délestage haute consommation", "mdi:home-lightning-bolt-outline"),
 }
 
