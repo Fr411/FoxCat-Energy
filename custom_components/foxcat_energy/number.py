@@ -38,6 +38,8 @@ class FoxCatSettingNumber(FoxCatEntity, NumberEntity):
         self._attr_native_max_value = maximum
         self._attr_native_step = step
         self._attr_native_unit_of_measurement = unit
+        if key == "dynamic_favorable_position_pct":
+            self._attr_suggested_object_id = "foxcat_seuil_prix_dynamique"
 
     @property
     def native_value(self) -> float:

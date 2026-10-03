@@ -9,6 +9,7 @@ from .const import (
     DYNAMIC_ARBITRAGE_HORIZON_HOURS,
     DYNAMIC_POSITION_HIGH,
     DYNAMIC_POSITION_LOW,
+    MODE_DYNAMIC,
     NETWORK_POLICY_COMPENSATION,
     TARIFF_DYNAMIC,
     TARIFF_TOU,
@@ -46,6 +47,13 @@ class EconomicDecision:
     dynamic_price_band: str | None = None
     dynamic_price_min_eur_kwh: float | None = None
     dynamic_price_max_eur_kwh: float | None = None
+    dynamic_curve_position_pct: float | None = None
+    dynamic_curve_rank: int | None = None
+    dynamic_curve_points: int = 0
+    dynamic_curve_trend: str | None = None
+    self_consumption_advantage_eur_kwh: float | None = None
+    boiler_effective_cost_eur_h: float | None = None
+    boiler_grid_power_needed_w: float | None = None
     boiler_energy_missing_kwh: float | None = None
     boiler_heating_duration_h: float | None = None
     boiler_reserved_start: datetime | None = None
@@ -120,15 +128,26 @@ def _parse_datetime(value: Any, now: datetime) -> datetime | None:
     return dt
 
 
-def extract_price_points(raw: Any, now: datetime, *, source: str, horizon_hours: int = 36) -> list[PricePoint]:
-    """Extract a generic future price series from common HA sensor attributes.
+def extract_price_points(
+    raw: Any,
+    now: datetime,
+    *,
+    source: str,
+    horizon_hours: int = 36,
+    preferred_price_keys: Iterable[str] | None = None,
+) -> list[PricePoint]:
+    """Extract a future price series from common Home Assistant attributes.
 
-    The parser is intentionally tolerant: it understands lists of dictionaries,
-    ``(timestamp, price)`` pairs and plain numeric hourly lists. It never imports
-    a provider SDK, keeping FoxCat fully local and Python-only.
+    V1.6.158 adds provider-aware key priority. Luminus Dynamic exposes its
+    all-in purchase curve as ``all_in`` and its export curve as ``injection``.
+    Callers can therefore select the financial series they need without mixing
+    purchase and export values when both are present in the same attribute row.
+    Generic providers keep the historical fallback keys.
     """
     horizon_end = now + timedelta(hours=max(int(horizon_hours), 1))
     found: list[PricePoint] = []
+    preferred = tuple(preferred_price_keys or ())
+    price_keys = tuple(dict.fromkeys((*preferred, *_PRICE_KEYS)))
 
     def add(at: datetime | None, price: float | None) -> None:
         if at is None or price is None:
@@ -140,7 +159,7 @@ def extract_price_points(raw: Any, now: datetime, *, source: str, horizon_hours:
 
     def walk(value: Any, base_at: datetime | None = None) -> None:
         if isinstance(value, dict):
-            price = next((_float(value.get(key)) for key in _PRICE_KEYS if key in value and _float(value.get(key)) is not None), None)
+            price = next((_float(value.get(key)) for key in price_keys if key in value and _float(value.get(key)) is not None), None)
             at = next((_parse_datetime(value.get(key), now) for key in _TIME_KEYS if key in value and _parse_datetime(value.get(key), now) is not None), None)
             if price is not None:
                 add(at or base_at, price)
@@ -384,28 +403,36 @@ def _evaluate_dynamic_market(
     prices: dict[str, Any],
     settings: dict[str, Any],
     import_points: list[PricePoint],
+    export_points: list[PricePoint],
     current_buy: float,
     export_value: float | None,
     boiler_thermal: dict[str, Any] | None,
 ) -> EconomicDecision:
-    """Day-Ahead relative-index arbitration. This function is DYNAMIC-only."""
+    """Arbitrage Luminus Day-Ahead, strictement réservé au régime DYNAMIQUE."""
     horizon = DYNAMIC_ARBITRAGE_HORIZON_HOURS
-    day_points = _dynamic_day_ahead_points(import_points, now, horizon_hours=horizon)
-    # Le prix instantané est souverain pour l'heure courante. Certaines
-    # intégrations publient leur série Day-Ahead avec un léger retard; on évite
-    # donc qu'une valeur de série ancienne réserve à tort l'heure en cours.
     current_slot = now.replace(minute=0, second=0, microsecond=0)
+    day_points = _dynamic_day_ahead_points(import_points, now, horizon_hours=horizon)
     day_points = _dynamic_day_ahead_points(
         merge_price_points(day_points, [PricePoint(current_slot, current_buy, "DYNAMIC_CURRENT")]),
         now,
         horizon_hours=horizon,
     )
+    export_day_points = _dynamic_day_ahead_points(export_points, now, horizon_hours=horizon)
+    if export_value is not None:
+        export_day_points = _dynamic_day_ahead_points(
+            merge_price_points(
+                export_day_points,
+                [PricePoint(current_slot, float(export_value), "DYNAMIC_EXPORT_CURRENT")],
+            ),
+            now,
+            horizon_hours=horizon,
+        )
+
     forecast_count = len(day_points)
     best_at, best_buy = best_start_window(day_points, now, 1.0, horizon)
     saving = (current_buy - best_buy) if best_buy is not None else None
     confidence = "HAUTE" if forecast_count >= 18 else ("MOYENNE" if forecast_count >= 6 else "FAIBLE")
 
-    # Kill-switch or insufficient Day-Ahead coverage: exact standard fallback.
     if not bool(settings.get("predictive_pricing_enabled", True)):
         return _legacy_dynamic_decision(
             now=now, snapshot=snapshot, prices=prices, settings=settings,
@@ -420,29 +447,63 @@ def _evaluate_dynamic_market(
             import_points=import_points, current_buy=current_buy, export_value=export_value,
             best_at=best_at, best_buy=best_buy, saving=saving, confidence=confidence,
             horizon=horizon, forecast_count=forecast_count,
-            reason_prefix="Day-Ahead 24 h insuffisant : repli standard.",
+            reason_prefix="Courbe Luminus Dynamic insuffisante : repli standard.",
         )
 
     pmin = min(p.price for p in day_points)
     pmax = max(p.price for p in day_points)
     amplitude = pmax - pmin
-    if amplitude <= 1e-9:
-        index = 0.5
+    index = 0.5 if amplitude <= 1e-9 else max(0.0, min(1.0, (current_buy - pmin) / amplitude))
+    position_pct = index * 100.0
+    # Le nouveau seuil réglable 1.6.159 est strictement réservé au mode EMS
+    # Dynamique. Hors de ce mode, on conserve les bandes historiques 1.6.158.
+    if str(settings.get("mode")) == MODE_DYNAMIC:
+        low_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
+        high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 70.0))))
     else:
-        index = max(0.0, min(1.0, (current_buy - pmin) / amplitude))
-
-    if index < DYNAMIC_POSITION_LOW:
+        low_pct = DYNAMIC_POSITION_LOW * 100.0
+        high_pct = DYNAMIC_POSITION_HIGH * 100.0
+    low = low_pct / 100.0
+    high = high_pct / 100.0
+    if index <= low:
         band = "BAS"
-    elif index > DYNAMIC_POSITION_HIGH:
+    elif index >= high:
         band = "HAUT"
     else:
         band = "MEDIAN"
+
+    ordered_prices = sorted(float(p.price) for p in day_points)
+    rank = 1 + sum(1 for value in ordered_prices if value < current_buy)
+    trend_threshold = max(float(settings.get("dynamic_price_significant_delta", 0.01)), 0.0)
+    future_slots = [p.price for p in day_points if p.at > current_slot][:3]
+    curve_trend = "STABLE"
+    if future_slots:
+        future_mean = sum(future_slots) / len(future_slots)
+        if future_mean > current_buy + trend_threshold:
+            curve_trend = "HAUSSE"
+        elif future_mean < current_buy - trend_threshold:
+            curve_trend = "BAISSE"
+
+    self_consumption_advantage = current_buy - export_value if export_value is not None else current_buy
+    export_margin = float(settings.get("economic_export_margin_eur_kwh", 0.01))
+    export_profitable = export_value is not None and export_value > 0
+    export_costly = export_value is not None and export_value < 0
+    has_surplus = snapshot.export_w >= float(settings.get("economic_solar_surplus_min_w", 250.0))
+    prefer_export = bool(
+        has_surplus and export_profitable and self_consumption_advantage < -export_margin
+    )
+    prefer_self_consumption = bool(
+        has_surplus and (
+            export_value is None or export_costly or self_consumption_advantage >= -export_margin
+        )
+    )
 
     thermal = boiler_thermal or {}
     energy_missing = max(float(thermal.get("energy_missing_kwh") or 0.0), 0.0)
     heating_h = max(float(thermal.get("heating_duration_h") or 0.0), 0.0)
     temp_c = thermal.get("measured_temp_c")
     start_c = thermal.get("comfort_min_c")
+    element_w = max(float(thermal.get("element_power_w") or settings.get("boiler_power_w", 1800.0)), 1.0)
     comfort_priority = (
         isinstance(temp_c, (int, float))
         and isinstance(start_c, (int, float))
@@ -450,24 +511,34 @@ def _evaluate_dynamic_market(
         and energy_missing > 0
     )
     reserved_start, reserved_end, reserved_avg = _best_consecutive_dynamic_window(day_points, now, heating_h)
-    current_slot = now.replace(minute=0, second=0, microsecond=0)
     reservation_active = bool(
-        energy_missing > 0
-        and reserved_start is not None
-        and reserved_end is not None
+        energy_missing > 0 and reserved_start is not None and reserved_end is not None
         and reserved_start <= current_slot < reserved_end
     )
-    # La réservation thermique ne peut autoriser une charge réseau que dans le
-    # bas de courbe. En médiane, le surplus local reste strictement requis; en
-    # haut de courbe, toute nouvelle charge réseau reste interdite. Le confort
-    # ECS minimum demeure la seule priorité absolue au-dessus de cette règle.
-    charge_now = reservation_active and band == "BAS"
+
+    solar_for_boiler_w = min(max(float(snapshot.export_w), 0.0), element_w)
+    boiler_grid_needed_w = max(element_w - solar_for_boiler_w, 0.0)
+    solar_opportunity = float(export_value) if export_value is not None else 0.0
+    boiler_effective_cost_h = (
+        boiler_grid_needed_w / 1000.0 * current_buy
+        + solar_for_boiler_w / 1000.0 * solar_opportunity
+    )
+    future_full_grid_cost_h = element_w / 1000.0 * best_buy if best_buy is not None else None
+    financial_now = bool(
+        future_full_grid_cost_h is not None
+        and boiler_effective_cost_h <= future_full_grid_cost_h + export_margin * (element_w / 1000.0)
+    )
+    solar_only_now = bool(
+        snapshot.export_w >= element_w
+        and (export_value is None or export_value <= (best_buy if best_buy is not None else current_buy) + export_margin)
+    )
+    charge_now = bool(reservation_active and index <= low)
+    if energy_missing > 0 and band == "MEDIAN" and has_surplus and financial_now:
+        charge_now = True
+    if energy_missing > 0 and solar_only_now:
+        charge_now = True
     if comfort_priority:
         charge_now = True
-
-    export_profitable = export_value is not None and export_value > 0
-    export_costly = export_value is not None and export_value < 0
-    has_surplus = snapshot.export_w >= float(settings.get("economic_solar_surplus_min_w", 250.0))
 
     common = dict(
         regime=TARIFF_DYNAMIC,
@@ -479,11 +550,16 @@ def _evaluate_dynamic_market(
         saving_vs_now_eur_kwh=saving,
         horizon_hours=horizon,
         forecast_points=forecast_count,
-        application="ARBITRAGE_DYNAMIQUE_DAY_AHEAD",
+        application="ARBITRAGE_DYNAMIQUE_COURBE_LUMINUS",
         dynamic_price_index=index,
         dynamic_price_band=band,
         dynamic_price_min_eur_kwh=pmin,
         dynamic_price_max_eur_kwh=pmax,
+        dynamic_curve_position_pct=position_pct,
+        dynamic_curve_rank=rank,
+        dynamic_curve_points=forecast_count,
+        dynamic_curve_trend=curve_trend,
+        self_consumption_advantage_eur_kwh=self_consumption_advantage,
         boiler_energy_missing_kwh=energy_missing,
         boiler_heating_duration_h=heating_h,
         boiler_reserved_start=reserved_start,
@@ -491,62 +567,58 @@ def _evaluate_dynamic_market(
         boiler_reserved_avg_price_eur_kwh=reserved_avg,
         boiler_charge_now=charge_now,
         boiler_comfort_priority=comfort_priority,
+        boiler_effective_cost_eur_h=boiler_effective_cost_h,
+        boiler_grid_power_needed_w=boiler_grid_needed_w,
     )
 
     reservation = ""
     if energy_missing > 0:
-        if reserved_start and reserved_end:
+        if reserved_start and reserved_end and reserved_avg is not None:
             reservation = (
                 f" Boiler: {energy_missing:.2f} kWh à fournir (~{heating_h:.2f} h), "
-                f"créneau réservé {reserved_start.strftime('%H:%M')}–{reserved_end.strftime('%H:%M')} "
+                f"créneau réseau réservé {reserved_start.strftime('%H:%M')}–{reserved_end.strftime('%H:%M')} "
                 f"à {reserved_avg:.3f} €/kWh moyen."
             )
         else:
             reservation = f" Boiler: {energy_missing:.2f} kWh à fournir (~{heating_h:.2f} h), créneau complet non disponible."
+    finance = (
+        f" Position courbe {position_pct:.1f} % (seuil favorable {low_pct:.1f} %), achat {current_buy:.3f} €/kWh"
+        + (f", réinjection {export_value:.3f} €/kWh" if export_value is not None else "")
+        + f", avantage autoconsommation {self_consumption_advantage:.3f} €/kWh."
+    )
 
     if comfort_priority:
         return EconomicDecision(
             code="ECS_PRIORITAIRE", label="Priorité confort ECS",
-            reason=(f"Température ECS sous le minimum de confort : charge Boiler prioritaire, quel que soit l'indice tarifaire ({index:.3f}, plage {band})." + reservation),
+            reason="Température ECS sous le minimum : charge prioritaire." + finance + reservation,
             flexible_start=False, prefer_self_consumption=True, prefer_export=False, **common,
         )
-
     if band == "BAS":
-        prefer_export = bool(has_surplus and export_profitable and export_value is not None and export_value > current_buy)
-        label = "Charger / stocker maintenant" if charge_now or energy_missing > 0 else "Prix dynamique favorable"
-        reason = (
-            f"Indice dynamique {index:.3f} < {DYNAMIC_POSITION_LOW:.2f} : bas de courbe Day-Ahead, opportunité de charge/stockage."
-            + reservation
-        )
-        if prefer_export:
-            reason += f" Export valorisé à {export_value:.3f} €/kWh : la réinjection reste économiquement attractive."
         return EconomicDecision(
-            code="DYNAMIC_BAS", label=label, reason=reason,
-            flexible_start=not charge_now, prefer_self_consumption=export_costly, prefer_export=prefer_export, **common,
+            code="DYNAMIC_BAS", label="Prix Day-Ahead favorable",
+            reason="Position sous le seuil utilisateur : achats flexibles autorisés." + finance + reservation,
+            flexible_start=not charge_now,
+            prefer_self_consumption=prefer_self_consumption,
+            prefer_export=prefer_export,
+            **common,
         )
-
     if band == "MEDIAN":
         return EconomicDecision(
-            code="DYNAMIC_MEDIAN", label="Autoconsommation stricte du surplus",
-            reason=(
-                f"Indice dynamique {index:.3f} entre {DYNAMIC_POSITION_LOW:.2f} et {DYNAMIC_POSITION_HIGH:.2f} : "
-                "pas de charge réseau opportuniste; seules les charges couvertes par le surplus local sont favorisées."
-                + reservation
-            ),
+            code="DYNAMIC_MEDIAN", label="Arbitrage solaire / réseau",
+            reason="Zone médiane : priorité à l'autoconsommation et comparaison du coût marginal." + finance + reservation,
             flexible_start=has_surplus and not charge_now,
-            prefer_self_consumption=True, prefer_export=export_profitable, **common,
+            prefer_self_consumption=prefer_self_consumption,
+            prefer_export=prefer_export,
+            **common,
         )
-
     return EconomicDecision(
-        code="DYNAMIC_HAUT", label="Prix élevé — charges réseau bloquées",
-        reason=(
-            f"Indice dynamique {index:.3f} > {DYNAMIC_POSITION_HIGH:.2f} : haut de courbe Day-Ahead, "
-            "interdiction de nouveau chargement réseau et délestage préventif des charges flexibles non protégées."
-            + reservation
-        ),
-        flexible_start=False, prefer_self_consumption=False, prefer_export=export_profitable, **common,
+        code="DYNAMIC_HAUT", label="Pic Day-Ahead — achats limités",
+        reason="Zone haute : nouveaux achats opportunistes bloqués; autoconsommation locale conservée." + finance + reservation,
+        flexible_start=False,
+        prefer_self_consumption=prefer_self_consumption,
+        prefer_export=prefer_export,
+        **common,
     )
-
 
 def evaluate_market(
     *,
@@ -555,6 +627,7 @@ def evaluate_market(
     prices: dict[str, Any],
     settings: dict[str, Any],
     import_points: list[PricePoint],
+    export_points: list[PricePoint] | None = None,
     boiler_thermal: dict[str, Any] | None = None,
 ) -> EconomicDecision:
     regime = str(prices.get("regime") or TARIFF_TOU)
@@ -599,7 +672,7 @@ def evaluate_market(
     if regime == TARIFF_DYNAMIC:
         return _evaluate_dynamic_market(
             now=now, snapshot=snapshot, prices=prices, settings=settings,
-            import_points=import_points, current_buy=current_buy,
+            import_points=import_points, export_points=list(export_points or []), current_buy=current_buy,
             export_value=export_value, boiler_thermal=boiler_thermal,
         )
 
@@ -707,22 +780,41 @@ def recommend_flexible_load(
             reason = "Le créneau courant est réservé au besoin thermique minimal du Boiler; les charges secondaires attendent."
         else:
             band = str(market.get("dynamic_price_band") or "")
+            full_surplus = snapshot.export_w >= max(avg_power_w, 1.0)
+            # Coût marginal réel du démarrage : la part solaire vaut son coût
+            # d'opportunité de réinjection, la part réseau vaut le prix d'achat.
+            # On compare ce coût au meilleur créneau futur connu.
+            future_reference = best_cost if best_cost is not None else grid_now_cost
+            financially_better_now = effective_now <= future_reference + min_saving
+            solar_present = solar_fraction > 0.0
+
             if band == "HAUT":
-                allow, decision, label = False, "DELESTAGE_PRIX_HAUT", "Reporter — prix dynamique élevé"
-                reason = "Haut de courbe Day-Ahead : nouveau démarrage réseau interdit; les cycles protégés restent intouchables."
-            elif band == "MEDIAN":
-                full_surplus = snapshot.export_w >= max(avg_power_w, 1.0)
-                allow = full_surplus
-                decision = "SURPLUS_STRICT" if allow else "REPORTER_MEDIAN"
-                label = "Démarrer sur surplus strict" if allow else "Reporter — surplus insuffisant"
+                allow = bool(solar_present and financially_better_now)
+                decision = "AUTOCONSO_HAUT_FINANCIERE" if allow else "DELESTAGE_PRIX_HAUT"
+                label = "Démarrer — solaire financièrement préférable" if allow else "Reporter — prix dynamique élevé"
                 reason = (
-                    "Plage médiane : démarrage autorisé uniquement si le surplus local couvre la puissance moyenne du cycle."
+                    f"Haut de courbe mais coût marginal actuel {effective_now:.3f} €/kWh <= meilleur coût futur {future_reference:.3f} €/kWh grâce au solaire/réinjection."
                     if allow else
-                    "Plage médiane : le surplus local ne couvre pas intégralement le cycle moyen; aucun prélèvement opportuniste."
+                    f"Haut de courbe : coût marginal actuel {effective_now:.3f} €/kWh > référence future {future_reference:.3f} €/kWh; démarrage reporté."
+                )
+            elif band == "MEDIAN":
+                allow = bool(full_surplus or (solar_present and financially_better_now))
+                decision = "SURPLUS_STRICT" if full_surplus else ("AUTOCONSO_HYBRIDE" if allow else "REPORTER_MEDIAN")
+                label = "Démarrer sur surplus" if full_surplus else ("Démarrer — solaire + réseau optimisés" if allow else "Reporter — coût marginal défavorable")
+                reason = (
+                    "Plage médiane : surplus local intégral, démarrage sans achat réseau supplémentaire."
+                    if full_surplus else
+                    (f"Plage médiane : combinaison solaire/réseau à {effective_now:.3f} €/kWh plus pertinente que le meilleur créneau futur {future_reference:.3f} €/kWh."
+                     if allow else
+                     f"Plage médiane : coût marginal {effective_now:.3f} €/kWh supérieur à la référence future {future_reference:.3f} €/kWh.")
                 )
             elif band == "BAS":
-                allow, decision, label = True, "DEMARRER_BAS", "Démarrer — bas de courbe"
-                reason = "Bas de courbe Day-Ahead : créneau économique favorable aux charges flexibles."
+                allow = bool(financially_better_now or best_cost is None)
+                decision = "DEMARRER_BAS" if allow else "REPORTER_BAS"
+                label = "Démarrer — bas de courbe" if allow else "Reporter — meilleur créneau encore attendu"
+                reason = (
+                    f"Bas de courbe : coût marginal actuel {effective_now:.3f} €/kWh, référence future {future_reference:.3f} €/kWh."
+                )
             else:
                 # Decision fallback: keep V1.6.156 behavior below.
                 allow = None

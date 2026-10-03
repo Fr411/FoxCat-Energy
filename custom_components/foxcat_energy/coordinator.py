@@ -77,6 +77,7 @@ from .const import (
     CONF_PRICE_MIN_TODAY,
     CONF_PRICE_MIN_TOMORROW,
     CONF_PRICE_NEXT,
+    CONF_PRICE_TOMORROW_AVAILABLE,
     CONF_PRICE_FORECAST_IMPORT,
     CONF_PRICE_FORECAST_EXPORT,
     CONF_DYNAMIC_EXPORT_SIGN_CONVENTION,
@@ -123,6 +124,7 @@ from .const import (
     TARIFF_COMPENSATION,
     NETWORK_POLICY_COMPENSATION,
     NETWORK_POLICY_BILLED_EXPORT,
+    NETWORK_POLICY_LEGACY_BILLED_EXPORT,
     TARIFF_DYNAMIC,
     TARIFF_TOU,
 )
@@ -147,6 +149,7 @@ from .machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
 from .inverter_core import InverterCore
 from .accounting import EnergyAccounting
+from .dynamic_scheduler import build_dynamic_schedule
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -451,6 +454,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         stored = await self._store.async_load()
         if isinstance(stored, dict):
             self.settings.update(stored.get("settings", {}))
+            # V1.6.158 : migration de libellé sans changer la politique réelle.
+            if self.settings.get("network_policy") == NETWORK_POLICY_LEGACY_BILLED_EXPORT:
+                self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
             self.accounting.restore(stored.get("accounting"))
             self.machine_learning.restore(stored.get("machine_learning"))
             sf = stored.get("solar_forecast")
@@ -672,6 +678,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             eid for eid in [
                 self.config.get(CONF_PRICE_FORECAST_IMPORT),
                 self.config.get(CONF_PRICE_FORECAST_EXPORT),
+                self.config.get(CONF_PRICE_TOMORROW_AVAILABLE),
             ] if eid and eid not in price_entities
         ]
         if economic_price_entities:
@@ -1016,8 +1023,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @callback
     def _on_economic_price_event(self, event: Event) -> None:
-        """Rafraîchit uniquement le comparateur économique hors Energy Bus."""
+        """Rafraîchit le Day-Ahead; en Dynamique, réévalue les nouveaux départs machines."""
         self.async_set_updated_data(self._build_data())
+        if (
+            bool(self.settings.get("regulation_active"))
+            and str(self.settings.get("mode")) == MODE_DYNAMIC
+            and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
+        ):
+            self.hass.async_create_task(self.async_reconcile_machines())
 
     @callback
     def _on_tariff_boundary(self, now: datetime) -> None:
@@ -1251,9 +1264,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         fixed_injection_manual = float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE, 0.0))
 
-        hp_sensor_id = self.config.get(CONF_TARIFF_HP_PRICE_SENSOR)
-        hc_sensor_id = self.config.get(CONF_TARIFF_HC_PRICE_SENSOR)
-        fixed_injection_sensor_id = self.config.get(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR)
+        hp_sensor_id = self.config.get(CONF_TARIFF_HP_PRICE_SENSOR) or "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_pleines_jour"
+        hc_sensor_id = self.config.get(CONF_TARIFF_HC_PRICE_SENSOR) or "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_creuses_nuit"
+        fixed_injection_sensor_id = self.config.get(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR) or "sensor.luminus_luminus_comfyflex_wallonia_prix_d_injection"
         hp_price = self._optional_float_state(hp_sensor_id)
         hc_price = self._optional_float_state(hc_sensor_id)
         fixed_injection_from_entity = self._optional_float_state(fixed_injection_sensor_id)
@@ -1267,9 +1280,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         export_value: float | None
         if regime == TARIFF_DYNAMIC:
             active_buy = current
-            # Normalisation explicite du signe de l'export dynamique. Le défaut
-            # conserve la convention Luminus historique : négatif = rémunération.
-            export_sign = str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE))
+            # V1.6.158 : Luminus Dynamic expose une réinjection positive lorsqu'elle
+            # rémunère le client et négative lorsqu'il paie pour injecter. On
+            # impose cette convention pour cette source, y compris sur les
+            # installations migrées qui avaient mémorisé l'ancien défaut.
+            injection_entity = str(self.config.get(CONF_PRICE_INJECTION) or "").lower()
+            if "luminus_luminus_dynamic" in injection_entity:
+                export_sign = DYNAMIC_EXPORT_POSITIVE_IS_REVENUE
+            else:
+                export_sign = str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_POSITIVE_IS_REVENUE))
             if injection is None:
                 export_value = None
             elif export_sign == DYNAMIC_EXPORT_POSITIVE_IS_REVENUE:
@@ -1331,7 +1350,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "active_buy_label": active_label,
             "next_buy_label": next_label,
             "export_value": export_value,
-            "export_sign_convention": str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE)),
+            "export_sign_convention": export_sign if regime == TARIFF_DYNAMIC else DYNAMIC_EXPORT_POSITIVE_IS_REVENUE,
             "negative_purchase": bool(regime == TARIFF_DYNAMIC and active_buy is not None and active_buy < negative_threshold),
             "dynamic_compatible": regime == TARIFF_DYNAMIC,
             "import_cost_rate_eur_h": import_cost_rate,
@@ -1341,7 +1360,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
 
     def _economic_series_from_entity(
-        self, entity_id: str | None, *, source: str, now: datetime, horizon_hours: int
+        self, entity_id: str | None, *, source: str, now: datetime, horizon_hours: int,
+        preferred_price_keys: tuple[str, ...] | None = None,
     ) -> list[PricePoint]:
         """Lit une série de prix depuis les attributs d'une entité HA.
 
@@ -1357,7 +1377,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Certaines intégrations exposent la série dans l'état lui-même sous
         # forme JSON/list; dans ce cas on laisse également le parseur l'essayer.
         raw["entity_state"] = state.state
-        return extract_price_points(raw, now, source=source, horizon_hours=horizon_hours)
+        return extract_price_points(
+            raw, now, source=source, horizon_hours=horizon_hours,
+            preferred_price_keys=preferred_price_keys,
+        )
 
     def _economic_import_points(
         self, prices: dict[str, Any], now: datetime
@@ -1379,7 +1402,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         source_entity = self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
         series = self._economic_series_from_entity(
-            source_entity, source="DYNAMIC_IMPORT", now=now, horizon_hours=horizon
+            source_entity, source="DYNAMIC_IMPORT", now=now, horizon_hours=horizon,
+            preferred_price_keys=("all_in",),
         )
         current = prices.get("active_buy")
         nxt = prices.get("next_buy")
@@ -1412,10 +1436,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         source_entity = self.config.get(CONF_PRICE_FORECAST_EXPORT) or self.config.get(CONF_PRICE_INJECTION)
         raw = self._economic_series_from_entity(
-            source_entity, source="DYNAMIC_EXPORT_RAW", now=now, horizon_hours=horizon
+            source_entity, source="DYNAMIC_EXPORT_RAW", now=now, horizon_hours=horizon,
+            preferred_price_keys=("injection",),
         )
-        # Même convention explicite que prices().
-        export_sign = str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE))
+        # Même convention effective que prices(), avec détection Luminus Dynamic.
+        source_name = str(source_entity or "").lower()
+        if "luminus_luminus_dynamic" in source_name:
+            export_sign = DYNAMIC_EXPORT_POSITIVE_IS_REVENUE
+        else:
+            export_sign = str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_POSITIVE_IS_REVENUE))
         factor = 1.0 if export_sign == DYNAMIC_EXPORT_POSITIVE_IS_REVENUE else -1.0
         normalised = [PricePoint(p.at, factor * float(p.price), "DYNAMIC_EXPORT") for p in raw]
         current = prices.get("export_value")
@@ -1450,6 +1479,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             prices=tariff,
             settings=self.settings,
             import_points=import_points,
+            export_points=export_points,
             boiler_thermal=boiler_thermal,
         ).as_dict()
 
@@ -1475,12 +1505,51 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             recommendations[machine.machine_id]["name"] = machine.name
             recommendations[machine.machine_id]["profile_cycles"] = int(profile.get("total_cycles", 0) or 0)
 
+        tomorrow_entity = self.config.get(CONF_PRICE_TOMORROW_AVAILABLE)
+        tomorrow_available = self._is_on(tomorrow_entity) if tomorrow_entity else any(
+            point.at.date() > now.date() for point in import_points
+        )
+        scheduler_active = bool(
+            str(self.settings.get("mode")) == MODE_DYNAMIC
+            and str(tariff.get("regime")) == TARIFF_DYNAMIC
+            and bool(self.settings.get("economic_optimizer_enabled", True))
+            and bool(self.settings.get("predictive_pricing_enabled", True))
+        )
+        day_ahead = build_dynamic_schedule(
+            now=now,
+            snapshot=snap,
+            settings=self.settings,
+            mode_dynamic_active=scheduler_active,
+            import_points=import_points,
+            export_points=export_points,
+            machines=self.machines,
+            learning=learning,
+            cycles=cycles,
+            market_decision=decision,
+            solar_forecast=self.solar_forecast,
+            tomorrow_available=tomorrow_available,
+        )
+        # En mode Dynamique uniquement, le planner devient la source de vérité
+        # pour l'autorisation de NOUVEAU départ. Les métriques économiques déjà
+        # calculées restent exposées et sont enrichies, jamais supprimées.
+        if day_ahead.get("active"):
+            for machine_id, plan in (day_ahead.get("machines") or {}).items():
+                rec = recommendations.setdefault(machine_id, {})
+                rec["allow_start"] = bool(plan.get("allow_start_now", False))
+                rec["scheduler_decision"] = plan.get("decision")
+                rec["scheduler_reason"] = plan.get("reason")
+                rec["best_user_window_start"] = plan.get("best_start")
+                rec["best_user_window_end"] = plan.get("best_end")
+                rec["user_window_now"] = plan.get("user_window_now")
+                rec["day_ahead_threshold_pct"] = day_ahead.get("threshold_pct")
+
         best_export = max(export_points, key=lambda p: p.price) if export_points else None
         worst_export = min(export_points, key=lambda p: p.price) if export_points else None
         return {
             "decision": decision,
             "boiler_thermal": boiler_thermal,
             "machines": recommendations,
+            "day_ahead": day_ahead,
             "forecast": {
                 "import_points": len(import_points),
                 "export_points": len(export_points),
@@ -1521,10 +1590,32 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         element_w = float((economic_view.get("boiler_thermal") or {}).get("element_power_w") or self.settings.get("boiler_power_w", 1800.0))
         band = str(decision.get("dynamic_price_band"))
         index = decision.get("dynamic_price_index")
+        position_pct = decision.get("dynamic_curve_position_pct")
+        favorable_threshold_pct = max(5.0, min(60.0, float(self.settings.get("dynamic_favorable_position_pct", 30.0))))
+        favorable_now = bool(isinstance(position_pct, (int, float)) and float(position_pct) <= favorable_threshold_pct)
         current_buy = decision.get("current_buy_eur_kwh")
         negative_threshold = float(self.settings.get("dynamic_grid_charge_threshold_eur_kwh", 0.0))
         negative_enabled = bool(self.settings.get("dynamic_negative_price_charge_enabled", True))
         negative_price = isinstance(current_buy, (int, float)) and float(current_buy) < negative_threshold
+
+        # V1.6.158 — coût marginal Boiler : la part solaire consommée localement
+        # vaut son coût d'opportunité de réinjection, la part réseau vaut le prix
+        # d'achat. On compare ce mélange au créneau Boiler futur réservé.
+        export_value = decision.get("export_value_eur_kwh")
+        reserved_avg = decision.get("boiler_reserved_avg_price_eur_kwh")
+        export_value = float(export_value) if isinstance(export_value, (int, float)) else 0.0
+        current_buy_f = float(current_buy) if isinstance(current_buy, (int, float)) else None
+        solar_fraction = min(max(float(snapshot.export_w), 0.0), max(element_w, 1.0)) / max(element_w, 1.0)
+        effective_boiler_cost = None
+        if current_buy_f is not None:
+            effective_boiler_cost = solar_fraction * export_value + (1.0 - solar_fraction) * current_buy_f
+        future_reference = float(reserved_avg) if isinstance(reserved_avg, (int, float)) else None
+        marginal_margin = float(self.settings.get("economic_min_saving_eur_kwh", 0.02))
+        solar_mix_favorable = bool(
+            solar_fraction > 0.0
+            and effective_boiler_cost is not None
+            and (future_reference is None or effective_boiler_cost <= future_reference + marginal_margin)
+        )
 
         # Confort ECS minimum : priorité absolue, même en haut de courbe.
         if snapshot.boiler_temp_c < minimum:
@@ -1542,13 +1633,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if negative_price and negative_enabled and intent.origin == "PRIX_NEGATIF_RESEAU":
             return intent
 
-        if snapshot.boiler_temp_c >= normal:
-            return BoilerIntent(
-                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
-                "Dynamique Day-Ahead : température ECS de confort atteinte.",
-                "DYNAMIC_DAY_AHEAD",
-            )
-
         if negative_price and not negative_enabled:
             if snapshot.export_w >= max(element_w, 1.0):
                 return BoilerIntent(
@@ -1560,6 +1644,38 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
                 "Prix dynamique sous le seuil mais charge réseau négative désactivée : attente sans prélèvement réseau.",
                 "DYNAMIC_NEGATIVE_DISABLED",
+            )
+
+        boost_target = float(self.settings.get("boiler_temp_boost_c", 65.0))
+        self_consumption_advantage = decision.get("self_consumption_advantage_eur_kwh")
+        solar_boost = bool(
+            snapshot.export_w >= max(element_w, 1.0)
+            and (
+                not isinstance(self_consumption_advantage, (int, float))
+                or float(self_consumption_advantage) >= -float(self.settings.get("economic_export_margin_eur_kwh", 0.01))
+            )
+        )
+        # V1.6.159 : stockage thermique uniquement en mode Dynamique. Un gros
+        # surplus solaire ou une position sous le seuil utilisateur peut charger
+        # jusqu'à la consigne BOOST, sans jamais contourner la sécurité 68 °C.
+        if snapshot.boiler_temp_c < boost_target and solar_boost:
+            return BoilerIntent(
+                BOILER_BOOST_65,
+                f"Dynamique : boost autoconsommation, surplus {snapshot.export_w:.0f} W couvre la résistance {element_w:.0f} W.",
+                "DYNAMIC_BOOST_SOLAIRE",
+            )
+        if snapshot.boiler_temp_c < boost_target and favorable_now:
+            return BoilerIntent(
+                BOILER_BOOST_65,
+                f"Dynamique : boost Day-Ahead, position {float(position_pct):.1f} % <= seuil {favorable_threshold_pct:.1f} %.",
+                "DYNAMIC_BOOST_PRIX",
+            )
+
+        if snapshot.boiler_temp_c >= normal:
+            return BoilerIntent(
+                BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
+                "Dynamique Day-Ahead : température de confort atteinte hors fenêtre de boost.",
+                "DYNAMIC_DAY_AHEAD",
             )
 
         if bool(decision.get("boiler_charge_now")):
@@ -1576,24 +1692,43 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     f"Dynamique médiane : surplus local {snapshot.export_w:.0f} W couvre la résistance {element_w:.0f} W.",
                     "DYNAMIC_SURPLUS_STRICT",
                 )
+            if solar_mix_favorable:
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Dynamique médiane : mélange solaire/réseau financièrement pertinent ({effective_boiler_cost:.3f} €/kWh effectif, référence future {future_reference if future_reference is not None else float('nan'):.3f} €/kWh).",
+                    "DYNAMIC_COUT_MARGINAL",
+                )
             return BoilerIntent(
                 BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
-                "Dynamique médiane : surplus insuffisant, aucune charge réseau du Boiler.",
-                "DYNAMIC_SURPLUS_STRICT",
+                "Dynamique médiane : coût marginal actuel moins favorable que le créneau futur, attente.",
+                "DYNAMIC_COUT_MARGINAL",
             )
 
         if band == "HAUT":
+            if solar_mix_favorable:
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Dynamique haut de courbe : le solaire réduit suffisamment le coût marginal ({effective_boiler_cost:.3f} €/kWh) pour chauffer sans attendre.",
+                    "DYNAMIC_COUT_MARGINAL",
+                )
             return BoilerIntent(
                 BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
-                f"Dynamique Day-Ahead : haut de courbe (indice={index}), charge réseau Boiler interdite hors confort minimum.",
+                f"Dynamique Day-Ahead : haut de courbe (indice={index}), charge réseau Boiler reportée hors confort minimum.",
                 "DYNAMIC_PRIX_HAUT",
             )
 
-        # Bas de courbe mais hors bloc réservé : attendre le bloc le moins cher.
+        # Bas de courbe mais hors bloc réservé : le solaire peut rendre le coût
+        # marginal meilleur que le bloc théorique futur.
         if band == "BAS":
+            if solar_mix_favorable:
+                return BoilerIntent(
+                    BOILER_HEAT_45,
+                    f"Dynamique bas de courbe : coût marginal solaire/réseau {effective_boiler_cost:.3f} €/kWh favorable, chauffe avancée.",
+                    "DYNAMIC_COUT_MARGINAL",
+                )
             return BoilerIntent(
                 BOILER_STOP if snapshot.boiler_on else BOILER_NONE,
-                "Dynamique Day-Ahead : bas de courbe mais hors créneau Boiler réservé, attente du bloc optimal.",
+                "Dynamique Day-Ahead : bas de courbe mais hors créneau optimal, attente du meilleur coût marginal.",
                 "DYNAMIC_RESERVATION",
             )
         return intent
@@ -1677,8 +1812,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                                 "PRIX_BLOQUE",
                             )
 
-        if key in {"predictive_pricing_enabled", "solar_forecast_arbitrage"}:
-            # Kill-switches dédiés au régime dynamique : aucun effet sur HP/HC.
+        if key in {"predictive_pricing_enabled", "solar_forecast_arbitrage", "dynamic_favorable_position_pct", "dynamic_high_position_pct"}:
+            # Réglages Day-Ahead dédiés au mode Dynamique : aucun effet sur HP/HC.
             if (
                 str(self.settings.get("mode")) == MODE_DYNAMIC
                 and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
@@ -2502,6 +2637,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         view = economic_view or self._economic_view(self.snapshot(), prices=prices)
         if machine is not None:
+            if regime == TARIFF_DYNAMIC and str(self.settings.get("mode")) == MODE_DYNAMIC:
+                plan = (view.get("day_ahead", {}).get("machines", {}) or {}).get(machine.machine_id)
+                if isinstance(plan, dict):
+                    return bool(plan.get("allow_start_now", False))
             rec = view.get("machines", {}).get(machine.machine_id)
             if isinstance(rec, dict):
                 return bool(rec.get("allow_start", False))
@@ -2588,9 +2727,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 external_cycle_on=external,
             )
 
-    def machine_states(self) -> list[dict[str, Any]]:
+    def machine_states(self, economic_view: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         self._refresh_machine_cycles()
         now = dt_util.now()
+        if economic_view is None and self.machines:
+            economic_view = self._economic_view(self.snapshot(), prices=self.prices(), now=now)
         result: list[dict[str, Any]] = []
         for machine in self.machines:
             result.append({
@@ -2611,7 +2752,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "sheddable": machine.sheddable,
                 "window_open": machine_allowed(machine, now),
                 "tariff_period": tariff_period(now, self.settings),
-                "tariff_start_favorable": self._tariff_start_favorable(),
+                "tariff_start_favorable": self._tariff_start_favorable(machine, economic_view=economic_view),
             })
         return result
 
@@ -2851,6 +2992,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._set_core_phase(PHASE_DECISION)
             await self._core_process_frame(snap)
             self._maybe_start_pri(snap)
+            # Le changement de créneau/prix doit aussi réévaluer immédiatement
+            # les NOUVEAUX départs LL/SL/LV. Les cycles protégés restent souverains.
+            await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data(snap))
 
     async def async_handle_pv_change(self) -> None:
@@ -3449,6 +3593,6 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "boiler_surplus_available_w": boiler_surplus_before_load_w(snap),
                 "boiler_allowed": protected_cycle_boiler_allowed(snap, self.settings),
             },
-            "machines": self.machine_states(),
+            "machines": self.machine_states(economic),
             "machine_window": {machine.machine_id: machine_allowed(machine, dt_util.now()) for machine in self.machines},
         }

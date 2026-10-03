@@ -109,6 +109,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "prix_negatif_actif", "Prix dynamique négatif actif", "mdi:cash-minus", "pricing", lambda d: "OUI" if d["prices"].get("negative_purchase") else "NON"),
         FoxCatNumericSensor(c, "prix_achat_actif", "Prix d'achat actif", "mdi:transmission-tower-import", "pricing", lambda d: d["prices"].get("active_buy"), "€/kWh"),
         FoxCatNumericSensor(c, "prix_achat_suivant", "Prix d'achat suivant", "mdi:clock-fast", "pricing", lambda d: d["prices"].get("next_buy"), "€/kWh"),
+        FoxCatNumericSensor(c, "position_courbe_dynamique", "Position sur la courbe dynamique", "mdi:chart-bell-curve-cumulative", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("dynamic_curve_position_pct"), PERCENTAGE),
+        FoxCatNumericSensor(c, "rang_courbe_dynamique", "Rang prix dynamique", "mdi:sort-numeric-ascending", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("dynamic_curve_rank")),
+        FoxCatValueSensor(c, "tendance_courbe_dynamique", "Tendance courbe dynamique", "mdi:trending-up", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("dynamic_curve_trend") or "—"),
         FoxCatValueSensor(c, "libelle_prix_actif", "Libellé prix actif", "mdi:label-outline", "pricing", lambda d: d["prices"].get("active_buy_label", "—")),
         FoxCatValueSensor(c, "libelle_prix_suivant", "Libellé prix suivant", "mdi:label-multiple-outline", "pricing", lambda d: d["prices"].get("next_buy_label", "—")),
         FoxCatNumericSensor(c, "valeur_reinjection", "Valeur économique de la réinjection", "mdi:transmission-tower-export", "pricing", lambda d: d["prices"].get("export_value"), "€/kWh"),
@@ -122,6 +125,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "economique_meilleur_prix_futur", "Meilleur prix d'achat futur", "mdi:cash-clock", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("best_future_buy_eur_kwh"), "€/kWh"),
         FoxCatNumericSensor(c, "economique_economie_potentielle", "Économie potentielle en reportant", "mdi:piggy-bank-outline", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("saving_vs_now_eur_kwh"), "€/kWh"),
         FoxCatValueSensor(c, "economique_meilleur_creneau", "Meilleur créneau économique", "mdi:calendar-clock", "pricing", lambda d: d.get("economic", {}).get("decision", {}).get("best_future_at") or "Maintenant"),
+        FoxCatDayAheadSensor(c),
+        FoxCatValueSensor(c, "day_ahead_prochain_creux", "Day-Ahead • Prochain creux", "mdi:chart-timeline-variant-shimmer", "pricing", lambda d: (d.get("economic", {}).get("day_ahead", {}).get("next_valley") or {}).get("start") or "Indisponible"),
+        FoxCatValueSensor(c, "day_ahead_prochain_pic", "Day-Ahead • Prochain pic", "mdi:chart-line-variant", "pricing", lambda d: (d.get("economic", {}).get("day_ahead", {}).get("next_peak") or {}).get("start") or "Indisponible"),
+        FoxCatNumericSensor(c, "day_ahead_horizon", "Day-Ahead • Horizon analysé", "mdi:timeline-clock-outline", "pricing", lambda d: d.get("economic", {}).get("day_ahead", {}).get("horizon_hours"), "h"),
         FoxCatNumericSensor(c, "bilan_conso_jour", "🏠 Maison • Consommation aujourd’hui", "mdi:home-lightning-bolt", "accounting", lambda d: d["accounting"]["today"]["house_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_pv_jour", "☀️ PV • Production aujourd’hui", "mdi:solar-power", "accounting", lambda d: d["accounting"]["today"]["pv_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_autoconso_jour", "☀️ PV • Énergie autoconsommée aujourd’hui", "mdi:home-import-outline", "accounting", lambda d: d["accounting"]["today"]["self_consumed_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
@@ -130,9 +137,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "bilan_autoconsommation_jour", "☀️ PV • Taux d’autoconsommation aujourd’hui", "mdi:percent-circle-outline", "accounting", lambda d: d["accounting"]["today"]["autoconsumption_pct"], PERCENTAGE),
         FoxCatNumericSensor(c, "bilan_autonomie_jour", "🏠 Maison • Taux d’autonomie aujourd’hui", "mdi:home-percent-outline", "accounting", lambda d: d["accounting"]["today"]["autonomy_pct"], PERCENTAGE),
         FoxCatNumericSensor(c, "bilan_cout_reseau_jour", "🏠 Maison • Coût réseau aujourd’hui", "mdi:cash-minus", "accounting", lambda d: d["accounting"]["today"]["import_cost_eur"], "€"),
-        FoxCatNumericSensor(c, "bilan_valeur_injection_jour", "☀️ PV • Valeur réinjection aujourd’hui", "mdi:cash-plus", "accounting", lambda d: d["accounting"]["today"]["export_value_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_valeur_injection_jour", "☀️ PV • Solde réinjection aujourd’hui", "mdi:cash-plus", "accounting", lambda d: d["accounting"]["today"]["export_value_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_revenu_injection_jour", "☀️ PV • Revenu réinjection aujourd’hui", "mdi:cash-plus", "accounting", lambda d: d["accounting"]["today"]["export_revenue_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_cout_injection_jour", "☀️ PV • Coût réinjection aujourd’hui", "mdi:cash-minus", "accounting", lambda d: d["accounting"]["today"]["export_cost_eur"], "€"),
         FoxCatNumericSensor(c, "bilan_cout_net_jour", "🏠 Maison • Coût net aujourd’hui", "mdi:cash-sync", "accounting", lambda d: d["accounting"]["today"]["net_grid_cost_eur"], "€"),
         FoxCatNumericSensor(c, "bilan_gain_solaire_jour", "☀️ PV • Gain solaire estimé aujourd’hui", "mdi:solar-power-variant", "accounting", lambda d: d["accounting"]["today"]["solar_gain_eur"], "€"),
+        # Accounting V2 — ventilation tarifaire sans netting énergétique.
+        FoxCatNumericSensor(c, "bilan_dynamic_import_jour", "Dynamic • Prélèvement réseau aujourd’hui", "mdi:transmission-tower-import", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["import_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+        FoxCatNumericSensor(c, "bilan_dynamic_export_jour", "Dynamic • Réinjection aujourd’hui", "mdi:transmission-tower-export", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["export_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+        FoxCatNumericSensor(c, "bilan_dynamic_cout_achat_jour", "Dynamic • Coût achat aujourd’hui", "mdi:cash-minus", "pricing", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["import_cost_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_dynamic_revenu_injection_jour", "Dynamic • Revenu réinjection aujourd’hui", "mdi:cash-plus", "pricing", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["export_revenue_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_dynamic_cout_injection_jour", "Dynamic • Coût réinjection aujourd’hui", "mdi:cash-minus", "pricing", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["export_cost_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_dynamic_cout_net_jour", "Dynamic • Coût net aujourd’hui", "mdi:cash-sync", "pricing", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["net_cost_eur"], "€"),
+        FoxCatNumericSensor(c, "bilan_hp_import_jour", "HP • Prélèvement réseau aujourd’hui", "mdi:weather-sunny", "accounting", lambda d: d["accounting"]["today"]["tariff"]["hphc"]["HP"]["import_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+        FoxCatNumericSensor(c, "bilan_hp_export_jour", "HP • Réinjection aujourd’hui", "mdi:transmission-tower-export", "accounting", lambda d: d["accounting"]["today"]["tariff"]["hphc"]["HP"]["export_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+        FoxCatNumericSensor(c, "bilan_hc_import_jour", "HC • Prélèvement réseau aujourd’hui", "mdi:weather-night", "accounting", lambda d: d["accounting"]["today"]["tariff"]["hphc"]["HC"]["import_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+        FoxCatNumericSensor(c, "bilan_hc_export_jour", "HC • Réinjection aujourd’hui", "mdi:transmission-tower-export", "accounting", lambda d: d["accounting"]["today"]["tariff"]["hphc"]["HC"]["export_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_conso_mois", "🏠 Maison • Consommation ce mois", "mdi:calendar-month", "accounting", lambda d: d["accounting"]["month"]["house_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_pv_mois", "☀️ PV • Production ce mois", "mdi:calendar-month-outline", "accounting", lambda d: d["accounting"]["month"]["pv_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_cout_net_mois", "🏠 Maison • Coût net ce mois", "mdi:cash-multiple", "accounting", lambda d: d["accounting"]["month"]["net_grid_cost_eur"], "€"),
@@ -188,6 +208,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatNumericSensor(c, f"appareil_{safe}_cout_jour", f"🔌 {appliance_name} • Coût aujourd’hui", "mdi:cash", "accounting", lambda d, aid=appliance_id: d["accounting"]["today"]["appliances"].get(aid,{}).get("cost_eur",0.0), "€"),
             FoxCatNumericSensor(c, f"appareil_{safe}_hp_jour", f"🔌 {appliance_name} • Consommation HP aujourd’hui", "mdi:weather-sunny", "accounting", lambda d, aid=appliance_id: d["accounting"]["today"]["appliances"].get(aid,{}).get("hp_kwh",0.0), UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
             FoxCatNumericSensor(c, f"appareil_{safe}_hc_jour", f"🔌 {appliance_name} • Consommation HC aujourd’hui", "mdi:weather-night", "accounting", lambda d, aid=appliance_id: d["accounting"]["today"]["appliances"].get(aid,{}).get("hc_kwh",0.0), UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+            FoxCatNumericSensor(c, f"appareil_{safe}_dynamic_jour", f"🔌 {appliance_name} • Consommation Dynamic aujourd’hui", "mdi:chart-timeline-variant", "accounting", lambda d, aid=appliance_id: d["accounting"]["today"]["appliances"].get(aid,{}).get("dynamic_kwh",0.0), UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
             FoxCatValueSensor(c, f"appareil_{safe}_tarif_actuel", f"🔌 {appliance_name} • Tarif actuel", "mdi:clock-check-outline", "accounting", lambda d: d["prices"].get("period","—")),
         ])
     # V1.6.152 — collecte passive des signatures machines. Les données brutes
@@ -202,6 +223,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatNumericSensor(c, f"apprentissage_{safe}_energie_moyenne", f"🧠 {name} • Énergie moyenne 10 cycles", "mdi:chart-bell-curve-cumulative", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_energy_wh_10") or 0.0) / 1000.0), UnitOfEnergy.KILO_WATT_HOUR),
             FoxCatNumericSensor(c, f"apprentissage_{safe}_duree_moyenne", f"🧠 {name} • Durée moyenne 10 cycles", "mdi:timer-outline", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_duration_s_10") or 0.0) / 60.0), "min"),
             FoxCatValueSensor(c, f"economique_{safe}_decision", f"💶 {name} • Choix économique", "mdi:cash-clock", "machines", lambda d, aid=mid: d.get("economic",{}).get("machines",{}).get(aid,{}).get("label", "Indisponible")),
+            FoxCatMachineDayAheadSensor(c, mid, name),
         ])
 
     # V1.6.0 — classement fonctionnel officiel. Les kWh et pourcentages vont
@@ -218,6 +240,74 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 entity._foxcat_device_name = None
 
     async_add_entities(entities)
+
+
+class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
+    """Synthèse du planificateur Day-Ahead, strictement Dynamique."""
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "day_ahead_plan", "Planificateur Day-Ahead", "mdi:chart-timeline-variant-shimmer", "pricing")
+
+    def _plan(self) -> dict[str, Any]:
+        return self.coordinator.data.get("economic", {}).get("day_ahead", {}) or {}
+
+    @property
+    def native_value(self) -> str:
+        plan = self._plan()
+        if not plan.get("active"):
+            return "INACTIF — HORS DYNAMIC"
+        if plan.get("favorable_now"):
+            return "PRIX FAVORABLE"
+        return "PLANIFICATION ACTIVE"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        plan = self._plan()
+        return {
+            "actif": bool(plan.get("active")),
+            "raison_inactive": plan.get("reason"),
+            "position_pct": plan.get("current_position_pct"),
+            "seuil_favorable_pct": plan.get("threshold_pct"),
+            "seuil_pic_pct": plan.get("high_threshold_pct"),
+            "prix_favorable": bool(plan.get("favorable_now")),
+            "prix_min_eur_kwh": plan.get("curve_min_eur_kwh"),
+            "prix_max_eur_kwh": plan.get("curve_max_eur_kwh"),
+            "prochain_creux": plan.get("next_valley"),
+            "prochain_pic": plan.get("next_peak"),
+            "demain_disponible": bool(plan.get("tomorrow_available")),
+            "horizon_heures": plan.get("horizon_hours"),
+            "fenetre_solaire": plan.get("solar_window"),
+            "machines": plan.get("machines", {}),
+        }
+
+
+class FoxCatMachineDayAheadSensor(FoxCatEntity, SensorEntity):
+    """Fenêtre optimale d'une machine, calculée dans ses plages utilisateur."""
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator, machine_id: str, name: str) -> None:
+        safe = machine_id.replace(" ", "_").lower()
+        super().__init__(coordinator, f"day_ahead_{safe}_plan", f"Day-Ahead • {name}", "mdi:calendar-clock", "machines")
+        self._machine_id = machine_id
+
+    def _plan(self) -> dict[str, Any]:
+        return (self.coordinator.data.get("economic", {}).get("day_ahead", {}).get("machines", {}) or {}).get(self._machine_id, {}) or {}
+
+    @property
+    def native_value(self) -> str:
+        root = self.coordinator.data.get("economic", {}).get("day_ahead", {}) or {}
+        if not root.get("active"):
+            return "INACTIF — HORS DYNAMIC"
+        plan = self._plan()
+        if plan.get("protected"):
+            return "EN CYCLE — PROTÉGÉ"
+        if plan.get("allow_start_now"):
+            return "DÉMARRAGE AUTORISÉ"
+        start = plan.get("best_start")
+        return f"PLANIFIÉ {start}" if start else "ATTENTE"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return dict(self._plan())
 
 
 class FoxCatEconomicDecisionSensor(FoxCatEntity, SensorEntity):
@@ -265,6 +355,10 @@ class FoxCatEconomicDecisionSensor(FoxCatEntity, SensorEntity):
             "plage_tarifaire_dynamique": decision.get("dynamic_price_band"),
             "prix_min_day_ahead_eur_kwh": decision.get("dynamic_price_min_eur_kwh"),
             "prix_max_day_ahead_eur_kwh": decision.get("dynamic_price_max_eur_kwh"),
+            "position_courbe_pct": decision.get("dynamic_curve_position_pct"),
+            "rang_courbe": decision.get("dynamic_curve_rank"),
+            "points_courbe": decision.get("dynamic_curve_points"),
+            "tendance_courbe": decision.get("dynamic_curve_trend"),
             "boiler_energie_manquante_kwh": decision.get("boiler_energy_missing_kwh"),
             "boiler_duree_chauffe_h": decision.get("boiler_heating_duration_h"),
             "boiler_creneau_reserve_debut": decision.get("boiler_reserved_start"),

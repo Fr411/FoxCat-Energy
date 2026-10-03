@@ -38,7 +38,7 @@ def evaluate_dynamic(
     pmin = prices.get("min_today")
     pmax = prices.get("max_today")
     avg = prices.get("avg_today")
-    injection = prices.get("injection")
+    export_value = prices.get("export_value")
     if not isinstance(current, (int, float)) or not isinstance(pmin, (int, float)) or not isinstance(pmax, (int, float)):
         return BoilerIntent(BOILER_NONE, "Prix dynamiques invalides : régulation suspendue.", "PRIX")
     current = float(current)
@@ -46,7 +46,7 @@ def evaluate_dynamic(
     pmax = float(pmax)
     next_price = float(next_price) if isinstance(next_price, (int, float)) else current
     avg = float(avg) if isinstance(avg, (int, float)) else current
-    injection = float(injection) if isinstance(injection, (int, float)) else 0.0
+    export_value = float(export_value) if isinstance(export_value, (int, float)) else 0.0
 
     normal = float(settings["boiler_temp_normal_c"])
     start = float(settings["boiler_temp_start_c"])
@@ -77,8 +77,12 @@ def evaluate_dynamic(
     low = position <= 0.45 or current < avg
     very_high = position >= 0.80 or current >= pmax - 0.005
     significant = float(settings["dynamic_price_significant_delta"])
-    injection_lucrative = injection < float(settings["dynamic_injection_lucrative_threshold"])
-    boost_solar = normal <= snapshot.boiler_temp_c < boost and coverage_t0 >= 100 and coverage_now >= 100 and not injection_lucrative
+    # V1.6.158 : ``export_value`` est déjà normalisé par le coordinateur :
+    # positif = revenu, négatif = coût. On ne bloque donc le stockage solaire
+    # que si vendre ce kWh vaut réellement davantage que l'achat évité.
+    injection_lucrative = export_value > max(float(settings.get("dynamic_injection_lucrative_threshold", 0.0)), 0.0)
+    export_more_valuable_than_self_use = injection_lucrative and export_value > current + float(settings.get("economic_export_margin_eur_kwh", 0.01))
+    boost_solar = normal <= snapshot.boiler_temp_c < boost and coverage_t0 >= 100 and coverage_now >= 100 and not export_more_valuable_than_self_use
     solar_future = solar.available and solar.confidence >= float(settings["solar_confidence_min_percent"]) and solar.potential in {"Moyen", "Bon", "Fort"}
     deadline = thermal_deadline(snapshot, settings, now)
 

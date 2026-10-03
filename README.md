@@ -2,12 +2,41 @@
 
 **EMS local pour Home Assistant — énergie, onduleur, Boiler, machines, tarification et optimisation économique.**
 
-Version actuelle : **1.6.157**  
-Base de développement : **1.6.156 Professional**  
+Version actuelle : **1.6.159**  
+Base de développement : **1.6.158 Financial Core**  
 Fonctionnement : **100 % local dans Home Assistant**
 
 ---
 
+
+
+## V1.6.159 — Accounting V2 & Dynamic Day-Ahead Scheduler
+
+Cette version professionnalise le régime **Prix dynamique** sans modifier le comportement validé des autres modes.
+
+- **Périmètre strict** : le nouveau scheduler, le seuil Day-Ahead, les fenêtres machines et les boosts Boiler s'appliquent uniquement lorsque le mode EMS **Prix dynamique** ET le régime tarifaire **Dynamique** sont actifs.
+- **Seuil Day-Ahead réglable** : `dynamic_favorable_position_pct`, 30 % par défaut, exposé comme nombre Home Assistant « Seuil prix favorable Day-Ahead ».
+- **LL / SL / LV** : chaque nouveau départ respecte les plages horaires utilisateur et la durée apprise sur les 10 derniers cycles; le cycle complet doit tenir dans la plage.
+- **Cycles protégés** : un cycle déjà démarré conserve la priorité absolue et n'est jamais interrompu par le scheduler.
+- **Today + Tomorrow** : quand les prix de demain sont disponibles, FoxCat recherche la meilleure fenêtre complète dans l'horizon Day-Ahead.
+- **Autoconsommation** : le surplus solaire reste prioritaire; sous le seuil favorable, un complément réseau peut être autorisé.
+- **Boiler** : boost thermique possible sur surplus solaire ou prix favorable, sans contourner la sécurité résistance 68 °C ni le confort ECS minimum.
+- **Accounting V2** : consommation, PV, import et réinjection restent des compteurs physiques indépendants; aucune valeur de réinjection ne peut diminuer les kWh importés.
+- **Ventilation tarifaire** : Dynamic import/export et HP/HC import/export sont comptabilisés séparément avec leurs coûts/revenus au prix de chaque trame.
+- **Dashboard** : nouvelle vue **Day-Ahead** avec graphique Luminus Dynamic achat/réinjection, seuil réglable, creux/pics, plans LL/SL/LV et bilan Dynamic journalier.
+
+## V1.6.158 — Cohérence tarifaire, courbe Luminus Dynamic & accounting signé
+
+Cette version corrige le socle financier des régimes Dynamique et HP/HC.
+
+- **Dynamique = Luminus Dynamic** : prix actuel, heure suivante et courbe Day-Ahead lisent les champs `all_in` de `today` / `tomorrow`.
+- **HP/HC = Luminus ComfyFlex** : les capteurs HP, HC et réinjection ComfyFlex sont les sources par défaut de ce régime uniquement.
+- **Réinjection Luminus Dynamic** : `injection > 0` = revenu, `injection < 0` = coût. Les anciennes installations utilisant l'ancienne convention sont corrigées automatiquement pour une source Luminus Dynamic.
+- **PRI** : toute réinjection rémunératrice libère l'onduleur à **100 %**, en Dynamique comme en HP/HC, indépendamment du kill-switch prédictif.
+- **Courbe** : le moteur expose position %, rang et tendance sur la courbe Luminus Dynamic utilisée pour ses décisions.
+- **Accounting signé** : `coût net = achat réseau + coût de réinjection - revenu de réinjection`. Les revenus et coûts de réinjection sont comptabilisés séparément.
+- **Terminologie** : la politique réseau est désormais nommée **Injection tarifée**. L'ancien libellé reste reconnu uniquement pour migration.
+- **Dashboard** : les rôles tarifaires FoxCat sont régime-dépendants ; aucun dashboard généré ne doit utiliser ComfyFlex comme prix dynamique.
 
 ## V1.6.157 — Arbitrage dynamique Day-Ahead & modèle thermique Boiler
 
@@ -195,7 +224,7 @@ FoxCat peut maintenant maintenir une **notification persistante unique** dans Ho
 Le résumé contient :
 
 - le **mode EMS** actif ;
-- la **politique réseau** : Compensation ou Injection facturée ;
+- la **politique réseau** : Compensation ou Injection tarifée ;
 - l'**état financier EMS** ;
 - la décision économique courante ;
 - le régime et la période tarifaire ;
@@ -320,7 +349,7 @@ Après une mise à jour importante, ouvrir **Configurer** et vérifier les nouve
 - Utilisation des profils machines pour estimer durée et énergie d'un cycle.
 - Capteur **Décision économique EMS** et recommandations par machine.
 - Compensation : onduleur 100 % direct.
-- Injection facturée : moteur PRI prédictif conservé.
+- Injection tarifée : moteur PRI prédictif conservé.
 - Audit : **309 → 331 fonctions/méthodes, 0 suppression**.
 
 ## 1.6.152 — Collecte passive machines et accounting natif
@@ -397,7 +426,7 @@ Après une mise à jour importante, ouvrir **Configurer** et vérifier les nouve
 ## 1.5.0 — Architecture double cœur
 
 - EMS Core ↔ Energy Bus ↔ Onduleur Core.
-- Politiques Compensation / Injection facturée.
+- Politiques Compensation / Injection tarifée.
 - Premiers comparateurs PV/plafond et comptabilité HP/HC par appareil.
 
 ---
