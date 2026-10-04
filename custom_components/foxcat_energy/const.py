@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.6.159"
+VERSION = "1.6.160"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "button"]
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
@@ -134,10 +134,13 @@ CONF_FORECAST_PEAK_TOMORROW = "forecast_peak_tomorrow"
 
 MODE_ECO = "Économie énergie"
 MODE_ZERO = "Zéro injection"
-MODE_ECS = "ECS solaire"
-MODE_DYNAMIC = "Prix dynamique"
+MODE_BIHORAIRE = "Bihoraire"
+# Symbole historique conservé dans le code : il pointe désormais vers le mode
+# Bihoraire afin de préserver le moteur HP/HC validé sans dupliquer sa logique.
+MODE_ECS = MODE_BIHORAIRE
+MODE_DYNAMIC = "Dynamique"
 MODE_MANUAL = "Manuel"
-MODES = [MODE_ECO, MODE_ZERO, MODE_ECS, MODE_DYNAMIC, MODE_MANUAL]
+MODES = [MODE_ECO, MODE_ZERO, MODE_BIHORAIRE, MODE_DYNAMIC, MODE_MANUAL]
 
 TARIFF_DYNAMIC = "Dynamique"
 TARIFF_COMPENSATION = "Compensation"
@@ -153,15 +156,19 @@ MODE_ALIASES = {
     "Économie énergie": MODE_ECO,
     "Zéro injection": MODE_ZERO,
     "Réinjection refusée": MODE_ZERO,
-    "ECS solaire": MODE_ECS,
+    "ECS solaire": MODE_BIHORAIRE,
+    "Bihoraire": MODE_BIHORAIRE,
+    "Bi-horaire": MODE_BIHORAIRE,
+    "HP/HC": MODE_BIHORAIRE,
     "Prix dynamique": MODE_DYNAMIC,
+    "Dynamique": MODE_DYNAMIC,
     "Tarification dynamique": MODE_DYNAMIC,
     # Migration volontaire : le mode Confort disparaît en V1.2.0.
     # Un ancien réglage Confort est ramené en Manuel pour ne déclencher
     # aucune stratégie automatique sans choix explicite de l'utilisateur.
     "Confort": MODE_MANUAL,
     "Manuel": MODE_MANUAL,
-    "Maxi solaire": MODE_ECS,
+    "Maxi solaire": MODE_BIHORAIRE,
     "Réinjection autorisée": MODE_ECO,
 }
 
@@ -210,7 +217,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "economic_optimizer_enabled": True,
     "predictive_pricing_enabled": True,
     "dynamic_favorable_position_pct": 30.0,
-    "dynamic_high_position_pct": 70.0,
+    "dynamic_high_position_pct": 65.0,
     "solar_forecast_arbitrage": True,
     "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
@@ -350,7 +357,7 @@ SWITCH_DEFINITIONS = {
     "boiler_enabled": ("Boiler géré par FoxCat", "mdi:water-boiler"),
     "boiler_allow_hc": ("Boiler autorisé en heures creuses", "mdi:clock-check-outline"),
     "pri_enabled": ("Réduction de puissance onduleur", "mdi:solar-power-variant"),
-    "agressivite_ecs": ("Agressivité ECS solaire", "mdi:water-boiler-auto"),
+    "agressivite_ecs": ("Agressivité solaire Bihoraire", "mdi:water-boiler-auto"),
     "washer_enabled": ("Gestion lave-linge", "mdi:washing-machine"),
     "dryer_enabled": ("Gestion sèche-linge", "mdi:tumble-dryer"),
     "dishwasher_enabled": ("Gestion lave-vaisselle", "mdi:dishwasher"),
