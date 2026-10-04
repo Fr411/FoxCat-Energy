@@ -134,6 +134,7 @@ from .engine.load_guard import (
     protected_cycle_boiler_allowed,
     protected_cycle_boiler_allowed_stable,
 )
+from .engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
 from .engine.tariff import price_status, tariff_boundaries, tariff_period
 from .economic_optimizer import (
     PricePoint,
@@ -486,6 +487,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.settings.setdefault(machine.setting_key, machine.automatic_default)
 
         self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
+        # V1.6.160 : cohérence souveraine du couple Mode/Tarification.
+        # Une ancienne configuration est migrée silencieusement au démarrage.
+        if str(self.settings.get("mode")) == MODE_DYNAMIC:
+            self.settings["tariff_regime"] = TARIFF_DYNAMIC
+            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
+        elif str(self.settings.get("mode")) == MODE_ECS:  # MODE_ECS = Bihoraire (alias historique)
+            self.settings["tariff_regime"] = TARIFF_TOU
+            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
         self.metronome_state["period_s"] = float(self.settings.get("metronome_period_s", 30.0))
         self._register_listeners()
         await self.async_config_entry_first_refresh()
@@ -1764,6 +1773,21 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_set_mode(str(value))
             return
 
+        # V1.6.160 : tant que le mode EMS est Dynamique, son modèle financier
+        # ne peut pas diverger : tarif Dynamique + Injection tarifée. Le mode
+        # Bihoraire verrouille de la même façon le régime HP/HC historique.
+        active_mode = str(self.settings.get("mode"))
+        if active_mode == MODE_DYNAMIC:
+            if key == "tariff_regime":
+                value = TARIFF_DYNAMIC
+            elif key == "network_policy":
+                value = NETWORK_POLICY_BILLED_EXPORT
+        elif active_mode == MODE_ECS:
+            if key == "tariff_regime":
+                value = TARIFF_TOU
+            elif key == "network_policy":
+                value = NETWORK_POLICY_BILLED_EXPORT
+
         self.settings[key] = value
 
         if key == "regulation_active":
@@ -1863,19 +1887,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.core_state["last_reason"] = "Mode Manuel : pilotages automatiques désactivés, sécurité thermique conservée."
 
         elif canonical == MODE_ECS:
+            # MODE_ECS est l'alias interne historique du nouveau mode Bihoraire.
+            # Le moteur HP/HC validé est conservé intégralement ; seul le contexte
+            # tarifaire est synchronisé automatiquement.
+            self.settings["tariff_regime"] = TARIFF_TOU
+            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
             self.settings["pri_enabled"] = False
             if bool(self.settings.get("regulation_active")):
-                await self.async_release_pri_100("Mode ECS solaire : PRI libéré à 100 %.")
+                await self.async_release_pri_100("Mode Bihoraire : PRI libéré à 100 %, tarif HP/HC + Injection tarifée synchronisés.")
                 await self.async_reconcile_machines()
+            self.core_state["last_reason"] = "Mode Bihoraire actif : Bi-horaire HP/HC + Injection tarifée."
 
-        elif canonical == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC:
-            self.settings["pri_enabled"] = False
+        elif canonical == MODE_DYNAMIC:
+            # Invariant V1.6.160 demandé : sélectionner le mode Dynamique suffit.
+            self.settings["tariff_regime"] = TARIFF_DYNAMIC
+            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
+            self.settings["pri_enabled"] = True
             if bool(self.settings.get("regulation_active")):
-                await self.async_release_pri_100("Mode Prix dynamique bloqué : régime tarifaire non dynamique.")
+                await self.async_release_pri_100("Mode Dynamique : initialisation PRI à 100 %, tarif Dynamique + Injection tarifée synchronisés.")
                 await self.async_reconcile_machines()
-            self.core_state["last_reason"] = "Prix dynamique bloqué : sélectionner le régime tarifaire Dynamique."
+            self.core_state["last_reason"] = "Mode Dynamique actif : tarif Dynamique + Injection tarifée."
 
-        elif canonical in {MODE_ECO, MODE_ZERO, MODE_DYNAMIC}:
+        elif canonical in {MODE_ECO, MODE_ZERO}:
             self.settings["pri_enabled"] = True
             if bool(self.settings.get("regulation_active")):
                 # Repartir d'un état déterministe avant que la stratégie PRI
@@ -2276,8 +2309,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 solar_for_mode,
             )
             if mode == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC:
-                intent = self._apply_dynamic_boiler_arbitrage(
-                    snapshot, intent, self._economic_view(snapshot, prices=tariff_context)
+                # V1.6.160 : branche Boiler dédiée au Dynamique. L'ancienne
+                # méthode _apply_dynamic_boiler_arbitrage reste dans le code pour
+                # audit/rollback mais n'est plus appelée.
+                intent = evaluate_dynamic_boiler_v2(
+                    snapshot, intent, self.settings, self._economic_view(snapshot, prices=tariff_context)
                 )
 
         if (

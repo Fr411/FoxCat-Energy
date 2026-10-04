@@ -2,13 +2,26 @@
 
 **EMS local pour Home Assistant — énergie, onduleur, Boiler, machines, tarification et optimisation économique.**
 
-Version actuelle : **1.6.159**  
-Base de développement : **1.6.158 Financial Core**  
+Version actuelle : **1.6.160**  
+Base de développement : **1.6.159 Accounting V2 & Dynamic Day-Ahead**  
 Fonctionnement : **100 % local dans Home Assistant**
 
 ---
 
 
+
+## V1.6.160 — Dynamic Coherence & Boiler Solar-First
+
+Correctif de cohérence du mode **Dynamique** et harmonisation complète des dashboards.
+
+- **Mode Dynamique souverain** : sélectionner `Dynamique` force automatiquement le régime tarifaire `Dynamique` et la politique réseau `Injection tarifée`. Ces deux valeurs ne peuvent plus diverger tant que le mode reste Dynamique.
+- **Mode Bihoraire** : l'ancien libellé `ECS solaire` est migré vers `Bihoraire`. Le moteur HP/HC historique reste inchangé bit pour bit et le régime `Bi-horaire HP/HC` + `Injection tarifée` est synchronisé automatiquement.
+- **Boiler Dynamic V2** : nouvelle branche additive appelée uniquement pour `Mode=Dynamique` + `Tarif=Dynamique`. Les autres modes ne passent jamais dans cette branche.
+- **BOOST Boiler** : la consigne 65 °C est désormais réservée au surplus solaire suffisant. Le prix Day-Ahead ne peut plus provoquer un stockage réseau à 65 °C.
+- **Plafond réseau Boiler** : `dynamic_high_position_pct` vaut 65 % par défaut. Au-dessus, aucune nouvelle chauffe réseau Boiler n'est autorisée ; entre 30 et 65 %, seul le confort 45 °C peut être assuré ; sous 30 %, le confort peut être anticipé mais le BOOST reste solaire.
+- **Dashboard Boiler unique** : résumé thermique, puissance, décision, cohérence Mode/Tarif/Réseau, seuils Dynamic et graphique 24 h sont réunis dans une seule vue.
+- **Dashboard Day-Ahead** : les contrôles Mode, Régime, Politique réseau et seuils 30/65 % sont affichés ensemble.
+- **Migration** : les anciennes valeurs `Prix dynamique` et `ECS solaire` sont reconnues et migrées silencieusement vers `Dynamique` et `Bihoraire`.
 
 ## V1.6.159 — Accounting V2 & Dynamic Day-Ahead Scheduler
 

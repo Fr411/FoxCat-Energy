@@ -340,7 +340,7 @@ views:
                     ? '#38bdf8'
                   : state === 'Réinjection refusée'
                     ? '#fb7185'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? '#fbbf24'
                   : state === 'Tarification dynamique'
                     ? '#c084fc'
@@ -366,7 +366,7 @@ views:
                     ? 'linear-gradient(90deg, rgba(56,189,248,0.08), transparent)'
                   : state === 'Réinjection refusée'
                     ? 'linear-gradient(90deg, rgba(251,113,133,0.08), transparent)'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? 'linear-gradient(90deg, rgba(251,191,36,0.08), transparent)'
                   : state === 'Tarification dynamique'
                     ? 'linear-gradient(90deg, rgba(192,132,252,0.08), transparent)'
@@ -388,7 +388,7 @@ views:
                     ? 'rgba(56,189,248,0.10)'
                   : state === 'Réinjection refusée'
                     ? 'rgba(251,113,133,0.10)'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? 'rgba(251,191,36,0.10)'
                   : state === 'Tarification dynamique'
                     ? 'rgba(192,132,252,0.10)'
@@ -404,7 +404,7 @@ views:
                     ? 'rgba(56,189,248,0.16)'
                   : state === 'Réinjection refusée'
                     ? 'rgba(251,113,133,0.16)'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? 'rgba(251,191,36,0.16)'
                   : state === 'Tarification dynamique'
                     ? 'rgba(192,132,252,0.16)'
@@ -421,7 +421,7 @@ views:
                     ? '#38bdf8'
                   : state === 'Réinjection refusée'
                     ? '#fb7185'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? '#fbbf24'
                   : state === 'Tarification dynamique'
                     ? '#c084fc'
@@ -436,7 +436,7 @@ views:
                     ? 'drop-shadow(0 0 8px rgba(56,189,248,0.35))'
                   : state === 'Réinjection refusée'
                     ? 'drop-shadow(0 0 8px rgba(251,113,133,0.35))'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? 'drop-shadow(0 0 8px rgba(251,191,36,0.35))'
                   : state === 'Tarification dynamique'
                     ? 'drop-shadow(0 0 8px rgba(192,132,252,0.35))'
@@ -466,7 +466,7 @@ views:
                     ? '#bae6fd'
                   : state === 'Réinjection refusée'
                     ? '#fecdd3'
-                  : state === 'ECS solaire'
+                  : state === 'Bihoraire'
                     ? '#fde68a'
                   : state === 'Tarification dynamique'
                     ? '#e9d5ff'
@@ -710,9 +710,9 @@ views:
                   const modeMap = {
                     'Économie énergie': ['🌿', '#34d399'],
                     'Economie énergie': ['🌿', '#34d399'],
-                    'ECS solaire': ['♨️', '#fb923c'],
+                    'Bihoraire': ['♨️', '#fb923c'],
                     'Zéro injection': ['⛔', '#fb7185'],
-                    'Prix dynamique': ['📈', '#a78bfa'],
+                    'Dynamique': ['📈', '#a78bfa'],
                     'Manuel': ['🖐️', '#60a5fa']
                   };
                   const [modeIcon, modeColor] = modeMap[mode] || ['⚡', '#c4b5fd'];
@@ -10877,1608 +10877,154 @@ views:
             - media_content_type: app
               media_content_id: media-source://image_upload
   - type: sections
-    max_columns: 10
+    max_columns: 4
+    title: Boiler ECS
     icon: mdi:water-boiler
     path: boiler
     sections:
       - type: grid
         cards:
-          - type: custom:button-card
-            show_name: false
-            show_icon: false
-            show_state: false
-            custom_fields:
-              header: |
-                [[[
-                  return `
-                    <div class="hfc-header">
-
-                      <div class="hfc-logo">
-                        <div class="fox-glow"></div>
-                        <ha-icon icon="mdi:cat"></ha-icon>
-                      </div>
-
-                      <div class="hfc-name">
-
-                        <div class="hfc-title">
-                          <span class="home"><span class="fox">FOX</span><span class="cat">CAT</span>
-                          <span class="energy">ENERGY</span>
-                        </div>
-
-                        <div class="hfc-subtitle">
-                          ENERGY MANAGEMENT SYSTEM
-                        </div>
-
-                      </div>
-
-                      <div class="hfc-line">
-                        <span class="line-orange"></span>
-                        <span class="line-blue"></span>
-                      </div>
-
-                    </div>
-                  `;
-                ]]]
-            styles:
-              card:
-                - padding: 17px 22px
-                - border-radius: 20px
-                - overflow: hidden
-                - background: |
-                    radial-gradient(
-                      circle at 3% 50%,
-                      rgba(255,120,20,0.15),
-                      transparent 24%
-                    ), radial-gradient(
-                      circle at 95% 30%,
-                      rgba(0,210,255,0.11),
-                      transparent 28%
-                    ), linear-gradient(
-                      135deg,
-                      #080d16 0%,
-                      #0a1420 48%,
-                      #071827 100%
-                    )
-                - border: 1px solid rgba(255,255,255,0.08)
-                - box-shadow: >
-                    0 10px 30px rgba(0,0,0,0.30), inset 0 1px 0
-                    rgba(255,255,255,0.035)
-              grid:
-                - grid-template-areas: '"header"'
-                - grid-template-columns: 1fr
-                - grid-template-rows: auto
-              custom_fields:
-                header:
-                  - width: 100%
-            extra_styles: |
-
-              .hfc-header {
-                position: relative;
-
-                width: 100%;
-
-                display: flex;
-                align-items: center;
-
-                gap: 16px;
-
-                box-sizing: border-box;
-              }
-
-
-              /* ==========================================
-                 LOGO
-                 ========================================== */
-
-              .hfc-logo {
-                position: relative;
-
-                width: 54px;
-                height: 54px;
-
-                flex: 0 0 54px;
-
-                display: flex;
-                align-items: center;
-                justify-content: center;
-
-                border-radius: 16px;
-
-                background:
-                  linear-gradient(
-                    135deg,
-                    rgba(255,126,25,0.15),
-                    rgba(0,211,255,0.12)
-                  );
-
-                border: 1px solid rgba(255,255,255,0.10);
-
-                box-shadow:
-                  -5px 0 20px rgba(255,110,15,0.12),
-                  5px 0 20px rgba(0,210,255,0.12);
-              }
-
-
-              .hfc-logo::before {
-                content: "";
-
-                position: absolute;
-
-                inset: 3px;
-
-                border-radius: 13px;
-
-                border-top:
-                  1px solid rgba(255,137,37,0.45);
-
-                border-right:
-                  1px solid rgba(0,216,255,0.40);
-              }
-
-
-              .hfc-logo ha-icon {
-                position: relative;
-
-                color: #ffffff;
-
-                --mdc-icon-size: 31px;
-
-                filter:
-                  drop-shadow(-3px 0 5px rgba(255,110,20,0.55))
-                  drop-shadow(3px 0 5px rgba(0,210,255,0.50));
-              }
-
-
-              /* ==========================================
-                 NOM
-                 ========================================== */
-
-              .hfc-name {
-                display: flex;
-                flex-direction: column;
-
-                justify-content: center;
-              }
-
-
-              .hfc-title {
-                white-space: nowrap;
-
-                font-size: 24px;
-                font-weight: 850;
-
-                line-height: 1;
-
-                letter-spacing: 0.055em;
-              }
-
-
-              .hfc-title .home {
-                color: #ffffff;
-              }
-
-
-              /* RENARD */
-
-              .hfc-title .fox {
-                color: #ff8a26;
-
-                text-shadow:
-                  0 0 12px rgba(255,120,20,0.25);
-              }
-
-
-              /* CHAT */
-
-              .hfc-title .cat {
-                color: #19d8ff;
-
-                text-shadow:
-                  0 0 12px rgba(0,210,255,0.25);
-              }
-
-
-              /* ENERGY */
-
-              .hfc-title .energy {
-                margin-left: 9px;
-
-                color: #a9bdcc;
-
-                font-weight: 600;
-              }
-
-
-              /* ==========================================
-                 SOUS-TITRE
-                 ========================================== */
-
-              .hfc-subtitle {
-                margin-top: 7px;
-
-                color: #71899d;
-
-                font-size: 8px;
-                font-weight: 600;
-
-                letter-spacing: 0.28em;
-              }
-
-
-              /* ==========================================
-                 LIGNE SIGNATURE
-                 ========================================== */
-
-              .hfc-line {
-                height: 2px;
-
-                flex: 1;
-
-                min-width: 60px;
-
-                margin-left: 12px;
-
-                display: flex;
-
-                border-radius: 10px;
-
-                overflow: hidden;
-
-                opacity: 0.75;
-              }
-
-
-              .line-orange {
-                width: 38%;
-
-                background:
-                  linear-gradient(
-                    90deg,
-                    rgba(255,130,25,0),
-                    #ff8125
-                  );
-
-                box-shadow:
-                  0 0 10px rgba(255,120,20,0.40);
-              }
-
-
-              .line-blue {
-                flex: 1;
-
-                background:
-                  linear-gradient(
-                    90deg,
-                    #00d8ff,
-                    rgba(0,216,255,0)
-                  );
-
-                box-shadow:
-                  0 0 10px rgba(0,216,255,0.40);
-              }
-          - type: custom:button-card
-            entity: [[foxcat:boiler.climate]]
-            show_name: false
-            show_icon: false
-            show_state: false
-            styles:
-              card:
-                - padding: 0
-                - border-radius: 24px
-                - overflow: hidden
-                - background: |
-                    linear-gradient(
-                      145deg,
-                      rgba(11,18,32,0.98),
-                      rgba(17,27,46,0.98)
-                    )
-                - box-shadow: 0 10px 30px rgba(0,0,0,0.28)
-              grid:
-                - grid-template-areas: |
-                    "hero"
-                    "why"
-                    "energy"
-                    "thermal"
-                    "decision"
-                - grid-template-columns: 1fr
-                - grid-template-rows: auto auto auto auto auto
-              custom_fields:
-                hero:
-                  - width: 100%
-                why:
-                  - width: 100%
-                energy:
-                  - width: 100%
-                thermal:
-                  - width: 100%
-                decision:
-                  - width: 100%
-            custom_fields:
-              hero: |
-                [[[
-                  const temp =
-                    Number(
-                      states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                    );
-
-                  const power =
-                    Number(
-                      states['[[foxcat:boiler.power_source]]']?.state || 0
-                    );
-
-                  const boilerOn =
-                    states['[[foxcat:boiler.binary_source]]']?.state === 'on'
-                    || power > 200;
-
-                  const demand =
-                    states['[[foxcat:legacy.input_select_ems_boiler_demande]]']?.state || 'AUCUNE';
-
-                  const score =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_agressivite_score]]']?.state || 0
-                    );
-
-                  let title = 'EN ATTENTE';
-                  let subtitle = 'FoxCat surveille les conditions';
-                  let icon = '⏸️';
-                  let accent = '#64748B';
-
-                  if (temp >= 65) {
-                    title = 'STOCKAGE COMPLET';
-                    subtitle = 'Limite de boost atteinte';
-                    icon = '✅';
-                    accent = '#10B981';
-                  }
-                  else if (demand === 'BOOST_65' && boilerOn) {
-                    title = 'BOOST SOLAIRE';
-                    subtitle = 'Stockage thermique jusqu’à 65 °C';
-                    icon = '☀️';
-                    accent = '#F59E0B';
-                  }
-                  else if (demand === 'CHAUFFE_45' && boilerOn) {
-                    title = 'CHAUFFE CONFORT';
-                    subtitle = 'FoxCat sécurise les 45 °C';
-                    icon = '🔥';
-                    accent = '#22D3EE';
-                  }
-                  else if (demand === 'ARRET') {
-                    title = 'ARRÊT';
-                    subtitle = 'La chauffe n’est actuellement pas utile';
-                    icon = '⏹️';
-                    accent = '#64748B';
-                  }
-                  else if (score > 0) {
-                    title = 'OPPORTUNITÉ SOLAIRE';
-                    subtitle = 'FoxCat évalue un stockage thermique';
-                    icon = '🧠';
-                    accent = '#A78BFA';
-                  }
-
-                  return `
-                    <div style="
-                      padding:20px;
-                      background:
-                        linear-gradient(
-                          135deg,
-                          ${accent}22,
-                          transparent 65%
-                        );
-                    ">
-
-                      <div style="
-                        display:flex;
-                        align-items:center;
-                        justify-content:space-between;
-                        gap:14px;
-                      ">
-
-                        <div>
-
-                          <div style="
-                            font-size:11px;
-                            letter-spacing:1.4px;
-                            opacity:0.55;
-                            font-weight:700;
-                          ">
-                            FOXCAT ENERGY · BOILER
-                          </div>
-
-                          <div style="
-                            font-size:24px;
-                            font-weight:800;
-                            margin-top:4px;
-                          ">
-                            ${icon} ${title}
-                          </div>
-
-                          <div style="
-                            font-size:13px;
-                            opacity:0.7;
-                            margin-top:4px;
-                          ">
-                            ${subtitle}
-                          </div>
-
-                        </div>
-
-                        <div style="
-                          text-align:right;
-                        ">
-
-                          <div style="
-                            font-size:36px;
-                            font-weight:800;
-                            line-height:1;
-                          ">
-                            ${temp.toFixed(1)}°
-                          </div>
-
-                          <div style="
-                            font-size:12px;
-                            opacity:0.6;
-                            margin-top:5px;
-                          ">
-                            ${power.toFixed(0)} W
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                      <div style="
-                        height:6px;
-                        border-radius:10px;
-                        background:rgba(255,255,255,0.08);
-                        overflow:hidden;
-                        margin-top:18px;
-                      ">
-
-                        <div style="
-                          height:100%;
-                          width:${Math.min(100, Math.max(0, ((temp - 25) / 40) * 100))}%;
-                          background:${accent};
-                          border-radius:10px;
-                        "></div>
-
-                      </div>
-
-                      <div style="
-                        display:flex;
-                        justify-content:space-between;
-                        font-size:10px;
-                        opacity:0.45;
-                        margin-top:5px;
-                      ">
-                        <span>25 °C</span>
-                        <span>45 °C confort</span>
-                        <span>65 °C boost</span>
-                      </div>
-
-                    </div>
-                  `;
-                ]]]
-              why: |
-                [[[
-                  const reason =
-                    states['[[foxcat:legacy.input_text_ems_agressivite_raison]]']?.state
-                    || 'Aucune optimisation particulière nécessaire';
-
-                  const demand =
-                    states['[[foxcat:legacy.input_select_ems_boiler_demande]]']?.state || 'AUCUNE';
-
-                  const temp =
-                    Number(
-                      states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                    );
-
-                  let headline = '';
-
-                  if (demand === 'CHAUFFE_45') {
-                    headline =
-                      'Le confort sanitaire est prioritaire : FoxCat vise au minimum 45 °C.';
-                  }
-                  else if (demand === 'BOOST_65') {
-                    headline =
-                      'Les 45 °C sont assurés. FoxCat utilise maintenant le boiler comme batterie thermique.';
-                  }
-                  else if (temp >= 65) {
-                    headline =
-                      'Le stockage thermique disponible est rempli.';
-                  }
-                  else {
-                    headline =
-                      'FoxCat attend qu’une chauffe soit réellement avantageuse ou nécessaire.';
-                  }
-
-                  return `
-                    <div style="
-                      margin:0 16px 12px 16px;
-                      padding:14px;
-                      border-radius:16px;
-                      background:rgba(255,255,255,0.045);
-                    ">
-
-                      <div style="
-                        font-size:11px;
-                        font-weight:800;
-                        letter-spacing:0.8px;
-                        opacity:0.55;
-                        margin-bottom:7px;
-                      ">
-                        POURQUOI ?
-                      </div>
-
-                      <div style="
-                        font-size:14px;
-                        font-weight:600;
-                        line-height:1.45;
-                      ">
-                        ${headline}
-                      </div>
-
-                      <div style="
-                        margin-top:8px;
-                        font-size:12px;
-                        opacity:0.65;
-                        line-height:1.45;
-                      ">
-                        ${reason}
-                      </div>
-
-                    </div>
-                  `;
-                ]]]
-              energy: |
-                [[[
-                  const pv =
-                    Number(
-                      states['[[foxcat:sources.pv]]']?.state || 0
-                    );
-
-                  const house =
-                    Number(
-                      states['[[foxcat:legacy.sensor_consommation_reelle_maison]]']?.state || 0
-                    );
-
-                  const surplus = pv - house;
-
-                  const prod =
-                    Number(
-                      states['[[foxcat:energy.today.pv]]']?.state || 0
-                    );
-
-                  const exportDay =
-                    Number(
-                      states['[[foxcat:energy.today.export]]']?.state || 0
-                    );
-
-                  const autocons =
-                    prod > 0
-                      ? Math.max(0, Math.min(100, ((prod - exportDay) / prod) * 100))
-                      : 0;
-
-                  const score =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_agressivite_score]]']?.state || 0
-                    );
-
-                  const importMax =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_import_boiler_max_dynamique]]']?.state || 0
-                    );
-
-                  const coverage =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_couverture_solaire_min_dynamique]]']?.state || 100
-                    );
-
-                  const price =
-                    Number(
-                      states['[[foxcat:pricing.active_buy]]']?.state || 0
-                    );
-
-                  let scoreLabel = 'Repos';
-
-                  if (score >= 90) scoreLabel = 'Maximum';
-                  else if (score >= 75) scoreLabel = 'Très agressif';
-                  else if (score >= 50) scoreLabel = 'Agressif';
-                  else if (score >= 25) scoreLabel = 'Modéré';
-                  else if (score > 0) scoreLabel = 'Prudent';
-
-                  return `
-                    <div style="
-                      margin:0 16px 12px 16px;
-                    ">
-
-                      <div style="
-                        font-size:11px;
-                        font-weight:800;
-                        letter-spacing:0.8px;
-                        opacity:0.55;
-                        margin-bottom:8px;
-                      ">
-                        STRATÉGIE ÉNERGÉTIQUE
-                      </div>
-
-                      <div style="
-                        display:grid;
-                        grid-template-columns:1fr 1fr;
-                        gap:8px;
-                      ">
-
-                        <div style="
-                          padding:11px;
-                          border-radius:14px;
-                          background:rgba(34,211,238,0.06);
-                        ">
-                          <div style="font-size:10px;opacity:0.5;">
-                            ☀️ Production PV
-                          </div>
-                          <div style="font-size:17px;font-weight:700;margin-top:3px;">
-                            ${pv.toFixed(0)} W
-                          </div>
-                        </div>
-
-                        <div style="
-                          padding:11px;
-                          border-radius:14px;
-                          background:rgba(34,211,238,0.06);
-                        ">
-                          <div style="font-size:10px;opacity:0.5;">
-                            ⚡ Surplus réel
-                          </div>
-                          <div style="font-size:17px;font-weight:700;margin-top:3px;">
-                            ${surplus.toFixed(0)} W
-                          </div>
-                        </div>
-
-                        <div style="
-                          padding:11px;
-                          border-radius:14px;
-                          background:rgba(167,139,250,0.07);
-                        ">
-                          <div style="font-size:10px;opacity:0.5;">
-                            🧠 Agressivité
-                          </div>
-                          <div style="font-size:17px;font-weight:700;margin-top:3px;">
-                            ${score.toFixed(0)} %
-                          </div>
-                          <div style="font-size:10px;opacity:0.5;margin-top:2px;">
-                            ${scoreLabel}
-                          </div>
-                        </div>
-
-                        <div style="
-                          padding:11px;
-                          border-radius:14px;
-                          background:rgba(16,185,129,0.06);
-                        ">
-                          <div style="font-size:10px;opacity:0.5;">
-                            ♻️ Autoconsommation
-                          </div>
-                          <div style="font-size:17px;font-weight:700;margin-top:3px;">
-                            ${autocons.toFixed(0)} %
-                          </div>
-                          <div style="font-size:10px;opacity:0.5;margin-top:2px;">
-                            cible 80–85 %
-                          </div>
-                        </div>
-
-                        <div style="
-                          padding:11px;
-                          border-radius:14px;
-                          background:rgba(245,158,11,0.06);
-                        ">
-                          <div style="font-size:10px;opacity:0.5;">
-                            🔌 Réseau autorisé
-                          </div>
-                          <div style="font-size:17px;font-weight:700;margin-top:3px;">
-                            ${importMax.toFixed(0)} W
-                          </div>
-                        </div>
-
-                        <div style="
-                          padding:11px;
-                          border-radius:14px;
-                          background:rgba(245,158,11,0.06);
-                        ">
-                          <div style="font-size:10px;opacity:0.5;">
-                            ☀️ Couverture mini
-                          </div>
-                          <div style="font-size:17px;font-weight:700;margin-top:3px;">
-                            ${coverage.toFixed(0)} %
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div style="
-                        margin-top:8px;
-                        padding:9px 11px;
-                        border-radius:12px;
-                        background:rgba(255,255,255,0.035);
-                        display:flex;
-                        justify-content:space-between;
-                        align-items:center;
-                      ">
-
-                        <span style="font-size:11px;opacity:0.55;">
-                          💶 Tarif actuel
-                        </span>
-
-                        <span style="font-size:14px;font-weight:700;">
-                          ${price.toFixed(3)} €/kWh
-                        </span>
-
-                      </div>
-
-                    </div>
-                  `;
-                ]]]
-              thermal: |
-                [[[
-                  const temp =
-                    Number(
-                      states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                    );
-
-                  const power =
-                    Number(
-                      states['[[foxcat:boiler.power_source]]']?.state || 0
-                    );
-
-                  const boilerEntity =
-                    states['[[foxcat:boiler.binary_source]]'];
-
-                  const boilerOn =
-                    boilerEntity?.state === 'on'
-                    || power > 200;
-
-                  let onSeconds = 0;
-
-                  if (boilerEntity?.state === 'on') {
-                    const start = new Date(boilerEntity.last_changed).getTime();
-                    onSeconds = Math.max(
-                      0,
-                      (Date.now() - start) / 1000
-                    );
-                  }
-
-                  const minCycle =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_boiler_cycle_min_secondes]]']?.state || 120
-                    );
-
-                  const cycleRemaining =
-                    boilerOn
-                      ? Math.max(0, minCycle - onSeconds)
-                      : 0;
-
-                  const now = new Date();
-                  const minute = now.getHours() * 60 + now.getMinutes();
-
-                  const hc =
-                    minute < 420
-                    || (minute >= 660 && minute < 1020)
-                    || minute >= 1320;
-
-                  let minutesFinHC = 9999;
-
-                  if (minute < 420) {
-                    minutesFinHC = 420 - minute;
-                  }
-                  else if (minute >= 660 && minute < 1020) {
-                    minutesFinHC = 1020 - minute;
-                  }
-                  else if (minute >= 1320) {
-                    minutesFinHC = (1440 - minute) + 420;
-                  }
-
-                  const perte = 0.5;
-                  const chauffe = 10;
-                  const marge = 30;
-
-                  const tempFin =
-                    minutesFinHC < 9999
-                      ? temp - perte * (minutesFinHC / 60)
-                      : temp;
-
-                  const minutesChauffe =
-                    minutesFinHC < 9999
-                      ? Math.max(0, ((45 - tempFin) / chauffe) * 60)
-                      : 0;
-
-                  const failback =
-                    minutesFinHC < 9999
-                      ? minutesFinHC - minutesChauffe - marge
-                      : 9999;
-
-                  let phase = 'HORS HC';
-
-                  if (minute >= 1320 && minute < 1380) {
-                    phase = 'Observation nuit';
-                  }
-                  else if (minute >= 1380 && minute < 1400) {
-                    phase = 'Charge initiale';
-                  }
-                  else if (minute >= 1400 && minute < 1430) {
-                    phase = 'Stabilisation sonde';
-                  }
-                  else if (minute >= 1430 || minute < 420) {
-                    phase = 'Failback thermique';
-                  }
-                  else if (minute >= 660 && minute < 1020) {
-                    phase = 'HC solaire';
-                  }
-
-                  let failbackText = 'Non applicable';
-
-                  if (hc) {
-                    if (failback <= 0) {
-                      failbackText = 'Départ requis maintenant';
-                    }
-                    else {
-                      const h = Math.floor(failback / 60);
-                      const m = Math.round(failback % 60);
-
-                      failbackText =
-                        h > 0
-                          ? `dans ${h} h ${m} min`
-                          : `dans ${m} min`;
-                    }
-                  }
-
-                  let cycleText = 'Disponible';
-
-                  if (boilerOn && cycleRemaining > 0) {
-                    cycleText =
-                      `${Math.ceil(cycleRemaining)} s minimum restant`;
-                  }
-                  else if (boilerOn) {
-                    cycleText = 'Minimum 120 s respecté';
-                  }
-
-                  return `
-                    <div style="
-                      margin:0 16px 12px 16px;
-                      padding:14px;
-                      border-radius:16px;
-                      background:rgba(255,255,255,0.04);
-                    ">
-
-                      <div style="
-                        font-size:11px;
-                        font-weight:800;
-                        letter-spacing:0.8px;
-                        opacity:0.55;
-                        margin-bottom:9px;
-                      ">
-                        PILOTAGE THERMIQUE
-                      </div>
-
-                      <div style="
-                        display:grid;
-                        grid-template-columns:1fr auto;
-                        row-gap:8px;
-                        column-gap:10px;
-                        font-size:12px;
-                      ">
-
-                        <span style="opacity:0.55;">
-                          Phase actuelle
-                        </span>
-                        <b>${phase}</b>
-
-                        <span style="opacity:0.55;">
-                          Objectif confort
-                        </span>
-                        <b>45 °C</b>
-
-                        <span style="opacity:0.55;">
-                          Stockage maximum
-                        </span>
-                        <b>65 °C</b>
-
-                        <span style="opacity:0.55;">
-                          Temp. estimée fin HC
-                        </span>
-                        <b>${tempFin.toFixed(1)} °C</b>
-
-                        <span style="opacity:0.55;">
-                          Failback
-                        </span>
-                        <b>${failbackText}</b>
-
-                        <span style="opacity:0.55;">
-                          Cycle minimum
-                        </span>
-                        <b>${cycleText}</b>
-
-                      </div>
-
-                    </div>
-                  `;
-                ]]]
-              decision: |
-                [[[
-                  const temp =
-                    Number(
-                      states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                    );
-
-                  const demand =
-                    states['[[foxcat:legacy.input_select_ems_boiler_demande]]']?.state || 'AUCUNE';
-
-                  const score =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_agressivite_score]]']?.state || 0
-                    );
-
-                  const importMax =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_import_boiler_max_dynamique]]']?.state || 0
-                    );
-
-                  const coverage =
-                    Number(
-                      states['[[foxcat:legacy.input_number_ems_couverture_solaire_min_dynamique]]']?.state || 100
-                    );
-
-                  let text = '';
-
-                  if (temp >= 65) {
-                    text =
-                      `Le boiler a atteint 65 °C. FoxCat arrête le stockage thermique même si du solaire reste disponible.`;
-                  }
-                  else if (demand === 'CHAUFFE_45') {
-                    text =
-                      `FoxCat chauffe actuellement pour garantir le confort. Sous 45 °C, le failback thermique reste prioritaire sur l'optimisation économique.`;
-                  }
-                  else if (demand === 'BOOST_65') {
-                    text =
-                      `Les 45 °C sont assurés. FoxCat continue la chauffe en mode BOOST pour stocker l'énergie disponible dans les 250 litres d'eau. ` +
-                      `Dans les conditions actuelles, jusqu'à ${importMax.toFixed(0)} W de réseau peuvent être tolérés et la couverture solaire minimale est de ${coverage.toFixed(0)} %.`;
-                  }
-                  else if (score > 0) {
-                    text =
-                      `FoxCat détecte une opportunité solaire, mais attend encore que toutes les conditions soient réunies avant d'engager les 1 800 W du boiler.`;
-                  }
-                  else {
-                    text =
-                      `Aucune chauffe opportuniste n'est justifiée actuellement. FoxCat conserve l'énergie réseau et attend soit une meilleure fenêtre solaire, soit le déclenchement du failback confort.`;
-                  }
-
-                  return `
-                    <div style="
-                      margin:0 16px 16px 16px;
-                      padding:15px;
-                      border-radius:16px;
-                      background:rgba(34,211,238,0.065);
-                      border:1px solid rgba(34,211,238,0.15);
-                    ">
-
-                      <div style="
-                        font-size:11px;
-                        font-weight:800;
-                        letter-spacing:0.8px;
-                        margin-bottom:7px;
-                      ">
-                        CE QUE FOXCAT DÉCIDE
-                      </div>
-
-                      <div style="
-                        font-size:13px;
-                        line-height:1.55;
-                      ">
-                        ${text}
-                      </div>
-
-                      <div style="
-                        margin-top:11px;
-                        padding-top:10px;
-                        border-top:1px solid rgba(255,255,255,0.08);
-                        font-size:10px;
-                        line-height:1.45;
-                        opacity:0.5;
-                      ">
-                        Ordre de priorité :
-                        sécurité → confort / failback → cycle minimum →
-                        tarif → photovoltaïque → autoconsommation → boost thermique.
-                      </div>
-
-                    </div>
-                  `;
-                ]]]
-          - type: custom:button-card
-            entity: [[foxcat:boiler.temperature_source]]
-            show_name: false
-            show_state: false
-            show_icon: false
-            triggers_update:
-              - [[foxcat:boiler.temperature_source]]
-              - [[foxcat:boiler.power_source]]
-              - [[foxcat:boiler.binary_source]]
-              - [[foxcat:legacy.input_select_ems_boiler_demande]]
-              - [[foxcat:legacy.input_select_ems_mode]]
-              - [[foxcat:legacy.input_number_ems_boiler_temp_normal]]
-            custom_fields:
-              header: |
-                [[[
-                  const now = new Date();
-                  const m = now.getHours() * 60 + now.getMinutes();
-
-                  let phase = 'HORS HC';
-
-                  if (m >= 1320 && m < 1380)
-                    phase = 'OBSERVATION NUIT';
-
-                  else if (m >= 1380 && m < 1400)
-                    phase = 'CHARGE INITIALE';
-
-                  else if (m >= 1400 && m < 1430)
-                    phase = 'STABILISATION SONDE';
-
-                  else if (m >= 1430 || m < 420)
-                    phase = 'FAILBACK THERMIQUE';
-
-                  else if (m >= 660 && m < 1020)
-                    phase = 'HC SOLAIRE';
-
-                  return `
-                    <div class="header-line">
-                      <div>
-                        <div class="foxcat-title">FOXCAT ECS</div>
-                        <div class="phase">${phase}</div>
-                      </div>
-                      <div class="mode">
-                        ${states['[[foxcat:legacy.input_select_ems_boiler_demande]]']?.state || 'AUCUNE'}
-                      </div>
-                    </div>
-                  `;
-                ]]]
-              time_now: |
-                [[[
-                  const now = new Date();
-
-                  const hh = String(now.getHours()).padStart(2,'0');
-                  const mm = String(now.getMinutes()).padStart(2,'0');
-
-                  return `
-                    <div class="main-value">${hh}:${mm}</div>
-                    <div class="main-label">HEURE ACTUELLE</div>
-                  `;
-                ]]]
-              next_start: |
-                [[[
-                  const t = parseFloat(
-                    states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                  );
-
-                  const target = parseFloat(
-                    states['[[foxcat:legacy.input_number_ems_boiler_temp_normal]]']?.state || 45
-                  );
-
-                  const now = new Date();
-                  const m = now.getHours() * 60 + now.getMinutes();
-
-                  const loss = 0.5;
-                  const heat = 10.0;
-                  const margin = 30;
-
-                  let end = null;
-                  let remaining = null;
-
-                  if (m < 420) {
-                    end = new Date(now);
-                    end.setHours(7,0,0,0);
-                    remaining = 420 - m;
-                  }
-
-                  else if (m >= 660 && m < 1020) {
-                    end = new Date(now);
-                    end.setHours(17,0,0,0);
-                    remaining = 1020 - m;
-                  }
-
-                  else if (m >= 1320) {
-                    end = new Date(now);
-                    end.setDate(end.getDate() + 1);
-                    end.setHours(7,0,0,0);
-                    remaining = (1440 - m) + 420;
-                  }
-
-                  let display = '--:--';
-                  let label = 'PROCHAIN DÉPART';
-
-                  // 22h → 23h : première chauffe prévue à 23h
-                  if (m >= 1320 && m < 1380) {
-
-                    const d = new Date(now);
-                    d.setHours(23,0,0,0);
-
-                    display = '23:00';
-                    label = 'CHARGE INITIALE';
-                  }
-
-                  // 23h → 23h20 : chauffe en cours / prévue maintenant
-                  else if (m >= 1380 && m < 1400) {
-
-                    display = 'NOW';
-                    label = 'CHARGE INITIALE';
-                  }
-
-                  // 23h20 → 23h50 : on ne prétend pas encore connaître
-                  // précisément le failback tant que la sonde se stabilise
-                  else if (m >= 1400 && m < 1430) {
-
-                    display = '23:50';
-                    label = 'RECALCUL APRÈS STABILISATION';
-                  }
-
-                  // Après stabilisation : vrai calcul failback
-                  else if (end && remaining !== null) {
-
-                    const tEnd = t - loss * remaining / 60;
-
-                    const heating =
-                      Math.max(0, (target - tEnd) / heat * 60);
-
-                    const start =
-                      new Date(end.getTime() - (heating + margin) * 60000);
-
-                    display =
-                      String(start.getHours()).padStart(2,'0')
-                      + ':'
-                      + String(start.getMinutes()).padStart(2,'0');
-
-                    label = 'DÉMARRAGE FAILBACK';
-                  }
-
-                  return `
-                    <div class="main-value">${display}</div>
-                    <div class="main-label">${label}</div>
-                  `;
-                ]]]
-              temp: |
-                [[[
-                  const t = parseFloat(
-                    states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                  );
-
-                  return `
-                    <div class="mini-value">${t.toFixed(1)}°</div>
-                    <div class="mini-label">TEMPÉRATURE</div>
-                  `;
-                ]]]
-              heat_time: |
-                [[[
-                  const t = parseFloat(
-                    states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                  );
-
-                  const target = parseFloat(
-                    states['[[foxcat:legacy.input_number_ems_boiler_temp_normal]]']?.state || 45
-                  );
-
-                  const now = new Date();
-                  const m = now.getHours() * 60 + now.getMinutes();
-
-                  let remaining = null;
-
-                  if (m < 420)
-                    remaining = 420 - m;
-
-                  else if (m >= 660 && m < 1020)
-                    remaining = 1020 - m;
-
-                  else if (m >= 1320)
-                    remaining = (1440 - m) + 420;
-
-                  if (remaining === null) {
-                    return `
-                      <div class="mini-value">--</div>
-                      <div class="mini-label">CHAUFFE NÉCESSAIRE</div>
-                    `;
-                  }
-
-                  const tEnd = t - 0.5 * remaining / 60;
-
-                  const heating =
-                    Math.max(0, (target - tEnd) / 10 * 60);
-
-                  const h = Math.floor(heating / 60);
-                  const min = Math.round(heating % 60);
-
-                  const txt =
-                    h > 0
-                      ? `${h}h${String(min).padStart(2,'0')}`
-                      : `${Math.round(heating)} min`;
-
-                  return `
-                    <div class="mini-value">${txt}</div>
-                    <div class="mini-label">CHAUFFE NÉCESSAIRE</div>
-                  `;
-                ]]]
-              temp_end: |
-                [[[
-                  const t = parseFloat(
-                    states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                  );
-
-                  const now = new Date();
-                  const m = now.getHours() * 60 + now.getMinutes();
-
-                  let remaining = null;
-
-                  if (m < 420)
-                    remaining = 420 - m;
-
-                  else if (m >= 660 && m < 1020)
-                    remaining = 1020 - m;
-
-                  else if (m >= 1320)
-                    remaining = (1440 - m) + 420;
-
-                  if (remaining === null) {
-                    return `
-                      <div class="mini-value">--</div>
-                      <div class="mini-label">T° FIN HC</div>
-                    `;
-                  }
-
-                  const tEnd = t - 0.5 * remaining / 60;
-
-                  return `
-                    <div class="mini-value">${tEnd.toFixed(1)}°</div>
-                    <div class="mini-label">T° FIN HC</div>
-                  `;
-                ]]]
-              end_hc: |
-                [[[
-                  const now = new Date();
-                  const m = now.getHours() * 60 + now.getMinutes();
-
-                  let txt = '--:--';
-
-                  if (m < 420 || m >= 1320)
-                    txt = '07:00';
-
-                  else if (m >= 660 && m < 1020)
-                    txt = '17:00';
-
-                  return `
-                    <div class="mini-value">${txt}</div>
-                    <div class="mini-label">FIN HC</div>
-                  `;
-                ]]]
-              failback: |
-                [[[
-                  const t = parseFloat(
-                    states['[[foxcat:boiler.temperature_source]]']?.state || 0
-                  );
-
-                  const target = parseFloat(
-                    states['[[foxcat:legacy.input_number_ems_boiler_temp_normal]]']?.state || 45
-                  );
-
-                  const now = new Date();
-                  const m = now.getHours() * 60 + now.getMinutes();
-
-                  if (m >= 1400 && m < 1430) {
-                    return `
-                      <div class="fail-value">STABILISATION</div>
-                      <div class="fail-label">
-                        recalcul thermique à 23:50
-                      </div>
-                    `;
-                  }
-
-                  let remaining = null;
-
-                  if (m < 420)
-                    remaining = 420 - m;
-
-                  else if (m >= 660 && m < 1020)
-                    remaining = 1020 - m;
-
-                  else if (m >= 1320)
-                    remaining = (1440 - m) + 420;
-
-                  if (remaining === null) {
-                    return `
-                      <div class="fail-value">HORS HC</div>
-                      <div class="fail-label">failback inactif</div>
-                    `;
-                  }
-
-                  const tEnd = t - 0.5 * remaining / 60;
-
-                  const heating =
-                    Math.max(0, (target - tEnd) / 10 * 60);
-
-                  const before =
-                    remaining - heating - 30;
-
-                  if (before <= 0) {
-                    return `
-                      <div class="fail-value">FAILBACK ACTIF</div>
-                      <div class="fail-label">chauffe nécessaire maintenant</div>
-                    `;
-                  }
-
-                  const h = Math.floor(before / 60);
-                  const min = Math.round(before % 60);
-
-                  const txt =
-                    h > 0
-                      ? `${h}h${String(min).padStart(2,'0')}`
-                      : `${Math.round(before)} min`;
-
-                  return `
-                    <div class="fail-value">${txt}</div>
-                    <div class="fail-label">
-                      avant dernier départ thermique
-                    </div>
-                  `;
-                ]]]
-            styles:
-              card:
-                - padding: 20px
-                - border-radius: 28px
-                - border: 1px solid rgba(255,255,255,0.08)
-                - box-shadow: 0 18px 45px rgba(0,0,0,0.28)
-                - background: |
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                show_name: false
+                show_icon: false
+                show_state: false
+                triggers_update: all
+                custom_fields:
+                  content: |
                     [[[
-                      const now = new Date();
-                      const m = now.getHours() * 60 + now.getMinutes();
-
-                      const demand =
-                        states['[[foxcat:legacy.input_select_ems_boiler_demande]]']?.state || '';
-
-                      if (demand === 'CHAUFFE_45')
-                        return 'linear-gradient(145deg, rgba(115,67,10,.95), rgba(11,18,32,.98))';
-
-                      if (m >= 1400 && m < 1430)
-                        return 'linear-gradient(145deg, rgba(45,42,90,.94), rgba(11,18,32,.98))';
-
-                      if (m >= 1320 || m < 420)
-                        return 'linear-gradient(145deg, rgba(12,61,76,.96), rgba(11,18,32,.98))';
-
-                      return 'linear-gradient(145deg, rgba(17,27,46,.96), rgba(11,18,32,.98))';
+                      const state=id=>states[id]?.state;
+                      const num=id=>Number(state(id));
+                      const mode=state('[[foxcat:ems.mode]]')||'—';
+                      const regime=state('[[foxcat:pricing.regime]]')||'—';
+                      const policy=state('[[foxcat:pricing.network_policy]]')||'—';
+                      const temp=num('[[foxcat:boiler.temperature]]');
+                      const avg=num('[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]');
+                      const power=num('[[foxcat:boiler.power]]');
+                      const demand=state('[[foxcat:boiler.demand]]')||'AUCUNE';
+                      const origin=state('[[foxcat:boiler.origin]]')||'AUCUNE';
+                      const execution=state('[[foxcat:boiler.execution_status]]')||'—';
+                      const missing=num('[[foxcat:boiler.thermal_energy_missing]]');
+                      const duration=num('[[foxcat:boiler.heating_duration]]');
+                      const position=num('[[foxcat:pricing.dynamic_curve_position]]');
+                      const low=num('[[foxcat:pricing.day_ahead.threshold]]');
+                      const high=num('[[foxcat:pricing.day_ahead.peak_threshold]]');
+                      const running=states['[[foxcat:boiler.physical]]']?.state==='on'||(Number.isFinite(power)&&power>100);
+                      const dynamic=mode==='Dynamique';
+                      const fmt=(v,u='',d=1)=>Number.isFinite(v)?`${v.toFixed(d).replace('.',',')} ${u}`.trim():'—';
+                      const zone=!dynamic?'HORS DYNAMIC':!Number.isFinite(position)?'INDISPONIBLE':position<=low?'TRÈS FAVORABLE':position<=high?'ACCEPTABLE':'TROP CHER';
+                      const decision=origin!=='AUCUNE'?origin:demand;
+                      const decisionColor=decision.includes('BOOST')?'#facc15':decision.includes('ATTENTE')||decision.includes('PRIX')?'#a78bfa':running?'#fb923c':'#94a3b8';
+                      return `<div class="fcb"><div class="fcb-top"><div><div class="fcb-title">BOILER ECS</div><div class="fcb-sub">FoxCat Energy · ${mode}</div></div><div class="fcb-run ${running?'on':'off'}">${running?'● CHAUFFE':'○ ATTENTE'}</div></div><div class="fcb-sync"><div><span>MODE</span><b>${mode}</b></div><div><span>TARIF</span><b>${regime}</b></div><div><span>RÉSEAU</span><b>${policy}</b></div></div><div class="fcb-grid"><div class="cell"><span>DOIGT DE GANT BAS</span><b>${fmt(temp,'°C')}</b></div><div class="cell"><span>MOYENNE BALLON</span><b>${fmt(avg,'°C')}</b></div><div class="cell"><span>PUISSANCE</span><b>${fmt(power,'W',0)}</b></div><div class="cell"><span>ÉNERGIE MANQUANTE</span><b>${fmt(missing,'kWh',2)}</b></div><div class="cell"><span>DURÉE ESTIMÉE</span><b>${fmt(duration,'h',2)}</b></div><div class="cell"><span>EXÉCUTION</span><b>${execution}</b></div></div><div class="fcb-dynamic ${dynamic?'active':''}"><div class="fcb-dyn-title">DYNAMIC BOILER</div><div class="fcb-dyn-grid"><div><span>POSITION</span><b>${fmt(position,'%',1)}</b></div><div><span>ZONE</span><b>${zone}</b></div><div><span>FAVORABLE</span><b>${fmt(low,'%',0)}</b></div><div><span>PLAFOND</span><b>${fmt(high,'%',0)}</b></div></div><div class="fcb-decision" style="color:${decisionColor}">${decision}</div><div class="fcb-note">BOOST 65 °C = solaire uniquement · réseau ≤ plafond = confort 45 °C</div></div></div>`;
                     ]]]
-              grid:
-                - grid-template-areas: |
-                    "header header header"
-                    "time_now time_now next_start"
-                    "temp heat_time temp_end"
-                    "end_hc end_hc end_hc"
-                    "failback failback failback"
-                - grid-template-columns: 1fr 1fr 1fr
-                - grid-template-rows: auto auto auto auto auto
-                - gap: 14px
-              custom_fields:
+                styles:
+                  card:
+                    - padding: 24px
+                    - border-radius: 24px
+                    - background: linear-gradient(145deg,rgba(25,28,34,.98),rgba(12,14,18,.98))
+                    - border: 1px solid rgba(255,255,255,.08)
+                  custom_fields:
+                    content:
+                      - width: 100%
+                extra_styles: |
+                  .fcb{width:100%}.fcb-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.fcb-title{font-size:24px;font-weight:900;letter-spacing:1px}.fcb-sub{font-size:11px;opacity:.45;margin-top:4px}.fcb-run{padding:8px 12px;border-radius:18px;font-size:11px;font-weight:900}.fcb-run.on{background:rgba(251,146,60,.14);color:#fb923c}.fcb-run.off{background:rgba(148,163,184,.08);color:#94a3b8}.fcb-sync,.fcb-grid,.fcb-dyn-grid{display:grid;gap:10px}.fcb-sync{grid-template-columns:repeat(3,1fr);margin-top:18px}.fcb-sync>div,.cell,.fcb-dyn-grid>div{padding:12px;border-radius:15px;text-align:center;background:rgba(255,255,255,.04)}.fcb-sync span,.cell span,.fcb-dyn-grid span{display:block;font-size:9px;opacity:.45;letter-spacing:.06em}.fcb-sync b,.cell b,.fcb-dyn-grid b{display:block;margin-top:5px;font-size:14px}.fcb-grid{grid-template-columns:repeat(3,1fr);margin-top:10px}.fcb-dynamic{margin-top:12px;padding:16px;border-radius:18px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}.fcb-dynamic.active{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.22)}.fcb-dyn-title{font-size:11px;font-weight:900;letter-spacing:.12em}.fcb-dyn-grid{grid-template-columns:repeat(4,1fr);margin-top:10px}.fcb-decision{margin-top:14px;text-align:center;font-size:15px;font-weight:900}.fcb-note{text-align:center;font-size:10px;opacity:.48;margin-top:6px}@media(max-width:700px){.fcb-grid{grid-template-columns:repeat(2,1fr)}.fcb-dyn-grid{grid-template-columns:repeat(2,1fr)}.fcb-sync{grid-template-columns:1fr}}
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: button
+                    entity: '[[foxcat:boiler.user_start]]'
+                    name: Démarrer
+                    icon: mdi:play-circle-outline
+                    tap_action:
+                      action: call-service
+                      service: button.press
+                      service_data:
+                        entity_id: '[[foxcat:boiler.user_start]]'
+                  - type: button
+                    entity: '[[foxcat:boiler.user_stop]]'
+                    name: Arrêter
+                    icon: mdi:stop-circle-outline
+                    tap_action:
+                      action: call-service
+                      service: button.press
+                      service_data:
+                        entity_id: '[[foxcat:boiler.user_stop]]'
+                  - type: button
+                    entity: '[[foxcat:boiler.user_auto]]'
+                    name: Automatique
+                    icon: mdi:autorenew
+                    tap_action:
+                      action: call-service
+                      service: button.press
+                      service_data:
+                        entity_id: '[[foxcat:boiler.user_auto]]'
+              - type: entities
+                title: Pilotage & cohérence EMS
+                show_header_toggle: false
+                state_color: true
+                entities:
+                  - entity: '[[foxcat:ems.mode]]'
+                    name: Mode EMS
+                  - entity: '[[foxcat:pricing.regime]]'
+                    name: Régime tarifaire
+                  - entity: '[[foxcat:pricing.network_policy]]'
+                    name: Politique réseau
+                  - entity: '[[foxcat:pricing.day_ahead.threshold]]'
+                    name: Seuil prix très favorable
+                  - entity: '[[foxcat:pricing.day_ahead.peak_threshold]]'
+                    name: Plafond prix Boiler Dynamic
+                  - entity: '[[foxcat:boiler.enabled]]'
+                    name: Gestion Boiler FoxCat
+                  - entity: '[[foxcat:boiler.climate]]'
+                    name: Chauffe-eau
+              - type: custom:apexcharts-card
+                graph_span: 24h
+                update_interval: 1min
+                now:
+                  show: true
+                  label: Maintenant
                 header:
-                  - width: 100%
-                time_now:
-                  - text-align: left
-                  - padding: 12px 6px
-                next_start:
-                  - text-align: center
-                  - padding: 12px
-                  - border-radius: 18px
-                  - background: rgba(255,255,255,.055)
-                temp:
-                  - text-align: center
-                  - padding: 12px
-                  - border-radius: 17px
-                  - background: rgba(255,255,255,.05)
-                heat_time:
-                  - text-align: center
-                  - padding: 12px
-                  - border-radius: 17px
-                  - background: rgba(255,255,255,.05)
-                temp_end:
-                  - text-align: center
-                  - padding: 12px
-                  - border-radius: 17px
-                  - background: rgba(255,255,255,.05)
-                end_hc:
-                  - text-align: center
-                  - padding: 8px
-                  - border-radius: 14px
-                  - background: rgba(255,255,255,.035)
-                failback:
-                  - text-align: center
-                  - padding: 14px
-                  - border-radius: 18px
-                  - background: rgba(255,255,255,.075)
-            extra_styles: |
-              .header-line {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-              }
-
-              .foxcat-title {
-                font-size: 18px;
-                font-weight: 850;
-                letter-spacing: .6px;
-              }
-
-              .phase {
-                margin-top: 4px;
-                font-size: 10px;
-                letter-spacing: 1.4px;
-                opacity: .55;
-              }
-
-              .mode {
-                padding: 7px 11px;
-                border-radius: 999px;
-                background: rgba(255,255,255,.08);
-                font-size: 10px;
-                font-weight: 750;
-                letter-spacing: .6px;
-              }
-
-              .main-value {
-                font-size: 38px;
-                font-weight: 850;
-                line-height: 1;
-                letter-spacing: -1.3px;
-              }
-
-              .main-label {
-                margin-top: 6px;
-                font-size: 9px;
-                opacity: .52;
-                letter-spacing: 1.1px;
-              }
-
-              .mini-value {
-                font-size: 19px;
-                font-weight: 800;
-                line-height: 1.1;
-              }
-
-              .mini-label {
-                margin-top: 5px;
-                font-size: 9px;
-                opacity: .5;
-                letter-spacing: .9px;
-              }
-
-              .fail-value {
-                font-size: 22px;
-                font-weight: 850;
-              }
-
-              .fail-label {
-                margin-top: 5px;
-                font-size: 10px;
-                opacity: .55;
-                letter-spacing: .5px;
-              }
-      - type: grid
-        cards:
-          - type: custom:button-card
-            entity: [[foxcat:boiler.climate]]
-            show_name: false
-            show_icon: false
-            show_state: false
-            custom_fields:
-              boiler: |
-                [[[
-                  const temp = Number(states['[[foxcat:boiler.temperature]]']?.state);
-                  const power = Number(states['[[foxcat:boiler.power]]']?.state);
-                  const physical = states['[[foxcat:boiler.physical]]']?.state === 'on';
-                  const demand = states['[[foxcat:boiler.demand]]']?.state || 'AUCUNE';
-                  const origin = states['[[foxcat:boiler.origin]]']?.state || 'AUCUNE';
-                  const exec = states['[[foxcat:boiler.execution_status]]']?.state || 'IDLE';
-                  const enabled = states['[[foxcat:boiler.enabled]]']?.state === 'on';
-                  const pv = Number(states['[[foxcat:energy.pv_power]]']?.state);
-                  const gridImport = Number(states['[[foxcat:energy.grid_import]]']?.state);
-                  const gridExport = Number(states['[[foxcat:energy.grid_export]]']?.state);
-                  const climate = states['[[foxcat:boiler.climate]]'];
-                  const target = Number(climate?.attributes?.temperature);
-                  const fmt = (v, unit, digits=0) => Number.isFinite(v) ? `${v.toFixed(digits)} ${unit}` : '—';
-                  const status = !enabled ? 'GESTION DÉSACTIVÉE' : physical ? 'CHAUFFE EN COURS' : demand !== 'AUCUNE' ? 'DEMANDE EN ATTENTE' : 'VEILLE';
-                  const accent = physical ? '#fb923c' : demand !== 'AUCUNE' ? '#facc15' : '#22d3ee';
-                  return `
-                    <div class="fcb-wrap">
-                      <div class="fcb-head">
-                        <div>
-                          <div class="fcb-title">BOILER</div>
-                          <div class="fcb-sub">FOXCAT ENERGY · REGISTRE NATIF</div>
-                        </div>
-                        <div class="fcb-state" style="color:${accent};border-color:${accent}55;background:${accent}12">${status}</div>
-                      </div>
-                      <div class="fcb-main">
-                        <div class="fcb-temp">${fmt(temp,'°C',1)}</div>
-                        <div class="fcb-target">Consigne ${fmt(target,'°C',1)}</div>
-                      </div>
-                      <div class="fcb-grid">
-                        <div class="fcb-cell"><span>Puissance</span><b>${fmt(power,'W')}</b></div>
-                        <div class="fcb-cell"><span>Demande</span><b>${demand}</b></div>
-                        <div class="fcb-cell"><span>Origine</span><b>${origin}</b></div>
-                        <div class="fcb-cell"><span>Exécution</span><b>${exec}</b></div>
-                        <div class="fcb-cell"><span>PV</span><b>${fmt(pv,'W')}</b></div>
-                        <div class="fcb-cell"><span>Réseau</span><b>${gridExport > 0 ? `−${fmt(gridExport,'W')}` : `+${fmt(gridImport,'W')}`}</b></div>
-                      </div>
-                    </div>`;
-                ]]]
-            styles:
-              card:
-                - padding: 0
-                - border-radius: 26px
-                - overflow: hidden
-                - background: linear-gradient(145deg, rgba(12,20,33,.98), rgba(7,12,21,.99))
-                - border: 1px solid rgba(255,255,255,.08)
-                - box-shadow: 0 18px 45px rgba(0,0,0,.28)
-              grid:
-                - grid-template-areas: '"boiler"'
-                - grid-template-columns: 1fr
-              custom_fields:
-                boiler:
-                  - width: 100%
-            extra_styles: |
-              .fcb-wrap{padding:20px;color:#fff}.fcb-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.fcb-title{font-size:22px;font-weight:900;letter-spacing:.08em}.fcb-sub{margin-top:4px;font-size:9px;letter-spacing:.16em;opacity:.45}.fcb-state{padding:7px 10px;border:1px solid;border-radius:999px;font-size:9px;font-weight:800;letter-spacing:.08em}.fcb-main{margin:20px 0 14px;display:flex;align-items:end;gap:12px}.fcb-temp{font-size:42px;font-weight:900;line-height:1}.fcb-target{padding-bottom:5px;font-size:11px;opacity:.55}.fcb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.fcb-cell{padding:11px;border-radius:15px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.055);display:flex;flex-direction:column;gap:5px}.fcb-cell span{font-size:8px;letter-spacing:.08em;text-transform:uppercase;opacity:.46}.fcb-cell b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-          - color: state
-            type: entities
-            title: Gestion Boiler ECS
-            show_header_toggle: false
-            entities:
-              - type: section
-                label: Températures & Stratification
-              - entity: [[foxcat:boiler.temperature_source]]
-                name: Température bas
-                icon: mdi:thermometer-low
-              - entity: [[foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature]]
-                name: Température milieu
-                icon: mdi:thermometer
-              - entity: [[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]
-                name: Delta stratification
-                icon: mdi:thermometer-lines
-              - entity: [[foxcat:legacy.sensor_garage_boiler_sonde_temperature_pente_boiler]]
-                name: Pente thermique
-                icon: mdi:chart-line
-              - type: section
-                label: Chauffe & Puissance
-              - entity: [[foxcat:boiler.climate]]
-                name: Chauffe-eau
-                icon: mdi:water-boiler
-              - entity: [[foxcat:boiler.power_source]]
-                name: Puissance réelle
-                icon: mdi:flash
-              - entity: [[foxcat:boiler.binary_source]]
-                name: Résistance en fonctionnement
-                icon: mdi:heating-coil
-              - entity: [[foxcat:legacy.switch_boiler_prise_1]]
-                name: Prise boiler
-                icon: mdi:power-socket-eu
-    subview: true
+                  show: true
+                  title: Boiler · températures & puissance
+                  show_states: true
+                  colorize_states: true
+                apex_config:
+                  chart:
+                    height: 320
+                    toolbar:
+                      show: true
+                  stroke:
+                    curve: smooth
+                  legend:
+                    show: true
+                    position: bottom
+                  xaxis:
+                    labels:
+                      datetimeUTC: false
+                yaxis:
+                  - id: temp
+                    decimals: 1
+                  - id: power
+                    opposite: true
+                    decimals: 0
+                series:
+                  - entity: '[[foxcat:boiler.temperature_source]]'
+                    name: Doigt de gant bas
+                    yaxis_id: temp
+                    stroke_width: 3
+                  - entity: '[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]'
+                    name: Moyenne ballon
+                    yaxis_id: temp
+                    stroke_width: 2
+                  - entity: '[[foxcat:boiler.power_source]]'
+                    name: Puissance
+                    yaxis_id: power
+                    type: area
+                    stroke_width: 2
+                    opacity: 0.14
     cards: []
-    title: Boiler ECS
-    show_icon_and_title: false
-    theme: ios-dark-mode-dark-blue-alternative
-    background:
-      opacity: 100
-      alignment: center
-      size: cover
-      repeat: repeat
-      attachment: fixed
-      image:
-        media_content_id: media-source://image_upload/fadc608e811683f9ac1563ad367be7d1
-        media_content_type: image/png
-        metadata:
-          title: 1000009922.png
-          thumbnail: /api/image/serve/fadc608e811683f9ac1563ad367be7d1/256x256
-          media_class: image
-          children_media_class: null
-          navigateIds:
-            - {}
-            - media_content_type: app
-              media_content_id: media-source://image_upload
   - type: sections
     max_columns: 4
     title: Appareils
@@ -17818,13 +16364,13 @@ views:
                         '#fb7185'
                       ],
 
-                    'ECS solaire':
+                    'Bihoraire':
                       [
                         '♨️',
                         '#fb923c'
                       ],
 
-                    'Prix dynamique':
+                    'Dynamique':
                       [
                         '📈',
                         '#a78bfa'
@@ -20680,6 +19226,12 @@ views:
             show_header_toggle: false
             state_color: true
             entities:
+              - entity: '[[foxcat:ems.mode]]'
+                name: Mode EMS
+              - entity: '[[foxcat:pricing.regime]]'
+                name: Régime tarifaire
+              - entity: '[[foxcat:pricing.network_policy]]'
+                name: Politique réseau
               - entity: '[[foxcat:pricing.day_ahead.threshold]]'
                 name: Seuil prix favorable
               - entity: '[[foxcat:pricing.day_ahead.peak_threshold]]'
