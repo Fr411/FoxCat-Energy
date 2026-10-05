@@ -9,9 +9,9 @@ from .const import (
     DYNAMIC_ARBITRAGE_HORIZON_HOURS,
     DYNAMIC_POSITION_HIGH,
     DYNAMIC_POSITION_LOW,
-    MODE_DYNAMIC,
     NETWORK_POLICY_COMPENSATION,
     TARIFF_DYNAMIC,
+    TARIFF_FIXED,
     TARIFF_TOU,
 )
 from .engine.models import EnergySnapshot
@@ -61,6 +61,7 @@ class EconomicDecision:
     boiler_reserved_avg_price_eur_kwh: float | None = None
     boiler_charge_now: bool = False
     boiler_comfort_priority: bool = False
+    boiler_comfort_needed: bool = False
     dynamic_fallback: bool = False
 
     def as_dict(self) -> dict[str, Any]:
@@ -455,14 +456,10 @@ def _evaluate_dynamic_market(
     amplitude = pmax - pmin
     index = 0.5 if amplitude <= 1e-9 else max(0.0, min(1.0, (current_buy - pmin) / amplitude))
     position_pct = index * 100.0
-    # Le nouveau seuil réglable 1.6.159 est strictement réservé au mode EMS
-    # Dynamique. Hors de ce mode, on conserve les bandes historiques 1.6.158.
-    if str(settings.get("mode")) == MODE_DYNAMIC:
-        low_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
-        high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 70.0))))
-    else:
-        low_pct = DYNAMIC_POSITION_LOW * 100.0
-        high_pct = DYNAMIC_POSITION_HIGH * 100.0
+    # V1.7.0 : les seuils Day-Ahead appartiennent au contrat Dynamique, pas au
+    # comportement Éco/Confort.
+    low_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
+    high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 65.0))))
     low = low_pct / 100.0
     high = high_pct / 100.0
     if index <= low:
@@ -504,7 +501,7 @@ def _evaluate_dynamic_market(
     temp_c = thermal.get("measured_temp_c")
     start_c = thermal.get("comfort_min_c")
     element_w = max(float(thermal.get("element_power_w") or settings.get("boiler_power_w", 1800.0)), 1.0)
-    comfort_priority = (
+    comfort_needed = (
         isinstance(temp_c, (int, float))
         and isinstance(start_c, (int, float))
         and float(temp_c) < float(start_c)
@@ -537,8 +534,6 @@ def _evaluate_dynamic_market(
         charge_now = True
     if energy_missing > 0 and solar_only_now:
         charge_now = True
-    if comfort_priority:
-        charge_now = True
 
     common = dict(
         regime=TARIFF_DYNAMIC,
@@ -566,7 +561,10 @@ def _evaluate_dynamic_market(
         boiler_reserved_end=reserved_end,
         boiler_reserved_avg_price_eur_kwh=reserved_avg,
         boiler_charge_now=charge_now,
-        boiler_comfort_priority=comfort_priority,
+        # 1.7.0 : un simple manque de confort n'est plus une priorité absolue.
+        # Le moteur Boiler flexible décide selon confiance sondes, solaire et contrat.
+        boiler_comfort_priority=False,
+        boiler_comfort_needed=comfort_needed,
         boiler_effective_cost_eur_h=boiler_effective_cost_h,
         boiler_grid_power_needed_w=boiler_grid_needed_w,
     )
@@ -587,12 +585,6 @@ def _evaluate_dynamic_market(
         + f", avantage autoconsommation {self_consumption_advantage:.3f} €/kWh."
     )
 
-    if comfort_priority:
-        return EconomicDecision(
-            code="ECS_PRIORITAIRE", label="Priorité confort ECS",
-            reason="Température ECS sous le minimum : charge prioritaire." + finance + reservation,
-            flexible_start=False, prefer_self_consumption=True, prefer_export=False, **common,
-        )
     if band == "BAS":
         return EconomicDecision(
             code="DYNAMIC_BAS", label="Prix Day-Ahead favorable",
@@ -674,6 +666,27 @@ def evaluate_market(
             now=now, snapshot=snapshot, prices=prices, settings=settings,
             import_points=import_points, export_points=list(export_points or []), current_buy=current_buy,
             export_value=export_value, boiler_thermal=boiler_thermal,
+        )
+
+    # ---------------- CONTRAT FIXE / MONOHORAIRE ----------------
+    # Aucune pseudo-période HP/HC ne doit apparaître ici. Le prix d'achat est
+    # constant ; FoxCat arbitre seulement l'autoconsommation, l'export et les
+    # contraintes de distribution indépendantes (Impact, capacité, etc.).
+    if regime == TARIFF_FIXED:
+        has_surplus = snapshot.export_w >= surplus_min
+        prefer_export = bool(
+            has_surplus and export_value is not None
+            and export_value > current_buy + export_margin
+        )
+        prefer_self = bool(
+            has_surplus and (export_value is None or export_value <= current_buy + export_margin)
+        )
+        return EconomicDecision(
+            "FIXE", "Contrat fixe — charge flexible disponible",
+            "Prix d'achat constant : aucun report HP/HC n'est appliqué ; "
+            "les contraintes de distribution et le surplus solaire restent pris en compte.",
+            regime, "HAUTE", True, prefer_self, prefer_export, current_buy, export_value,
+            current_buy, now, 0.0, horizon, forecast_count, application="CONTRAT_FIXE",
         )
 
     # ---------------- HP/HC BASELINE (unchanged V1.6.156 semantics) ----------------
@@ -773,11 +786,9 @@ def recommend_flexible_load(
     # New relative-index rules apply to DYNAMIC only and only when enabled.
     if str(prices.get("regime")) == TARIFF_DYNAMIC and bool(settings.get("predictive_pricing_enabled", True)):
         market = market_decision or {}
-        if bool(market.get("boiler_comfort_priority")) or (
-            bool(market.get("boiler_charge_now")) and float(market.get("boiler_energy_missing_kwh") or 0.0) > 0
-        ):
-            allow, decision, label = False, "PRIORITE_ECS", "Reporter — priorité confort ECS"
-            reason = "Le créneau courant est réservé au besoin thermique minimal du Boiler; les charges secondaires attendent."
+        if bool(market.get("boiler_charge_now")) and float(market.get("boiler_energy_missing_kwh") or 0.0) > 0:
+            allow, decision, label = False, "RESERVATION_BOILER", "Reporter — créneau Boiler réservé"
+            reason = "Le créneau courant est réservé au Boiler par le planificateur Day-Ahead; les charges secondaires attendent."
         else:
             band = str(market.get("dynamic_price_band") or "")
             full_surplus = snapshot.export_w >= max(avg_power_w, 1.0)

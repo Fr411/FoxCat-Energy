@@ -5,7 +5,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, MODE_MANUAL, MODES, TARIFF_REGIMES, NETWORK_POLICIES, NETWORK_POLICY_COMPENSATION
+from .const import (
+    DOMAIN, MODE_ECO, MODE_MANUAL, MODES, TARIFF_REGIMES, NETWORK_POLICIES,
+    NETWORK_POLICY_BILLED_EXPORT, DISTRIBUTION_PROFILES, DISTRIBUTION_WALLONIA_TOU,
+)
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 
@@ -17,6 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatModeSelect(coordinator),
             FoxCatTariffRegimeSelect(coordinator),
             FoxCatNetworkPolicySelect(coordinator),
+            FoxCatDistributionProfileSelect(coordinator),
             FoxCatPriManualLevelSelect(coordinator),
         ]
     )
@@ -31,7 +35,7 @@ class FoxCatModeSelect(FoxCatEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         value = str(self.coordinator.settings.get("mode"))
-        return value if value in MODES else MODE_MANUAL
+        return value if value in MODES else MODE_ECO
 
     async def async_select_option(self, option: str) -> None:
         if option not in MODES:
@@ -43,7 +47,7 @@ class FoxCatTariffRegimeSelect(FoxCatEntity, SelectEntity):
     _attr_options = TARIFF_REGIMES
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "regime_tarifaire", "Régime tarifaire", "mdi:cash-sync", "pricing")
+        super().__init__(coordinator, "regime_tarifaire", "Contrat énergie", "mdi:cash-sync", "pricing")
 
     @property
     def current_option(self) -> str | None:
@@ -64,13 +68,30 @@ class FoxCatNetworkPolicySelect(FoxCatEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("network_policy", NETWORK_POLICY_COMPENSATION))
-        return value if value in NETWORK_POLICIES else NETWORK_POLICY_COMPENSATION
+        value = str(self.coordinator.settings.get("network_policy", NETWORK_POLICY_BILLED_EXPORT))
+        return value if value in NETWORK_POLICIES else NETWORK_POLICY_BILLED_EXPORT
 
     async def async_select_option(self, option: str) -> None:
         if option not in NETWORK_POLICIES:
             return
         await self.coordinator.async_set_setting("network_policy", option)
+
+
+class FoxCatDistributionProfileSelect(FoxCatEntity, SelectEntity):
+    _attr_options = DISTRIBUTION_PROFILES
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "profil_distribution", "Profil distribution Belgique", "mdi:transmission-tower-export", "pricing")
+
+    @property
+    def current_option(self) -> str | None:
+        value = str(self.coordinator.settings.get("distribution_profile", DISTRIBUTION_WALLONIA_TOU))
+        return value if value in DISTRIBUTION_PROFILES else DISTRIBUTION_WALLONIA_TOU
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in DISTRIBUTION_PROFILES:
+            return
+        await self.coordinator.async_set_setting("distribution_profile", option)
 
 
 class FoxCatPriManualLevelSelect(FoxCatEntity, SelectEntity):

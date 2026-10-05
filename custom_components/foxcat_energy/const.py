@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.6.160"
+VERSION = "1.7.0"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "button"]
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
@@ -14,7 +14,7 @@ OFFICIAL_SECTION_ORDER = (
     "Energy Bus",
     "Machines",
     "Boiler",
-    "Tarification",
+    "Configuration réseau",
     "Métronome",
     "Diagnostic",
 )
@@ -26,7 +26,7 @@ OFFICIAL_MENU_STEPS = (
     "energy_bus",
     "machines",
     "boiler",
-    "pricing",
+    "network",
     "metronome",
     "diagnostic",
     "finish",
@@ -119,7 +119,6 @@ CONF_TARIFF_HP_PRICE_SENSOR = "tariff_hp_price_sensor"
 CONF_TARIFF_HC_PRICE_SENSOR = "tariff_hc_price_sensor"
 CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR = "tariff_fixed_injection_price_sensor"
 
-CONF_AI_TASK = "ai_task"
 CONF_FORECAST_NOW = "forecast_now"
 CONF_FORECAST_THIS_HOUR = "forecast_this_hour"
 CONF_FORECAST_NEXT_HOUR = "forecast_next_hour"
@@ -132,43 +131,82 @@ CONF_FORECAST_PEAK_TODAY = "forecast_peak_today"
 CONF_FORECAST_TOMORROW = "forecast_tomorrow"
 CONF_FORECAST_PEAK_TOMORROW = "forecast_peak_tomorrow"
 
-MODE_ECO = "Économie énergie"
-MODE_ZERO = "Zéro injection"
-MODE_BIHORAIRE = "Bihoraire"
-# Symbole historique conservé dans le code : il pointe désormais vers le mode
-# Bihoraire afin de préserver le moteur HP/HC validé sans dupliquer sa logique.
-MODE_ECS = MODE_BIHORAIRE
-MODE_DYNAMIC = "Dynamique"
+MODE_ECO = "Éco"
+MODE_COMFORT = "Confort"
 MODE_MANUAL = "Manuel"
-MODES = [MODE_ECO, MODE_ZERO, MODE_BIHORAIRE, MODE_DYNAMIC, MODE_MANUAL]
+MODES = [MODE_ECO, MODE_COMFORT, MODE_MANUAL]
 
-TARIFF_DYNAMIC = "Dynamique"
+# Compatibilité de migration 1.6.x. Ces libellés ne sont plus des comportements
+# moteur en 1.7.0 : le contrat, le comptage et la politique réseau sont séparés.
+LEGACY_MODE_ECO = "Économie énergie"
+LEGACY_MODE_ZERO = "Zéro injection"
+LEGACY_MODE_BIHORAIRE = "Bihoraire"
+LEGACY_MODE_DYNAMIC = "Dynamique"
+LEGACY_MODE_ECS_SOLAR = "ECS solaire"
+
+# Symboles 1.6.x conservés uniquement pour le code de migration/rollback.
+MODE_ZERO = LEGACY_MODE_ZERO
+MODE_BIHORAIRE = LEGACY_MODE_BIHORAIRE
+MODE_ECS = LEGACY_MODE_BIHORAIRE
+MODE_DYNAMIC = LEGACY_MODE_DYNAMIC
 TARIFF_COMPENSATION = "Compensation"
+
+TARIFF_FIXED = "Fixe / Monohoraire"
 TARIFF_TOU = "Bi-horaire HP/HC"
-TARIFF_REGIMES = [TARIFF_TOU, TARIFF_DYNAMIC]
+TARIFF_DYNAMIC = "Dynamique"
+TARIFF_REGIMES = [TARIFF_FIXED, TARIFF_TOU, TARIFF_DYNAMIC]
+
+# Profil de distribution/comptage belge. Il est volontairement indépendant du
+# contrat de fourniture d'énergie. Les profils décrivent la structure réseau ;
+# les montants restent fournis par les intégrations tarifaires du client.
+DISTRIBUTION_WALLONIA_SINGLE = "Wallonie · Monohoraire"
+DISTRIBUTION_WALLONIA_TOU = "Wallonie · Bihoraire 2026"
+DISTRIBUTION_WALLONIA_IMPACT = "Wallonie · Impact"
+DISTRIBUTION_WALLONIA_NIGHT = "Wallonie · Exclusif nuit (piloté GRD)"
+DISTRIBUTION_FLANDERS_STANDARD = "Flandre · Standard"
+DISTRIBUTION_FLANDERS_CAPACITY = "Flandre · Capacité"
+DISTRIBUTION_BRUSSELS_SINGLE = "Bruxelles · Monohoraire"
+DISTRIBUTION_BRUSSELS_TOU = "Bruxelles · Bihoraire"
+DISTRIBUTION_PROFILES = [
+    DISTRIBUTION_WALLONIA_SINGLE,
+    DISTRIBUTION_WALLONIA_TOU,
+    DISTRIBUTION_WALLONIA_IMPACT,
+    DISTRIBUTION_WALLONIA_NIGHT,
+    DISTRIBUTION_FLANDERS_STANDARD,
+    DISTRIBUTION_FLANDERS_CAPACITY,
+    DISTRIBUTION_BRUSSELS_SINGLE,
+    DISTRIBUTION_BRUSSELS_TOU,
+]
 
 NETWORK_POLICY_COMPENSATION = "Compensation"
 NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"
+NETWORK_POLICY_ZERO_INJECTION = "Zéro injection"
 NETWORK_POLICY_LEGACY_BILLED_EXPORT = "Injection facturée"
-NETWORK_POLICIES = [NETWORK_POLICY_COMPENSATION, NETWORK_POLICY_BILLED_EXPORT]
+NETWORK_POLICIES = [
+    NETWORK_POLICY_BILLED_EXPORT,
+    NETWORK_POLICY_COMPENSATION,
+    NETWORK_POLICY_ZERO_INJECTION,
+]
+
 MODE_ALIASES = {
     "Economie énergie": MODE_ECO,
     "Économie énergie": MODE_ECO,
-    "Zéro injection": MODE_ZERO,
-    "Réinjection refusée": MODE_ZERO,
-    "ECS solaire": MODE_BIHORAIRE,
-    "Bihoraire": MODE_BIHORAIRE,
-    "Bi-horaire": MODE_BIHORAIRE,
-    "HP/HC": MODE_BIHORAIRE,
-    "Prix dynamique": MODE_DYNAMIC,
-    "Dynamique": MODE_DYNAMIC,
-    "Tarification dynamique": MODE_DYNAMIC,
-    # Migration volontaire : le mode Confort disparaît en V1.2.0.
-    # Un ancien réglage Confort est ramené en Manuel pour ne déclencher
-    # aucune stratégie automatique sans choix explicite de l'utilisateur.
-    "Confort": MODE_MANUAL,
+    "Éco": MODE_ECO,
+    "Eco": MODE_ECO,
+    "Confort": MODE_COMFORT,
     "Manuel": MODE_MANUAL,
-    "Maxi solaire": MODE_BIHORAIRE,
+    # Les anciens modes tarifaires deviennent Éco ; leur contexte tarifaire est
+    # migré séparément dans le coordinateur.
+    "Zéro injection": MODE_ECO,
+    "Réinjection refusée": MODE_ECO,
+    "ECS solaire": MODE_ECO,
+    "Bihoraire": MODE_ECO,
+    "Bi-horaire": MODE_ECO,
+    "HP/HC": MODE_ECO,
+    "Prix dynamique": MODE_ECO,
+    "Dynamique": MODE_ECO,
+    "Tarification dynamique": MODE_ECO,
+    "Maxi solaire": MODE_ECO,
     "Réinjection autorisée": MODE_ECO,
 }
 
@@ -212,7 +250,6 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "washer_enabled": True,
     "dryer_enabled": True,
     "dishwasher_enabled": True,
-    "solar_advisor_enabled": True,
     "dynamic_negative_price_charge_enabled": True,
     "economic_optimizer_enabled": True,
     "predictive_pricing_enabled": True,
@@ -222,7 +259,9 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
     "tariff_regime": TARIFF_TOU,
-    "network_policy": NETWORK_POLICY_COMPENSATION,
+    "distribution_profile": DISTRIBUTION_WALLONIA_TOU,
+    "network_policy": NETWORK_POLICY_BILLED_EXPORT,
+    "comfort_relaxation_pct": 10.0,
     "tariff_fixed_injection_eur_kwh": 0.0,
     "tariff_hp_start_1": "07:00:00",
     "tariff_hp_end_1": "11:00:00",
@@ -233,6 +272,10 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "boiler_temp_normal_c": 45.0,
     "boiler_temp_boost_c": 65.0,
     "boiler_temp_safety_c": 68.0,
+    "boiler_sensor_top_offset_c": 0.0,
+    "boiler_sensor_heat_bias_seconds": 900.0,
+    "boiler_draw_drop_c": 2.5,
+    "boiler_fallback_min_confidence_pct": 35.0,
     "boiler_cycle_min_s": 120.0,
     "ack_tolerance_w": 400.0,
     "stability_tolerance_w": 500.0,
@@ -295,6 +338,10 @@ NUMBER_DEFINITIONS = {
     "boiler_temp_normal_c": ("Température confort boiler", 35, 65, 0.5, "°C", "mdi:thermometer"),
     "boiler_temp_boost_c": ("Température boost solaire", 45, 70, 0.5, "°C", "mdi:thermometer-plus"),
     "boiler_temp_safety_c": ("Sécurité température boiler", 50, 80, 0.5, "°C", "mdi:thermometer-alert"),
+    "boiler_sensor_top_offset_c": ("Correction sonde haute boiler", -10, 10, 0.5, "°C", "mdi:thermometer-lines"),
+    "boiler_sensor_heat_bias_seconds": ("Durée influence résistance sur sonde basse", 60, 3600, 60, "s", "mdi:timer-sand"),
+    "boiler_draw_drop_c": ("Chute rapide détectant un puisage ECS", 0.5, 10, 0.5, "°C", "mdi:water-pump"),
+    "boiler_fallback_min_confidence_pct": ("Confiance minimale fallback boiler", 0, 100, 5, "%", "mdi:shield-check-outline"),
     "boiler_cycle_min_s": ("Cycle minimum boiler", 30, 600, 10, "s", "mdi:timer-lock"),
     "ack_tolerance_w": ("Tolérance ACK", 50, 3000, 50, "W", "mdi:check-decagram-outline"),
     "stability_tolerance_w": ("Tolérance stabilité T0/T1", 50, 3000, 50, "W", "mdi:chart-bell-curve-cumulative"),
@@ -337,7 +384,8 @@ NUMBER_DEFINITIONS = {
     "solar_window_min_minutes": ("Durée minimale fenêtre solaire", 5, 240, 5, "min", "mdi:timeline-clock-outline"),
     "dynamic_price_significant_delta": ("Écart de prix significatif", 0, 1, 0.001, "€/kWh", "mdi:cash-sync"),
     "dynamic_favorable_position_pct": ("Seuil prix favorable Day-Ahead", 5, 60, 1, "%", "mdi:tune-variant"),
-    "dynamic_high_position_pct": ("Seuil zone pic Day-Ahead", 60, 95, 1, "%", "mdi:chart-line-variant"),
+    "dynamic_high_position_pct": ("Plafond prix acceptable Day-Ahead", 40, 95, 1, "%", "mdi:chart-line-variant"),
+    "comfort_relaxation_pct": ("Assouplissement économique mode Confort", 0, 30, 1, "%", "mdi:sofa-outline"),
     "dynamic_injection_lucrative_threshold": ("Seuil injection rémunératrice", -1, 1, 0.0001, "€/kWh", "mdi:cash-plus"),
     "dynamic_grid_charge_threshold_eur_kwh": ("Seuil charge réseau prix négatif", -1, 0, 0.001, "€/kWh", "mdi:transmission-tower-import"),
     "economic_horizon_hours": ("Horizon comparateur économique", 1, 48, 1, "h", "mdi:timeline-clock-outline"),
@@ -361,7 +409,6 @@ SWITCH_DEFINITIONS = {
     "washer_enabled": ("Gestion lave-linge", "mdi:washing-machine"),
     "dryer_enabled": ("Gestion sèche-linge", "mdi:tumble-dryer"),
     "dishwasher_enabled": ("Gestion lave-vaisselle", "mdi:dishwasher"),
-    "solar_advisor_enabled": ("Analyse prédictive IA", "mdi:brain"),
     "dynamic_negative_price_charge_enabled": ("Charge réseau si prix dynamique négatif", "mdi:transmission-tower-import"),
     "economic_optimizer_enabled": ("Optimisation économique des charges flexibles", "mdi:finance"),
     "predictive_pricing_enabled": ("Prédictif prix dynamique", "mdi:chart-timeline-variant-shimmer"),

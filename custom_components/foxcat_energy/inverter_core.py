@@ -7,6 +7,7 @@ from .const import TARIFF_DYNAMIC
 
 NETWORK_COMPENSATION = "Compensation"
 NETWORK_BILLED_EXPORT = "Injection tarifée"
+NETWORK_ZERO_INJECTION = "Zéro injection"
 
 
 @dataclass(slots=True)
@@ -120,7 +121,8 @@ class InverterCore:
         # ne concerne que l'anticipation Day-Ahead, pas la valeur économique
         # instantanée de l'export.
         if (
-            dynamic_export_value_eur_kwh is not None
+            network_policy != NETWORK_ZERO_INJECTION
+            and dynamic_export_value_eur_kwh is not None
             and dynamic_export_value_eur_kwh > 0.0
         ):
             target = 100
@@ -135,7 +137,8 @@ class InverterCore:
         # Si la valeur d'export est négative, nulle ou indisponible, le moteur
         # prédictif ci-dessous conserve sa cible locale de quasi-zéro injection.
         # Injection tarifée : calcul prédictif du meilleur palier.
-        export_limit = max(float(settings.get("network_billed_export_max_w", 50.0)), 0.0)
+        zero_injection = network_policy == NETWORK_ZERO_INJECTION
+        export_limit = 0.0 if zero_injection else max(float(settings.get("network_billed_export_max_w", 50.0)), 0.0)
         import_target = max(float(settings.get("network_billed_import_target_w", 100.0)), 0.0)
         import_high = max(float(settings.get("network_billed_import_max_w", 250.0)), import_target)
         weight_import = max(float(settings.get("pri_weight_import", 1.0)), 0.01)

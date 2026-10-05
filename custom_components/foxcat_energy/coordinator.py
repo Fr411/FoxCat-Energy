@@ -24,7 +24,6 @@ from .const import (
     BOILER_HEAT_45,
     BOILER_NONE,
     BOILER_STOP,
-    CONF_AI_TASK,
     CONF_BOILER_BINARY,
     CONF_BOILER_CLIMATE,
     CONF_BOILER_POWER_SENSOR,
@@ -113,9 +112,17 @@ from .const import (
     MODE_ALIASES,
     MODE_DYNAMIC,
     MODE_ECO,
+    MODE_COMFORT,
     MODE_ECS,
     MODE_MANUAL,
     MODE_ZERO,
+    LEGACY_MODE_DYNAMIC,
+    LEGACY_MODE_BIHORAIRE,
+    LEGACY_MODE_ZERO,
+    LEGACY_MODE_ECS_SOLAR,
+    TARIFF_FIXED,
+    DISTRIBUTION_WALLONIA_TOU,
+    NETWORK_POLICY_ZERO_INJECTION,
     PHASE_ACQUISITION,
     PHASE_DECISION,
     PHASE_WAIT_ACK,
@@ -128,14 +135,15 @@ from .const import (
     TARIFF_DYNAMIC,
     TARIFF_TOU,
 )
-from .engine import BoilerIntent, EnergySnapshot, SolarForecast, decide_dynamic, decide_zero, evaluate_mode
+from .engine import BoilerIntent, EnergySnapshot, SolarForecast, decide_dynamic, decide_zero
 from .engine.load_guard import (
     boiler_surplus_before_load_w,
     protected_cycle_boiler_allowed,
     protected_cycle_boiler_allowed_stable,
 )
-from .engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
-from .engine.tariff import price_status, tariff_boundaries, tariff_period
+from .engine.flexible_boiler import evaluate_flexible_boiler
+from .boiler_estimator import BoilerThermalEstimator
+from .engine.tariff import price_status, tariff_boundaries, tariff_period, distribution_period
 from .economic_optimizer import (
     PricePoint,
     build_hphc_points,
@@ -315,6 +323,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         self._loaded_existing_state = False
         self.accounting = EnergyAccounting()
+        self.boiler_estimator = BoilerThermalEstimator()
 
         super().__init__(
             hass,
@@ -486,15 +495,21 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for machine in self.machines:
             self.settings.setdefault(machine.setting_key, machine.automatic_default)
 
-        self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
-        # V1.6.160 : cohérence souveraine du couple Mode/Tarification.
-        # Une ancienne configuration est migrée silencieusement au démarrage.
-        if str(self.settings.get("mode")) == MODE_DYNAMIC:
+        # V1.7.0 : migration de l'ancien sélecteur polymorphe vers trois couches
+        # indépendantes : comportement, contrat énergie, politique réseau.
+        legacy_mode = str(self.settings.get("mode"))
+        if legacy_mode in {LEGACY_MODE_DYNAMIC, "Prix dynamique", "Tarification dynamique"}:
             self.settings["tariff_regime"] = TARIFF_DYNAMIC
             self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
-        elif str(self.settings.get("mode")) == MODE_ECS:  # MODE_ECS = Bihoraire (alias historique)
+        elif legacy_mode in {LEGACY_MODE_BIHORAIRE, LEGACY_MODE_ECS_SOLAR, "HP/HC", "Bi-horaire", "Maxi solaire"}:
             self.settings["tariff_regime"] = TARIFF_TOU
-            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
+            self.settings.setdefault("distribution_profile", DISTRIBUTION_WALLONIA_TOU)
+        elif legacy_mode in {LEGACY_MODE_ZERO, "Réinjection refusée"}:
+            self.settings["network_policy"] = NETWORK_POLICY_ZERO_INJECTION
+        self.settings["mode"] = MODE_ALIASES.get(legacy_mode, legacy_mode)
+        if self.settings["mode"] not in {MODE_ECO, MODE_COMFORT, MODE_MANUAL}:
+            self.settings["mode"] = MODE_ECO
+        self.settings.setdefault("distribution_profile", DISTRIBUTION_WALLONIA_TOU)
         self.metronome_state["period_s"] = float(self.settings.get("metronome_period_s", 30.0))
         self._register_listeners()
         await self.async_config_entry_first_refresh()
@@ -707,7 +722,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         for hour, minute in sorted(self._machine_schedule_boundaries()):
             self._unsubs.append(async_track_time_change(self.hass, self._on_machine_schedule, hour=hour, minute=minute, second=0))
 
-        # IA prédictive schedule.
+        # Prévision solaire déterministe.
         for hour, minute, label in (
             (7, 0, "STRATÉGIE JOUR - TRANSITION HP 07:00"),
             (10, 30, "CONFIRMATION SOLAIRE 10:30"),
@@ -1036,7 +1051,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data())
         if (
             bool(self.settings.get("regulation_active"))
-            and str(self.settings.get("mode")) == MODE_DYNAMIC
+            and str(self.settings.get("mode")) != MODE_MANUAL
             and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
         ):
             self.hass.async_create_task(self.async_reconcile_machines())
@@ -1154,14 +1169,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         boiler_on = boiler_binary or boiler_power > 200
         boiler_temp = self._float_state(self.config.get(CONF_BOILER_TEMP_SENSOR))
 
-        # V1.6.154 : la sonde placée sur la résistance est la référence de
-        # sécurité thermique lorsqu'elle est configurée et valide. La sonde
-        # boiler historique reste la référence de régulation ECS et le secours
-        # de sécurité pour garantir la compatibilité des installations existantes.
-        resistance_id = self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR)
-        resistance_temp = self._optional_float_state(resistance_id) if resistance_id else None
-        boiler_safety_temp = resistance_temp if resistance_temp is not None else boiler_temp
-        boiler_safety_source = "RESISTANCE" if resistance_temp is not None else "REFERENCE"
+        # V1.7.0 : câblage réel de l'installation de référence.
+        # CONF_BOILER_TEMP_SENSOR = doigt de gant BAS, proche de la résistance :
+        # il reste souverain pour la sécurité 68 °C mais est biaisé pendant la chauffe.
+        # CONF_BOILER_RESISTANCE_TEMP_SENSOR = sonde HAUTE en applique :
+        # moins précise en absolu, mais utile pour tendance/stratification/puisage.
+        top_id = self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR)
+        top_temp = self._optional_float_state(top_id) if top_id else None
+        boiler_safety_temp = boiler_temp
+        boiler_safety_source = "DOIGT_GANT_BAS"
 
         # La puissance physique onduleur est lue au moment du snapshot mais ne
         # cadence jamais EMS Core ni Onduleur Core. Le rôle de registre direct
@@ -1195,18 +1211,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             machine_active=machine_active,
             valid=valid,
             raw={
-                "boiler_resistance_temp_c": resistance_temp,
+                "boiler_resistance_temp_c": top_temp,
+                "boiler_top_contact_temp_c": top_temp,
+                "boiler_bottom_temp_c": boiler_temp,
                 "boiler_safety_source": boiler_safety_source,
                 "inverter_power_w": inverter_power,
             },
         )
 
     def _boiler_thermal_view(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
-        """Modèle thermique physique du Boiler, destiné à l'arbitrage DYNAMIQUE.
+        """Modèle thermique universel de la charge flexible Boiler.
 
-        Ce calcul est purement descriptif hors régime dynamique : il n'altère
-        ni HP/HC, ni les sécurités, ni la comptabilité. La constante 1.163
-        représente l'énergie en Wh nécessaire pour élever 1 litre d'eau de 1 °C.
+        L'estimation fusionne les deux sondes imparfaites avec l'état de chauffe.
+        La constante 1.163 représente l'énergie en Wh nécessaire pour élever
+        1 litre d'eau de 1 °C. Les sécurités physiques restent souveraines.
         """
         snap = snapshot or self.snapshot()
         try:
@@ -1226,7 +1244,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             cold_water_c = 15.0
 
         target_c = max(float(self.settings.get("boiler_temp_normal_c", 45.0)), 0.0)
-        measured_c = float(snap.boiler_temp_c)
+        estimate = self.boiler_estimator.update(
+            now=dt_util.now(),
+            bottom_c=float(snap.boiler_temp_c),
+            top_c=snap.raw.get("boiler_top_contact_temp_c"),
+            boiler_on=bool(snap.boiler_on),
+            settings=self.settings,
+        )
+        measured_c = float(estimate.effective_temp_c)
         delta_c = max(target_c - measured_c, 0.0)
         energy_missing_kwh = max(volume_l * 1.163 * delta_c / 1000.0, 0.0)
         heating_duration_h = (energy_missing_kwh / (element_power_w / 1000.0)) if element_power_w > 0 else None
@@ -1237,6 +1262,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "element_power_w": round(element_power_w, 3),
             "cold_water_temp_c": round(cold_water_c, 3),
             "measured_temp_c": round(measured_c, 3),
+            "estimated_temp_c": round(measured_c, 3),
+            "bottom_temp_c": estimate.bottom_c,
+            "top_contact_temp_c": estimate.top_c,
+            "estimate_confidence_pct": estimate.confidence_pct,
+            "draw_detected": estimate.draw_detected,
+            "thermal_state": estimate.state,
+            "estimate_reason": estimate.reason,
+            "bottom_weight": estimate.bottom_weight,
+            "top_weight": estimate.top_weight,
             "target_temp_c": round(target_c, 3),
             "comfort_min_c": float(self.settings.get("boiler_temp_start_c", 43.0)),
             "energy_missing_kwh": round(energy_missing_kwh, 5),
@@ -1306,13 +1340,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 export_value = -injection
             status = price_status(current, pmin, pmax, avg)
             model = "DYNAMIQUE"
-        else:
+        elif regime == TARIFF_TOU:
             active_buy = hp_price if period == "HP" else hc_price
             export_value = fixed_injection
             status = period
             model = "BIHORAIRE"
             if active_buy is None:
                 status = f"{status} · HIÉRARCHIE SANS PRIX"
+        else:
+            # Contrat fixe/monohoraire : on réutilise la source actuelle si elle
+            # existe, sinon la source HP comme valeur fournisseur générique.
+            active_buy = current if current is not None else hp_price
+            export_value = fixed_injection
+            status = "FIXE"
+            model = "FIXE"
 
         snap = self.snapshot()
         # Prix affichés génériques : le dashboard n'a plus à deviner le régime.
@@ -1322,10 +1363,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             next_buy = next_price
             active_label = "DYNAMIQUE"
             next_label = "HEURE SUIVANTE"
-        else:
+        elif regime == TARIFF_TOU:
             next_buy = hc_price if period == "HP" else hp_price
             active_label = period
             next_label = "HC" if period == "HP" else "HP"
+        else:
+            next_buy = active_buy
+            active_label = "FIXE"
+            next_label = "FIXE"
 
         import_cost_rate = (snap.import_w / 1000.0 * active_buy) if active_buy is not None else None
         export_value_rate = (snap.export_w / 1000.0 * export_value) if export_value is not None else None
@@ -1352,6 +1397,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "avg_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),
             "regime": regime,
             "period": period,
+            "distribution_profile": str(self.settings.get("distribution_profile", DISTRIBUTION_WALLONIA_TOU)),
+            "distribution_period": distribution_period(dt_util.now(), self.settings),
             "status": status,
             "cost_model": model,
             "active_buy": active_buy,
@@ -1408,6 +1455,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 prices.get("hc_price") if isinstance(prices.get("hc_price"), (int, float)) else None,
                 horizon_hours=horizon,
             )
+        if regime == TARIFF_FIXED:
+            value = prices.get("active_buy")
+            if not isinstance(value, (int, float)):
+                return []
+            return [PricePoint(now + timedelta(hours=hour), float(value), "FIXED_IMPORT") for hour in range(horizon + 1)]
 
         source_entity = self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
         series = self._economic_series_from_entity(
@@ -1434,12 +1486,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
-        if regime == TARIFF_TOU:
+        if regime in {TARIFF_TOU, TARIFF_FIXED}:
             value = prices.get("export_value")
             if not isinstance(value, (int, float)):
                 return []
+            source = "HP_HC_EXPORT" if regime == TARIFF_TOU else "FIXED_EXPORT"
             return [
-                PricePoint(now + timedelta(hours=hour), float(value), "HP_HC_EXPORT")
+                PricePoint(now + timedelta(hours=hour), float(value), source)
                 for hour in range(horizon + 1)
             ]
 
@@ -1519,7 +1572,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             point.at.date() > now.date() for point in import_points
         )
         scheduler_active = bool(
-            str(self.settings.get("mode")) == MODE_DYNAMIC
+            str(self.settings.get("mode")) != MODE_MANUAL
             and str(tariff.get("regime")) == TARIFF_DYNAMIC
             and bool(self.settings.get("economic_optimizer_enabled", True))
             and bool(self.settings.get("predictive_pricing_enabled", True))
@@ -1582,8 +1635,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         appel. Lorsque le kill-switch prédictif est coupé ou que le moteur est en
         repli standard, l'intention historique est restituée sans modification.
         """
-        if str(self.settings.get("mode")) != MODE_DYNAMIC:
-            return intent
         if str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC:
             return intent
         if not bool(self.settings.get("predictive_pricing_enabled", True)):
@@ -1773,21 +1824,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_set_mode(str(value))
             return
 
-        # V1.6.160 : tant que le mode EMS est Dynamique, son modèle financier
-        # ne peut pas diverger : tarif Dynamique + Injection tarifée. Le mode
-        # Bihoraire verrouille de la même façon le régime HP/HC historique.
-        active_mode = str(self.settings.get("mode"))
-        if active_mode == MODE_DYNAMIC:
-            if key == "tariff_regime":
-                value = TARIFF_DYNAMIC
-            elif key == "network_policy":
-                value = NETWORK_POLICY_BILLED_EXPORT
-        elif active_mode == MODE_ECS:
-            if key == "tariff_regime":
-                value = TARIFF_TOU
-            elif key == "network_policy":
-                value = NETWORK_POLICY_BILLED_EXPORT
-
+        # V1.7.0 : comportement, contrat, distribution et politique réseau sont
+        # indépendants. Aucun changement de comportement ne réécrit silencieusement
+        # une autre couche.
         self.settings[key] = value
 
         if key == "regulation_active":
@@ -1819,27 +1858,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_reconcile_machines()
 
         if key == "tariff_regime":
-            self.reset_core(f"Régime tarifaire modifié vers {value} : nouvelle acquisition demandée.")
-            if str(self.settings.get("mode")) == MODE_DYNAMIC:
-                if str(value) == TARIFF_DYNAMIC:
-                    self.settings["pri_enabled"] = True
-                else:
-                    self.settings["pri_enabled"] = False
-                    if self._pri_task and not self._pri_task.done():
-                        self._pri_task.cancel()
-                    if bool(self.settings.get("regulation_active")):
-                        await self.async_release_pri_100("Prix dynamique incompatible avec le régime tarifaire : onduleur libéré à 100 %.")
-                        if self.snapshot().boiler_on:
-                            await self.async_command_boiler(
-                                BOILER_STOP,
-                                "Régime tarifaire quitté : arrêt de la charge financière dynamique en cours.",
-                                "PRIX_BLOQUE",
-                            )
+            self.reset_core(f"Contrat énergie modifié vers {value} : nouvelle acquisition demandée.")
+            if str(value) != TARIFF_DYNAMIC and self.snapshot().boiler_on:
+                # On ne coupe pas brutalement une charge : le moteur flexible
+                # réévalue la situation à la trame suivante.
+                self.core_state["last_reason"] = "Contrat modifié : réévaluation Boiler à la prochaine trame."
 
         if key in {"predictive_pricing_enabled", "solar_forecast_arbitrage", "dynamic_favorable_position_pct", "dynamic_high_position_pct"}:
             # Réglages Day-Ahead dédiés au mode Dynamique : aucun effet sur HP/HC.
             if (
-                str(self.settings.get("mode")) == MODE_DYNAMIC
+                str(self.settings.get("mode")) != MODE_MANUAL
                 and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
             ):
                 self.reset_core(f"Option dynamique {key}={bool(value)} : nouvelle acquisition demandée.")
@@ -1868,53 +1896,32 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data())
 
     async def async_set_mode(self, mode: str) -> None:
-        canonical = MODE_ALIASES.get(mode, mode)
+        """Change uniquement le comportement moteur FoxCat 1.7.0.
+
+        Éco/Confort/Manuel ne modifient jamais le contrat, la distribution ou
+        la politique réseau. C'est la séparation architecturale majeure 1.7.0.
+        """
+        canonical = MODE_ALIASES.get(str(mode), str(mode))
+        if canonical not in {MODE_ECO, MODE_COMFORT, MODE_MANUAL}:
+            canonical = MODE_ECO
         self.settings["mode"] = canonical
-        self.reset_core(f"Mode EMS modifié vers {canonical}. Cycle ACK annulé et nouvelle acquisition demandée.")
+        self.reset_core(f"Comportement EMS modifié vers {canonical} : nouvelle acquisition demandée.")
         self.core_state["boiler_demand"] = BOILER_NONE
 
-        if self._pri_task and not self._pri_task.done():
-            self._pri_task.cancel()
-
         if canonical == MODE_MANUAL:
-            # Handover complet : pas de PRI, pas de planning machines, pas de
-            # stratégie boiler. Le fail-safe met seulement le PRI à 100 % au
-            # moment de la transition, puis l'utilisateur peut le forcer via
-            # le sélecteur manuel 0..100 %.
             self.settings["pri_enabled"] = False
+            if self._pri_task and not self._pri_task.done():
+                self._pri_task.cancel()
             if bool(self.settings.get("regulation_active")):
-                await self.async_release_pri_100("Mode Manuel : remise initiale PRI à 100 %, puis main à l'utilisateur.")
-            self.core_state["last_reason"] = "Mode Manuel : pilotages automatiques désactivés, sécurité thermique conservée."
-
-        elif canonical == MODE_ECS:
-            # MODE_ECS est l'alias interne historique du nouveau mode Bihoraire.
-            # Le moteur HP/HC validé est conservé intégralement ; seul le contexte
-            # tarifaire est synchronisé automatiquement.
-            self.settings["tariff_regime"] = TARIFF_TOU
-            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
-            self.settings["pri_enabled"] = False
-            if bool(self.settings.get("regulation_active")):
-                await self.async_release_pri_100("Mode Bihoraire : PRI libéré à 100 %, tarif HP/HC + Injection tarifée synchronisés.")
-                await self.async_reconcile_machines()
-            self.core_state["last_reason"] = "Mode Bihoraire actif : Bi-horaire HP/HC + Injection tarifée."
-
-        elif canonical == MODE_DYNAMIC:
-            # Invariant V1.6.160 demandé : sélectionner le mode Dynamique suffit.
-            self.settings["tariff_regime"] = TARIFF_DYNAMIC
-            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
+                await self.async_release_pri_100("Mode Manuel : onduleur libéré à 100 %.")
+            self.core_state["last_reason"] = "Mode Manuel : automatismes de charge suspendus, sécurités conservées."
+        else:
+            # Éco et Confort utilisent les mêmes moteurs physiques. Confort
+            # assouplit uniquement les seuils via comfort_relaxation_pct.
             self.settings["pri_enabled"] = True
             if bool(self.settings.get("regulation_active")):
-                await self.async_release_pri_100("Mode Dynamique : initialisation PRI à 100 %, tarif Dynamique + Injection tarifée synchronisés.")
                 await self.async_reconcile_machines()
-            self.core_state["last_reason"] = "Mode Dynamique actif : tarif Dynamique + Injection tarifée."
-
-        elif canonical in {MODE_ECO, MODE_ZERO}:
-            self.settings["pri_enabled"] = True
-            if bool(self.settings.get("regulation_active")):
-                # Repartir d'un état déterministe avant que la stratégie PRI
-                # du nouveau mode ne reprenne la main.
-                await self.async_release_pri_100(f"Mode {canonical} : initialisation PRI à 100 %.")
-                await self.async_reconcile_machines()
+            self.core_state["last_reason"] = f"Comportement {canonical} actif ; configuration réseau inchangée."
 
         await self._async_save()
         self.async_set_updated_data(self._build_data())
@@ -2276,45 +2283,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         mode = str(self.settings.get("mode"))
         user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
-        if user_override == "FORCE_ON":
-            if snapshot.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
-                intent = BoilerIntent(BOILER_STOP, "Utilisateur : démarrage Boiler bloqué par sécurité température.", "UTILISATEUR")
-            else:
-                intent = BoilerIntent(BOILER_HEAT_45, "Utilisateur : démarrage Boiler forcé.", "UTILISATEUR")
-        elif user_override == "FORCE_OFF":
-            intent = BoilerIntent(BOILER_STOP, "Utilisateur : arrêt Boiler forcé.", "UTILISATEUR")
-        else:
-            if mode == MODE_MANUAL:
-                self.reset_core("Mode Manuel : stratégies automatiques en sommeil, sécurités actives.")
-                return
-            tariff_context = self.prices()
-            solar_for_mode = self.solar_forecast
-            if (
-                mode == MODE_DYNAMIC
-                and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
-                and not bool(self.settings.get("solar_forecast_arbitrage", True))
-            ):
-                # Le kill-switch neutralise uniquement l'influence de la prévision
-                # solaire sur l'arbitrage DYNAMIQUE; la télémétrie IA reste intacte.
-                solar_for_mode = SolarForecast()
-            intent = evaluate_mode(
-                mode,
-                snapshot,
-                t0,
-                self.settings,
-                dt_util.now(),
-                self._boiler_on_seconds(),
-                str(self.core_state.get("boiler_demand", BOILER_NONE)),
-                tariff_context,
-                solar_for_mode,
-            )
-            if mode == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC:
-                # V1.6.160 : branche Boiler dédiée au Dynamique. L'ancienne
-                # méthode _apply_dynamic_boiler_arbitrage reste dans le code pour
-                # audit/rollback mais n'est plus appelée.
-                intent = evaluate_dynamic_boiler_v2(
-                    snapshot, intent, self.settings, self._economic_view(snapshot, prices=tariff_context)
-                )
+        if mode == MODE_MANUAL and user_override == "AUTO":
+            self.reset_core("Mode Manuel : charges flexibles automatiques en sommeil, sécurités actives.")
+            return
+        tariff_context = self.prices()
+        economic_view = self._economic_view(snapshot, prices=tariff_context)
+        thermal_view = economic_view.get("boiler_thermal", {})
+        intent = evaluate_flexible_boiler(
+            snapshot, self.settings, economic_view, dt_util.now(), thermal_view, user_override
+        )
 
         if (
             intent.origin != "UTILISATEUR"
@@ -2436,7 +2413,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             delta = power
         elif action == BOILER_HEAT_45:
             expected = reference - float(self.settings["boiler_power_w"])
-            pending = "ECS_MODULE_ON_45" if str(self.settings.get("mode")) == MODE_ECS else ("BOILER_ON_45_PRICE" if str(self.settings.get("mode")) == MODE_DYNAMIC else "BOILER_ON_45")
+            pending = "BOILER_FLEX_ON_45"
             delta = float(self.settings["boiler_power_w"])
         elif action == BOILER_BOOST_65:
             if snap.boiler_on:
@@ -2657,7 +2634,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         prices = self.prices()
         regime = str(self.settings.get("tariff_regime", TARIFF_TOU))
+        snap = self.snapshot()
+        # Le profil de distribution est indépendant du contrat énergie.
+        # Impact/PIC bloque les NOUVEAUX départs en Éco sauf surplus solaire ;
+        # les cycles déjà actifs restent protégés dans async_reconcile_machines.
+        if (
+            distribution_period(dt_util.now(), self.settings) == "PIC"
+            and str(self.settings.get("mode")) == MODE_ECO
+            and snap.export_w < float(self.settings.get("economic_solar_surplus_min_w", 250.0))
+        ):
+            return False
         if not bool(self.settings.get("economic_optimizer_enabled", True)):
+            if regime == TARIFF_FIXED:
+                return True
             if regime == TARIFF_DYNAMIC:
                 current = prices.get("current")
                 nxt = prices.get("next")
@@ -2673,7 +2662,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         view = economic_view or self._economic_view(self.snapshot(), prices=prices)
         if machine is not None:
-            if regime == TARIFF_DYNAMIC and str(self.settings.get("mode")) == MODE_DYNAMIC:
+            if regime == TARIFF_DYNAMIC and str(self.settings.get("mode")) != MODE_MANUAL:
                 plan = (view.get("day_ahead", {}).get("machines", {}) or {}).get(machine.machine_id)
                 if isinstance(plan, dict):
                     return bool(plan.get("allow_start_now", False))
@@ -3017,7 +3006,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         snap = self.snapshot()
         if (
             bool(self.settings.get("regulation_active"))
-            and str(self.settings.get("mode")) == MODE_DYNAMIC
+            and str(self.settings.get("mode")) != MODE_MANUAL
             and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
         ):
             # Un changement de prix doit pouvoir déclencher immédiatement le
@@ -3042,7 +3031,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._pv_below_since = None
             return
         mode = str(self.settings.get("mode"))
-        if mode not in {MODE_ECO, MODE_ZERO}:
+        if mode not in {MODE_ECO, MODE_COMFORT}:
             self._pv_below_since = None
             return
         pv = self._float_state(self.config.get(CONF_PV_SENSOR))
@@ -3102,10 +3091,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return age >= float(self.settings.get("pri_boiler_settle_s", 30.0))
 
     def _dynamic_tariff_ok(self) -> bool:
-        return not (
-            str(self.settings.get("mode")) == MODE_DYNAMIC
-            and str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC
-        )
+        return True
 
     def _maybe_start_pri(self, snapshot: EnergySnapshot) -> None:
         """Compatibilité 1.3.x : aucune horloge PRI indépendante en 1.3.200."""
@@ -3119,7 +3105,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not bool(self.settings.get("pri_enabled")):
             self.pri_state["guard_reason"] = "reduction_onduleur_desactivee"
             return False
-        if str(self.settings.get("mode")) not in {MODE_ECO, MODE_ZERO, MODE_DYNAMIC}:
+        if str(self.settings.get("mode")) not in {MODE_ECO, MODE_COMFORT}:
             self.pri_state["guard_reason"] = f"mode_{self.settings.get('mode')}"
             return False
         self.pri_state["guard_reason"] = "OK"
@@ -3479,48 +3465,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data(snap))
 
     async def async_analyze_solar(self, analysis_type: str = "RÉÉVALUATION MANUELLE") -> None:
-        if not bool(self.settings.get("solar_advisor_enabled")):
-            return
-        ai_entity = self.config.get(CONF_AI_TASK)
-        if ai_entity and self.hass.services.has_service("ai_task", "generate_data"):
-            try:
-                prompt = self._solar_prompt(analysis_type)
-                structure = {
-                    "decision": {"selector": {"select": {"options": ["OUI", "NON"]}}},
-                    "debut": {"selector": {"text": {}}},
-                    "fin": {"selector": {"text": {}}},
-                    "confiance": {"selector": {"number": {"min": 0, "max": 100, "step": 1}}},
-                    "potentiel": {"selector": {"select": {"options": ["Aucun", "Faible", "Moyen", "Bon", "Fort"]}}},
-                    "tendance": {"selector": {"select": {"options": ["NOUVELLE", "CONFIRMÉE", "DÉCALÉE", "DÉGRADÉE", "ANNULÉE"]}}},
-                    "justification": {"selector": {"text": {}}},
-                }
-                response = await self.hass.services.async_call(
-                    "ai_task",
-                    "generate_data",
-                    {"entity_id": ai_entity, "task_name": f"FoxCat IA - Prévision solaire - {analysis_type}", "instructions": prompt, "structure": structure},
-                    blocking=True,
-                    return_response=True,
-                )
-                payload = response.get("data", response) if isinstance(response, dict) else {}
-                decision = str(payload.get("decision", "NON"))
-                potential = str(payload.get("potentiel", "Aucun"))
-                trend = str(payload.get("tendance", "NOUVELLE"))
-                if decision in {"OUI", "NON"} and potential in {"Aucun", "Faible", "Moyen", "Bon", "Fort"} and trend in {"NOUVELLE", "CONFIRMÉE", "DÉCALÉE", "DÉGRADÉE", "ANNULÉE"}:
-                    self.solar_forecast = SolarForecast(
-                        available=decision == "OUI",
-                        start=str(payload.get("debut", "--:--")),
-                        end=str(payload.get("fin", "--:--")),
-                        confidence=max(0.0, min(100.0, float(payload.get("confiance", 0)))),
-                        potential=potential,
-                        trend=trend,
-                        reason=str(payload.get("justification", ""))[:255],
-                        raw=f"{decision} | {payload.get('debut','--:--')}-{payload.get('fin','--:--')} | {payload.get('confiance',0)}% | {potential} | {trend}",
-                    )
-                    await self._async_save()
-                    self.async_set_updated_data(self._build_data())
-                    return
-            except Exception as err:  # pragma: no cover
-                _LOGGER.warning("FoxCat IA : AI Task indisponible, fallback déterministe utilisé: %s", err)
+        """Actualise la prévision solaire sans service externe.
+
+        FoxCat 1.7.0 ne dépend plus d’un service externe : l’analyse est déterministe
+        et s’appuie uniquement sur les sources solaires configurées.
+        """
         self._deterministic_solar_fallback(analysis_type)
         await self._async_save()
         self.async_set_updated_data(self._build_data())
@@ -3567,7 +3516,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             eid = self.config.get(key)
             state = self.hass.states.get(eid) if eid else None
             return state.state if state else "indisponible"
-        return f"""Tu es le module IA prédictif solaire de FoxCat Energy. Tu es uniquement consultatif : ne commande aucun équipement et ne modifies aucune consigne. L’EMS FoxCat reste seul décisionnaire.
+        return f"""Tu es le module de prévision solaire de FoxCat Energy. Tu es uniquement consultatif : ne commande aucun équipement et ne modifies aucune consigne. L’EMS FoxCat reste seul décisionnaire.
 
 Analyse: {analysis_type}
 Date/heure: {dt_util.now().strftime('%d/%m/%Y %H:%M')}
