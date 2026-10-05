@@ -1,0 +1,861 @@
+title: FoxCat Energy 1.7.0
+views:
+  # ============================================================
+  # VUE PRINCIPALE — seule vue exposée dans la barre de navigation
+  # ============================================================
+  - title: FoxCat Energy
+    path: home
+    icon: mdi:home-lightning-bolt
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 12% 8%, rgba(255,155,38,.22), transparent 29%),
+      radial-gradient(circle at 88% 12%, rgba(0,205,255,.20), transparent 32%),
+      radial-gradient(circle at 48% 92%, rgba(0,105,190,.18), transparent 38%),
+      linear-gradient(145deg,#05080d 0%,#08111b 48%,#05070b 100%)
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            triggers_update:
+              - '[[foxcat:ems.mode]]'
+              - '[[foxcat:pricing.regime]]'
+              - '[[foxcat:pricing.distribution_profile]]'
+              - '[[foxcat:pricing.network_policy]]'
+              - '[[foxcat:ems.ack]]'
+            custom_fields:
+              content: |
+                [[[
+                  const s=id=>states[id];
+                  const mode=s('[[foxcat:ems.mode]]')?.state ?? '—';
+                  const contract=s('[[foxcat:pricing.regime]]')?.state ?? '—';
+                  const dist=s('[[foxcat:pricing.distribution_profile]]')?.state ?? '—';
+                  const policy=s('[[foxcat:pricing.network_policy]]')?.state ?? '—';
+                  const ack=s('[[foxcat:ems.ack]]')?.state ?? '—';
+                  return `<div class="foxcat-hero">
+                    <div class="brand">
+                      <div class="mark"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon></div>
+                      <div><div class="brand-name">FOXC<span>AT</span> ENERGY</div><div class="tag">INTELLIGENT BUILDING & ENERGY INTEGRATOR</div></div>
+                    </div>
+                    <div class="statusline"><span class="live"></span> EMS ${ack === 'NOK' ? 'À VÉRIFIER' : 'EN LIGNE'}</div>
+                    <div class="hero-grid">
+                      <div><small>COMPORTEMENT</small><b>${mode}</b></div>
+                      <div><small>CONTRAT ÉNERGIE</small><b>${contract}</b></div>
+                      <div><small>DISTRIBUTION</small><b>${dist}</b></div>
+                      <div><small>POLITIQUE RÉSEAU</small><b>${policy}</b></div>
+                    </div>
+                  </div>`;
+                ]]]
+            styles:
+              card:
+                - border-radius: 30px
+                - padding: 0
+                - overflow: hidden
+                - background: linear-gradient(125deg,rgba(8,13,20,.93),rgba(12,27,41,.89))
+                - border: 1px solid rgba(99,220,255,.16)
+                - box-shadow: 0 22px 70px rgba(0,0,0,.35)
+                - backdrop-filter: blur(18px)
+            extra_styles: |
+              .foxcat-hero{padding:28px;position:relative;overflow:hidden}
+              .foxcat-hero:before{content:"";position:absolute;width:290px;height:290px;border-radius:50%;background:rgba(255,153,34,.12);filter:blur(45px);left:-120px;top:-160px}
+              .foxcat-hero:after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:rgba(0,196,255,.11);filter:blur(55px);right:-130px;bottom:-190px}
+              .brand,.statusline,.hero-grid{position:relative;z-index:2}.brand{display:flex;align-items:center;gap:14px}.mark{width:52px;height:52px;border-radius:17px;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(255,158,36,.22),rgba(0,189,255,.18));border:1px solid rgba(255,255,255,.11)}.mark ha-icon{--mdc-icon-size:31px;color:#f5b44c}.brand-name{font-weight:950;font-size:24px;letter-spacing:.08em}.brand-name span{color:#5fd8ff}.tag{font-size:9px;opacity:.48;letter-spacing:.18em;margin-top:3px}.statusline{position:absolute;right:28px;top:31px;font-size:10px;font-weight:800;letter-spacing:.12em;opacity:.76}.live{display:inline-block;width:7px;height:7px;border-radius:50%;background:#50e3a4;box-shadow:0 0 12px #50e3a4;margin-right:7px}.hero-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:28px}.hero-grid>div{padding:13px 15px;border-radius:15px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.055)}small{font-size:8px;letter-spacing:.12em;opacity:.46}b{display:block;margin-top:5px;font-size:14px}@media(max-width:700px){.hero-grid{grid-template-columns:repeat(2,1fr)}.statusline{display:none}}
+
+      - type: grid
+        cards:
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            triggers_update:
+              - '[[foxcat:energy.pv_power]]'
+              - '[[foxcat:energy.house_power]]'
+              - '[[foxcat:energy.grid_import]]'
+              - '[[foxcat:energy.grid_export]]'
+            custom_fields:
+              content: |
+                [[[
+                  const n=id=>{const v=Number(states[id]?.state);return Number.isFinite(v)?Math.round(v):0};
+                  const pv=n('[[foxcat:energy.pv_power]]'), house=n('[[foxcat:energy.house_power]]'), imp=n('[[foxcat:energy.grid_import]]'), exp=n('[[foxcat:energy.grid_export]]');
+                  return `<div class="card-head"><span>FLUX ÉNERGIE</span><ha-icon icon="mdi:transmission-tower"></ha-icon></div>
+                    <div class="flow"><div class="pv"><i>☀</i><small>PV</small><b>${pv} W</b></div><div class="center"><ha-icon icon="mdi:home-lightning-bolt"></ha-icon><small>MAISON</small><b>${house} W</b></div><div class="grid"><i>↕</i><small>RÉSEAU</small><b>${imp>0?'+'+imp+' W':exp>0?'-'+exp+' W':'0 W'}</b></div></div>`;
+                ]]]
+            tap_action:
+              action: navigate
+              navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/energie`; ]]]'
+            styles:
+              card: &premium_card
+                - padding: 20px
+                - border-radius: 24px
+                - background: rgba(7,14,23,.84)
+                - border: 1px solid rgba(95,211,255,.12)
+                - backdrop-filter: blur(15px)
+                - box-shadow: 0 14px 42px rgba(0,0,0,.22)
+            extra_styles: |
+              .card-head{display:flex;justify-content:space-between;font-size:10px;font-weight:900;letter-spacing:.14em;opacity:.65}.flow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:18px;text-align:center}.flow>div{padding:13px 5px;border-radius:17px;background:rgba(255,255,255,.035)}.flow i{font-style:normal;font-size:25px;color:#f1b24a}.flow .center ha-icon{color:#64dfff;--mdc-icon-size:26px}.flow .grid i{color:#83a9ff}.flow small{display:block;margin-top:6px;font-size:8px;opacity:.45}.flow b{font-size:15px}
+
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            triggers_update:
+              - '[[foxcat:ems.reason]]'
+              - '[[foxcat:ems.phase]]'
+              - '[[foxcat:ems.ack]]'
+            custom_fields:
+              content: |
+                [[[
+                  const reason=states['[[foxcat:ems.reason]]']?.state ?? 'Aucune décision';
+                  const phase=states['[[foxcat:ems.phase]]']?.state ?? '—';
+                  const ack=states['[[foxcat:ems.ack]]']?.state ?? '—';
+                  return `<div class="decision"><div class="card-head"><span>DÉCISION EMS</span><span>${phase} · ${ack}</span></div><ha-icon icon="mdi:lightning-bolt-circle"></ha-icon><div class="reason">${reason}</div></div>`;
+                ]]]
+            styles:
+              card: *premium_card
+            extra_styles: |
+              .card-head{display:flex;justify-content:space-between;font-size:9px;font-weight:900;letter-spacing:.12em;opacity:.58}.decision>ha-icon{--mdc-icon-size:34px;color:#58d8ff;margin-top:19px}.reason{font-size:14px;font-weight:650;line-height:1.45;margin-top:10px;opacity:.92}
+
+      - type: grid
+        cards:
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            triggers_update:
+              - '[[foxcat:energy.today.pv]]'
+              - '[[foxcat:energy.today.house]]'
+              - '[[foxcat:energy.today.import]]'
+              - '[[foxcat:energy.today.export]]'
+              - '[[foxcat:pricing.net_today]]'
+            custom_fields:
+              content: |
+                [[[
+                  const f=(id,d=2)=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v.toFixed(d).replace('.',','):'—'};
+                  const cost=f('[[foxcat:pricing.net_today]]',2);
+                  return `<div class="card-head"><span>AUJOURD'HUI</span><span class="cost">${cost} € NET</span></div><div class="today"><div><small>PV</small><b>${f('[[foxcat:energy.today.pv]]')} kWh</b></div><div><small>MAISON</small><b>${f('[[foxcat:energy.today.house]]')} kWh</b></div><div><small>IMPORT</small><b>${f('[[foxcat:energy.today.import]]')} kWh</b></div><div><small>EXPORT</small><b>${f('[[foxcat:energy.today.export]]')} kWh</b></div></div>`;
+                ]]]
+            tap_action:
+              action: navigate
+              navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/energie`; ]]]'
+            styles:
+              card: *premium_card
+            extra_styles: |
+              .card-head{display:flex;justify-content:space-between;font-size:9px;font-weight:900;letter-spacing:.13em;opacity:.62}.cost{color:#64e1bb;opacity:1}.today{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:16px}.today>div{padding:11px;border-radius:14px;background:rgba(255,255,255,.035)}.today small{font-size:8px;opacity:.42}.today b{font-size:14px;margin-top:4px}
+
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            triggers_update:
+              - '[[foxcat:boiler.estimated_temperature]]'
+              - '[[foxcat:boiler.power]]'
+              - '[[foxcat:boiler.thermal_state]]'
+              - '[[foxcat:boiler.origin]]'
+            custom_fields:
+              content: |
+                [[[
+                  const f=id=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v.toFixed(1).replace('.',','):'—'};
+                  const st=states['[[foxcat:boiler.thermal_state]]']?.state ?? '—';
+                  const p=Number(states['[[foxcat:boiler.power]]']?.state)||0;
+                  const origin=states['[[foxcat:boiler.origin]]']?.state ?? '—';
+                  return `<div class="card-head"><span>CHARGE FLEXIBLE · BOILER</span><span>${p>100?'CHAUFFE':'ATTENTE'}</span></div><div class="boiler"><div class="ring"><ha-icon icon="mdi:water-boiler"></ha-icon><b>${f('[[foxcat:boiler.estimated_temperature]]')}°</b></div><div><small>ÉTAT THERMIQUE</small><strong>${st}</strong><small>ORIGINE DÉCISION</small><strong>${origin}</strong></div></div>`;
+                ]]]
+            tap_action:
+              action: navigate
+              navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/boiler`; ]]]'
+            styles:
+              card:
+                - padding: 20px
+                - border-radius: 24px
+                - background: linear-gradient(145deg,rgba(32,20,10,.86),rgba(9,15,22,.89))
+                - border: 1px solid rgba(255,176,69,.16)
+                - backdrop-filter: blur(15px)
+                - box-shadow: 0 14px 42px rgba(0,0,0,.22)
+            extra_styles: |
+              .card-head{display:flex;justify-content:space-between;font-size:9px;font-weight:900;letter-spacing:.12em;opacity:.62}.boiler{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:16px;margin-top:13px}.ring{height:86px;border-radius:28px;background:radial-gradient(circle,rgba(255,177,62,.18),rgba(255,255,255,.02));display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,180,69,.12)}.ring ha-icon{color:#ffc060;--mdc-icon-size:26px}.ring b{font-size:19px;margin-top:3px}.boiler small{display:block;font-size:8px;opacity:.43;margin:8px 0 2px}.boiler strong{display:block;font-size:12px}
+
+      - type: grid
+        cards:
+          - type: conditional
+            conditions:
+              - entity: '[[foxcat:pricing.regime]]'
+                state: Dynamique
+            card:
+              type: custom:button-card
+              show_name: false
+              show_icon: false
+              show_state: false
+              triggers_update:
+                - '[[foxcat:pricing.current]]'
+                - '[[foxcat:pricing.next]]'
+                - '[[foxcat:pricing.dynamic_curve_position]]'
+                - '[[foxcat:pricing.day_ahead.plan]]'
+              custom_fields:
+                content: |
+                  [[[
+                    const f=(id,d=3)=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v.toFixed(d).replace('.',','):'—'};
+                    const plan=states['[[foxcat:pricing.day_ahead.plan]]'];
+                    const remain=plan?.attributes?.temps_restant_creux || '—';
+                    const pos=f('[[foxcat:pricing.dynamic_curve_position]]',1);
+                    return `<div class="card-head"><span>DAY-AHEAD</span><span>DYNAMIC</span></div><div class="price">${f('[[foxcat:pricing.current]]')}<em> €/kWh</em></div><div class="daygrid"><div><small>H+1</small><b>${f('[[foxcat:pricing.next]]')}</b></div><div><small>POSITION</small><b>${pos} %</b></div><div class="wide"><small>CREUX &lt; SEUIL FAVORABLE</small><b>${remain === '—' ? 'Non actif' : remain + ' restantes'}</b></div></div>`;
+                  ]]]
+              tap_action:
+                action: navigate
+                navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/marche`; ]]]'
+              styles:
+                card:
+                  - padding: 20px
+                  - border-radius: 24px
+                  - background: linear-gradient(145deg,rgba(6,29,45,.9),rgba(7,13,22,.91))
+                  - border: 1px solid rgba(79,218,255,.18)
+                  - backdrop-filter: blur(15px)
+              extra_styles: |
+                .card-head{display:flex;justify-content:space-between;font-size:9px;font-weight:900;letter-spacing:.13em;opacity:.6}.price{font-size:30px;font-weight:900;margin:13px 0;color:#69ddff}.price em{font-size:11px;font-style:normal;opacity:.6}.daygrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.daygrid>div{padding:9px;border-radius:12px;background:rgba(255,255,255,.035)}.daygrid .wide{grid-column:1/-1}.daygrid small{font-size:8px;opacity:.42}.daygrid b{font-size:12px;margin-top:3px}
+
+          - type: custom:button-card
+            name: Ouvrir le configurateur EMS
+            icon: mdi:tune-variant
+            show_state: false
+            tap_action:
+              action: navigate
+              navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/technique`; ]]]'
+            styles:
+              card:
+                - height: 100%
+                - min-height: 128px
+                - border-radius: 24px
+                - background: linear-gradient(145deg,rgba(255,155,37,.10),rgba(0,195,255,.08)),rgba(7,13,21,.88)
+                - border: 1px solid rgba(255,255,255,.09)
+                - box-shadow: 0 14px 42px rgba(0,0,0,.20)
+              icon:
+                - color: '#f3b251'
+                - width: 34px
+              name:
+                - font-size: 13px
+                - font-weight: 800
+
+      - type: grid
+        column_span: 4
+        cards:
+          - type: grid
+            columns: 7
+            square: false
+            cards:
+              - &nav_energy
+                type: custom:button-card
+                name: Énergie
+                icon: mdi:lightning-bolt
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/energie`; ]]]'}
+                styles: &nav_style
+                  card: [border-radius: 18px, padding: 13px, background: 'rgba(8,16,25,.82)', border: '1px solid rgba(255,255,255,.07)']
+                  icon: [width: 25px, color: '#62dcff']
+                  name: [font-size: 10px, font-weight: 800]
+              - type: custom:button-card
+                name: Marché
+                icon: mdi:chart-timeline-variant-shimmer
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/marche`; ]]]'}
+                styles: *nav_style
+              - type: custom:button-card
+                name: Boiler
+                icon: mdi:water-boiler
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/boiler`; ]]]'}
+                styles: *nav_style
+              - type: custom:button-card
+                name: Appareils
+                icon: mdi:washing-machine
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/appareils`; ]]]'}
+                styles: *nav_style
+              - type: custom:button-card
+                name: Onduleur
+                icon: mdi:solar-power-variant
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/onduleur`; ]]]'}
+                styles: *nav_style
+              - type: custom:button-card
+                name: Technique
+                icon: mdi:tune-vertical-variant
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/technique`; ]]]'}
+                styles: *nav_style
+              - type: custom:button-card
+                name: Diagnostic
+                icon: mdi:stethoscope
+                tap_action: {action: navigate, navigation_path: '[[[ const b=window.location.pathname.replace(/\/[^\/]*$/, ""); return `${b}/diagnostic`; ]]]'}
+                styles: *nav_style
+
+  # ============================================================
+  # SOUS-VUE ÉNERGIE
+  # ============================================================
+  - title: Énergie
+    path: energie
+    icon: mdi:lightning-bolt
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 85% 5%, rgba(0,205,255,.25), transparent 30%),
+      radial-gradient(circle at 5% 95%, rgba(0,98,190,.20), transparent 35%),
+      linear-gradient(150deg,#04080d,#07131f 55%,#05080c)
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            name: ÉNERGIE · FLUX & COMPTABILITÉ
+            icon: mdi:lightning-bolt-circle
+            show_state: false
+            styles:
+              card: [padding: 22px, border-radius: 26px, background: 'linear-gradient(125deg,rgba(4,25,40,.9),rgba(8,13,21,.9))', border: '1px solid rgba(80,220,255,.17)']
+              name: [font-size: 18px, font-weight: 900, letter-spacing: .08em]
+              icon: [color: '#65dcff', width: 32px]
+      - type: grid
+        cards:
+          - type: entities
+            title: Puissances instantanées
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:energy.pv_power]]', name: Production PV}
+              - {entity: '[[foxcat:energy.house_power]]', name: Consommation maison}
+              - {entity: '[[foxcat:energy.grid_import]]', name: Prélèvement réseau}
+              - {entity: '[[foxcat:energy.grid_export]]', name: Réinjection réseau}
+              - {entity: '[[foxcat:energy.grid_power]]', name: Réseau signé}
+          - type: entities
+            title: Bilan physique du jour
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:energy.today.pv]]', name: Production PV}
+              - {entity: '[[foxcat:energy.today.house]]', name: Consommation maison}
+              - {entity: '[[foxcat:energy.today.self_consumed]]', name: Autoconsommation PV}
+              - {entity: '[[foxcat:energy.today.import]]', name: Prélèvement réseau}
+              - {entity: '[[foxcat:energy.today.export]]', name: Réinjection}
+              - {entity: '[[foxcat:energy.today.self_consumption_pct]]', name: Taux autoconsommation}
+              - {entity: '[[foxcat:energy.today.autonomy_pct]]', name: Autonomie}
+      - type: grid
+        cards:
+          - type: entities
+            title: Bilan financier
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:pricing.cost_today]]', name: Coût des prélèvements}
+              - {entity: '[[foxcat:pricing.export_revenue_today]]', name: Revenu injection}
+              - {entity: '[[foxcat:pricing.export_cost_today]]', name: Coût injection}
+              - {entity: '[[foxcat:pricing.net_today]]', name: Coût net réseau}
+              - {entity: '[[foxcat:pricing.solar_gain_today]]', name: Gain solaire estimé}
+          - type: custom:apexcharts-card
+            graph_span: 24h
+            update_interval: 1min
+            header: {show: true, title: Puissances · 24 h, show_states: true}
+            now: {show: true}
+            apex_config:
+              chart: {height: 310, toolbar: {show: true}}
+              stroke: {curve: smooth}
+              legend: {show: true, position: bottom}
+            series:
+              - {entity: '[[foxcat:energy.pv_power]]', name: PV, stroke_width: 2, type: area, opacity: 0.12}
+              - {entity: '[[foxcat:energy.house_power]]', name: Maison, stroke_width: 2}
+              - {entity: '[[foxcat:energy.grid_import]]', name: Import, stroke_width: 1}
+              - {entity: '[[foxcat:energy.grid_export]]', name: Export, stroke_width: 1}
+
+  # ============================================================
+  # SOUS-VUE MARCHÉ / RÉSEAU — contenu totalement contextuel
+  # ============================================================
+  - title: Marché & Réseau
+    path: marche
+    icon: mdi:chart-timeline-variant-shimmer
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 14% 10%, rgba(0,194,255,.23), transparent 30%),
+      radial-gradient(circle at 90% 85%, rgba(255,160,38,.15), transparent 30%),
+      linear-gradient(145deg,#04090e,#071724 55%,#05090e)
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            custom_fields:
+              content: |
+                [[[
+                  const c=states['[[foxcat:pricing.regime]]']?.state??'—', d=states['[[foxcat:pricing.distribution_profile]]']?.state??'—', p=states['[[foxcat:pricing.network_policy]]']?.state??'—';
+                  return `<div style="padding:8px"><div style="font-size:20px;font-weight:950;letter-spacing:.08em">MARCHÉ & RÉSEAU</div><div style="opacity:.5;font-size:10px;margin-top:5px">${c} · ${d} · ${p}</div></div>`;
+                ]]]
+            styles:
+              card: [padding: 17px, border-radius: 26px, background: 'rgba(6,18,29,.9)', border: '1px solid rgba(75,217,255,.16)']
+
+      - type: grid
+        column_span: 3
+        cards:
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+            card:
+              type: custom:button-card
+              show_name: false
+              show_icon: false
+              custom_fields:
+                content: |
+                  [[[
+                    const f=(id,d=3)=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v.toFixed(d).replace('.',','):'—'};
+                    const plan=states['[[foxcat:pricing.day_ahead.plan]]'];
+                    const a=plan?.attributes||{};
+                    const remain=a.temps_restant_creux||'—';
+                    const end=a.fin_creux_actuel||'—';
+                    return `<div class="market"><div class="eyebrow">CONTRAT DYNAMIQUE · DAY-AHEAD</div><div class="mainprice">${f('[[foxcat:pricing.current]]')} <small>€/kWh</small></div><div class="metrics"><div><span>H+1</span><b>${f('[[foxcat:pricing.next]]')}</b></div><div><span>POSITION</span><b>${f('[[foxcat:pricing.dynamic_curve_position]]',1)} %</b></div><div><span>SEUIL FAVORABLE</span><b>${a.seuil_favorable_pct??'—'} %</b></div><div><span>PLAFOND</span><b>${a.seuil_pic_pct??'—'} %</b></div></div><div class="trough"><span>CREUX ACTUEL &lt; SEUIL FAVORABLE</span><b>${remain==='—'?'Aucun creux actif':remain+' restantes'}</b><small>${end==='—'?'':`Fin estimée : ${end}`}</small></div></div>`;
+                  ]]]
+              styles:
+                card: [padding: 24px, border-radius: 26px, background: 'linear-gradient(145deg,rgba(7,36,55,.92),rgba(6,12,20,.92))', border: '1px solid rgba(71,219,255,.18)']
+              extra_styles: |
+                .eyebrow{font-size:9px;font-weight:900;letter-spacing:.14em;opacity:.54}.mainprice{font-size:34px;font-weight:950;margin:13px 0;color:#67ddff}.mainprice small{font-size:12px;opacity:.6}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metrics>div{padding:10px;border-radius:13px;background:rgba(255,255,255,.035)}.metrics span,.trough span{display:block;font-size:8px;opacity:.42}.metrics b{font-size:12px}.trough{margin-top:11px;padding:13px;border-radius:15px;background:linear-gradient(90deg,rgba(0,207,255,.09),rgba(255,178,56,.05))}.trough b{font-size:15px}.trough small{display:block;font-size:9px;opacity:.45;margin-top:4px}
+
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+            card:
+              type: custom:apexcharts-card
+              update_interval: 1min
+              graph_span: 2d
+              span: {start: day}
+              now: {show: true, label: Maintenant}
+              header: {show: true, title: Courbe Luminus Dynamic, show_states: false}
+              yaxis: [{decimals: 3}]
+              apex_config:
+                chart: {height: 360, toolbar: {show: true}, zoom: {enabled: true}}
+                legend: {show: true, position: bottom}
+                stroke: {curve: smooth}
+                xaxis: {type: datetime, labels: {datetimeUTC: false}}
+              series:
+                - entity: '[[foxcat:pricing.source.current]]'
+                  name: Achat
+                  type: area
+                  unit: €/kWh
+                  stroke_width: 3
+                  opacity: 0.16
+                  data_generator: |
+                    const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]; return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new Date(r.start).getTime(),Number(r.all_in)]);
+                - entity: '[[foxcat:pricing.source.injection]]'
+                  name: Injection
+                  type: line
+                  unit: €/kWh
+                  stroke_width: 2
+                  data_generator: |
+                    const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]; return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new Date(r.start).getTime(),Number(r.injection)]);
+
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: 'Bi-horaire HP/HC'}
+            card:
+              type: entities
+              title: Contrat bihoraire
+              show_header_toggle: false
+              entities:
+                - {entity: '[[foxcat:pricing.period]]', name: Période énergie actuelle}
+                - {entity: '[[foxcat:pricing.source.hp]]', name: Prix heures pleines}
+                - {entity: '[[foxcat:pricing.source.hc]]', name: Prix heures creuses}
+                - {entity: '[[foxcat:pricing.current]]', name: Prix actif}
+                - {entity: '[[foxcat:pricing.injection]]', name: Injection tarifée}
+
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: 'Fixe / Monohoraire'}
+            card:
+              type: entities
+              title: Contrat fixe / monohoraire
+              show_header_toggle: false
+              entities:
+                - {entity: '[[foxcat:pricing.current]]', name: Prix actif}
+                - {entity: '[[foxcat:pricing.injection]]', name: Prix injection}
+                - {entity: '[[foxcat:pricing.network_policy]]', name: Politique réseau}
+
+      - type: grid
+        cards:
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.distribution_profile]]', state: 'Wallonie · Impact'}
+            card:
+              type: custom:button-card
+              show_name: false
+              show_icon: false
+              custom_fields:
+                content: |
+                  [[[
+                    const period=states['[[foxcat:pricing.distribution_period]]']?.state??'—';
+                    const map={ECO:['01–07 · 11–17','Déplacer les charges ici'],MEDIUM:['07–11 · 22–01','Zone intermédiaire'],PIC:['17–22','Éviter les nouvelles grosses charges']};
+                    const v=map[period]||['—','Profil Impact actif'];
+                    return `<div class="impact"><span>TARIF DE DISTRIBUTION · IMPACT</span><b>${period}</b><strong>${v[0]}</strong><small>${v[1]}</small></div>`;
+                  ]]]
+              styles:
+                card: [padding: 22px, border-radius: 24px, background: 'linear-gradient(145deg,rgba(37,25,9,.84),rgba(9,15,22,.9))', border: '1px solid rgba(255,177,65,.16)']
+              extra_styles: |
+                .impact span{font-size:9px;font-weight:900;letter-spacing:.13em;opacity:.55}.impact b{font-size:30px;color:#f4b44f;margin-top:10px}.impact strong{display:block;font-size:13px}.impact small{display:block;font-size:10px;opacity:.48;margin-top:5px}
+          - type: entities
+            title: Configuration active
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:pricing.regime]]', name: Contrat énergie}
+              - {entity: '[[foxcat:pricing.distribution_profile]]', name: Distribution / comptage}
+              - {entity: '[[foxcat:pricing.distribution_period]]', name: Période distribution}
+              - {entity: '[[foxcat:pricing.network_policy]]', name: Politique réseau}
+
+  # ============================================================
+  # SOUS-VUE BOILER — une seule expérience, charge flexible
+  # ============================================================
+  - title: Boiler
+    path: boiler
+    icon: mdi:water-boiler
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 14% 10%, rgba(255,157,37,.27), transparent 30%),
+      radial-gradient(circle at 88% 90%, rgba(0,178,255,.12), transparent 35%),
+      linear-gradient(145deg,#0c0905,#171006 42%,#070c12 100%)
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            custom_fields:
+              content: |
+                [[[
+                  const num=id=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v:null};
+                  const fmt=(v,u='°C')=>v==null?'—':v.toFixed(1).replace('.',',')+' '+u;
+                  const est=num('[[foxcat:boiler.estimated_temperature]]'), low=num('[[foxcat:boiler.temperature_source]]'), top=num('[[foxcat:boiler.resistance_temperature_source]]'), p=num('[[foxcat:boiler.power]]');
+                  const conf=num('[[foxcat:boiler.estimate_confidence]]'), st=states['[[foxcat:boiler.thermal_state]]']?.state??'—', origin=states['[[foxcat:boiler.origin]]']?.state??'—';
+                  return `<div class="boilerhero"><div class="title"><div><span>CHARGE FLEXIBLE</span><h2>BOILER ECS</h2></div><div class="heat">${(p||0)>100?'● EN CHAUFFE':'○ EN ATTENTE'}</div></div><div class="bgrid"><div class="estimate"><small>TEMPÉRATURE ESTIMÉE</small><b>${fmt(est)}</b><em>confiance ${conf==null?'—':conf.toFixed(0)+' %'}</em></div><div><small>DOIGT DE GANT BAS</small><b>${fmt(low)}</b><small>CONTACT TÊTE CUVE</small><b>${fmt(top)}</b></div><div><small>PUISSANCE</small><b>${p==null?'—':Math.round(p)+' W'}</b><small>ÉTAT THERMIQUE</small><b>${st}</b></div><div><small>DÉCISION</small><b>${origin}</b><small>DEMANDE</small><b>${states['[[foxcat:boiler.demand]]']?.state??'—'}</b></div></div></div>`;
+                ]]]
+            styles:
+              card: [padding: 25px, border-radius: 30px, background: 'linear-gradient(130deg,rgba(42,26,8,.91),rgba(9,15,22,.92))', border: '1px solid rgba(255,180,70,.18)', box-shadow: '0 22px 60px rgba(0,0,0,.30)']
+            extra_styles: |
+              .title{display:flex;justify-content:space-between;align-items:start}.title span{font-size:8px;letter-spacing:.16em;opacity:.5}.title h2{margin:4px 0 0;font-size:22px;letter-spacing:.08em}.heat{font-size:9px;font-weight:900;color:#ffc160;padding:8px 10px;border-radius:15px;background:rgba(255,181,70,.08)}.bgrid{display:grid;grid-template-columns:1.25fr 1fr 1fr 1.35fr;gap:10px;margin-top:20px}.bgrid>div{padding:14px;border-radius:17px;background:rgba(255,255,255,.035)}.bgrid small{display:block;font-size:8px;opacity:.42;margin:5px 0 2px}.bgrid b{font-size:13px}.estimate b{font-size:25px;color:#ffc15e}.estimate em{display:block;font-size:9px;font-style:normal;opacity:.45;margin-top:4px}@media(max-width:800px){.bgrid{grid-template-columns:repeat(2,1fr)}}
+      - type: grid
+        column_span: 3
+        cards:
+          - type: custom:apexcharts-card
+            graph_span: 24h
+            update_interval: 1min
+            header: {show: true, title: Boiler · thermie et puissance, show_states: true}
+            now: {show: true}
+            apex_config:
+              chart: {height: 330, toolbar: {show: true}}
+              stroke: {curve: smooth}
+              legend: {show: true, position: bottom}
+            yaxis:
+              - {id: temp, decimals: 1}
+              - {id: power, opposite: true, decimals: 0}
+            series:
+              - {entity: '[[foxcat:boiler.estimated_temperature]]', name: Température estimée, yaxis_id: temp, stroke_width: 3}
+              - {entity: '[[foxcat:boiler.temperature_source]]', name: Sonde bas / résistance, yaxis_id: temp, stroke_width: 1}
+              - {entity: '[[foxcat:boiler.resistance_temperature_source]]', name: Contact tête cuve, yaxis_id: temp, stroke_width: 1}
+              - {entity: '[[foxcat:boiler.power]]', name: Puissance, yaxis_id: power, type: area, opacity: 0.12, stroke_width: 2}
+      - type: grid
+        cards:
+          - type: entities
+            title: Commandes
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:boiler.enabled]]', name: Charge flexible active}
+              - {entity: '[[foxcat:boiler.user_start]]', name: Démarrage utilisateur}
+              - {entity: '[[foxcat:boiler.user_stop]]', name: Arrêt utilisateur}
+              - {entity: '[[foxcat:boiler.user_auto]]', name: Retour automatique}
+          - type: entities
+            title: Réserve thermique
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:boiler.thermal_energy_missing]]', name: Énergie manquante}
+              - {entity: '[[foxcat:boiler.heating_duration]]', name: Durée de chauffe estimée}
+              - {entity: '[[foxcat:boiler.safety]]', name: Sécurité thermique}
+
+  # ============================================================
+  # SOUS-VUE APPAREILS FLEXIBLES
+  # ============================================================
+  - title: Appareils
+    path: appareils
+    icon: mdi:washing-machine
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 12% 12%, rgba(76,209,255,.20), transparent 28%),
+      radial-gradient(circle at 88% 85%, rgba(255,161,40,.12), transparent 32%),
+      linear-gradient(145deg,#05090f,#0b1220 55%,#05080c)
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            name: APPAREILS · CHARGES FLEXIBLES
+            icon: mdi:home-clock-outline
+            styles:
+              card: [padding: 21px, border-radius: 26px, background: 'rgba(7,16,26,.9)', border: '1px solid rgba(83,215,255,.15)']
+              name: [font-size: 18px, font-weight: 900, letter-spacing: .08em]
+              icon: [color: '#61d9ff']
+      - type: grid
+        cards:
+          - type: entities
+            title: Lave-linge
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:machines.washer.cycle]]', name: Cycle}
+              - {entity: '[[foxcat:machines.washer.switch]]', name: Prise}
+          - type: entities
+            title: Sèche-linge
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:machines.dryer.cycle]]', name: Cycle}
+              - {entity: '[[foxcat:machines.dryer.switch]]', name: Prise}
+          - type: entities
+            title: Lave-vaisselle
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:machines.dishwasher.cycle]]', name: Cycle}
+              - {entity: '[[foxcat:machines.dishwasher.switch]]', name: Prise}
+      - type: grid
+        column_span: 2
+        cards:
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+            card:
+              type: custom:button-card
+              show_name: false
+              show_icon: false
+              custom_fields:
+                content: |
+                  [[[
+                    const p=states['[[foxcat:pricing.day_ahead.plan]]']; const a=p?.attributes||{}; const machines=a.machines||{};
+                    const rows=Object.entries(machines).map(([k,v])=>`<div><b>${v.name||k}</b><span>${v.status||v.reason||'Planification en cours'}</span></div>`).join('');
+                    return `<div class="planner"><span>PLANIFICATEUR DYNAMIC</span><h3>${a.temps_restant_creux?`Creux favorable · ${a.temps_restant_creux} restantes`:'Optimisation Day-Ahead active'}</h3>${rows||'<small>Aucune charge flexible planifiée pour le moment.</small>'}</div>`;
+                  ]]]
+              styles:
+                card: [padding: 22px, border-radius: 24px, background: 'linear-gradient(145deg,rgba(5,31,48,.9),rgba(7,13,21,.9))', border: '1px solid rgba(71,218,255,.16)']
+              extra_styles: |
+                .planner>span{font-size:9px;font-weight:900;letter-spacing:.13em;opacity:.48}.planner h3{font-size:16px;margin:7px 0 13px}.planner>div{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid rgba(255,255,255,.06);font-size:11px}.planner>div span{opacity:.55;text-align:right}
+
+  # ============================================================
+  # SOUS-VUE ONDULEUR / PRI
+  # ============================================================
+  - title: Onduleur
+    path: onduleur
+    icon: mdi:solar-power-variant
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 16% 12%, rgba(255,186,56,.22), transparent 29%),
+      radial-gradient(circle at 87% 10%, rgba(0,197,255,.17), transparent 32%),
+      linear-gradient(145deg,#090804,#101208 45%,#061019)
+    sections:
+      - type: grid
+        cards:
+          - type: entities
+            title: PRI · régulation onduleur
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:inverter.enabled]]', name: PRI actif}
+              - {entity: '[[foxcat:inverter.level_current]]', name: Niveau actuel}
+              - {entity: '[[foxcat:inverter.level_target]]', name: Niveau cible}
+              - {entity: '[[foxcat:inverter.direction]]', name: Direction}
+              - {entity: '[[foxcat:inverter.reason]]', name: Dernière décision}
+          - type: entities
+            title: Mesures
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:inverter.power_live]]', name: Puissance onduleur live}
+              - {entity: '[[foxcat:inverter.power_snapshot]]', name: Snapshot}
+              - {entity: '[[foxcat:inverter.target_pv]]', name: PV cible}
+              - {entity: '[[foxcat:inverter.predicted_import]]', name: Import prévu}
+              - {entity: '[[foxcat:inverter.predicted_export]]', name: Export prévu}
+      - type: grid
+        column_span: 2
+        cards:
+          - type: custom:apexcharts-card
+            graph_span: 12h
+            header: {show: true, title: Onduleur & réseau, show_states: true}
+            now: {show: true}
+            series:
+              - {entity: '[[foxcat:energy.pv_power]]', name: PV, stroke_width: 3, type: area, opacity: 0.12}
+              - {entity: '[[foxcat:energy.grid_power]]', name: Réseau signé, stroke_width: 2}
+
+  # ============================================================
+  # SOUS-VUE TECHNIQUE — véritable configurateur EMS
+  # ============================================================
+  - title: Technique
+    path: technique
+    icon: mdi:tune-vertical-variant
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 7% 8%, rgba(255,160,39,.16), transparent 26%),
+      radial-gradient(circle at 94% 9%, rgba(0,198,255,.18), transparent 29%),
+      linear-gradient(150deg,#05080c,#0b121a 58%,#05070a)
+    sections:
+      - type: grid
+        column_span: 4
+        cards:
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            custom_fields:
+              content: |
+                [[[
+                  const mode=states['[[foxcat:ems.mode]]']?.state??'—', c=states['[[foxcat:pricing.regime]]']?.state??'—', d=states['[[foxcat:pricing.distribution_profile]]']?.state??'—', p=states['[[foxcat:pricing.network_policy]]']?.state??'—';
+                  return `<div class="confighead"><span>FOXCAT ENERGY · 1.7.0</span><h2>EMS CONFIGURATOR</h2><p>Le comportement du moteur, le contrat d’énergie, la distribution et la politique réseau sont indépendants.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
+                ]]]
+            styles:
+              card: [padding: 27px, border-radius: 30px, background: 'linear-gradient(130deg,rgba(36,23,8,.75),rgba(5,31,46,.82))', border: '1px solid rgba(255,255,255,.10)', box-shadow: '0 20px 60px rgba(0,0,0,.28)']
+            extra_styles: |
+              .confighead>span{font-size:9px;font-weight:900;letter-spacing:.15em;opacity:.5}.confighead h2{font-size:24px;letter-spacing:.08em;margin:6px 0}.confighead p{font-size:11px;opacity:.55;max-width:700px}.confighead>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}.confighead b{font-size:10px;padding:8px 10px;border-radius:14px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.06)}
+
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### 1 · Comportement du moteur
+              **Éco** applique les règles économiques de façon stricte. **Confort** conserve l’optimisation mais autorise davantage d’assouplissement. **Manuel** désactive les décisions automatiques, tout en conservant les sécurités.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:ems.mode]]', name: Comportement EMS}
+              - {entity: '[[foxcat:ems.regulation_active]]', name: Régulation FoxCat}
+              - {entity: '[[foxcat:pricing.behavior_relaxation]]', name: Assouplissement Confort}
+
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### 2 · Énergie, distribution et réseau
+              Le **contrat énergie** détermine le prix d’achat. Le **profil distribution/comptage** décrit la structure du réseau belge. La **politique réseau** définit la façon dont FoxCat traite l’injection.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:pricing.regime]]', name: Contrat énergie}
+              - {entity: '[[foxcat:pricing.distribution_profile]]', name: Profil distribution / comptage}
+              - {entity: '[[foxcat:pricing.network_policy]]', name: Politique réseau}
+              - {entity: '[[foxcat:pricing.distribution_period]]', name: Période distribution actuelle}
+
+      - type: grid
+        cards:
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: |
+                    ### 3 · Réglages Dynamic
+                    Le **seuil favorable** définit le bas de la courbe Day-Ahead. Le **plafond acceptable** bloque les nouveaux achats flexibles au-delà de cette position. Le planificateur affiche aussi le temps restant dans le creux favorable courant.
+                - type: entities
+                  show_header_toggle: false
+                  entities:
+                    - {entity: '[[foxcat:pricing.day_ahead.threshold]]', name: Seuil favorable}
+                    - {entity: '[[foxcat:pricing.day_ahead.peak_threshold]]', name: Plafond acceptable}
+                    - {entity: '[[foxcat:pricing.predictive_enabled]]', name: Planification prix}
+                    - {entity: '[[foxcat:pricing.solar_forecast_arbitrage]]', name: Arbitrage prévision solaire}
+
+      - type: grid
+        column_span: 2
+        cards:
+          - type: markdown
+            content: |
+              ### 4 · Boiler · charge flexible
+              La sonde dans le **doigt de gant bas** est fiable pour la sécurité mais influencée par la résistance pendant la chauffe. Le capteur en **contact sur la tête de cuve** est utilisé surtout pour la tendance et la détection de puisage. FoxCat fusionne ces informations avec la puissance et l’historique pour estimer la réserve thermique.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:boiler.enabled]]', name: Charge flexible Boiler}
+              - {entity: '[[foxcat:boiler.setting.start]]', name: Température de reprise}
+              - {entity: '[[foxcat:boiler.setting.normal]]', name: Cible confort réseau}
+              - {entity: '[[foxcat:boiler.setting.boost]]', name: Stockage solaire / boost}
+              - {entity: '[[foxcat:boiler.setting.safety]]', name: Sécurité absolue}
+              - {entity: '[[foxcat:boiler.setting.top_offset]]', name: Correction capteur tête cuve}
+              - {entity: '[[foxcat:boiler.setting.heat_bias]]', name: Durée influence résistance}
+              - {entity: '[[foxcat:boiler.setting.draw_drop]]', name: Chute de température = puisage}
+              - {entity: '[[foxcat:boiler.setting.min_confidence]]', name: Confiance minimale fallback}
+
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### 5 · Onduleur / PRI
+              Le PRI reste indépendant du comportement tarifaire. En **Zéro injection**, il vise une réinjection quasi nulle ; en **Compensation**, la production disponible reste libérée. Les seuils ci-dessous règlent la tolérance physique du réseau.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:inverter.enabled]]', name: Régulation PRI}
+              - {entity: '[[foxcat:inverter.setting.export_max]]', name: Injection maximale tolérée}
+              - {entity: '[[foxcat:inverter.setting.import_target]]', name: Import cible}
+              - {entity: '[[foxcat:inverter.setting.import_max]]', name: Import maximal avant libération PV}
+              - {entity: '[[foxcat:inverter.setting.pv_min]]', name: Production PV minimale PRI}
+
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### 6 · Maintenance
+              La régénération du dashboard utilise le registre FoxCat et crée une sauvegarde du fichier existant avant remplacement. Le diagnostic ne modifie aucune règle de décision. Les plages détaillées LL / SL / LV restent configurables dans les options de l'intégration FoxCat Energy.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:diagnostic.dashboard_regenerate]]', name: Régénérer le dashboard}
+              - {entity: '[[foxcat:diagnostic.button]]', name: Lancer diagnostic}
+              - {entity: '[[foxcat:diagnostic.reset]]', name: Réinitialiser cycle EMS}
+
+  # ============================================================
+  # SOUS-VUE DIAGNOSTIC
+  # ============================================================
+  - title: Diagnostic
+    path: diagnostic
+    icon: mdi:stethoscope
+    subview: true
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 88% 8%, rgba(0,200,255,.16), transparent 28%),
+      linear-gradient(145deg,#05080d,#0a1118 55%,#05070a)
+    sections:
+      - type: grid
+        cards:
+          - type: entities
+            title: EMS Core
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:ems.phase]]', name: Phase}
+              - {entity: '[[foxcat:ems.ack]]', name: ACK}
+              - {entity: '[[foxcat:ems.reason]]', name: Dernière raison}
+              - {entity: '[[foxcat:ems.last_frame]]', name: Dernière trame}
+              - {entity: '[[foxcat:ems.last_action]]', name: Dernière action}
+          - type: entities
+            title: Energy Bus
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:energy_bus.state]]', name: État}
+              - {entity: '[[foxcat:energy_bus.frame_id]]', name: Frame ID}
+              - {entity: '[[foxcat:energy_bus.ack]]', name: ACK bus}
+              - {entity: '[[foxcat:energy_bus.pending_count]]', name: Messages en attente}
+          - type: entities
+            title: Métronome
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:metronome.status]]', name: Statut}
+              - {entity: '[[foxcat:metronome.source]]', name: Source}
+              - {entity: '[[foxcat:metronome.counter]]', name: Battements du jour}
+              - {entity: '[[foxcat:metronome.last_pulse]]', name: Dernier battement}
+      - type: grid
+        column_span: 2
+        cards:
+          - type: entities
+            title: Registre & cohérence
+            show_header_toggle: false
+            entities:
+              - {entity: '[[foxcat:diagnostic.registry]]', name: Registre des entités FoxCat}
+              - {entity: '[[foxcat:diagnostic.legacy_conflict]]', name: Conflit legacy}
+              - {entity: '[[foxcat:diagnostic.high_load]]', name: Haute consommation}
