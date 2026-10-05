@@ -107,5 +107,5 @@ def evaluate_dynamic(
     if snapshot.boiler_temp_c < normal and very_high:
         return BoilerIntent(BOILER_STOP, "Prix élevé évité.", "PRIX")
     if snapshot.boiler_temp_c < normal and solar_future and not deadline and not very_low:
-        return BoilerIntent(BOILER_STOP, "Attente solaire recommandée par IA.", "IA")
+        return BoilerIntent(BOILER_STOP, "Attente solaire recommandée par la prévision.", "PREVISION")
     return BoilerIntent(BOILER_NONE, "Surveillance dynamique : aucune action nécessaire.", "PRIX")
