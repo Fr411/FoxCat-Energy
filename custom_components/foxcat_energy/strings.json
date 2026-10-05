@@ -26,24 +26,24 @@
       },
       "boiler": {
         "title": "FoxCat Energy – 2/7 • Boiler",
-        "description": "Configuration physique et sécurité du Boiler. Les paramètres volume/puissance/eau froide calibrent uniquement l’arbitrage tarifaire DYNAMIQUE. La sécurité Résistance à 68 °C reste souveraine.",
+        "description": "Configuration physique et sécurité du Boiler, traité comme charge flexible dans tous les contrats. Les paramètres volume/puissance/eau froide calibrent l’estimation thermique et les arbitrages. La sécurité Résistance à 68 °C reste souveraine.",
         "data": {
           "boiler_climate": "Thermostat du boiler",
-          "boiler_temp_sensor": "Température de référence du boiler",
+          "boiler_temp_sensor": "Sonde basse · doigt de gant / sécurité",
           "boiler_power_sensor": "Puissance du boiler",
           "boiler_binary": "État physique du boiler",
-          "boiler_resistance_temp_sensor": "Température Résistance / sécurité",
-          "boiler_volume": "Volume du Boiler (L)",
+          "boiler_resistance_temp_sensor": "Sonde haute · contact tête de cuve",
+          "boiler_volume": "Volume utile du ballon utilisé par l’estimateur thermique universel de la charge flexible Boiler.",
           "boiler_element_power": "Puissance nominale de la résistance (W)",
           "boiler_cold_water_temp": "Température eau froide réseau (°C)"
         },
         "data_description": {
           "boiler_climate": "Entité climate réellement commandée par FoxCat.",
-          "boiler_temp_sensor": "Température d’eau de référence utilisée pour la régulation normale du Boiler.",
-          "boiler_resistance_temp_sensor": "Sonde placée sur ou au plus près de la résistance. Au-delà du seuil de sécurité FoxCat (68 °C par défaut), toute chauffe est interdite et un arrêt est demandé.",
+          "boiler_temp_sensor": "Sonde placée dans le doigt de gant en bas du ballon, proche de la résistance. Elle reste la référence de sécurité thermique mais son poids dans l’estimation est réduit pendant et après la chauffe.",
+          "boiler_resistance_temp_sensor": "Sonde en applique sur la tête du ballon. Sa valeur absolue est considérée moins précise ; FoxCat l’utilise surtout pour la tendance, la stratification et la détection des puisages.",
           "boiler_power_sensor": "Puissance électrique instantanée du Boiler, utilisée pour confirmer son état physique et la comptabilité énergétique.",
           "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible.",
-          "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
+          "boiler_volume": "Volume utile du ballon utilisé par l’estimateur thermique universel de la charge flexible Boiler.",
           "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
           "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
         }
@@ -110,10 +110,9 @@
         }
       },
       "solar": {
-        "title": "FoxCat Energy – IA (compatibilité)",
-        "description": "Ancien nom de l’étape IA conservé uniquement pour compatibilité.",
+        "title": "Prévisions solaires",
+        "description": "Sources Forecast.Solar utilisées comme contexte déterministe pour l’autoconsommation et les charges flexibles.",
         "data": {
-          "ai_task": "Agent AI Task",
           "forecast_now": "Prévision maintenant",
           "forecast_this_hour": "Prévision cette heure",
           "forecast_next_hour": "Prévision heure suivante",
@@ -128,8 +127,8 @@
         }
       },
       "hphc": {
-        "title": "FoxCat Energy – 6/7 • Tarifs HP/HC",
-        "description": "Tarifs ComfyFlex réservés au régime HP/HC, prix de réinjection et plages horaires utilisés par le comparateur économique.",
+        "title": "Contrat bihoraire HP/HC",
+        "description": "Sources de prix HP/HC, prix d’injection et plages horaires. Enregistrer ramène à Configuration réseau.",
         "data": {
           "tariff_hp_price_sensor": "Capteur prix heures pleines (HP)",
           "tariff_hc_price_sensor": "Capteur prix heures creuses (HC)",
@@ -141,11 +140,10 @@
           "tariff_hp_end_2": "Fin HP 2"
         }
       },
-      "ia": {
-        "title": "FoxCat Energy – 7/7 • IA",
-        "description": "Configurez le module prédictif IA. Il analyse les prévisions solaires et reste consultatif : les décisions opérationnelles restent prises par l’EMS FoxCat.",
+      "forecast": {
+        "title": "Prévisions solaires",
+        "description": "Sources Forecast.Solar utilisées comme contexte déterministe pour l’autoconsommation et les charges flexibles.",
         "data": {
-          "ai_task": "Agent IA (AI Task)",
           "forecast_now": "Prévision maintenant",
           "forecast_this_hour": "Prévision cette heure",
           "forecast_next_hour": "Prévision heure suivante",
@@ -159,7 +157,6 @@
           "forecast_peak_tomorrow": "Heure du pic demain"
         },
         "data_description": {
-          "ai_task": "Agent IA Home Assistant utilisé pour enrichir l’analyse. Si indisponible, FoxCat conserve son fallback déterministe.",
           "forecast_now": "Prévision de production photovoltaïque à l’instant présent.",
           "forecast_this_hour": "Énergie solaire estimée pour l’heure en cours.",
           "forecast_next_hour": "Énergie solaire estimée pour l’heure suivante.",
@@ -188,10 +185,10 @@
           "energy_bus": "5 • Energy Bus",
           "machines": "6 • Machines",
           "boiler": "7 • Boiler",
-          "pricing": "8 • Tarification",
           "metronome": "9 • Métronome",
           "diagnostic": "10 • Diagnostic",
-          "finish": "✓ Enregistrer et quitter"
+          "finish": "✓ Enregistrer et quitter",
+          "network": "8 • Configuration réseau"
         }
       },
       "core": {
@@ -214,24 +211,24 @@
       },
       "boiler": {
         "title": "Boiler • Capteurs et sécurité",
-        "description": "Configuration physique et sécurité du Boiler. Les paramètres volume/puissance/eau froide calibrent uniquement l’arbitrage tarifaire DYNAMIQUE. La sécurité Résistance à 68 °C reste souveraine.",
+        "description": "Configuration physique et sécurité du Boiler, traité comme charge flexible dans tous les contrats. Les paramètres volume/puissance/eau froide calibrent l’estimation thermique et les arbitrages. La sécurité Résistance à 68 °C reste souveraine.",
         "data": {
           "boiler_climate": "Thermostat du boiler",
-          "boiler_temp_sensor": "Température de référence du boiler",
+          "boiler_temp_sensor": "Sonde basse · doigt de gant / sécurité",
           "boiler_power_sensor": "Puissance du boiler",
           "boiler_binary": "État physique du boiler",
-          "boiler_resistance_temp_sensor": "Température Résistance / sécurité",
-          "boiler_volume": "Volume du Boiler (L)",
+          "boiler_resistance_temp_sensor": "Sonde haute · contact tête de cuve",
+          "boiler_volume": "Volume utile du ballon utilisé par l’estimateur thermique universel de la charge flexible Boiler.",
           "boiler_element_power": "Puissance nominale de la résistance (W)",
           "boiler_cold_water_temp": "Température eau froide réseau (°C)"
         },
         "data_description": {
           "boiler_climate": "Entité climate réellement commandée par FoxCat.",
-          "boiler_temp_sensor": "Température d’eau de référence utilisée pour la régulation normale du Boiler.",
-          "boiler_resistance_temp_sensor": "Sonde placée sur ou au plus près de la résistance. Au-delà du seuil de sécurité FoxCat (68 °C par défaut), toute chauffe est interdite et un arrêt est demandé.",
+          "boiler_temp_sensor": "Sonde placée dans le doigt de gant en bas du ballon, proche de la résistance. Elle reste la référence de sécurité thermique mais son poids dans l’estimation est réduit pendant et après la chauffe.",
+          "boiler_resistance_temp_sensor": "Sonde en applique sur la tête du ballon. Sa valeur absolue est considérée moins précise ; FoxCat l’utilise surtout pour la tendance, la stratification et la détection des puisages.",
           "boiler_power_sensor": "Puissance électrique instantanée du Boiler, utilisée pour confirmer son état physique et la comptabilité énergétique.",
           "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible.",
-          "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
+          "boiler_volume": "Volume utile du ballon utilisé par l’estimateur thermique universel de la charge flexible Boiler.",
           "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
           "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
         }
@@ -256,18 +253,18 @@
       },
       "machines": {
         "title": "Machines",
-        "description": "Gestion des appareils pilotables. L’apprentissage passif est séparé dans son propre menu Machine Learning.",
+        "description": "Gestion des appareils pilotables. L’apprentissage passif des durées et consommations est séparé dans son propre menu Apprentissage des cycles.",
         "menu_options": {
           "machine_add": "＋ Ajouter une machine",
           "machine_edit": "✎ Modifier une machine",
           "machine_remove": "− Supprimer une machine",
-          "machine_learning": "Machine Learning",
+          "machine_learning": "Apprentissage des cycles",
           "init": "← Retour au menu principal"
         }
       },
       "pricing": {
-        "title": "Tarification",
-        "description": "Sépare clairement tarification dynamique et HP/HC. Le comparateur économique reste distinct d’Energy Bus.",
+        "title": "Configuration réseau",
+        "description": "Configuration des sources de prix selon le contrat énergie actif.",
         "menu_options": {
           "pricing_dynamic": "Tarification dynamique",
           "hphc": "Tarification HP/HC",
@@ -275,10 +272,9 @@
         }
       },
       "solar": {
-        "title": "IA (ancien nom)",
-        "description": "Compatibilité avec l’ancien menu EMS 2 solaire.",
+        "title": "Prévisions solaires",
+        "description": "Sources Forecast.Solar utilisées comme contexte déterministe pour l’autoconsommation et les charges flexibles.",
         "data": {
-          "ai_task": "Agent IA (AI Task)",
           "forecast_now": "Prévision maintenant",
           "forecast_this_hour": "Prévision cette heure",
           "forecast_next_hour": "Prévision heure suivante",
@@ -296,8 +292,8 @@
         "title": "Enregistrer et quitter"
       },
       "hphc": {
-        "title": "Tarification HP/HC",
-        "description": "Prix d’achat HP/HC, prix de réinjection et plages horaires. Enregistrer ramène au menu Tarification.",
+        "title": "Contrat bihoraire HP/HC",
+        "description": "Sources de prix HP/HC, prix d’injection et plages horaires. Enregistrer ramène à Configuration réseau.",
         "data": {
           "tariff_hp_price_sensor": "Capteur prix heures pleines (HP)",
           "tariff_hc_price_sensor": "Capteur prix heures creuses (HC)",
@@ -381,16 +377,16 @@
       },
       "ems": {
         "title": "EMS",
-        "description": "Réglages et modules liés au cœur décisionnel FoxCat. Le module prédictif est désormais présenté sous le nom « IA ».",
+        "description": "Réglages et modules liés au cœur décisionnel FoxCat. Le module prédictif est désormais présenté sous le nom « Prévision ».",
         "menu_options": {
           "ems_core": "EMS • Fonctionnement et réglages",
-          "ia": "IA • Prévisions et analyse",
+          "forecast": "Prévisions solaires",
           "init": "← Retour au menu principal"
         }
       },
       "energy_bus": {
         "title": "Energy Bus",
-        "description": "Bus opérationnel interne entre modules FoxCat : trames, commandes, événements et ACK/NOK. L’IA et le comparateur économique n’y publient pas de recommandations.",
+        "description": "Bus opérationnel interne entre modules FoxCat : trames, commandes, événements et ACK/NOK. Le module de prévision et le comparateur économique n’y publient pas de recommandations.",
         "data": {}
       },
       "metronome": {
@@ -410,11 +406,10 @@
         "description": "L’EMS Core reste le décideur souverain : modes, sécurité, arbitrage Boiler/machines et décisions opérationnelles. Les paramètres ajustables sont exposés sous forme d’entités FoxCat. Validez pour revenir au menu EMS.",
         "data": {}
       },
-      "ia": {
-        "title": "IA • Prévisions solaires",
-        "description": "Module prédictif consultatif. Il exploite Forecast.Solar et, si configuré, un agent IA Home Assistant. Il ne commande directement aucun équipement. Enregistrer ramène au menu EMS.",
+      "forecast": {
+        "title": "Prévisions solaires",
+        "description": "Sources Forecast.Solar utilisées comme contexte déterministe pour l’autoconsommation et les charges flexibles.",
         "data": {
-          "ai_task": "Agent IA (AI Task)",
           "forecast_now": "Prévision maintenant",
           "forecast_this_hour": "Prévision cette heure",
           "forecast_next_hour": "Prévision heure suivante",
@@ -428,7 +423,6 @@
           "forecast_peak_tomorrow": "Heure du pic demain"
         },
         "data_description": {
-          "ai_task": "Agent IA Home Assistant utilisé pour enrichir l’analyse. Si indisponible, FoxCat conserve son fallback déterministe.",
           "forecast_now": "Prévision de production photovoltaïque à l’instant présent.",
           "forecast_this_hour": "Énergie solaire estimée pour l’heure en cours.",
           "forecast_next_hour": "Énergie solaire estimée pour l’heure suivante.",
@@ -443,21 +437,21 @@
         }
       },
       "machine_learning": {
-        "title": "Machine Learning",
-        "description": "Espace dédié à l’apprentissage passif des cycles machines. Les modèles apprennent durée, énergie et signatures de puissance sans modifier les décisions de l’EMS.",
+        "title": "Apprentissage des cycles",
+        "description": "Espace dédié à l’apprentissage passif des cycles machines. FoxCat observe durée, énergie et signatures de puissance sans modifier les décisions de l’EMS.",
         "menu_options": {
           "machine_learning_info": "Présentation et état du modèle",
           "machines": "← Retour aux Machines"
         }
       },
       "machine_learning_info": {
-        "title": "Machine Learning • Présentation",
+        "title": "Apprentissage des cycles • Présentation",
         "description": "FoxCat enregistre localement jusqu’à 30 cycles récents par machine mesurée. Les données observées comprennent puissance, courant, tension, durée, énergie, tarif et contexte solaire/réseau. Cette collecte reste strictement passive et n’influence pas l’EMS.",
         "data": {}
       },
       "pricing_dynamic": {
-        "title": "Tarification dynamique",
-        "description": "Tarification dynamique Day-Ahead. FoxCat positionne le prix actuel sur l’horizon 24 h et réserve les blocs les moins chers pour les besoins thermiques du Boiler.",
+        "title": "Contrat dynamique · Day-Ahead",
+        "description": "Sources du contrat dynamique. FoxCat positionne le prix actuel sur la courbe Day-Ahead et planifie les charges flexibles dans les fenêtres autorisées.",
         "data": {
           "price_current": "Luminus Dynamic • Prix actuel",
           "price_next": "Luminus Dynamic • Prix heure suivante",
@@ -472,6 +466,16 @@
           "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
           "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
           "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+        }
+      },
+      "network": {
+        "title": "Configuration réseau",
+        "description": "Contrat énergie, profil de distribution/comptage, politique réseau et sources de prévision sont indépendants du comportement Éco / Confort / Manuel.",
+        "menu_options": {
+          "pricing_dynamic": "Sources contrat dynamique",
+          "hphc": "Sources contrat bihoraire HP/HC",
+          "forecast": "Prévisions solaires",
+          "init": "← Retour au menu principal"
         }
       }
     }

@@ -68,6 +68,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "boiler_temperature_eau_froide", "Boiler • Température eau froide réseau", "mdi:coolant-temperature", "boiler", lambda d: d.get("boiler_thermal", {}).get("cold_water_temp_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, suggested_object_id="foxcat_boiler_temperature_eau_froide"),
         FoxCatNumericSensor(c, "boiler_energie_thermique_manquante", "Boiler • Énergie thermique manquante", "mdi:water-thermometer-outline", "boiler", lambda d: d.get("boiler_thermal", {}).get("energy_missing_kwh"), UnitOfEnergy.KILO_WATT_HOUR, suggested_object_id="foxcat_boiler_energie_thermique_manquante"),
         FoxCatNumericSensor(c, "boiler_duree_chauffe_estimee", "Boiler • Durée de chauffe estimée", "mdi:timer-heat-outline", "boiler", lambda d: d.get("boiler_thermal", {}).get("heating_duration_h"), "h", suggested_object_id="foxcat_boiler_duree_chauffe_estimee"),
+        FoxCatNumericSensor(c, "boiler_temperature_estimee", "Boiler • Température thermique estimée", "mdi:thermometer-water", "boiler", lambda d: d.get("boiler_thermal", {}).get("estimated_temp_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE),
+        FoxCatNumericSensor(c, "boiler_confiance_estimation", "Boiler • Confiance estimation", "mdi:shield-check-outline", "boiler", lambda d: d.get("boiler_thermal", {}).get("estimate_confidence_pct"), PERCENTAGE),
+        FoxCatValueSensor(c, "boiler_etat_thermique", "Boiler • État thermique", "mdi:water-thermometer", "boiler", lambda d: d.get("boiler_thermal", {}).get("thermal_state", "INDISPONIBLE")),
         FoxCatNumericSensor(c, "boiler_capacite_thermique_confort", "Boiler • Capacité thermique confort", "mdi:water-boiler-auto", "boiler", lambda d: d.get("boiler_thermal", {}).get("thermal_capacity_comfort_kwh"), UnitOfEnergy.KILO_WATT_HOUR, suggested_object_id="foxcat_boiler_capacite_thermique_confort"),
         FoxCatNumericSensor(c, "puissance_onduleur_snapshot", "Puissance onduleur au dernier snapshot", "mdi:solar-power", "pri", lambda d: d["snapshot"].inverter_power_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "pri_niveau_actuel", "Niveau de puissance PRI actuel", "mdi:solar-power-variant", "pri", lambda d: d["pri"]["current_level"], PERCENTAGE),
@@ -85,13 +88,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "pri_puissance_pv_cible", "Puissance PV cible PRI", "mdi:solar-power", "pri", lambda d: d["pri"].get("target_pv_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "pri_import_prevu", "Import réseau prévu au palier cible", "mdi:transmission-tower-import", "pri", lambda d: d["pri"].get("predicted_import_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "pri_export_prevu", "Réinjection prévue au palier cible", "mdi:transmission-tower-export", "pri", lambda d: d["pri"].get("predicted_export_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
-        FoxCatNumericSensor(c, "confiance_solaire", "Confiance solaire", "mdi:weather-sunny-alert", "ai", lambda d: d["solar"].confidence, PERCENTAGE),
-        FoxCatValueSensor(c, "potentiel_solaire", "Potentiel solaire", "mdi:white-balance-sunny", "ai", lambda d: d["solar"].potential),
-        FoxCatValueSensor(c, "tendance_solaire", "Tendance solaire", "mdi:trending-up", "ai", lambda d: d["solar"].trend),
-        FoxCatValueSensor(c, "prevision_solaire_debut", "Début fenêtre solaire", "mdi:clock-start", "ai", lambda d: d["solar"].start),
-        FoxCatValueSensor(c, "prevision_solaire_fin", "Fin fenêtre solaire", "mdi:clock-end", "ai", lambda d: d["solar"].end),
-        FoxCatValueSensor(c, "prevision_solaire_raison", "Raison prévision solaire", "mdi:text-box-outline", "ai", lambda d: d["solar"].reason),
-        FoxCatValueSensor(c, "prevision_solaire_brute", "Prévision solaire brute", "mdi:code-json", "ai", lambda d: d["solar"].raw),
+        FoxCatNumericSensor(c, "confiance_solaire", "Confiance solaire", "mdi:weather-sunny-alert", "solar", lambda d: d["solar"].confidence, PERCENTAGE),
+        FoxCatValueSensor(c, "potentiel_solaire", "Potentiel solaire", "mdi:white-balance-sunny", "solar", lambda d: d["solar"].potential),
+        FoxCatValueSensor(c, "tendance_solaire", "Tendance solaire", "mdi:trending-up", "solar", lambda d: d["solar"].trend),
+        FoxCatValueSensor(c, "prevision_solaire_debut", "Début fenêtre solaire", "mdi:clock-start", "solar", lambda d: d["solar"].start),
+        FoxCatValueSensor(c, "prevision_solaire_fin", "Fin fenêtre solaire", "mdi:clock-end", "solar", lambda d: d["solar"].end),
+        FoxCatValueSensor(c, "prevision_solaire_raison", "Raison prévision solaire", "mdi:text-box-outline", "solar", lambda d: d["solar"].reason),
+        FoxCatValueSensor(c, "prevision_solaire_brute", "Prévision solaire brute", "mdi:code-json", "solar", lambda d: d["solar"].raw),
         FoxCatNumericSensor(c, "prix_actuel", "Prix dynamique actuel", "mdi:cash", "pricing", lambda d: d["prices"].get("current"), "€/kWh"),
         FoxCatNumericSensor(c, "prix_suivant", "Prix dynamique heure suivante", "mdi:cash-clock", "pricing", lambda d: d["prices"].get("next"), "€/kWh"),
         FoxCatNumericSensor(c, "prix_injection", "Prix dynamique de réinjection brut", "mdi:cash-plus", "pricing", lambda d: d["prices"].get("injection"), "€/kWh"),
@@ -102,7 +105,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "source_prix_hc", "Source prix heures creuses", "mdi:database-arrow-right-outline", "pricing", lambda d: d["prices"].get("hc_price_source")),
         FoxCatValueSensor(c, "source_prix_reinjection_fixe", "Source prix fixe de réinjection", "mdi:database-arrow-right-outline", "pricing", lambda d: d["prices"].get("fixed_injection_price_source")),
         FoxCatNumericSensor(c, "surplus_disponible_boiler_cycle_protege", "Surplus disponible pour le chauffe-eau pendant cycle protégé", "mdi:solar-power-variant-outline", "machines", lambda d: d["machine_guard"].get("boiler_surplus_available_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
-        FoxCatValueSensor(c, "regime_tarifaire_actif", "Régime tarifaire actif", "mdi:cash-sync", "pricing", lambda d: d["prices"].get("regime")),
+        FoxCatValueSensor(c, "regime_tarifaire_actif", "Contrat énergie actif", "mdi:cash-sync", "pricing", lambda d: d["prices"].get("regime")),
+        FoxCatValueSensor(c, "profil_distribution_actif", "Profil distribution actif", "mdi:transmission-tower", "pricing", lambda d: d["prices"].get("distribution_profile")),
+        FoxCatValueSensor(c, "periode_distribution", "Période de distribution", "mdi:clock-outline", "pricing", lambda d: d["prices"].get("distribution_period")),
         FoxCatValueSensor(c, "periode_tarifaire", "Période tarifaire", "mdi:clock-time-eight-outline", "pricing", lambda d: d["prices"].get("period")),
         FoxCatValueSensor(c, "statut_prix", "Statut du prix", "mdi:chart-line", "pricing", lambda d: d["prices"].get("status")),
         FoxCatValueSensor(c, "modele_cout", "Modèle de coût", "mdi:calculator-variant-outline", "pricing", lambda d: d["prices"].get("cost_model")),
@@ -218,10 +223,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         safe = mid.replace(" ", "_").lower()
         name = machine.name
         entities.extend([
-            FoxCatNumericSensor(c, f"apprentissage_{safe}_cycles", f"🧠 {name} • Cycles collectés", "mdi:brain", "machine_learning", lambda d, aid=mid: d.get("machine_learning",{}).get(aid,{}).get("total_cycles",0)),
-            FoxCatValueSensor(c, f"apprentissage_{safe}_collecte", f"🧠 {name} • Collecte en cours", "mdi:record-rec", "machine_learning", lambda d, aid=mid: "OUI" if (d.get("machine_learning",{}).get(aid,{}).get("current") or {}).get("active") else "NON"),
-            FoxCatNumericSensor(c, f"apprentissage_{safe}_energie_moyenne", f"🧠 {name} • Énergie moyenne 10 cycles", "mdi:chart-bell-curve-cumulative", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_energy_wh_10") or 0.0) / 1000.0), UnitOfEnergy.KILO_WATT_HOUR),
-            FoxCatNumericSensor(c, f"apprentissage_{safe}_duree_moyenne", f"🧠 {name} • Durée moyenne 10 cycles", "mdi:timer-outline", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_duration_s_10") or 0.0) / 60.0), "min"),
+            FoxCatNumericSensor(c, f"apprentissage_{safe}_cycles", f"📊 {name} • Cycles collectés", "mdi:chart-timeline-variant", "machine_learning", lambda d, aid=mid: d.get("machine_learning",{}).get(aid,{}).get("total_cycles",0)),
+            FoxCatValueSensor(c, f"apprentissage_{safe}_collecte", f"📊 {name} • Collecte en cours", "mdi:record-rec", "machine_learning", lambda d, aid=mid: "OUI" if (d.get("machine_learning",{}).get(aid,{}).get("current") or {}).get("active") else "NON"),
+            FoxCatNumericSensor(c, f"apprentissage_{safe}_energie_moyenne", f"📊 {name} • Énergie moyenne 10 cycles", "mdi:chart-bell-curve-cumulative", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_energy_wh_10") or 0.0) / 1000.0), UnitOfEnergy.KILO_WATT_HOUR),
+            FoxCatNumericSensor(c, f"apprentissage_{safe}_duree_moyenne", f"📊 {name} • Durée moyenne 10 cycles", "mdi:timer-outline", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_duration_s_10") or 0.0) / 60.0), "min"),
             FoxCatValueSensor(c, f"economique_{safe}_decision", f"💶 {name} • Choix économique", "mdi:cash-clock", "machines", lambda d, aid=mid: d.get("economic",{}).get("machines",{}).get(aid,{}).get("label", "Indisponible")),
             FoxCatMachineDayAheadSensor(c, mid, name),
         ])
@@ -243,7 +248,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
-    """Synthèse du planificateur Day-Ahead, strictement Dynamique."""
+    """Synthèse du planificateur Day-Ahead, strictement contrat Dynamique."""
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "day_ahead_plan", "Planificateur Day-Ahead", "mdi:chart-timeline-variant-shimmer", "pricing")
@@ -255,7 +260,7 @@ class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
     def native_value(self) -> str:
         plan = self._plan()
         if not plan.get("active"):
-            return "INACTIF — HORS DYNAMIC"
+            return "INACTIF — HORS CONTRAT DYNAMIQUE"
         if plan.get("favorable_now"):
             return "PRIX FAVORABLE"
         return "PLANIFICATION ACTIVE"
@@ -270,6 +275,12 @@ class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
             "seuil_favorable_pct": plan.get("threshold_pct"),
             "seuil_pic_pct": plan.get("high_threshold_pct"),
             "prix_favorable": bool(plan.get("favorable_now")),
+            "fin_creux_actuel": plan.get("current_favorable_end"),
+            "minutes_restantes_creux": plan.get("current_favorable_remaining_minutes"),
+            "temps_restant_creux": plan.get("current_favorable_remaining_label"),
+            "seuil_demarrage_effectif_pct": plan.get("start_threshold_pct"),
+            "periode_distribution": plan.get("distribution_period"),
+            "comportement": plan.get("behavior"),
             "prix_min_eur_kwh": plan.get("curve_min_eur_kwh"),
             "prix_max_eur_kwh": plan.get("curve_max_eur_kwh"),
             "prochain_creux": plan.get("next_valley"),
@@ -296,7 +307,7 @@ class FoxCatMachineDayAheadSensor(FoxCatEntity, SensorEntity):
     def native_value(self) -> str:
         root = self.coordinator.data.get("economic", {}).get("day_ahead", {}) or {}
         if not root.get("active"):
-            return "INACTIF — HORS DYNAMIC"
+            return "INACTIF — HORS CONTRAT DYNAMIQUE"
         plan = self._plan()
         if plan.get("protected"):
             return "EN CYCLE — PROTÉGÉ"

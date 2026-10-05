@@ -11,7 +11,6 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 from .const import (
-    CONF_AI_TASK,
     CONF_BOILER_BINARY,
     CONF_BOILER_CLIMATE,
     CONF_BOILER_POWER_SENSOR,
@@ -328,7 +327,6 @@ def _hphc_schema() -> vol.Schema:
 def _solar_schema() -> vol.Schema:
     return vol.Schema(
         {
-            _optional(CONF_AI_TASK, "ai_task.google_ai_task"): _entity("ai_task"),
             _optional(CONF_FORECAST_NOW, "sensor.solar_production_forecast_production_d_electricite_estimee_maintenant"): _entity("sensor"),
             _optional(CONF_FORECAST_THIS_HOUR, "sensor.solar_production_forecast_production_d_energie_estimee_cette_heure"): _entity("sensor"),
             _optional(CONF_FORECAST_NEXT_HOUR, "sensor.solar_production_forecast_production_d_energie_estimee_heure_suivante"): _entity("sensor"),
@@ -354,7 +352,7 @@ _SCHEMA_BUILDERS = {
     "pricing": _pricing_schema,
     "hphc": _hphc_schema,
     "solar": _solar_schema,
-    "ia": _solar_schema,
+    "forecast": _solar_schema,
     "pricing_dynamic": _pricing_schema,
 }
 
@@ -418,21 +416,21 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_hphc(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
-            return await self.async_step_ia()
+            return await self.async_step_forecast()
         return self.async_show_form(step_id="hphc", data_schema=_hphc_schema())
 
-    async def async_step_ia(self, user_input=None):
+    async def async_step_forecast(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
             title = str(self._data.get(CONF_INSTALLATION_NAME, "FoxCat Energy"))
             await self.async_set_unique_id("foxcat_energy_main")
             self._abort_if_unique_id_configured()
             return self.async_create_entry(title=title, data=self._data)
-        return self.async_show_form(step_id="ia", data_schema=_solar_schema())
+        return self.async_show_form(step_id="forecast", data_schema=_solar_schema())
+
 
     async def async_step_solar(self, user_input=None):
-        """Compatibilité avec l'ancien nom de l'étape EMS 2 solaire."""
-        return await self.async_step_ia(user_input)
+        return await self.async_step_forecast(user_input)
 
     @staticmethod
     @callback
@@ -523,14 +521,15 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     async def async_step_ems(self, user_input=None):
         return self.async_show_menu(
             step_id="ems",
-            menu_options=["ems_core", "ia", "init"],
+            menu_options=["ems_core", "init"],
         )
 
     async def async_step_ems_core(self, user_input=None):
         return await self._info_section("ems_core", user_input, return_step="ems")
 
-    async def async_step_ia(self, user_input=None):
-        return await self._section("ia", user_input, return_step="ems")
+    async def async_step_forecast(self, user_input=None):
+        return await self._section("forecast", user_input, return_step="network")
+
 
     async def async_step_energy_bus(self, user_input=None):
         return await self._info_section("energy_bus", user_input)
@@ -616,21 +615,23 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     async def async_step_machine_learning_info(self, user_input=None):
         return await self._info_section("machine_learning_info", user_input, return_step="machine_learning")
 
-    async def async_step_pricing(self, user_input=None):
+    async def async_step_network(self, user_input=None):
         return self.async_show_menu(
-            step_id="pricing",
-            menu_options=["pricing_dynamic", "hphc", "init"],
+            step_id="network",
+            menu_options=["pricing_dynamic", "hphc", "forecast", "init"],
         )
 
+    async def async_step_pricing(self, user_input=None):
+        return await self.async_step_network(user_input)
+
     async def async_step_pricing_dynamic(self, user_input=None):
-        return await self._section("pricing_dynamic", user_input, return_step="pricing")
+        return await self._section("pricing_dynamic", user_input, return_step="network")
 
     async def async_step_hphc(self, user_input=None):
-        return await self._section("hphc", user_input, return_step="pricing")
+        return await self._section("hphc", user_input, return_step="network")
 
     async def async_step_solar(self, user_input=None):
-        """Compatibilité options avec l'ancien nom EMS 2 solaire."""
-        return await self.async_step_ia(user_input)
+        return await self.async_step_forecast(user_input)
 
     async def async_step_finish(self, user_input=None):
         return self.async_create_entry(title="", data=self._ensure_pending())

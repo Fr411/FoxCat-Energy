@@ -20,7 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatBinary(c, "boiler_autorise_cycle_protege", "Chauffe-eau autorisé pendant cycle protégé", "mdi:shield-check-outline", "machines", lambda d: d["machine_guard"].get("boiler_allowed")),
             FoxCatBinary(c, "boiler_physique", "Boiler physique", "mdi:water-boiler", "boiler", lambda d: d["snapshot"].boiler_on, BinarySensorDeviceClass.POWER),
             FoxCatBinary(c, "securite_thermique_boiler", "Sécurité thermique résistance", "mdi:thermometer-alert", "boiler", lambda d: d["snapshot"].boiler_safety_temp_c >= float(c.settings.get("boiler_temp_safety_c", 68.0)), BinarySensorDeviceClass.PROBLEM),
-            FoxCatBinary(c, "fenetre_solaire", "Fenêtre solaire exploitable", "mdi:weather-sunny", "ai", lambda d: d["solar"].available),
+            FoxCatBinary(c, "fenetre_solaire", "Fenêtre solaire exploitable", "mdi:weather-sunny", "forecast", lambda d: d["solar"].available),
             FoxCatBinary(c, "conflit_legacy", "Automatisation FoxCat legacy active", "mdi:alert-decagram-outline", "diagnostic", lambda d: d["legacy_conflict"], BinarySensorDeviceClass.PROBLEM),
             FoxCatBinary(c, "fenetre_machines", "Fenêtre alimentation machines", "mdi:clock-check-outline", "machines", lambda d: any(d["machine_window"].values())),
             FoxCatBinary(c, "fenetre_prix_favorable_day_ahead", "Fenêtre prix favorable Day-Ahead", "mdi:cash-clock", "pricing", lambda d: bool(d.get("economic", {}).get("day_ahead", {}).get("active") and d.get("economic", {}).get("day_ahead", {}).get("favorable_now"))),
