@@ -7,7 +7,8 @@ from ...const import (
     BOILER_HEAT_45,
     BOILER_NONE,
     BOILER_STOP,
-    MODE_DYNAMIC,
+    MODE_MANUAL,
+    PRICE_SOURCE_DYNAMIC,
     TARIFF_DYNAMIC,
 )
 from ..load_guard import boiler_surplus_before_load_w
@@ -20,16 +21,19 @@ def evaluate_dynamic_boiler_v2(
     settings: dict[str, object],
     economic_view: dict[str, Any],
 ) -> BoilerIntent:
-    """Arbitrage Boiler strictement réservé au couple Mode/Régime Dynamique.
+    """Arbitrage boiler réservé à la source Day-Ahead, hors comportement Manuel.
 
-    Cette branche est additive : elle ne modifie aucun moteur HP/HC, Eco,
-    Manuel ou Zéro injection. Le BOOST 65 °C est exclusivement solaire.
+    Cette branche ne s'applique qu'à la source Day-Ahead et ne s'exécute jamais
+    en comportement Manuel. Le BOOST 65 °C reste exclusivement solaire.
     Le réseau peut assurer le confort normal jusqu'au plafond Day-Ahead
     ``dynamic_high_position_pct`` (65 % par défaut), jamais le stockage 65 °C.
     """
-    if str(settings.get("mode")) != MODE_DYNAMIC:
+    if str(settings.get("mode")) == MODE_MANUAL:
         return base_intent
-    if str(settings.get("tariff_regime")) != TARIFF_DYNAMIC:
+    if (
+        str(settings.get("price_source")) != PRICE_SOURCE_DYNAMIC
+        and str(settings.get("tariff_regime")) != TARIFF_DYNAMIC
+    ):
         return base_intent
     if base_intent.origin in {"SECURITE", "UTILISATEUR"}:
         return base_intent

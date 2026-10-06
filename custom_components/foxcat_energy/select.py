@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN, MODE_MANUAL, MODES, TARIFF_REGIMES, NETWORK_POLICIES, NETWORK_POLICY_COMPENSATION, PRICE_SOURCES, TARIFF_STRUCTURES
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
+from .migration import compatibility_tariff_regime
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -63,7 +64,7 @@ class FoxCatTariffRegimeSelect(FoxCatEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("tariff_regime"))
+        value = compatibility_tariff_regime(self.coordinator.settings)
         return value if value in TARIFF_REGIMES else None
 
     async def async_select_option(self, option: str) -> None:

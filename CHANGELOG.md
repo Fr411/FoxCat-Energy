@@ -1,4 +1,12 @@
-# Changelog — FoxCat Energy V1.7.1 Professional
+# Changelog — FoxCat Energy V1.7.2 Professional
+
+## V1.7.2
+- Les sélections initiales et les options de configuration sont maintenant reprises dans les réglages actifs, sans écraser les réglages conservés dans le Store.
+- Le comportement EMS ne verrouille plus le régime tarifaire ni la politique réseau.
+- Le chemin de lecture des séries tarifaires Day-Ahead est implémenté; les prix Simple et HP/HC restent déterministes et n'utilisent pas les prévisions J+1.
+- Les comportements Éco et Confort utilisent le dispatch de stratégie Éco; l'arbitrage boiler Day-Ahead s'applique avec les sources dynamiques, hors Manuel.
+- Le Price Analyzer calcule les fenêtres favorables, les pics, les meilleurs créneaux J/J+1, la durée utilisée/restante et les comparaisons avec J-1.
+- Tests autonomes ciblés et rapport de validation mis à jour. Les vérifications Home Assistant et matérielles restent requises.
 
 ## V1.7.1
 - Séparation comportement EMS / source de prix / structure tarifaire / politique réseau.
