@@ -172,6 +172,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self.config = dict(entry.data)
         self.config.update(entry.options)
+        self._entry_options_snapshot: dict[str, Any] = {}
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         self.machines: list[MachineDefinition] = machine_definitions(self.config)
         # FoxCat 1.5.0 : deux cœurs, communication immédiate par EnergyBus.
@@ -469,16 +470,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if raw.get("configuration_model_version") != MIGRATION_MODEL_VERSION:
                 raw, self._migration_notes = migrate_settings_v171(raw)
             self.settings.update(raw)
-            # Options are explicit user choices and take precedence over the
-            # persisted entity values. Initial config-entry data seeds only a
-            # new store, so later entity changes survive a restart.
-            self.settings.update(
-                {
-                    key: value
-                    for key, value in self.entry.options.items()
-                    if key in self.settings
-                }
-            )
+            option_settings = self._entry_option_settings()
+            if stored.get("entry_option_settings") != option_settings:
+                self.settings.update(option_settings)
+            self._entry_options_snapshot = option_settings
             self.accounting.restore(stored.get("accounting"))
             self.machine_learning.restore(stored.get("machine_learning"))
             sf = stored.get("solar_forecast")
@@ -501,7 +496,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     if key in self.settings
                 }
             )
-            await self._async_save()
+            self._entry_options_snapshot = self._entry_option_settings()
 
         # Les plages tarifaires sont des options de configuration. Elles sont
         # recopiées dans le contexte de stratégie à chaque chargement, sans
@@ -523,6 +518,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
         self.metronome_state["period_s"] = float(self.settings.get("metronome_period_s", 30.0))
+        await self._async_save()
         self._register_listeners()
         await self.async_config_entry_first_refresh()
 
@@ -566,10 +562,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if mode:
             self.settings["mode"] = MODE_ALIASES.get(mode.state, mode.state)
 
+    def _entry_option_settings(self) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in self.entry.options.items()
+            if key in self.settings
+        }
+
     async def _async_save(self) -> None:
         await self._store.async_save(
             {
                 "settings": self.settings,
+                "entry_option_settings": self._entry_options_snapshot,
                 "accounting": self.accounting.dump(),
                 "machine_learning": self.machine_learning.dump(),
                 "solar_forecast": {
@@ -1760,6 +1764,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if key == "mode":
             await self.async_set_mode(str(value))
             return
+
+        if key == "tariff_regime":
+            if value == TARIFF_DYNAMIC:
+                self.settings["price_source"] = PRICE_SOURCE_DYNAMIC
+            elif value in {TARIFF_TOU, TARIFF_SIMPLE}:
+                if tariff_dimensions(self.settings).dynamic:
+                    self.settings["price_source"] = PRICE_SOURCE_VARIABLE
+                self.settings["tariff_structure"] = (
+                    TARIFF_STRUCTURE_TOU if value == TARIFF_TOU else TARIFF_STRUCTURE_SIMPLE
+                )
 
         self.settings[key] = value
 

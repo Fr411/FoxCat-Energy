@@ -1,6 +1,8 @@
-# FoxCat Energy V1.7.1 Professional
+# FoxCat Energy V1.7.2 Professional
 
 EMS local Home Assistant basé exclusivement sur la baseline V1.6.160 fournie.
+
+La V1.7.2 corrige la reprise des réglages du flux de configuration, complète les principaux indicateurs du Price Analyzer dynamique et rétablit l'arbitrage Day-Ahead en Éco/Confort. Elle ne constitue pas une validation complète de tous les critères d'acceptation du chantier V1.7.1; voir le rapport de validation.
 
 ## Architecture
 - EMS Core : économie, charges et coordination.
@@ -26,4 +28,4 @@ Exécuter les tests autonomes avec `PYTHONDONTWRITEBYTECODE=1 python -m unittest
 
 La validation finale dans Home Assistant, l'interface frontend et avec les équipements physiques reste nécessaire avant mise en production. Ces tests unitaires ne valident pas les commandes physiques, l'ACK EnergyBus/PRI, ni les prix réels fournis par une intégration.
 
-Les valeurs EMS enregistrées dans le flux initial alimentent les réglages au premier démarrage. Par la suite, les choix explicites de l'Options Flow priment sur les réglages persistés; les modifications faites par les entités restent conservées tant qu'elles ne sont pas remplacées par une option. Le comportement EMS ne verrouille plus la structure tarifaire ni la politique réseau.
+Les valeurs EMS du flux initial alimentent les réglages au premier démarrage. Les changements de l'Options Flow sont appliqués lorsqu'ils diffèrent de la dernière version persistée; les changements ultérieurs faits par les entités restent conservés au redémarrage. Le comportement EMS ne verrouille plus la structure tarifaire ni la politique réseau.
