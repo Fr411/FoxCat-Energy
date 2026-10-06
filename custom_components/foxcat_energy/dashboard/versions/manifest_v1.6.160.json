@@ -1,0 +1,14 @@
+{
+  "dashboard_version": "1.6.160",
+  "engine_min_version": "1.6.160",
+  "required_entities": [
+    "select.mode_ems",
+    "sensor.price_analyzer_v2"
+  ],
+  "frontend_cards": [
+    "custom:button-card",
+    "custom:apexcharts-card"
+  ],
+  "date": "2026-10-06",
+  "sha256": "7a8b6810c40951de39f8dcca40aa5d7ca57dbe6f53f1547e069602ecdee65e1c"
+}

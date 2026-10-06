@@ -6,8 +6,6 @@ from typing import Any, Iterable
 
 from .economic_optimizer import PricePoint, average_price
 from .engine.models import EnergySnapshot, SolarForecast
-from .engine.tariff import distribution_period
-from .const import MODE_COMFORT, MODE_ECO
 from .machines import MachineDefinition, time_minutes
 
 
@@ -254,17 +252,13 @@ def build_dynamic_schedule(
     solar_forecast: SolarForecast | None,
     tomorrow_available: bool,
 ) -> dict[str, Any]:
-    """Planificateur Day-Ahead : actif uniquement avec un contrat Dynamique."""
+    """Build the V1.6.159 planner. It is intentionally inert outside Dynamic mode."""
     threshold_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
-    high_threshold_pct = max(threshold_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 65.0))))
-    behavior = str(settings.get("mode", MODE_ECO))
-    start_threshold_pct = threshold_pct
-    if behavior == MODE_COMFORT:
-        start_threshold_pct = min(high_threshold_pct, threshold_pct + float(settings.get("comfort_relaxation_pct", 10.0)))
+    high_threshold_pct = max(threshold_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 70.0))))
     if not mode_dynamic_active:
         return {
             "active": False,
-            "reason": "Planificateur Day-Ahead inactif hors contrat Dynamique.",
+            "reason": "Planificateur Day-Ahead inactif hors mode Dynamique.",
             "threshold_pct": threshold_pct,
             "tomorrow_available": bool(tomorrow_available),
             "machines": {},
@@ -289,24 +283,6 @@ def build_dynamic_schedule(
         current_buy = market_decision.get("current_buy_eur_kwh")
         current_position = _position(float(current_buy), pmin, pmax) if isinstance(current_buy, (int, float)) else None
     favorable_now = bool(isinstance(current_position, (int, float)) and float(current_position) <= threshold_pct)
-    start_allowed_now = bool(isinstance(current_position, (int, float)) and float(current_position) <= start_threshold_pct)
-
-    favorable_end = None
-    favorable_remaining_minutes = 0
-    if favorable_now:
-        current_slot = now.replace(minute=0, second=0, microsecond=0)
-        block = [p for p in sorted(points, key=lambda item: item.at) if p.at >= current_slot]
-        last_favorable = None
-        for point in block:
-            if _position(point.price, pmin, pmax) <= threshold_pct:
-                if last_favorable is not None and point.at - last_favorable > timedelta(minutes=90):
-                    break
-                last_favorable = point.at
-            else:
-                break
-        if last_favorable is not None:
-            favorable_end = last_favorable + timedelta(hours=1)
-            favorable_remaining_minutes = max(int((favorable_end - now).total_seconds() // 60), 0)
 
     last_point = max(p.at for p in points)
     horizon_end = min(last_point + timedelta(hours=1), now + timedelta(hours=36))
@@ -337,8 +313,6 @@ def build_dynamic_schedule(
         )
         solar_start_now = bool(user_window_now and solar_fraction_now >= 0.50)
         boiler_priority = bool(market_decision.get("boiler_comfort_priority"))
-        distribution_now = distribution_period(now, settings)
-        impact_pic_block = behavior == MODE_ECO and distribution_now == "PIC"
 
         best = _best_machine_candidate(
             machine=machine,
@@ -370,16 +344,10 @@ def build_dynamic_schedule(
             allow_now = True
             decision = "DEMARRAGE_AUTOCONSOMMATION"
             reason = f"Surplus actuel estimé couvrant {solar_fraction_now*100:.0f} % de la puissance moyenne apprise."
-        elif impact_pic_block:
-            allow_now = False
-            decision = "ATTENTE_IMPACT_PIC"
-            reason = "Profil Impact en période PIC : nouveau départ réseau reporté en mode Éco."
-        elif start_allowed_now:
+        elif favorable_now:
             allow_now = True
-            decision = "DEMARRAGE_PRIX_FAVORABLE" if favorable_now else "DEMARRAGE_CONFORT_ASSOUPLI"
-            reason = (
-                f"Position Day-Ahead {float(current_position):.1f} % <= seuil de départ {start_threshold_pct:.1f} %."
-            )
+            decision = "DEMARRAGE_PRIX_FAVORABLE"
+            reason = f"Position Day-Ahead {float(current_position):.1f} % <= seuil utilisateur {threshold_pct:.1f} %."
         else:
             allow_now = False
             decision = "PLANIFIE"
@@ -411,19 +379,11 @@ def build_dynamic_schedule(
     return {
         "active": True,
         "ready": True,
-        "reason": "Planificateur Day-Ahead actif exclusivement avec un contrat Dynamique.",
+        "reason": "Planificateur Day-Ahead actif exclusivement en mode Dynamique.",
         "threshold_pct": threshold_pct,
-        "start_threshold_pct": round(start_threshold_pct, 2),
         "high_threshold_pct": high_threshold_pct,
         "current_position_pct": round(float(current_position), 2) if isinstance(current_position, (int, float)) else None,
         "favorable_now": favorable_now,
-        "current_favorable_end": favorable_end.isoformat() if favorable_end else None,
-        "current_favorable_remaining_minutes": favorable_remaining_minutes,
-        "current_favorable_remaining_label": (
-            f"{favorable_remaining_minutes // 60} h {favorable_remaining_minutes % 60:02d}" if favorable_now else "—"
-        ),
-        "distribution_period": distribution_period(now, settings),
-        "behavior": behavior,
         "curve_min_eur_kwh": round(pmin, 6),
         "curve_max_eur_kwh": round(pmax, 6),
         "horizon_hours": round(actual_horizon_h, 2),

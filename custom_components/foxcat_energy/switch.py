@@ -18,8 +18,8 @@ def _device_for(key: str) -> str:
         return "pri"
     if key in {"washer_enabled", "dryer_enabled", "dishwasher_enabled"}:
         return "machines"
-    if key == "solar_forecast_arbitrage":
-        return "solar"
+    if key in {"solar_advisor_enabled", "solar_forecast_arbitrage"}:
+        return "ai"
     if key == "predictive_pricing_enabled" or key.startswith("dynamic_") or key.startswith("economic_"):
         return "pricing"
     return "ems"

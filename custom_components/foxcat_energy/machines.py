@@ -54,6 +54,12 @@ class MachineDefinition:
     cycle_margin_minutes: float = 45.0
     cycle_end_w: float = 5.0
     cycle_end_confirm_minutes: float = 10.0
+    nominal_power_w: float = 2000.0
+    interruptible: bool = False
+    priority: int = 50
+    available_from: str = ""
+    deadline: str = ""
+    max_delay_hours: float = 24.0
 
     @property
     def setting_key(self) -> str:
@@ -80,6 +86,7 @@ class MachineDefinition:
             "cycle_margin_minutes": self.cycle_margin_minutes,
             "cycle_end_w": self.cycle_end_w,
             "cycle_end_confirm_minutes": self.cycle_end_confirm_minutes,
+            "nominal_power_w": self.nominal_power_w, "interruptible": self.interruptible, "priority": self.priority, "available_from": self.available_from, "deadline": self.deadline, "max_delay_hours": self.max_delay_hours,
         }
 
 
@@ -115,6 +122,7 @@ def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
         cycle_margin_minutes=float(raw.get("cycle_margin_minutes",45.0)),
         cycle_end_w=float(raw.get("cycle_end_w",5.0)),
         cycle_end_confirm_minutes=float(raw.get("cycle_end_confirm_minutes",10.0)),
+        nominal_power_w=float(raw.get("nominal_power_w",2000)), interruptible=bool(raw.get("interruptible",False)), priority=int(raw.get("priority",50)), available_from=_str(raw.get("available_from")), deadline=_str(raw.get("deadline")), max_delay_hours=float(raw.get("max_delay_hours",24)),
         on_1=_str(raw.get("on_1"), DEFAULT_ON_1),
         off_1=_str(raw.get("off_1"), DEFAULT_OFF_1),
         on_2=_str(raw.get("on_2"), DEFAULT_ON_2),
