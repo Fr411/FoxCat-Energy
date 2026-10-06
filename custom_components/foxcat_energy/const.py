@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.7.2"
-PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "button"]
+VERSION = "1.7.3"
+PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "time", "button"]
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
 # menus, le registre et les diagnostics et ne doit pas être réordonné.
@@ -118,6 +118,14 @@ CONF_TARIFF_FIXED_INJECTION_PRICE = "tariff_fixed_injection_eur_kwh"
 CONF_TARIFF_HP_PRICE_SENSOR = "tariff_hp_price_sensor"
 CONF_TARIFF_HC_PRICE_SENSOR = "tariff_hc_price_sensor"
 CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR = "tariff_fixed_injection_price_sensor"
+TIME_SETTING_KEYS = (
+    CONF_WASHER_ON_1, CONF_WASHER_OFF_1, CONF_WASHER_ON_2, CONF_WASHER_OFF_2,
+    CONF_DRYER_ON_1, CONF_DRYER_OFF_1, CONF_DRYER_ON_2, CONF_DRYER_OFF_2,
+    CONF_DISHWASHER_ON_1, CONF_DISHWASHER_OFF_1, CONF_DISHWASHER_ON_2, CONF_DISHWASHER_OFF_2,
+    CONF_TARIFF_HP_START_1, CONF_TARIFF_HP_END_1, CONF_TARIFF_HP_START_2, CONF_TARIFF_HP_END_2,
+    "impact_eco_start_1", "impact_eco_end_1", "impact_eco_start_2",
+    "impact_eco_end_2", "impact_peak_start", "impact_peak_end",
+)
 
 CONF_AI_TASK = "ai_task"
 CONF_FORECAST_NOW = "forecast_now"
@@ -136,15 +144,54 @@ MODE_ECO = "Éco"
 MODE_COMFORT = "Confort"
 MODE_MANUAL = "Manuel"
 MODES = [MODE_ECO, MODE_COMFORT, MODE_MANUAL]
-MODE_ZERO = "Zéro injection"; MODE_BIHORAIRE = "Bihoraire"; MODE_ECS = MODE_BIHORAIRE; MODE_DYNAMIC = "Dynamique"
-TARIFF_DYNAMIC = "Dynamique"; TARIFF_COMPENSATION = "Compensation"; TARIFF_TOU = "Bi-horaire HP/HC"; TARIFF_SIMPLE = "Simple"
+MODE_ZERO = "Zéro injection"
+MODE_BIHORAIRE = "Bihoraire"
+MODE_ECS = MODE_BIHORAIRE
+MODE_DYNAMIC = "Dynamique"
+TARIFF_DYNAMIC = "Dynamique"
+TARIFF_COMPENSATION = "Compensation"
+TARIFF_TOU = "Bi-horaire HP/HC"
+TARIFF_SIMPLE = "Simple"
 TARIFF_REGIMES = [TARIFF_TOU, TARIFF_DYNAMIC, TARIFF_SIMPLE]
-PRICE_SOURCE_CONTRACT = "Contractuelle / fixe"; PRICE_SOURCE_VARIABLE = "Variable via entités Home Assistant"; PRICE_SOURCE_DYNAMIC = "Dynamique Day-Ahead"; PRICE_SOURCES=[PRICE_SOURCE_CONTRACT,PRICE_SOURCE_VARIABLE,PRICE_SOURCE_DYNAMIC]
-TARIFF_STRUCTURE_SIMPLE = "Simple"; TARIFF_STRUCTURE_TOU = "Bi-horaire"; TARIFF_STRUCTURE_IMPACT = "Impact"; TARIFF_STRUCTURES=[TARIFF_STRUCTURE_SIMPLE,TARIFF_STRUCTURE_TOU,TARIFF_STRUCTURE_IMPACT]
-NETWORK_POLICY_COMPENSATION = "Compensation"; NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"; NETWORK_POLICY_NOT_VALUED = "Injection non valorisée"; NETWORK_POLICY_ZERO_INJECTION = "Zéro injection"; NETWORK_POLICY_LEGACY_BILLED_EXPORT="Injection facturée"; NETWORK_POLICIES=[NETWORK_POLICY_COMPENSATION,NETWORK_POLICY_BILLED_EXPORT,NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO_INJECTION]
-MODE_ALIASES={"Economie énergie":MODE_ECO,"Économie énergie":MODE_ECO,"Éco":MODE_ECO,"Eco":MODE_ECO,"Confort":MODE_COMFORT,"Manuel":MODE_MANUAL,"Dynamique":MODE_ECO,"Prix dynamique":MODE_ECO,"Tarification dynamique":MODE_ECO,"Bihoraire":MODE_ECO,"Bi-horaire":MODE_ECO,"HP/HC":MODE_ECO,"ECS solaire":MODE_ECO,"Zéro injection":MODE_ECO,"Réinjection refusée":MODE_ECO,"Réinjection autorisée":MODE_ECO,"Maxi solaire":MODE_ECO}
-CONF_TARIFF_SIMPLE_PRICE='tariff_simple_fixed_price_eur_kwh'
-DEFAULT_SETTINGS.update if False else None
+PRICE_SOURCE_CONTRACT = "Contractuelle / fixe"
+PRICE_SOURCE_VARIABLE = "Variable via entités Home Assistant"
+PRICE_SOURCE_DYNAMIC = "Dynamique Day-Ahead"
+PRICE_SOURCES = [PRICE_SOURCE_CONTRACT, PRICE_SOURCE_VARIABLE, PRICE_SOURCE_DYNAMIC]
+TARIFF_STRUCTURE_SIMPLE = "Simple"
+TARIFF_STRUCTURE_TOU = "Bi-horaire"
+TARIFF_STRUCTURE_IMPACT = "Impact"
+TARIFF_STRUCTURES = [TARIFF_STRUCTURE_SIMPLE, TARIFF_STRUCTURE_TOU, TARIFF_STRUCTURE_IMPACT]
+NETWORK_POLICY_COMPENSATION = "Compensation"
+NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"
+NETWORK_POLICY_NOT_VALUED = "Injection non valorisée"
+NETWORK_POLICY_ZERO_INJECTION = "Zéro injection"
+NETWORK_POLICY_LEGACY_BILLED_EXPORT = "Injection facturée"
+NETWORK_POLICIES = [
+    NETWORK_POLICY_COMPENSATION,
+    NETWORK_POLICY_BILLED_EXPORT,
+    NETWORK_POLICY_NOT_VALUED,
+    NETWORK_POLICY_ZERO_INJECTION,
+]
+MODE_ALIASES = {
+    "Economie énergie": MODE_ECO,
+    "Économie énergie": MODE_ECO,
+    "Éco": MODE_ECO,
+    "Eco": MODE_ECO,
+    "Confort": MODE_COMFORT,
+    "Manuel": MODE_MANUAL,
+    "Dynamique": MODE_ECO,
+    "Prix dynamique": MODE_ECO,
+    "Tarification dynamique": MODE_ECO,
+    "Bihoraire": MODE_ECO,
+    "Bi-horaire": MODE_ECO,
+    "HP/HC": MODE_ECO,
+    "ECS solaire": MODE_ECO,
+    "Zéro injection": MODE_ECO,
+    "Réinjection refusée": MODE_ECO,
+    "Réinjection autorisée": MODE_ECO,
+    "Maxi solaire": MODE_ECO,
+}
+CONF_TARIFF_SIMPLE_PRICE = "tariff_simple_fixed_price_eur_kwh"
 
 BOILER_NONE = "AUCUNE"
 BOILER_HEAT_45 = "CHAUFFE_45"
@@ -193,6 +240,16 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "impact_eco_start_1":"01:00:00","impact_eco_end_1":"07:00:00","impact_eco_start_2":"11:00:00","impact_eco_end_2":"17:00:00","impact_peak_start":"17:00:00","impact_peak_end":"22:00:00",
     "regulation_active": False,
     "mode": MODE_ECO,
+    "device_inverter_enabled": True,
+    "device_meter_enabled": True,
+    "device_boiler_enabled": True,
+    "device_machines_enabled": True,
+    CONF_WASHER_ON_1: "21:30:00", CONF_WASHER_OFF_1: "07:00:00",
+    CONF_WASHER_ON_2: "10:30:00", CONF_WASHER_OFF_2: "17:00:00",
+    CONF_DRYER_ON_1: "21:30:00", CONF_DRYER_OFF_1: "07:00:00",
+    CONF_DRYER_ON_2: "10:30:00", CONF_DRYER_OFF_2: "17:00:00",
+    CONF_DISHWASHER_ON_1: "21:30:00", CONF_DISHWASHER_OFF_1: "07:00:00",
+    CONF_DISHWASHER_ON_2: "10:30:00", CONF_DISHWASHER_OFF_2: "17:00:00",
     "boiler_enabled": True,
     "boiler_allow_hc": True,
     "pri_enabled": True,

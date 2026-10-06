@@ -55,6 +55,9 @@ from .const import (
     CONF_TARIFF_HP_PRICE_SENSOR,
     CONF_WASHER_CYCLE,
     CONF_WASHER_SOCKET,
+    NUMBER_DEFINITIONS,
+    SWITCH_DEFINITIONS,
+    TIME_SETTING_KEYS,
     OFFICIAL_SECTION_ORDER,
 )
 
@@ -151,6 +154,12 @@ _native("ems.last_action", "EMS", "derniere_action")
 _native("ems.load_shed", "EMS", "statut_delestage")
 _native("ems.persistent_status_notification", "EMS", "persistent_status_notification_enabled")
 
+# Appareils
+_native("devices.inverter.enabled", "Appareils", "device_inverter_enabled")
+_native("devices.meter.enabled", "Appareils", "device_meter_enabled")
+_native("devices.boiler.enabled", "Appareils", "device_boiler_enabled")
+_native("devices.machines.enabled", "Appareils", "device_machines_enabled")
+
 # Energy Bus
 _native("energy_bus.state", "Energy Bus", "energy_bus_etat")
 _native("energy_bus.frame_id", "Energy Bus", "energy_bus_frame_id")
@@ -226,7 +235,15 @@ _native("pricing.price_analyzer", "Tarification", "price_analyzer_v2")
 _native("machines.flexible_planner", "Machines", "planificateur_charges_flexibles")
 _native("diagnostic.engine_version", "Diagnostic", "version_moteur")
 _native("diagnostic.dashboard_version", "Diagnostic", "version_dashboard_active")
+_native("diagnostic.dashboard_select", "Diagnostic", "dashboard_version")
 _native("pricing.network_policy", "Tarification", "politique_reseau", "select.foxcat_energy_tarification_politique_reseau")
+
+for _setting_key in NUMBER_DEFINITIONS:
+    _native(f"settings.{_setting_key}", "Technique", _setting_key)
+for _setting_key in SWITCH_DEFINITIONS:
+    _native(f"settings.{_setting_key}", "Technique", _setting_key)
+for _setting_key in TIME_SETTING_KEYS:
+    _native(f"settings.time.{_setting_key}", "Technique", f"heure_{_setting_key}")
 _native("pricing.current", "Tarification", "prix_actuel")
 _native("pricing.next", "Tarification", "prix_suivant")
 _native("pricing.injection", "Tarification", "prix_injection")

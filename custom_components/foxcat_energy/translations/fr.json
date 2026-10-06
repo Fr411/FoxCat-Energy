@@ -474,6 +474,14 @@
           "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
         }
       }
+    },
+    "entity": {
+      "select": {
+        "mode_ems": {"name": "Mode EMS"},
+        "regime_tarifaire": {"name": "Régime tarifaire"},
+        "politique_reseau": {"name": "Politique réseau"},
+        "dashboard_version": {"name": "Version du dashboard"}
+      }
     }
   }
 }

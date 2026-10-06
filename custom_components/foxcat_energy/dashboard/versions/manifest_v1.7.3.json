@@ -1,0 +1,18 @@
+{
+  "dashboard_version": "1.7.3",
+  "engine_min_version": "1.7.3",
+  "recommended": true,
+  "required_entities": [
+    "select.mode_ems",
+    "select.dashboard_version",
+    "sensor.version_dashboard_active",
+    "sensor.price_analyzer_v2"
+  ],
+  "frontend_cards": [
+    "custom:button-card",
+    "custom:apexcharts-card",
+    "custom:bubble-card"
+  ],
+  "date": "2026-10-06",
+  "sha256": "d44cdbb84a693cc1ea1e01a0f958b236882a8f6762bad385266eeac2d7acd567"
+}
