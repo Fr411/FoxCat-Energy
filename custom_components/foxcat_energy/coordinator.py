@@ -133,6 +133,7 @@ from .const import (
     NETWORK_POLICY_LEGACY_BILLED_EXPORT,
     TARIFF_DYNAMIC,
     TARIFF_TOU,
+    TIME_SETTING_KEYS,
 )
 from .engine import BoilerIntent, EnergySnapshot, SolarForecast, decide_dynamic, decide_zero, evaluate_mode
 from .engine.load_guard import (
@@ -157,10 +158,15 @@ from .energy_bus import EnergyBus
 from .inverter_core import InverterCore
 from .accounting import EnergyAccounting
 from .dynamic_scheduler import build_dynamic_schedule
-from .migration import migrate_settings_v171, compatibility_tariff_regime, MIGRATION_MODEL_VERSION
+from .migration import (
+    MIGRATION_MODEL_VERSION,
+    compatibility_tariff_regime,
+    migrate_settings_v173,
+)
 from .tariff_model import tariff_dimensions, final_client_price, apply_final_price_components
 from .price_analyzer import analyze_price_curve
 from .flexible_load_planner import build_flexible_load_plan
+from .dashboard import dashboard_status
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -468,7 +474,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if isinstance(stored, dict):
             raw = dict(stored.get("settings", {}) or {})
             if raw.get("configuration_model_version") != MIGRATION_MODEL_VERSION:
-                raw, self._migration_notes = migrate_settings_v171(raw)
+                raw, self._migration_notes = migrate_settings_v173(raw)
             self.settings.update(raw)
             option_settings = self._entry_option_settings()
             if stored.get("entry_option_settings") != option_settings:
@@ -501,7 +507,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Les plages tarifaires sont des options de configuration. Elles sont
         # recopiées dans le contexte de stratégie à chaque chargement, sans
         # écraser les autres réglages persistants.
-        for key in (CONF_TARIFF_HP_START_1, CONF_TARIFF_HP_END_1, CONF_TARIFF_HP_START_2, CONF_TARIFF_HP_END_2):
+        for key in TIME_SETTING_KEYS:
             if key in self.config and self.config.get(key) not in (None, ""):
                 self.settings[key] = str(self.config[key])
         for key in (CONF_TARIFF_FIXED_INJECTION_PRICE,):
@@ -1765,6 +1771,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_set_mode(str(value))
             return
 
+        if key == "regulation_active" and bool(value) and not bool(
+            self.settings.get("device_meter_enabled", True)
+        ):
+            value = False
+            self.core_state["last_reason"] = (
+                "Activation refusée : le compteur réseau est désactivé."
+            )
+        if key == "pri_enabled" and bool(value) and not bool(
+            self.settings.get("device_inverter_enabled", True)
+        ):
+            value = False
+
         if key == "tariff_regime":
             if value == TARIFF_DYNAMIC:
                 self.settings["price_source"] = PRICE_SOURCE_DYNAMIC
@@ -1845,13 +1863,48 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # editable number entities for backwards compatibility, but mirror any
         # change they make into ConfigEntry options so the dedicated tariff
         # page and the entities always survive restarts with the same value.
-        if key in {CONF_TARIFF_FIXED_INJECTION_PRICE}:
+        if key in {*TIME_SETTING_KEYS, CONF_TARIFF_FIXED_INJECTION_PRICE}:
             options = dict(self.entry.options)
             if options.get(key) != value:
                 options[key] = value
                 self.config[key] = value
                 self.hass.config_entries.async_update_entry(self.entry, options=options)
 
+        self.async_set_updated_data(self._build_data())
+
+    async def async_apply_settings_profile(self, values: dict[str, Any]) -> None:
+        was_regulating = bool(self.settings.get("regulation_active"))
+        was_pri_enabled = bool(self.settings.get("pri_enabled"))
+        was_boiler_on = self.snapshot().boiler_on
+        self.settings.update(values)
+        if not bool(self.settings.get("device_meter_enabled", True)):
+            self.settings["regulation_active"] = False
+        if not bool(self.settings.get("device_inverter_enabled", True)):
+            self.settings["pri_enabled"] = False
+
+        regulation_active = bool(self.settings.get("regulation_active"))
+        pri_enabled = bool(self.settings.get("pri_enabled"))
+        boiler_enabled = bool(self.settings.get("boiler_enabled")) and bool(
+            self.settings.get("device_boiler_enabled", True)
+        )
+
+        self.reset_core("Profil de réglages appliqué : acquisition de sécurité requise.")
+        if (was_regulating and not regulation_active) or (was_pri_enabled and not pri_enabled):
+            if self._pri_task and not self._pri_task.done():
+                self._pri_task.cancel()
+            await self.async_release_pri_100("Profil appliqué : onduleur libéré à 100 %.")
+        elif not was_regulating and regulation_active:
+            await self.async_release_pri_100("Profil appliqué : démarrage depuis un point sûr à 100 %.")
+
+        if was_boiler_on and not boiler_enabled:
+            await self.async_command_boiler(
+                BOILER_STOP,
+                "Profil appliqué : fonction Boiler désactivée.",
+                "UTILISATEUR",
+            )
+        if str(self.settings.get("mode")) != MODE_MANUAL:
+            await self.async_reconcile_machines()
+        await self._async_save()
         self.async_set_updated_data(self._build_data())
 
     async def async_set_mode(self, mode: str) -> None:
@@ -2509,7 +2562,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         command_on = not (command.startswith("BOILER_OFF") or command == "ECS_MODULE_OFF")
         if not command_on:
             return False
-        if not bool(self.settings["boiler_enabled"]) or snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
+        if (
+            not bool(self.settings["boiler_enabled"])
+            or not bool(self.settings.get("device_boiler_enabled", True))
+            or snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"])
+        ):
             return True
         # Un démarrage utilisateur garde la priorité sur les stratégies EMS et
         # les cycles machines. La sécurité thermique reste souveraine.
@@ -2749,6 +2806,35 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data())
 
+    async def async_set_device_enabled(self, device_id: str, enabled: bool) -> None:
+        from .devices import apply_device_toggle
+
+        try:
+            action = apply_device_toggle(self.settings, device_id, enabled)
+        except ValueError:
+            return
+
+        if action == "release_inverter":
+            await self.async_set_setting("pri_enabled", False)
+            return
+        if action == "stop_regulation":
+            await self.async_set_setting("regulation_active", False)
+            return
+        if action == "stop_boiler" and self.snapshot().boiler_on:
+            await self.async_command_boiler(
+                BOILER_STOP,
+                "Boiler désactivé depuis le menu Appareils.",
+                "UTILISATEUR",
+            )
+        if device_id == "boiler" and not enabled:
+            await self.async_release_pri_100(
+                "Boiler désactivé : onduleur libéré à 100 %."
+            )
+        if action == "reconcile_machines":
+            await self.async_reconcile_machines()
+        await self._async_save()
+        self.async_set_updated_data(self._build_data())
+
     async def _async_user_switch_call(self, entity_id: str, turn_on: bool) -> bool:
         """Commande utilisateur bornée, sans polluer l'état d'exécution Boiler."""
         try:
@@ -2833,7 +2919,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ok = True
         else:
             snap = self.snapshot()
-            if not bool(self.settings.get("boiler_enabled")):
+            if not bool(self.settings.get("boiler_enabled")) or not bool(self.settings.get("device_boiler_enabled", True)):
                 self.core_state["last_reason"] = "Utilisateur : démarrage Boiler refusé car la fonction Boiler est désactivée."
                 self.core_state["boiler_user_override"] = "AUTO"
                 action = "BOILER_USER_START_BLOCKED"
@@ -2875,7 +2961,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if not socket:
                 continue
             cycle_active = self.machine_cycle_manager.is_protected(machine.machine_id)
-            management = bool(self.settings.get(machine.setting_key, machine.automatic_default))
+            management = bool(self.settings.get(machine.setting_key, machine.automatic_default)) and bool(
+                self.settings.get("device_machines_enabled", True)
+            )
             allowed = machine_allowed(machine, now)
             # Règle souveraine : un cycle déjà commencé n'est jamais interrompu.
             # Pendant un délestage, seules les machines explicitement délestables
@@ -3551,7 +3639,10 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         return {
             "snapshot": snap,
             "settings": dict(self.settings),
-            "versions": {"engine": VERSION, "dashboard": "1.7.1"},
+            "versions": {
+                "engine": VERSION,
+                "dashboard": dashboard_status(self.hass).get("active_version") or "Non installé",
+            },
             "migration": {"model_version": self.settings.get("configuration_model_version"), "notes": getattr(self, "_migration_notes", [])},
             "core": dict(self.core_state),
             "pri": dict(self.pri_state),

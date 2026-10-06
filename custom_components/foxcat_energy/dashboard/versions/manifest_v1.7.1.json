@@ -1,6 +1,7 @@
 {
   "dashboard_version": "1.7.1",
   "engine_min_version": "1.7.1",
+  "recommended": false,
   "required_entities": [
     "select.mode_ems",
     "sensor.price_analyzer_v2"

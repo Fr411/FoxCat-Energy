@@ -8,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import DOMAIN, SWITCH_DEFINITIONS
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
+from .devices import DeviceDefinition, device_definitions
 from .machines import MachineDefinition
 
 
@@ -35,6 +36,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatMachineManagementSwitch(coordinator, machine)
         for machine in coordinator.machines
         if machine.setting_key not in legacy_keys
+    )
+    entities.extend(
+        FoxCatDeviceSwitch(coordinator, definition)
+        for definition in device_definitions()
     )
     async_add_entities(entities)
 
@@ -72,3 +77,31 @@ class FoxCatMachineManagementSwitch(FoxCatEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs) -> None:
         await self.coordinator.async_set_machine_enabled(self.machine.machine_id, False)
+
+
+class FoxCatDeviceSwitch(FoxCatEntity, SwitchEntity):
+    def __init__(self, coordinator: FoxCatEnergyCoordinator, definition: DeviceDefinition) -> None:
+        self.definition = definition
+        device = {
+            "inverter": "pri",
+            "meter": "sources",
+            "boiler": "boiler",
+            "machines": "machines",
+        }[definition.category]
+        super().__init__(
+            coordinator,
+            definition.enabled_setting,
+            f"{definition.name} activé",
+            "mdi:power-plug",
+            device,
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self.coordinator.settings.get(self.definition.enabled_setting, True))
+
+    async def async_turn_on(self, **kwargs) -> None:
+        await self.coordinator.async_set_device_enabled(self.definition.device_id, True)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        await self.coordinator.async_set_device_enabled(self.definition.device_id, False)
