@@ -18,7 +18,7 @@ def _device_for(key: str) -> str:
     if key.startswith("pri") or key == "inverter_power_w":
         return "pri"
     if key.startswith("solar_"):
-        return "solar"
+        return "ai"
     if key.startswith("dynamic_") or key.startswith("tariff_") or key.startswith("economic_"):
         return "pricing"
     return "ems"

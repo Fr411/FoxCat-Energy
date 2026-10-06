@@ -105,28 +105,3 @@ def price_status(current: float | None, pmin: float | None, pmax: float | None, 
     if position >= 0.60:
         return "ÉLEVÉ"
     return "NORMAL"
-
-
-def distribution_period(now: datetime, settings: dict[str, object] | None = None) -> str:
-    """Période de distribution belge indépendante du contrat d'énergie.
-
-    Wallonie Impact 2026 : ECO 01-07 + 11-17, MEDIUM 07-11 + 22-01,
-    PIC 17-22. Le profil bihoraire wallon utilise les plages 2026 officielles.
-    Les profils non temporels retournent STANDARD/CAPACITE.
-    """
-    settings = settings or {}
-    profile = str(settings.get("distribution_profile", "Wallonie · Bihoraire 2026"))
-    m = minute_of_day(now)
-    if profile == "Wallonie · Impact":
-        if _within(m, 17*60, 22*60):
-            return "PIC"
-        if _within(m, 7*60, 11*60) or _within(m, 22*60, 1*60):
-            return "MEDIUM"
-        return "ECO"
-    if profile == "Wallonie · Exclusif nuit (piloté GRD)":
-        return "EXCLUSIF_NUIT"
-    if profile in {"Wallonie · Bihoraire 2026", "Bruxelles · Bihoraire"}:
-        return tariff_period(now, settings)
-    if profile == "Flandre · Capacité":
-        return "CAPACITE"
-    return "STANDARD"
