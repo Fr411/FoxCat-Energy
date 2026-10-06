@@ -469,6 +469,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if raw.get("configuration_model_version") != MIGRATION_MODEL_VERSION:
                 raw, self._migration_notes = migrate_settings_v171(raw)
             self.settings.update(raw)
+            # Options are explicit user choices and take precedence over the
+            # persisted entity values. Initial config-entry data seeds only a
+            # new store, so later entity changes survive a restart.
+            self.settings.update(
+                {
+                    key: value
+                    for key, value in self.entry.options.items()
+                    if key in self.settings
+                }
+            )
             self.accounting.restore(stored.get("accounting"))
             self.machine_learning.restore(stored.get("machine_learning"))
             sf = stored.get("solar_forecast")
@@ -477,6 +487,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._loaded_existing_state = True
         else:
             self._migrate_legacy_defaults()
+            self.settings.update(
+                {
+                    key: value
+                    for key, value in self.entry.data.items()
+                    if key in self.settings
+                }
+            )
+            self.settings.update(
+                {
+                    key: value
+                    for key, value in self.entry.options.items()
+                    if key in self.settings
+                }
+            )
             await self._async_save()
 
         # Les plages tarifaires sont des options de configuration. Elles sont
@@ -498,14 +522,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.settings.setdefault(machine.setting_key, machine.automatic_default)
 
         self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
-        # V1.6.160 : cohérence souveraine du couple Mode/Tarification.
-        # Une ancienne configuration est migrée silencieusement au démarrage.
-        if str(self.settings.get("mode")) == MODE_DYNAMIC:
-            self.settings["tariff_regime"] = TARIFF_DYNAMIC
-            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
-        elif str(self.settings.get("mode")) == MODE_ECS:  # MODE_ECS = Bihoraire (alias historique)
-            self.settings["tariff_regime"] = TARIFF_TOU
-            self.settings["network_policy"] = NETWORK_POLICY_BILLED_EXPORT
         self.metronome_state["period_s"] = float(self.settings.get("metronome_period_s", 30.0))
         self._register_listeners()
         await self.async_config_entry_first_refresh()
@@ -1297,6 +1313,23 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
+        if not tariff_dimensions(self.settings).dynamic and regime != TARIFF_TOU:
+            if tariff_dimensions(self.settings).price_source == PRICE_SOURCE_CONTRACT:
+                base = self.settings.get(CONF_TARIFF_SIMPLE_PRICE, 0.30)
+            else:
+                base = self._optional_float_state(self.config.get(CONF_PRICE_CURRENT))
+            if not isinstance(base, (int, float)):
+                base = prices.get("active_buy")
+            if not isinstance(base, (int, float)):
+                return []
+            return [
+                PricePoint(
+                    now + timedelta(hours=hour),
+                    final_client_price(float(base), now + timedelta(hours=hour), self.settings),
+                    "NON_DYNAMIC_FIXED",
+                )
+                for hour in range(horizon + 1)
+            ]
         if regime == TARIFF_TOU:
             return build_hphc_points(
                 now,
@@ -1321,6 +1354,50 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             manual.append(PricePoint(slot + timedelta(hours=1), float(nxt), "DYNAMIC_NEXT"))
         return merge_price_points(series, manual)
 
+    def _economic_series_from_entity(
+        self,
+        entity_id: str | None,
+        *,
+        source: str,
+        now: datetime,
+        horizon_hours: int,
+        preferred_price_keys: tuple[str, ...] = (),
+    ) -> list[PricePoint]:
+        """Extract a provider price curve without treating missing data as prices."""
+        if not entity_id:
+            return []
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+            return []
+        raw = dict(state.attributes)
+        if state.attributes:
+            raw.setdefault("state", state.state)
+        else:
+            raw = state.state
+        points = extract_price_points(
+            raw,
+            now,
+            source=source,
+            horizon_hours=horizon_hours,
+            preferred_price_keys=preferred_price_keys,
+        )
+        for key in preferred_price_keys:
+            curve = state.attributes.get(key)
+            if isinstance(curve, (dict, list, tuple)):
+                points.extend(
+                    extract_price_points(
+                        curve,
+                        now,
+                        source=source,
+                        horizon_hours=horizon_hours,
+                        preferred_price_keys=preferred_price_keys,
+                    )
+                )
+        points = merge_price_points(points)
+        if source == "DYNAMIC_IMPORT":
+            return apply_final_price_components(points, self.settings)
+        return points
+
     def _economic_export_points(
         self, prices: dict[str, Any], now: datetime
     ) -> list[PricePoint]:
@@ -1331,6 +1408,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
+        if not tariff_dimensions(self.settings).dynamic:
+            value = prices.get("export_value")
+            if not isinstance(value, (int, float)):
+                return []
+            return [
+                PricePoint(now + timedelta(hours=hour), float(value), "NON_DYNAMIC_EXPORT")
+                for hour in range(horizon + 1)
+            ]
         if regime == TARIFF_TOU:
             value = prices.get("export_value")
             if not isinstance(value, (int, float)):
@@ -1416,8 +1501,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             point.at.date() > now.date() for point in import_points
         )
         scheduler_active = bool(
-            str(self.settings.get("mode")) == MODE_DYNAMIC
-            and str(tariff.get("regime")) == TARIFF_DYNAMIC
+            tariff_dimensions(self.settings).dynamic
+            and str(self.settings.get("mode")) != MODE_MANUAL
             and bool(self.settings.get("economic_optimizer_enabled", True))
             and bool(self.settings.get("predictive_pricing_enabled", True))
         )
@@ -1675,21 +1760,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if key == "mode":
             await self.async_set_mode(str(value))
             return
-
-        # V1.6.160 : tant que le mode EMS est Dynamique, son modèle financier
-        # ne peut pas diverger : tarif Dynamique + Injection tarifée. Le mode
-        # Bihoraire verrouille de la même façon le régime HP/HC historique.
-        active_mode = str(self.settings.get("mode"))
-        if active_mode == MODE_DYNAMIC:
-            if key == "tariff_regime":
-                value = TARIFF_DYNAMIC
-            elif key == "network_policy":
-                value = NETWORK_POLICY_BILLED_EXPORT
-        elif active_mode == MODE_ECS:
-            if key == "tariff_regime":
-                value = TARIFF_TOU
-            elif key == "network_policy":
-                value = NETWORK_POLICY_BILLED_EXPORT
 
         self.settings[key] = value
 
@@ -2152,8 +2222,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             tariff_context = self.prices()
             solar_for_mode = self.solar_forecast
             if (
-                mode == MODE_DYNAMIC
-                and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC
+                tariff_dimensions(self.settings).dynamic
                 and not bool(self.settings.get("solar_forecast_arbitrage", True))
             ):
                 # Le kill-switch neutralise uniquement l'influence de la prévision
@@ -2170,10 +2239,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 tariff_context,
                 solar_for_mode,
             )
-            if mode == MODE_DYNAMIC and str(self.settings.get("tariff_regime")) == TARIFF_DYNAMIC:
+            if (
+                mode != MODE_MANUAL
+                and tariff_dimensions(self.settings).dynamic
+            ):
                 # V1.6.160 : branche Boiler dédiée au Dynamique. L'ancienne
-                # méthode _apply_dynamic_boiler_arbitrage reste dans le code pour
-                # audit/rollback mais n'est plus appelée.
+                # stratégie ne dépend plus du comportement EMS : le Planner et
+                # le prix Day-Ahead déterminent l'arbitrage, jamais le mode Manuel.
                 intent = evaluate_dynamic_boiler_v2(
                     snapshot, intent, self.settings, self._economic_view(snapshot, prices=tariff_context)
                 )

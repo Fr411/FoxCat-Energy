@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ...const import MODE_DYNAMIC, MODE_ECO, MODE_ECS, MODE_MANUAL, MODE_ZERO, BOILER_NONE
+from ...const import MODE_COMFORT, MODE_DYNAMIC, MODE_ECO, MODE_ECS, MODE_MANUAL, MODE_ZERO, BOILER_NONE
 from ..models import BoilerIntent, EnergySnapshot, SolarForecast
 from .dynamic import evaluate_dynamic
 from .eco import evaluate_eco
@@ -26,7 +26,7 @@ def evaluate_mode(
         return evaluate_manual(snapshot, settings)
     if mode == MODE_ZERO:
         return evaluate_zero_injection(snapshot, settings)
-    if mode == MODE_ECO:
+    if mode in {MODE_ECO, MODE_COMFORT}:
         return evaluate_eco(snapshot, t0, settings, now, boiler_on_seconds, current_demand)
     if mode == MODE_ECS:
         return evaluate_ecs_solar(snapshot, t0, settings, now, boiler_on_seconds, current_demand)

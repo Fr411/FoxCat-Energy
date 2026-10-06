@@ -1,17 +1,35 @@
-# FoxCat Energy V1.7.1 — Test report
+# FoxCat Energy V1.7.1 — Validation status
 
-## Automated checks executed
-- Python compilation: PASS for all integration Python modules.
-- Migration Dynamique → source Day-Ahead + Éco: PASS.
-- Manual remains Manual: PASS.
-- Final-price no-double-count: PASS.
-- Impact PIC component: PASS.
-- Price Analyzer 15-minute native granularity: PASS.
-- J+1 predictive mode: PASS.
-- Eco / Confort / Manuel planner decisions: PASS.
+## Automated checks
 
-## Not claimed as passed
-- Home Assistant runtime integration test: not executable in this build environment because the Home Assistant Python package/runtime is not installed.
-- Physical PRI/RRCR, EnergyBus ACK/NOK, boiler sensors and real machine switches: require a real HA installation.
-- Browser/frontend rendering on smartphone/tablet/desktop: requires HA frontend.
-- Actual provider Day-Ahead payload validity and real contract prices: require connected entities.
+Run the standard-library unit tests with:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -v
+```
+
+The current focused suite covers:
+
+- migration of the historical Dynamique mode to the Éco EMS behavior while preserving the Day-Ahead source;
+- dispatch of Confort through the established Éco boiler strategy;
+- Price Analyzer reactive versus predictive state;
+- favorable-window selection and duration cap;
+- peak and best-slot reporting.
+
+Compile the integration without writing bytecode into the repository with:
+
+```bash
+PYTHONPYCACHEPREFIX=/tmp/foxcat-pycache python -m compileall -q custom_components/foxcat_energy tests
+```
+
+These checks do not constitute full V1.7.1 acceptance testing.
+
+## Not validated here
+
+- Home Assistant startup, Config Flow/Options Flow persistence, entity registry, and dashboard rendering;
+- live Day-Ahead provider payloads, tariff contract values, stale/unavailable entities, and DST transitions;
+- physical boiler commands and thermal protections;
+- PRI/RRCR, InverterCore, EnergyBus ACK/NOK, and real machine switches;
+- mobile/tablet/desktop dashboard behavior and dashboard replacement/rollback.
+
+Those checks require a Home Assistant runtime, real provider data, or physical equipment. Do not treat this report as evidence that those acceptance criteria have passed.
