@@ -5,8 +5,8 @@ MIGRATION_MODEL_VERSION="1.7.1"
 def migrate_settings_v171(settings:dict[str,Any]):
  out=dict(settings); notes=[]; old=str(out.get("mode",MODE_ECO)); regime=str(out.get("tariff_regime",TARIFF_TOU))
  if old in {MODE_DYNAMIC,"Prix dynamique","Tarification dynamique"} or regime==TARIFF_DYNAMIC: out["price_source"]=PRICE_SOURCE_DYNAMIC; out.setdefault("tariff_structure",TARIFF_STRUCTURE_SIMPLE); notes.append("Ancien Dynamique migré vers source Day-Ahead.")
- elif old in {MODE_BIHORAIRE,"ECS solaire","Bihoraire","Bi-horaire","HP/HC"} or regime==TARIFF_TOU: out["price_source"]=out.get("price_source",PRICE_SOURCE_VARIABLE); out["tariff_structure"]=TARIFF_STRUCTURE_TOU; notes.append("Ancien HP/HC conservé.")
- else: out.setdefault("price_source",PRICE_SOURCE_VARIABLE); out.setdefault("tariff_structure",TARIFF_STRUCTURE_SIMPLE if regime==TARIFF_SIMPLE else TARIFF_STRUCTURE_TOU)
+ elif old in {MODE_BIHORAIRE,"ECS solaire","Bihoraire","Bi-horaire","HP/HC"} or regime in {TARIFF_TOU,"Bi-horaire HP/HC"}: out["price_source"]=out.get("price_source",PRICE_SOURCE_VARIABLE); out["tariff_structure"]=TARIFF_STRUCTURE_TOU; notes.append("Ancien HP/HC conservé.")
+ else: out.setdefault("price_source",PRICE_SOURCE_VARIABLE); out.setdefault("tariff_structure",TARIFF_STRUCTURE_SIMPLE if regime in {TARIFF_SIMPLE,TARIFF_MONO} else TARIFF_STRUCTURE_TOU)
  if old in {MODE_ZERO,"Réinjection refusée"}: out["network_policy"]=NETWORK_POLICY_ZERO_INJECTION
  elif old=="Réinjection autorisée" and "network_policy" not in out: out["network_policy"]=NETWORK_POLICY_BILLED_EXPORT
  else: out.setdefault("network_policy",NETWORK_POLICY_COMPENSATION)

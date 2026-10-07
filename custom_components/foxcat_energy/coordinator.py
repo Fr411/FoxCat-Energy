@@ -479,7 +479,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.accounting.restore(stored.get("accounting"))
             self.machine_learning.restore(stored.get("machine_learning"))
             price_backup = stored.get("price_backup", {})
-            self.price_backup = price_backup if isinstance(price_backup, dict) else {}
+            self.price_backup = (
+                {
+                    key: dict(points)
+                    for key, points in price_backup.items()
+                    if key in {"import", "export"} and isinstance(points, dict)
+                }
+                if isinstance(price_backup, dict)
+                else {}
+            )
             sf = stored.get("solar_forecast")
             if isinstance(sf, dict):
                 self.solar_forecast = SolarForecast(**{k: sf.get(k, getattr(SolarForecast(), k)) for k in SolarForecast.__dataclass_fields__})
@@ -1324,6 +1332,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
+        if self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+            source_entity = self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
+            state = self.hass.states.get(source_entity) if source_entity else None
+            if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+                backup = self._economic_series_from_entity(
+                    source_entity,
+                    source="DYNAMIC_IMPORT",
+                    now=now,
+                    horizon_hours=horizon,
+                    preferred_price_keys=("all_in",),
+                )
+                if backup:
+                    return backup
         if not tariff_dimensions(self.settings).dynamic and regime != TARIFF_TOU:
             if tariff_dimensions(self.settings).price_source == PRICE_SOURCE_CONTRACT:
                 base = self.settings.get(CONF_TARIFF_SIMPLE_PRICE, 0.30)
@@ -1524,6 +1545,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
+        if self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+            source_entity = self.config.get(CONF_PRICE_FORECAST_EXPORT) or self.config.get(CONF_PRICE_INJECTION)
+            state = self.hass.states.get(source_entity) if source_entity else None
+            if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+                raw = self._economic_series_from_entity(
+                    source_entity,
+                    source="DYNAMIC_EXPORT_RAW",
+                    now=now,
+                    horizon_hours=horizon,
+                    preferred_price_keys=("injection",),
+                )
+                if raw:
+                    source_name = str(source_entity or "").lower()
+                    export_sign = (
+                        DYNAMIC_EXPORT_POSITIVE_IS_REVENUE
+                        if "luminus_luminus_dynamic" in source_name
+                        else str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_POSITIVE_IS_REVENUE))
+                    )
+                    factor = 1.0 if export_sign == DYNAMIC_EXPORT_POSITIVE_IS_REVENUE else -1.0
+                    return merge_price_points(
+                        [PricePoint(point.at, factor * point.price, "DYNAMIC_EXPORT_BACKUP") for point in raw]
+                    )
         if not tariff_dimensions(self.settings).dynamic:
             value = prices.get("export_value")
             if not isinstance(value, (int, float)):
