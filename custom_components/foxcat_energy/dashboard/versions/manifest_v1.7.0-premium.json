@@ -1,0 +1,11 @@
+{
+  "dashboard_version": "1.7.0-premium",
+  "name": "V1.7.0 Premium",
+  "engine_min_version": "1.7.0",
+  "recommended": false,
+  "required_entities": [
+    "select.dashboard_version",
+    "sensor.version_dashboard_active"
+  ],
+  "date": "2026-10-07"
+}
