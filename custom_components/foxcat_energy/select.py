@@ -5,7 +5,17 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, MODE_MANUAL, MODES, TARIFF_REGIMES, NETWORK_POLICIES, NETWORK_POLICY_COMPENSATION, PRICE_SOURCES, TARIFF_STRUCTURES
+from .const import (
+    DOMAIN,
+    DYNAMIC_STRUCTURES,
+    MODE_MANUAL,
+    MODES,
+    NETWORK_POLICIES,
+    NETWORK_POLICY_COMPENSATION,
+    PRICE_SOURCES,
+    TARIFF_REGIMES,
+    TARIFF_STRUCTURES,
+)
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .migration import compatibility_tariff_regime
@@ -16,7 +26,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(
         [
             FoxCatModeSelect(coordinator),
-            FoxCatTariffRegimeSelect(coordinator), FoxCatPriceSourceSelect(coordinator), FoxCatTariffStructureSelect(coordinator),
+            FoxCatTariffRegimeSelect(coordinator),
+            FoxCatDynamicStructureSelect(coordinator),
+            FoxCatPriceSourceSelect(coordinator), FoxCatTariffStructureSelect(coordinator),
             FoxCatNetworkPolicySelect(coordinator),
             FoxCatPriManualLevelSelect(coordinator),
         ]
@@ -56,11 +68,42 @@ class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
     async def async_select_option(self,option):
         if option in TARIFF_STRUCTURES: await self.coordinator.async_set_setting("tariff_structure",option)
 
-class FoxCatTariffRegimeSelect(FoxCatEntity, SelectEntity):
-    _attr_options = TARIFF_REGIMES
+class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
+    def __init__(
+        self,
+        coordinator: FoxCatEnergyCoordinator,
+        key: str,
+        name: str,
+        icon: str,
+        setting_key: str,
+        options: list[str],
+    ) -> None:
+        super().__init__(coordinator, key, name, icon, "pricing")
+        self._setting_key = setting_key
+        self._attr_options = options
 
+    @property
+    def current_option(self) -> str | None:
+        value = self.coordinator.settings.get(self._setting_key)
+        return str(value) if value in self._attr_options else None
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self._attr_options:
+            return
+        await self.coordinator.async_set_setting(self._setting_key, option)
+        self.async_write_ha_state()
+
+
+class FoxCatTariffRegimeSelect(FoxCatBaseSelect):
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "regime_tarifaire", "Régime tarifaire", "mdi:cash-sync", "pricing")
+        super().__init__(
+            coordinator,
+            "regime_tarifaire",
+            "Régime Tarifaire",
+            "mdi:file-document-outline",
+            "tariff_regime",
+            TARIFF_REGIMES,
+        )
 
     @property
     def current_option(self) -> str | None:
@@ -68,9 +111,19 @@ class FoxCatTariffRegimeSelect(FoxCatEntity, SelectEntity):
         return value if value in TARIFF_REGIMES else None
 
     async def async_select_option(self, option: str) -> None:
-        if option not in TARIFF_REGIMES:
-            return
-        await self.coordinator.async_set_setting("tariff_regime", option)
+        await super().async_select_option(option)
+
+
+class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            "structure_dynamique",
+            "Structure (Si Dynamique)",
+            "mdi:chart-bell-curve-cumulative",
+            "dynamic_structure",
+            DYNAMIC_STRUCTURES,
+        )
 
 
 class FoxCatNetworkPolicySelect(FoxCatEntity, SelectEntity):

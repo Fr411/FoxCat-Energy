@@ -137,9 +137,18 @@ MODE_COMFORT = "Confort"
 MODE_MANUAL = "Manuel"
 MODES = [MODE_ECO, MODE_COMFORT, MODE_MANUAL]
 MODE_ZERO = "Zéro injection"; MODE_BIHORAIRE = "Bihoraire"; MODE_ECS = MODE_BIHORAIRE; MODE_DYNAMIC = "Dynamique"
-TARIFF_DYNAMIC = "Dynamique"; TARIFF_COMPENSATION = "Compensation"; TARIFF_TOU = "Bi-horaire HP/HC"; TARIFF_SIMPLE = "Simple"
-TARIFF_REGIMES = [TARIFF_TOU, TARIFF_DYNAMIC, TARIFF_SIMPLE]
-PRICE_SOURCE_CONTRACT = "Contractuelle / fixe"; PRICE_SOURCE_VARIABLE = "Variable via entités Home Assistant"; PRICE_SOURCE_DYNAMIC = "Dynamique Day-Ahead"; PRICE_SOURCES=[PRICE_SOURCE_CONTRACT,PRICE_SOURCE_VARIABLE,PRICE_SOURCE_DYNAMIC]
+TARIFF_MONO = "Mono-horaire"
+TARIFF_BI = "Bi-horaire (HP/HC)"
+TARIFF_DYNAMIC = "Dynamique"
+TARIFF_COMPENSATION = "Compensation"
+TARIFF_TOU = TARIFF_BI
+TARIFF_SIMPLE = "Simple"
+TARIFF_REGIMES = [TARIFF_MONO, TARIFF_BI, TARIFF_DYNAMIC]
+DYNAMIC_STRUCT_SIMPLE = "Simple"
+DYNAMIC_STRUCT_BI = "Bi-horaire"
+DYNAMIC_STRUCT_IMPACT = "Impact (Capacitaire)"
+DYNAMIC_STRUCTURES = [DYNAMIC_STRUCT_SIMPLE, DYNAMIC_STRUCT_BI, DYNAMIC_STRUCT_IMPACT]
+PRICE_SOURCE_CONTRACT = "Contractuelle / fixe"; PRICE_SOURCE_VARIABLE = "Variable via entités Home Assistant"; PRICE_SOURCE_INTEGRATION = "Intégration externe"; PRICE_SOURCE_DYNAMIC = "Dynamique Day-Ahead"; PRICE_SOURCES=[PRICE_SOURCE_CONTRACT,PRICE_SOURCE_VARIABLE,PRICE_SOURCE_INTEGRATION,PRICE_SOURCE_DYNAMIC]
 TARIFF_STRUCTURE_SIMPLE = "Simple"; TARIFF_STRUCTURE_TOU = "Bi-horaire"; TARIFF_STRUCTURE_IMPACT = "Impact"; TARIFF_STRUCTURES=[TARIFF_STRUCTURE_SIMPLE,TARIFF_STRUCTURE_TOU,TARIFF_STRUCTURE_IMPACT]
 NETWORK_POLICY_COMPENSATION = "Compensation"; NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"; NETWORK_POLICY_NOT_VALUED = "Injection non valorisée"; NETWORK_POLICY_ZERO_INJECTION = "Zéro injection"; NETWORK_POLICY_LEGACY_BILLED_EXPORT="Injection facturée"; NETWORK_POLICIES=[NETWORK_POLICY_COMPENSATION,NETWORK_POLICY_BILLED_EXPORT,NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO_INJECTION]
 MODE_ALIASES={"Economie énergie":MODE_ECO,"Économie énergie":MODE_ECO,"Éco":MODE_ECO,"Eco":MODE_ECO,"Confort":MODE_COMFORT,"Manuel":MODE_MANUAL,"Dynamique":MODE_ECO,"Prix dynamique":MODE_ECO,"Tarification dynamique":MODE_ECO,"Bihoraire":MODE_ECO,"Bi-horaire":MODE_ECO,"HP/HC":MODE_ECO,"ECS solaire":MODE_ECO,"Zéro injection":MODE_ECO,"Réinjection refusée":MODE_ECO,"Réinjection autorisée":MODE_ECO,"Maxi solaire":MODE_ECO}
@@ -178,7 +187,9 @@ RRCR_CODE_TO_LEVEL = {v: k for k, v in RRCR_LEVEL_TO_CODE.items()}
 # Defaults intentionally mirror the supplied EMS automations where values were explicit.
 DEFAULT_SETTINGS: dict[str, object] = {
     "price_source": PRICE_SOURCE_VARIABLE,
-    "tariff_structure": TARIFF_STRUCTURE_TOU,
+    "tariff_structure": TARIFF_STRUCTURE_SIMPLE,
+    "tariff_regime": TARIFF_MONO,
+    "dynamic_structure": DYNAMIC_STRUCT_SIMPLE,
     "network_policy": NETWORK_POLICY_COMPENSATION,
     "price_curve_is_final": True,
     "dynamic_favorable_max_hours": 4.0,
@@ -209,7 +220,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "solar_forecast_arbitrage": True,
     "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
-    "tariff_regime": TARIFF_TOU,
+    "tariff_regime": TARIFF_MONO,
     "network_policy": NETWORK_POLICY_COMPENSATION,
     "tariff_fixed_injection_eur_kwh": 0.0,
     "tariff_hp_start_1": "07:00:00",
