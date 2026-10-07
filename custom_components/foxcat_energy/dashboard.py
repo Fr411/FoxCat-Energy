@@ -7,10 +7,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import VERSION
+from .dashboard_merge import merge_dashboard_text
 from .dashboard_versions import (
     available_dashboard_versions as _scan_dashboard_versions,
     recommended_dashboard_version as _scan_recommended_version,
@@ -34,6 +36,18 @@ def _state(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_state.json"))
 
 
+def _user_dashboard(hass: HomeAssistant) -> Path:
+    return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_user.yaml"))
+
+
+def _user_dashboard_base(hass: HomeAssistant) -> Path:
+    return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_user_base.yaml"))
+
+
+def _user_dashboard_state(hass: HomeAssistant) -> Path:
+    return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_user_state.json"))
+
+
 def _read(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -46,6 +60,13 @@ def _write(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
+
+
+def _write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(content, encoding="utf-8")
     temporary.replace(path)
 
 
@@ -180,6 +201,122 @@ async def async_regenerate_dashboard(
         raise FileNotFoundError("Aucune version de dashboard FoxCat n’est disponible.")
     await async_switch_dashboard(hass, entry, config, version)
     return str(_target(hass))
+
+
+def _save_user_dashboard(
+    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+) -> str:
+    target = _target(hass)
+    if not target.is_file():
+        raise ValueError("Aucun dashboard FoxCat n’est disponible à sauvegarder.")
+
+    state = _read(_state(hass))
+    version = state.get("active_version")
+    if version not in available_dashboard_versions():
+        raise ValueError(
+            "La version de base du dashboard est inconnue ; sauvegardez d’abord "
+            "une version FoxCat, puis personnalisez-la."
+        )
+    current = target.read_text(encoding="utf-8")
+    if not _dashboard_customized(hass):
+        raise ValueError("Aucune personnalisation du dashboard n’a été détectée.")
+
+    base = _render(hass, entry, config, version)
+    _write_text(_user_dashboard_base(hass), base)
+    _write_text(_user_dashboard(hass), current)
+    _write(
+        _user_dashboard_state(hass),
+        {
+            "base_version": version,
+            "base_sha256": hashlib.sha256(base.encode("utf-8")).hexdigest(),
+            "user_sha256": hashlib.sha256(current.encode("utf-8")).hexdigest(),
+            "saved_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    return str(_user_dashboard(hass))
+
+
+def _apply_user_dashboard_to_latest(
+    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+) -> dict[str, Any]:
+    saved_state = _read(_user_dashboard_state(hass))
+    user_path = _user_dashboard(hass)
+    base_path = _user_dashboard_base(hass)
+    if not saved_state or not user_path.is_file() or not base_path.is_file():
+        raise ValueError("Enregistrez d’abord votre dashboard personnalisé.")
+
+    user_text = user_path.read_text(encoding="utf-8")
+    base_text = base_path.read_text(encoding="utf-8")
+    if hashlib.sha256(user_text.encode("utf-8")).hexdigest() != saved_state.get("user_sha256"):
+        raise ValueError("La sauvegarde utilisateur est invalide ; enregistrez-la à nouveau.")
+    if hashlib.sha256(base_text.encode("utf-8")).hexdigest() != saved_state.get("base_sha256"):
+        raise ValueError("La base de fusion est invalide ; enregistrez à nouveau votre dashboard.")
+
+    latest_version = recommended_dashboard_version()
+    if latest_version is None:
+        raise FileNotFoundError("Aucune version de dashboard FoxCat n’est disponible.")
+    latest_text = _render(hass, entry, config, latest_version)
+    merged = merge_dashboard_text(base_text, user_text, latest_text)
+    try:
+        parsed = yaml.safe_load(merged)
+    except yaml.YAMLError as err:
+        raise ValueError(
+            "La fusion produirait un YAML invalide ; aucun changement n’a été appliqué."
+        ) from err
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "La fusion ne produit pas un dashboard YAML valide ; aucun changement n’a été appliqué."
+        )
+
+    target = _target(hass)
+    state_path = _state(hass)
+    state = _read(state_path)
+    old_content = target.read_bytes() if target.exists() else None
+    old_state = state_path.read_bytes() if state_path.exists() else None
+    backup = target.with_suffix(target.suffix + ".bak") if old_content is not None else None
+    if backup is not None:
+        shutil.copy2(target, backup)
+    try:
+        _write_text(target, merged)
+        digest = hashlib.sha256(target.read_bytes()).hexdigest()
+        _write(
+            state_path,
+            {
+                "active_version": latest_version,
+                "previous_version": state.get("active_version"),
+                "backup": str(backup) if backup else None,
+                "last_change": datetime.now(timezone.utc).isoformat(),
+                "sha256": digest,
+                "user_customizations_applied": True,
+            },
+        )
+    except Exception:
+        if old_content is not None:
+            target.write_bytes(old_content)
+        elif target.exists():
+            target.unlink()
+        if old_state is not None:
+            state_path.write_bytes(old_state)
+        elif state_path.exists():
+            state_path.unlink()
+        raise
+    return dashboard_status(hass)
+
+
+async def async_save_user_dashboard(
+    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+) -> str:
+    return await hass.async_add_executor_job(
+        _save_user_dashboard, hass, entry, config
+    )
+
+
+async def async_apply_user_dashboard_to_latest(
+    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+) -> dict[str, Any]:
+    return await hass.async_add_executor_job(
+        _apply_user_dashboard_to_latest, hass, entry, config
+    )
 
 
 async def async_restore_previous_dashboard(

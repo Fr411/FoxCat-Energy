@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.7.3"
+VERSION = "1.7.4"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "time", "button"]
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les

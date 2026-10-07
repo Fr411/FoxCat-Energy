@@ -1,3 +1,9 @@
+# Changelog — FoxCat Energy V1.7.4
+
+## V1.7.4
+- Enregistrement explicite du dashboard utilisateur et fusion avec la dernière version FoxCat.
+- La fusion à trois sources conserve les modifications non conflictuelles, signale les conflits et sauvegarde le dashboard courant avant application.
+
 # Changelog — FoxCat Energy V1.7.3
 
 ## V1.7.3 (préparation)
