@@ -25,6 +25,7 @@ from foxcat_energy.const import (
 )
 from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
+    dashboard_version_label,
     recommended_dashboard_version,
 )
 from foxcat_energy.dashboard_merge import merge_dashboard_text
@@ -142,6 +143,7 @@ class DashboardAndProfileTests(unittest.TestCase):
             directory = Path(temporary)
             for filename in (
                 "dashboard_v1.6.160.yaml",
+                "dashboard_v1.7.0-premium.yaml",
                 "dashboard_v1.7.1.yaml",
                 "dashboard_v1.7.3.yaml",
                 "dashboard_vbad.yaml",
@@ -152,17 +154,26 @@ class DashboardAndProfileTests(unittest.TestCase):
                 '{"dashboard_version":"1.7.3","recommended":true}',
                 encoding="utf-8",
             )
+            (directory / "manifest_v1.7.0-premium.json").write_text(
+                '{"dashboard_version":"1.7.0-premium","name":"V1.7.0 Premium"}',
+                encoding="utf-8",
+            )
             self.assertEqual(
                 available_dashboard_versions(directory),
-                ["1.7.3", "1.7.1", "1.6.160"],
+                ["1.7.3", "1.7.1", "1.7.0-premium", "1.6.160"],
             )
             self.assertEqual(recommended_dashboard_version(directory), "1.7.3")
+            self.assertEqual(
+                dashboard_version_label("1.7.0-premium", directory),
+                "V1.7.0 Premium",
+            )
 
     def test_repository_dashboard_versions_include_recommended_release_candidate(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         versions = available_dashboard_versions(versions_directory)
         self.assertIn("1.7.3", versions)
         self.assertIn("1.7.1", versions)
+        self.assertIn("1.7.0-premium", versions)
         self.assertIn("1.6.160", versions)
         self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.3")
 

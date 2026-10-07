@@ -15,6 +15,8 @@ from .const import VERSION
 from .dashboard_merge import merge_dashboard_text
 from .dashboard_versions import (
     available_dashboard_versions as _scan_dashboard_versions,
+    dashboard_version_for_label as _scan_dashboard_version_for_label,
+    dashboard_version_label as _scan_dashboard_version_label,
     recommended_dashboard_version as _scan_recommended_version,
 )
 from .registry import render_dashboard_template, resolve_registry
@@ -76,6 +78,14 @@ def available_dashboard_versions() -> list[str]:
 
 def recommended_dashboard_version() -> str | None:
     return _scan_recommended_version(_dir())
+
+
+def dashboard_version_label(version: str) -> str:
+    return _scan_dashboard_version_label(version, _dir())
+
+
+def dashboard_version_for_label(label: str) -> str:
+    return _scan_dashboard_version_for_label(label, _dir())
 
 
 def dashboard_select_options(hass: HomeAssistant | None = None) -> list[str]:

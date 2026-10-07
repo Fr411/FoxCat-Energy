@@ -201,24 +201,32 @@ class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntit
 class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     @property
     def options(self) -> list[str]:
-        from .dashboard import dashboard_select_options
+        from .dashboard import dashboard_select_options, dashboard_version_label
 
-        return dashboard_select_options(self.coordinator.hass)
+        return [
+            dashboard_version_label(option)
+            for option in dashboard_select_options(self.coordinator.hass)
+        ]
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "dashboard_version", "Version du dashboard", "mdi:view-dashboard", "diagnostic")
 
     @property
     def current_option(self) -> str | None:
-        from .dashboard import dashboard_status
+        from .dashboard import dashboard_status, dashboard_version_label
 
         active = dashboard_status(self.coordinator.hass).get("active_version")
+        active = dashboard_version_label(active) if active else active
         return active if active in self.options else (self.options[0] if self.options else None)
 
     async def async_select_option(self, option: str) -> None:
         if option not in self.options:
             return
-        from .dashboard import CUSTOM_DASHBOARD_OPTION, async_switch_dashboard
+        from .dashboard import (
+            CUSTOM_DASHBOARD_OPTION,
+            async_switch_dashboard,
+            dashboard_version_for_label,
+        )
 
         if option == CUSTOM_DASHBOARD_OPTION:
             return
@@ -228,7 +236,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
                 self.coordinator.hass,
                 self.coordinator.entry,
                 self.coordinator.config,
-                option,
+                dashboard_version_for_label(option),
             )
         except ValueError as err:
             from homeassistant.components import persistent_notification

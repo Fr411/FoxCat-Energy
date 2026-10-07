@@ -1,0 +1,1582 @@
+kiosk_mode:
+  hide_header: '{{ is_state("[[foxcat:legacy.input_boolean_ems_head_menu]]", "on") }}'
+  hide_sidebar: '{{ is_state("[[foxcat:legacy.input_boolean_ems_head_lateral]]", "on") }}'
+
+button_card_templates:
+
+  # ------------------------------------------------------------------
+  # Carte de base : fond, bordure, CSS partagé
+  # ------------------------------------------------------------------
+  fc_panel:
+    show_name: false
+    show_icon: false
+    show_state: false
+    triggers_update: all
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    styles:
+      card:
+        - padding: 0
+        - border-radius: 18px
+        - overflow: hidden
+        - color: '#e8f1fb'
+        - background: linear-gradient(160deg,#0d1a2c,#08111e)
+        - border: 1px solid rgba(90,150,220,.18)
+        - box-shadow: 0 10px 30px rgba(0,0,0,.35)
+      grid:
+        - grid-template-areas: '"c"'
+        - grid-template-columns: 1fr
+      custom_fields:
+        c:
+          - width: 100%
+    extra_styles: |
+      .p{padding:16px 18px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
+      .t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;font-weight:700;margin-bottom:12px}
+      .t small{font-weight:400;color:#8fa6bf;font-size:12px}
+      .t ha-icon{--mdc-icon-size:20px;color:#38bdf8;margin-right:6px}
+      .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+      .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+      .tile{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
+      .tile ha-icon{--mdc-icon-size:26px;flex:none}
+      .tile span{display:block;font-size:11px;color:#9bb3cc}
+      .tile b{font-size:17px}
+      .stat{padding:9px 6px;border-radius:12px;background:rgba(255,255,255,.04);text-align:center}
+      .stat span{display:block;font-size:10px;color:#8fa6bf}
+      .stat b{display:block;font-size:14px;margin-top:3px}
+      .k{font-size:11px;color:#8fa6bf}
+      .v{font-size:20px;font-weight:800}
+      .bar{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
+      .bar i{display:block;height:100%;border-radius:5px}
+      .chip{display:inline-block;padding:3px 9px;border-radius:7px;font-size:11px;font-weight:600}
+      .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;font-size:13px;border-top:1px solid rgba(255,255,255,.05)}
+      .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:8px}
+      .o{color:#ffb020}.b{color:#38bdf8}.r{color:#f87171}.gr{color:#34d399}.pu{color:#a78bfa}
+      .ring{border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+      .ring>div{border-radius:50%;background:#0b1626;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800}
+      .ring small{font-size:9px;color:#8fa6bf;font-weight:400}
+      .flux{display:grid;grid-template-columns:1fr 54px 1fr 54px 1fr;align-items:center;text-align:center;gap:6px}
+      .n ha-icon{--mdc-icon-size:34px}
+      .n b{display:block;font-size:20px;font-weight:800}
+      .n span{font-size:11px;color:#9bb3cc}
+      .ar{font-size:28px;font-weight:300}
+      .img{height:96px;background-size:contain;background-repeat:no-repeat;background-position:center}
+      .seg{display:flex;height:9px;border-radius:9px;overflow:hidden;margin:8px 0 10px}
+      .legend{display:flex;justify-content:space-between;font-size:11px}
+      .legend b{display:block;font-size:15px;color:#fff}
+      .legend span{color:#8fa6bf}
+      .quote{font-style:italic;color:#8fa6bf;font-size:12px;text-align:right;margin-top:10px}
+
+  # ------------------------------------------------------------------
+  # Onglet de navigation (surbrillance automatique de l'onglet actif)
+  # ------------------------------------------------------------------
+  fc_nav:
+    show_name: true
+    show_icon: true
+    variables:
+      path: ''
+    tap_action:
+      action: navigate
+      navigation_path: |
+        [[[
+          const base = window.location.pathname.replace(/\/[^\/]*$/, '');
+          return `${base}/${variables.path}`;
+        ]]]
+    styles:
+      card:
+        - padding: 11px 6px
+        - border-radius: 12px
+        - background: |
+            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? 'rgba(56,189,248,.12)' : 'rgba(255,255,255,.03)'; ]]]
+        - border: |
+            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? '1px solid rgba(56,189,248,.6)' : '1px solid rgba(255,255,255,.07)'; ]]]
+        - color: |
+            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? '#38bdf8' : '#c4d4e6'; ]]]
+      grid:
+        - grid-template-areas: '"i n"'
+        - grid-template-columns: auto auto
+        - justify-content: center
+        - column-gap: 7px
+      icon:
+        - width: 18px
+        - color: |
+            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? '#38bdf8' : '#8fa6bf'; ]]]
+      name:
+        - font-size: 12px
+        - font-weight: 600
+
+  # ------------------------------------------------------------------
+  # Barre de navigation complète (8 onglets)
+  # ------------------------------------------------------------------
+  fc_navbar:
+    show_name: false
+    show_icon: false
+    show_state: false
+    styles:
+      card:
+        - padding: 0
+        - background: transparent
+        - box-shadow: none
+        - border: none
+      grid:
+        - grid-template-areas: '"a b c d e f g h"'
+        - grid-template-columns: repeat(8,1fr)
+        - column-gap: 8px
+    custom_fields:
+      a: {card: {type: custom:button-card, template: fc_nav, name: Accueil, icon: mdi:home, variables: {path: Emsdash}}}
+      b: {card: {type: custom:button-card, template: fc_nav, name: Énergie, icon: mdi:lightning-bolt, variables: {path: energie}}}
+      c: {card: {type: custom:button-card, template: fc_nav, name: Onduleur, icon: mdi:solar-power, variables: {path: onduleur}}}
+      d: {card: {type: custom:button-card, template: fc_nav, name: Boiler, icon: mdi:water-boiler, variables: {path: boiler}}}
+      e: {card: {type: custom:button-card, template: fc_nav, name: Machines, icon: mdi:washing-machine, variables: {path: appareils}}}
+      f: {card: {type: custom:button-card, template: fc_nav, name: Économie, icon: mdi:chart-timeline-variant-shimmer, variables: {path: marche}}}
+      g: {card: {type: custom:button-card, template: fc_nav, name: Diagnostic, icon: mdi:stethoscope, variables: {path: diagnostic}}}
+      h: {card: {type: custom:button-card, template: fc_nav, name: Paramètres, icon: mdi:cog, variables: {path: technique}}}
+
+  # ------------------------------------------------------------------
+  # En-tête de sous-vue
+  # ------------------------------------------------------------------
+  fc_head:
+    template: fc_panel
+    variables:
+      title: ''
+      subtitle: ''
+      icon: mdi:home
+      color: '#38bdf8'
+    custom_fields:
+      c: |
+        [[[
+          return `<div class="p" style="display:flex;align-items:center;gap:14px;padding:14px 20px">
+            <div class="ring" style="width:46px;height:46px;background:rgba(56,189,248,.12)"><ha-icon icon="${variables.icon}" style="color:${variables.color}"></ha-icon></div>
+            <div><div style="font-size:22px;font-weight:800;letter-spacing:.03em">${variables.title}</div>
+            <div class="k">${variables.subtitle}</div></div>
+            <div style="margin-left:auto;font-weight:800;letter-spacing:.04em"><span style="color:#38bdf8">FOX</span>CAT <span style="font-weight:500">ENERGY</span></div>
+          </div>`;
+        ]]]
+
+  # ------------------------------------------------------------------
+  # Liste de lignes "libellé / valeur" (une ligne YAML par entité)
+  # ------------------------------------------------------------------
+  fc_list:
+    template: fc_panel
+    variables:
+      title: ''
+      icon: mdi:information
+      rows: []
+    custom_fields:
+      c: |
+        [[[
+          const fmt=id=>{const s=states[id];if(!s)return ['—','#64748b'];const v=s.state;
+            if(['unknown','unavailable','none',''].includes(v))return ['—','#64748b'];
+            if(v==='on')return ['Actif','#34d399'];
+            if(v==='off')return ['Inactif','#8fa6bf'];
+            if(!isNaN(Number(v))){const n=Number(v),u=s.attributes.unit_of_measurement||'';return [(Number.isInteger(n)?n:n.toFixed(2).replace('.',','))+(u?' '+u:''),''];}
+            return [v,''];};
+          const rows=(variables.rows||[]).map(r=>{const f=fmt(r[1]);
+            return `<div class="row"><span class="k" style="font-size:12px">${r[0]}</span><b style="font-size:13px;text-align:right;max-width:58%;${f[1]?'color:'+f[1]:''}">${f[0]}</b></div>`}).join('');
+          return `<div class="p"><div class="t"><span><ha-icon icon="${variables.icon}"></ha-icon>${variables.title}</span></div>${rows}</div>`;
+        ]]]
+
+  # ------------------------------------------------------------------
+  # Bouton compact (niveaux onduleur, boiler)
+  # ------------------------------------------------------------------
+  fc_btn:
+    show_name: true
+    show_icon: true
+    styles:
+      card:
+        - padding: 12px 6px
+        - border-radius: 12px
+        - background: rgba(255,255,255,.04)
+        - border: 1px solid rgba(255,255,255,.08)
+        - color: '#e8f1fb'
+      icon:
+        - width: 22px
+        - color: '#ffb020'
+      name:
+        - font-size: 12px
+        - font-weight: 700
+
+  # ------------------------------------------------------------------
+  # Carte appareil (prise + cycle + puissance)
+  # ------------------------------------------------------------------
+  fc_device:
+    template: fc_panel
+    variables:
+      name: ''
+      sub: Charge pilotée EMS
+      emoji: ⚙️
+      col: '#38bdf8'
+      cy: ''
+      pw: ''
+      sw: ''
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+    custom_fields:
+      c: |
+        [[[
+          const v=variables;
+          const pw=Math.max(parseFloat(states[v.pw]?.state)||0,0);
+          const cyc=states[v.cy]?.state==='on';
+          const sock=states[v.sw]?.state==='on';
+          let st='ARRÊT',col='#64748b';
+          if(cyc||pw>20){st=cyc?'EN COURS':'EN MARCHE';col='#34d399'}else if(sock){st='PRÊT';col='#facc15'}
+          return `<div class="p" style="text-align:center;height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center">
+            <div class="ring" style="width:54px;height:54px;border-radius:17px;background:${v.col}22;font-size:28px">${v.emoji}</div>
+            <div style="margin-top:10px;font-size:10px;font-weight:800;color:${col}"><span class="dot" style="background:${col};width:7px;height:7px;margin-right:5px;${cyc||pw>20?'box-shadow:0 0 9px '+col:''}"></span>${st}</div>
+            <div style="font-size:19px;font-weight:800;margin-top:6px">${v.name}</div>
+            <div class="k">${v.sub}</div>
+            <div class="stat" style="width:88%;margin-top:12px;padding:12px 6px"><b style="font-size:28px">${Math.round(pw)}<span style="font-size:11px;opacity:.5"> W</span></b><span>PUISSANCE ACTUELLE</span></div>
+            <div class="k" style="margin-top:10px;font-size:11px">${sock?'⚡ Prise active':'○ Prise coupée'}</div>
+          </div>`;
+        ]]]
+
+views:
+
+  # ====================================================================
+  # ACCUEIL
+  # ====================================================================
+  - type: panel
+    title: Accueil
+    path: Emsdash
+    icon: mdi:home
+    cards:
+      - type: vertical-stack
+        cards:
+
+          # ---------- Barre du haut ----------
+          - type: custom:button-card
+            template: fc_panel
+            styles:
+              card:
+                - border-radius: 18px 18px 0 0
+            custom_fields:
+              c: |
+                [[[
+                  const OUTDOOR = 'weather.forecast_maison'; // <- adapte ton entité météo
+                  const d = new Date();
+                  const date = d.toLocaleDateString('fr-BE',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+                  const time = d.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});
+                  const temp = states[OUTDOOR]?.attributes?.temperature;
+                  return `
+                  <div class="p" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div class="img" style="width:44px;height:44px;background-image:url(/foxcat_energy_assets/logo.png)"></div>
+                      <div>
+                        <div style="font-size:20px;font-weight:800;letter-spacing:.04em"><span style="color:#38bdf8">FOX</span>CAT <span style="font-weight:500">ENERGY</span></div>
+                        <div class="k">Home Assistant • EMS intelligent</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:28px">
+                      <div style="text-align:right"><div class="k">${date}</div><div style="font-size:20px;font-weight:600">${time}</div></div>
+                      <div style="text-align:right"><div style="font-size:18px;font-weight:700"><span class="o">☀</span> ${temp!==undefined?Number(temp).toFixed(1).replace('.',','):'—'} °C</div><div class="k">Extérieur</div></div>
+                    </div>
+                  </div>`;
+                ]]]
+
+          # ---------- Navigation ----------
+          - type: custom:button-card
+            template: fc_navbar
+
+          # ---------- Héros ----------
+          - type: custom:button-card
+            template: fc_panel
+            styles:
+              card:
+                - border-radius: 0
+                - min-height: 170px
+                - background: |
+                    linear-gradient(90deg,rgba(6,13,24,.95),rgba(6,13,24,.35) 55%,rgba(6,13,24,.9)),
+                    url('/foxcat_energy_assets/hero.jpg') center/cover,
+                    linear-gradient(160deg,#0d1a2c,#08111e)
+            custom_fields:
+              c: |
+                [[[
+                  const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                  const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                  const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                  const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                  const regOn=states['[[foxcat:ems.regulation_active]]']?.state==='on';
+                  const valid=states[F('binary_sensor',['donnees','energetiques','valides'])]?.state!=='off';
+                  const ok=regOn&&valid;
+                  const mode=S('[[foxcat:ems.mode]]');
+                  const period=S(F('sensor',['periode','tarifaire']));
+                  const price=N('[[foxcat:pricing.active_buy]]').toFixed(3).replace('.',',');
+                  const nextLbl=S('[[foxcat:pricing.next_label]]','Prochain tarif');
+                  const nextP=N('[[foxcat:pricing.next_buy]]').toFixed(3).replace('.',',');
+                  const col=ok?'#34d399':'#f87171';
+                  return `
+                  <div class="p" style="display:flex;justify-content:space-between;min-height:140px">
+                    <div style="align-self:center">
+                      <div style="font-size:38px;font-weight:800;letter-spacing:.03em"><span style="color:#67e8f9">FOXCAT</span> ENERGY</div>
+                      <div style="font-size:17px;margin-top:6px;line-height:1.35">Une énergie plus intelligente<br>pour une maison plus durable</div>
+                      <div class="k" style="margin-top:12px;font-size:13px;color:#cfe0f2"><span class="gr">🍃</span> Optimiser aujourd'hui.<br>&nbsp;&nbsp;&nbsp;&nbsp;Préserver demain.</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end">
+                      <div style="display:flex;gap:26px">
+                        <div style="display:flex;gap:9px"><span class="dot" style="background:${col};box-shadow:0 0 10px ${col};margin-top:5px"></span><div><b>${ok?'Système OK':'Attention'}</b><div class="k">${ok?'Tout fonctionne normalement':'Vérifier le diagnostic'}</div></div></div>
+                        <div style="display:flex;gap:9px"><span class="gr" style="font-size:20px">🍃</span><div><b>Mode EMS</b><div class="k">${mode}</div></div></div>
+                        <div style="display:flex;gap:9px"><span class="o" style="font-size:20px">🪙</span><div><b>Tarif actuel</b><div class="k">${period}<br><b style="color:#fff">${price} €/kWh</b></div></div></div>
+                        <div style="display:flex;gap:9px"><span class="b" style="font-size:20px">🕒</span><div><b>${nextLbl}</b><div class="k"><b style="color:#fff">${nextP} €/kWh</b></div></div></div>
+                      </div>
+                      <div class="quote">« L'énergie la plus propre<br>est celle qu'on utilise intelligemment. »</div>
+                    </div>
+                  </div>`;
+                ]]]
+
+          # ---------- Grille 3 x 3 ----------
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+
+              # 1. Flux énergétique
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                      const W=v=>{v=Math.abs(v);return v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W'};
+                      const pv=Math.max(N('[[foxcat:energy.pv_power]]'),0), house=Math.max(N('[[foxcat:energy.house_power]]'),0);
+                      const imp=Math.max(N('[[foxcat:energy.grid_import]]'),0), exp=Math.max(N('[[foxcat:energy.grid_export]]'),0);
+                      const pri=N(F('sensor',['niveau','puissance','pri','actuel']),100);
+                      const bT=N('[[foxcat:boiler.temperature_source]]'), bP=Math.max(N('[[foxcat:boiler.power_source]]'),0);
+                      return `
+                      <div class="p">
+                        <div class="t"><span><ha-icon icon="mdi:flash-circle"></ha-icon>Flux énergétique <small>(temps réel)</small></span></div>
+                        <div class="flux">
+                          <div></div><div></div>
+                          <div class="n"><ha-icon class="o" icon="mdi:white-balance-sunny"></ha-icon><span>SOLAIRE</span><b class="o">${W(pv)}</b></div>
+                          <div></div><div></div>
+
+                          <div class="n"><ha-icon style="color:#cbd5e1" icon="mdi:transmission-tower"></ha-icon><span>RÉSEAU</span><b class="${imp>20?'r':''}">${W(imp>20?imp:0)}</b><span>(Import)</span></div>
+                          <div class="ar ${imp>20?'r':''}" style="${imp>20?'':'opacity:.25'}">${imp>20?'←':'→'}</div>
+                          <div class="n"><ha-icon class="b" icon="mdi:home-lightning-bolt-outline"></ha-icon><span>MAISON</span><b>${W(house)}</b></div>
+                          <div class="ar ${exp>20?'gr':''}" style="${exp>20?'':'opacity:.25'}">→</div>
+                          <div class="n"><ha-icon class="gr" icon="mdi:leaf"></ha-icon><span>RÉINJECTION</span><b class="gr">${W(exp)}</b><span>(Export)</span></div>
+
+                          <div class="n"><div class="img" style="height:56px;background-image:url(/foxcat_energy_assets/inverter.png)"></div><span>ONDULEUR</span><b class="b">${W(pv)}</b><span>PRI ${Math.round(pri)} %</span></div>
+                          <div></div><div></div><div></div>
+                          <div class="n"><div class="img" style="height:56px;background-image:url(/foxcat_energy_assets/boiler.png)"></div><span>BOILER</span><b>${W(bP)}</b><span class="o">${bT.toFixed(1).replace('.',',')} °C</span></div>
+                        </div>
+                      </div>`;
+                    ]]]
+
+              # 2. Bilan du jour
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const N=(i,f=0)=>{const v=parseFloat(states[i]?.state);return isFinite(v)?v:f};
+                      const K=v=>v.toFixed(2).replace('.',',')+' kWh';
+                      const pv=N('[[foxcat:energy.today.pv]]'), hs=N('[[foxcat:energy.today.house]]');
+                      const im=N('[[foxcat:energy.today.import]]'), ex=N('[[foxcat:energy.today.export]]');
+                      const sc=N('[[foxcat:energy.today.self_consumed]]');
+                      const pct=Math.min(Math.max(N('[[foxcat:energy.today.self_consumption_pct]]'),0),100);
+                      const date=new Date().toLocaleDateString('fr-BE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+                      return `
+                      <div class="p">
+                        <div class="t"><span><ha-icon icon="mdi:chart-donut"></ha-icon>Bilan du jour</span><small style="text-transform:capitalize">${date}</small></div>
+                        <div class="g2">
+                          <div class="tile"><ha-icon class="o" icon="mdi:white-balance-sunny"></ha-icon><div><span>Production PV</span><b>${K(pv)}</b></div></div>
+                          <div class="tile"><ha-icon class="b" icon="mdi:home"></ha-icon><div><span>Consommation maison</span><b>${K(hs)}</b></div></div>
+                          <div class="tile"><ha-icon class="r" icon="mdi:transmission-tower-import"></ha-icon><div><span>Réseau prélevé</span><b>${K(im)}</b></div></div>
+                          <div class="tile"><ha-icon class="gr" icon="mdi:leaf"></ha-icon><div><span>Autoconsommé</span><b>${K(sc)}</b></div></div>
+                        </div>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:12px">
+                          <div class="tile" style="flex:1"><ha-icon class="gr" icon="mdi:transmission-tower-export"></ha-icon><div><span>Réinjection réseau</span><b>${K(ex)}</b></div></div>
+                          <div class="ring" style="width:104px;height:104px;background:conic-gradient(#34d399 ${pct*3.6}deg,rgba(255,255,255,.08) 0)">
+                            <div style="width:80px;height:80px;font-size:20px">${Math.round(pct)} %<small>Autoconsommation</small></div>
+                          </div>
+                        </div>
+                      </div>`;
+                    ]]]
+
+              # 3. Production et consommation
+              - type: vertical-stack
+                cards:
+                  - type: custom:button-card
+                    template: fc_panel
+                    styles:
+                      card:
+                        - border-radius: 18px 18px 0 0
+                        - border-bottom: none
+                    custom_fields:
+                      c: |
+                        [[[ return `<div class="p" style="padding-bottom:0"><div class="t"><span>Production et consommation</span><small>Aujourd'hui ▾</small></div></div>`; ]]]
+                  - type: custom:apexcharts-card
+                    graph_span: 24h
+                    span:
+                      start: day
+                    update_interval: 1min
+                    header:
+                      show: false
+                    apex_config:
+                      chart:
+                        height: 190
+                        background: transparent
+                        toolbar:
+                          show: false
+                      legend:
+                        position: top
+                        labels:
+                          colors: '#9bb3cc'
+                      grid:
+                        borderColor: rgba(255,255,255,.06)
+                      stroke:
+                        width: 2
+                        curve: smooth
+                      xaxis:
+                        labels:
+                          datetimeUTC: false
+                    series:
+                      - entity: '[[foxcat:energy.pv_power]]'
+                        name: Solaire
+                        type: area
+                        color: '#ffb020'
+                        opacity: 0.25
+                        transform: return x/1000;
+                      - entity: '[[foxcat:energy.house_power]]'
+                        name: Maison
+                        type: line
+                        color: '#38bdf8'
+                        transform: return x/1000;
+                      - entity: '[[foxcat:energy.grid_import]]'
+                        name: Réseau
+                        type: line
+                        color: '#f87171'
+                        transform: return x/1000;
+                    card_mod:
+                      style: |
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important}
+                  - type: custom:button-card
+                    template: fc_panel
+                    styles:
+                      card:
+                        - border-radius: 0 0 18px 18px
+                        - border-top: none
+                    custom_fields:
+                      c: |
+                        [[[
+                          const N=(i)=>{const v=parseFloat(states[i]?.state);return isFinite(v)&&v>0?v:0};
+                          const d=[
+                            ['Production PV',N('[[foxcat:energy.today.pv]]'),'#ffb020'],
+                            ['Consommation',N('[[foxcat:energy.today.house]]'),'#38bdf8'],
+                            ['Réseau',N('[[foxcat:energy.today.import]]'),'#f87171'],
+                            ['Autoconsommé',N('[[foxcat:energy.today.self_consumed]]'),'#34d399'],
+                            ['Réinjection',N('[[foxcat:energy.today.export]]'),'#a7f3d0']
+                          ];
+                          const tot=d.reduce((s,x)=>s+x[1],0)||1;
+                          return `<div class="p" style="padding-top:0">
+                            <div class="k" style="margin-bottom:2px">Énergie (kWh)</div>
+                            <div class="seg">${d.map(x=>`<i style="width:${x[1]/tot*100}%;background:${x[2]}"></i>`).join('')}</div>
+                            <div class="legend">${d.map(x=>`<div><b>${x[1].toFixed(2).replace('.',',')}</b><span>${x[0]}</span></div>`).join('')}</div>
+                          </div>`;
+                        ]]]
+
+              # 4. Onduleur SolarEdge
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                      const W=v=>{v=Math.abs(v);return v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W'};
+                      const lvl=Math.min(Math.max(N(F('sensor',['niveau','puissance','pri','actuel']),100),0),100);
+                      const tgt=Math.round(N(F('sensor',['niveau','puissance','pri','cible']),lvl));
+                      const dir=S(F('sensor',['direction','pri']),'Maintien');
+                      const ackInv=S(F('sensor',['ack','onduleur']));
+                      const ackR=S(F('sensor',['ack','rrcr']));
+                      const ok=!/FAILED|ERREUR/i.test(ackInv+ackR);
+                      const pv=Math.max(N('[[foxcat:energy.pv_power]]'),0), ex=Math.max(N('[[foxcat:energy.grid_export]]'),0);
+                      return `
+                      <div class="p">
+                        <div class="t"><span><ha-icon icon="mdi:solar-power-variant"></ha-icon>Onduleur SolarEdge</span>
+                          <span class="chip ${ok?'gr':'r'}" style="background:${ok?'rgba(52,211,153,.12)':'rgba(248,113,113,.12)'}">● ${ok?'Connecté':'Défaut'}</span></div>
+                        <div style="display:flex;align-items:center;gap:16px">
+                          <div class="img" style="width:34%;height:110px;background-image:url(/foxcat_energy_assets/inverter.png)"></div>
+                          <div style="flex:1;text-align:center">
+                            <div class="ring" style="width:118px;height:118px;margin:0 auto;background:conic-gradient(#38bdf8 ${lvl*3.6}deg,rgba(255,255,255,.08) 0)">
+                              <div style="width:94px;height:94px;font-size:28px">${Math.round(lvl)} %<small>Palier actuel</small></div>
+                            </div>
+                            <div class="stat" style="margin-top:8px"><span>Cible EMS : ${tgt} %</span><b style="font-size:12px">${dir}</b></div>
+                          </div>
+                        </div>
+                        <div class="g3" style="margin-top:12px">
+                          <div class="stat"><b class="b">${W(pv)}</b><span>Production</span></div>
+                          <div class="stat"><b>${W(ex)}</b><span>Injection réseau</span></div>
+                          <div class="stat"><b>${ackR}</b><span>RRCR</span></div>
+                        </div>
+                      </div>`;
+                    ]]]
+
+              # 5. Boiler / ECS
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const S=(i,f='—')=>{const v=states[i]?.state;return (!v||['unknown','unavailable','none'].includes(v))?f:v};
+                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                      const t=N('[[foxcat:boiler.temperature_source]]'), p=Math.max(N('[[foxcat:boiler.power_source]]'),0);
+                      const run=states['[[foxcat:boiler.binary_source]]']?.state==='on'||p>100;
+                      return `
+                      <div class="p">
+                        <div class="t"><span><ha-icon class="o" icon="mdi:water-boiler"></ha-icon>Boiler / ECS</span>
+                          <span class="chip gr" style="border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.1)">⟳ Mode ${S('[[foxcat:ems.mode]]')}</span></div>
+                        <div style="display:flex;gap:14px;align-items:center">
+                          <div class="img" style="width:30%;height:150px;background-image:url(/foxcat_energy_assets/boiler.png)"></div>
+                          <div style="flex:1">
+                            <div class="tile" style="margin-bottom:8px"><ha-icon class="o" icon="mdi:thermometer"></ha-icon><div><b style="font-size:20px">${t.toFixed(1).replace('.',',')} °C</b><span>Température actuelle</span></div></div>
+                            <div class="tile"><ha-icon class="b" icon="mdi:flash"></ha-icon><div><b style="font-size:20px">${Math.round(p)} W</b><span>Puissance ${run?'· chauffe':''}</span></div></div>
+                          </div>
+                        </div>
+                        <div class="g3" style="margin-top:12px">
+                          <div class="stat"><b>${S('[[foxcat:boiler.demand]]','Aucune')}</b><span>Demande</span></div>
+                          <div class="stat"><b>${S('[[foxcat:boiler.origin]]','Aucune')}</b><span>Origine</span></div>
+                          <div class="stat"><b>${S('[[foxcat:boiler.execution_status]]','Attente')}</b><span>État</span></div>
+                        </div>
+                      </div>`;
+                    ]]]
+
+              # 6. Appareils et charges pilotées
+              - type: custom:button-card
+                template: fc_panel
+                tap_action:
+                  action: navigate
+                  navigation_path: appareils
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const N=(i)=>{const v=parseFloat(states[i]?.state);return isFinite(v)?Math.max(v,0):0};
+                      const prot=states[F('binary_sensor',['machine','protegee','active'])]?.state==='on';
+                      const dev=[
+                        ['Lave-linge','[[foxcat:machines.washer.cycle]]','[[foxcat:legacy.sensor_lave_linge_puissance]]','/foxcat_energy_assets/washer.png',2200],
+                        ['Sèche-linge','[[foxcat:machines.dryer.cycle]]','[[foxcat:legacy.sensor_seche_linge_puissance]]','/foxcat_energy_assets/dryer.png',2500],
+                        ['Lave-vaisselle','[[foxcat:machines.dishwasher.cycle]]','[[foxcat:legacy.sensor_lave_vaisselle_puissance]]','/foxcat_energy_assets/dishwasher.png',2000]
+                      ].map(([n,c,p,img,max])=>{
+                        const pw=N(p), cyc=states[c]?.state==='on';
+                        let chip='En attente',col='#8fa6bf',bg='rgba(255,255,255,.08)';
+                        if(cyc&&prot){chip='Cycle protégé';col='#052e16';bg='#4ade80'}
+                        else if(cyc){chip='Cycle actif';col='#fff';bg='#0ea5e9'}
+                        else if(pw>20){chip='En marche';col='#fff';bg='#0ea5e9'}
+                        return `<div>
+                          <div class="k" style="color:#e8f1fb;font-weight:600">${n}</div>
+                          <span class="chip" style="color:${col};background:${bg};margin:4px 0">${chip}</span>
+                          <div class="img" style="height:64px;background-image:url(${img})"></div>
+                          <div class="v" style="font-size:18px;margin-top:4px">${Math.round(pw)} W</div>
+                          <div class="k">${cyc||pw>20?'En cours':'Prêt'}</div>
+                          <div class="bar"><i style="width:${Math.min(pw/max*100,100)}%;background:${cyc?'#38bdf8':'#64748b'}"></i></div>
+                        </div>`;
+                      }).join('');
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:washing-machine"></ha-icon>Appareils et charges pilotées</span><span class="k">›</span></div>
+                        <div class="g3" style="gap:14px">${dev}</div></div>`;
+                    ]]]
+
+              # 7. Coûts et tarifs
+              - type: vertical-stack
+                cards:
+                  - type: custom:button-card
+                    template: fc_panel
+                    styles:
+                      card:
+                        - border-radius: 18px 18px 0 0
+                        - border-bottom: none
+                    custom_fields:
+                      c: |
+                        [[[
+                          const S=(i,f='—')=>{const v=states[i]?.state;return (!v||['unknown','unavailable','none'].includes(v))?f:v};
+                          const N=(i)=>{const v=parseFloat(states[i]?.state);return isFinite(v)?v:0};
+                          const f3=v=>v.toFixed(3).replace('.',',');
+                          return `<div class="p" style="padding-bottom:4px">
+                            <div class="t"><span><ha-icon icon="mdi:currency-eur"></ha-icon>Coûts et tarifs</span></div>
+                            <div class="g3">
+                              <div class="tile"><ha-icon class="b" icon="mdi:currency-eur"></ha-icon><div><span>Prix actuel</span><b class="b" style="font-size:15px">${f3(N('[[foxcat:pricing.active_buy]]'))} €/kWh</b><span>${S('[[foxcat:pricing.active_label]]')}</span></div></div>
+                              <div class="tile"><ha-icon class="o" icon="mdi:cash"></ha-icon><div><span>Prix prochain</span><b class="o" style="font-size:15px">${f3(N('[[foxcat:pricing.next_buy]]'))} €/kWh</b><span>${S('[[foxcat:pricing.next_label]]')}</span></div></div>
+                              <div class="tile"><ha-icon class="r" icon="mdi:cart"></ha-icon><div><span>Coût du jour</span><b style="font-size:15px">${N('[[foxcat:pricing.cost_today]]').toFixed(2).replace('.',',')} €</b><span>Estimation</span></div></div>
+                            </div></div>`;
+                        ]]]
+                  - type: custom:apexcharts-card
+                    graph_span: 24h
+                    span:
+                      start: day
+                    update_interval: 5min
+                    header:
+                      show: false
+                    apex_config:
+                      chart:
+                        height: 150
+                        background: transparent
+                        toolbar:
+                          show: false
+                      legend:
+                        show: false
+                      grid:
+                        borderColor: rgba(255,255,255,.06)
+                      stroke:
+                        width: 2
+                        curve: stepline
+                      xaxis:
+                        labels:
+                          datetimeUTC: false
+                    series:
+                      - entity: '[[foxcat:pricing.active_buy]]'
+                        name: Prix
+                        type: area
+                        color: '#38bdf8'
+                        opacity: 0.2
+                    card_mod:
+                      style: |
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0 0 18px 18px!important;box-shadow:none!important}
+
+              # 8. Décision économique EMS
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                      const conf=Math.round(N(F('sensor',['confiance','solaire'])));
+                      const sv=N('[[foxcat:pricing.economic_saving]]').toFixed(3).replace('.',',');
+                      return `
+                      <div class="p">
+                        <div class="t"><span>✨ Décision économique EMS</span></div>
+                        <div style="padding:14px;border-radius:14px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.4)">
+                          <div class="gr" style="font-weight:800;font-size:15px;text-transform:uppercase">🍃 ${S('[[foxcat:pricing.economic_decision]]')}</div>
+                          <div class="k" style="margin-top:4px;color:#cfe0f2">Décision courante du moteur économique FoxCat.</div>
+                        </div>
+                        <div style="margin-top:12px">
+                          <div class="row" style="border:none">♥ Statut du prix : <b>${S('[[foxcat:pricing.status]]')}</b></div>
+                          <div class="row" style="border:none">⏱ Meilleur créneau : <b>${S('[[foxcat:pricing.economic_best_slot]]','Maintenant')}</b></div>
+                          <div class="row" style="border:none">✔ Gain estimé : <b>${sv} €/kWh</b></div>
+                          <div class="row" style="border:none">✔ Confiance solaire : <b>${conf} %</b></div>
+                        </div>
+                        <div class="quote">« Le bon kWh est celui qu'on n'achète pas. »</div>
+                      </div>`;
+                    ]]]
+
+              # 9. Système et diagnostics
+              - type: custom:button-card
+                template: fc_panel
+                tap_action:
+                  action: navigate
+                  navigation_path: diagnostic
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const good=i=>!!i&&!!states[i]&&!['unknown','unavailable'].includes(states[i].state);
+                      const valid=states[F('binary_sensor',['donnees','energetiques','valides'])]?.state!=='off';
+                      const ackInv=F('sensor',['ack','onduleur']), phase=F('sensor',['phase','regulation']), core=F('sensor',['validation','execution','ems']);
+                      const rows=[
+                        ['Energy Bus',valid,'Communication nominale'],
+                        ['EMS Core',good(core),S(core)],
+                        ['Onduleur Core',good(ackInv)&&!/FAILED/i.test(S(ackInv,'')),'Synchronisé'],
+                        ['Phase de régulation',good(phase),S(phase)],
+                        ['Sources énergie',good('[[foxcat:energy.pv_power]]'),valid?'Données fraîches':'Données invalides']
+                      ];
+                      return `<div class="p">
+                        <div class="t"><span><ha-icon icon="mdi:pulse"></ha-icon>Système et diagnostics</span></div>
+                        ${rows.map(r=>`<div class="row"><span><span class="dot" style="background:${r[1]?'#34d399':'#f87171'}"></span>${r[0]}</span><b class="${r[1]?'gr':'r'}" style="font-size:12px">${r[1]?'OK':'KO'}</b><span class="k" style="text-align:right;max-width:42%">${r[2]}</span></div>`).join('')}
+                        <div class="k" style="margin-top:10px;display:flex;justify-content:space-between"><span>Version 1.7.0</span><span style="color:#38bdf8;font-weight:700">FOXCAT ENERGY</span></div>
+                      </div>`;
+                    ]]]
+
+  # ====================================================================
+  # ÉNERGIE
+  # ====================================================================
+  - type: panel
+    title: Énergie
+    path: energie
+    icon: mdi:lightning-bolt
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: Énergie, subtitle: 'Flux · Maison · Réseau', icon: mdi:lightning-bolt, color: '#38bdf8'}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const N=i=>{const v=parseFloat(states[i]?.state);return isFinite(v)?Math.max(v,0):0};
+                      const W=v=>v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W';
+                      const pv=N('[[foxcat:energy.pv_power]]'),h=N('[[foxcat:energy.house_power]]'),im=N('[[foxcat:energy.grid_import]]'),ex=N('[[foxcat:energy.grid_export]]');
+                      const cov=h>0?Math.min(pv/h*100,100):(pv>0?100:0);
+                      const g=ex>30&&ex>=im?['RÉINJECTION',ex,'gr']:im>30?['PRÉLÈVEMENT',im,'r']:['ÉQUILIBRE',0,''];
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:flash-circle"></ha-icon>Situation instantanée</span><small>● temps réel</small></div>
+                        <div class="g3">
+                          <div class="stat"><span>SOLAIRE</span><b class="o" style="font-size:18px">${W(pv)}</b></div>
+                          <div class="stat"><span>MAISON</span><b class="b" style="font-size:18px">${W(h)}</b></div>
+                          <div class="stat"><span>${g[0]}</span><b class="${g[2]}" style="font-size:18px">${W(g[1])}</b></div>
+                        </div>
+                        <div class="row" style="border:none;margin-top:10px"><span class="k">Couverture solaire de la maison</span><b>${Math.round(cov)} %</b></div>
+                        <div class="bar"><i style="width:${cov}%;background:linear-gradient(90deg,#ffb020,#34d399)"></i></div></div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const N=i=>{const v=parseFloat(states[i]?.state);return isFinite(v)?Math.max(v,0):0};
+                      const K=v=>v.toFixed(2).replace('.',',')+' kWh';
+                      const bar=(l,v,c)=>`<div style="margin-top:10px"><div class="row" style="border:none;padding:0"><span class="k">${l}</span><b>${Math.round(v)} %</b></div><div class="bar"><i style="width:${Math.min(v,100)}%;background:${c}"></i></div></div>`;
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:chart-donut"></ha-icon>Aujourd'hui</span><small>Bilan énergétique</small></div>
+                        <div class="g2">
+                          <div class="tile"><ha-icon class="o" icon="mdi:white-balance-sunny"></ha-icon><div><span>Production PV</span><b>${K(N('[[foxcat:energy.today.pv]]'))}</b></div></div>
+                          <div class="tile"><ha-icon class="b" icon="mdi:home-lightning-bolt-outline"></ha-icon><div><span>Consommation</span><b>${K(N('[[foxcat:energy.today.house]]'))}</b></div></div>
+                          <div class="tile"><ha-icon class="r" icon="mdi:transmission-tower-import"></ha-icon><div><span>Réseau prélevé</span><b>${K(N('[[foxcat:energy.today.import]]'))}</b></div></div>
+                          <div class="tile"><ha-icon class="gr" icon="mdi:transmission-tower-export"></ha-icon><div><span>Réinjection</span><b>${K(N('[[foxcat:energy.today.export]]'))}</b></div></div>
+                        </div>
+                        ${bar('Autoconsommation',N('[[foxcat:energy.today.self_consumption_pct]]'),'#ffb020')}
+                        ${bar('Autonomie solaire',N('[[foxcat:energy.today.autonomy_pct]]'),'#34d399')}</div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const S=(i,f='—')=>{const v=states[i]?.state;return (!v||['unknown','unavailable','none'].includes(v))?f:v};
+                      const N=i=>{const v=parseFloat(states[i]?.state);return isFinite(v)?v:0};
+                      const e=v=>v.toFixed(2).replace('.',',')+' €';
+                      const f3=v=>v.toFixed(3).replace('.',',');
+                      return `<div class="p"><div class="t"><span><ha-icon class="gr" icon="mdi:cash"></ha-icon>Coût énergie</span></div>
+                        <div style="text-align:center;margin-bottom:6px"><div class="v gr" style="font-size:32px">${e(N('[[foxcat:pricing.cost_today]]'))}</div><div class="k">coût réseau intégré aujourd'hui</div></div>
+                        <div class="row"><span class="k">${S('[[foxcat:pricing.active_label]]','Tarif actif')}</span><b>${f3(N('[[foxcat:pricing.active_buy]]'))} €/kWh</b></div>
+                        <div class="row"><span class="k">${S('[[foxcat:pricing.next_label]]','Tarif suivant')}</span><b>${f3(N('[[foxcat:pricing.next_buy]]'))} €/kWh</b></div>
+                        <div class="row"><span class="k">Économie solaire</span><b class="gr">${e(N('[[foxcat:pricing.solar_gain_today]]'))}</b></div>
+                        <div class="row"><span class="k">Décision économique</span><b>${S('[[foxcat:pricing.economic_decision]]')}</b></div></div>`;
+                    ]]]
+              - type: vertical-stack
+                cards:
+                  - type: custom:button-card
+                    template: fc_panel
+                    styles:
+                      card:
+                        - border-radius: 18px 18px 0 0
+                        - border-bottom: none
+                    custom_fields:
+                      c: |
+                        [[[ return `<div class="p" style="padding-bottom:0"><div class="t"><span>Production · Consommation · Réseau</span><small>24 h (kW)</small></div></div>`; ]]]
+                  - type: custom:apexcharts-card
+                    graph_span: 24h
+                    span: {start: day}
+                    update_interval: 1min
+                    header: {show: false}
+                    apex_config:
+                      chart: {height: 260, background: transparent, toolbar: {show: false}}
+                      legend: {position: top, labels: {colors: '#9bb3cc'}}
+                      grid: {borderColor: 'rgba(255,255,255,.06)'}
+                      stroke: {width: 2, curve: smooth}
+                      xaxis: {labels: {datetimeUTC: false}}
+                    series:
+                      - {entity: '[[foxcat:energy.pv_power]]', name: Solaire, type: area, color: '#ffb020', opacity: 0.25, transform: 'return x/1000;'}
+                      - {entity: '[[foxcat:energy.house_power]]', name: Maison, type: line, color: '#38bdf8', transform: 'return x/1000;'}
+                      - {entity: '[[foxcat:energy.grid_import]]', name: Prélèvement, type: line, color: '#f87171', transform: 'return x/1000;'}
+                      - {entity: '[[foxcat:energy.grid_export]]', name: Réinjection, type: line, color: '#34d399', transform: 'return x/1000;'}
+                    card_mod:
+                      style: |
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0 0 18px 18px!important;box-shadow:none!important}
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: FoxCat · EMS
+                  icon: mdi:cat
+                  rows:
+                    - ['Mode EMS', '[[foxcat:ems.mode]]']
+                    - ['Régulation active', '[[foxcat:ems.regulation_active]]']
+                    - ['Demande Boiler', '[[foxcat:boiler.demand]]']
+                    - ['Origine Boiler', '[[foxcat:boiler.origin]]']
+                    - ['Exécution Boiler', '[[foxcat:boiler.execution_status]]']
+                    - ['Statut du prix', '[[foxcat:pricing.status]]']
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const N=i=>{const v=parseFloat(states[i]?.state);return isFinite(v)?Math.max(v,0):0};
+                      const W=v=>v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W';
+                      const pv=N('[[foxcat:energy.pv_power]]'),h=N('[[foxcat:energy.house_power]]'),im=N('[[foxcat:energy.grid_import]]'),ex=N('[[foxcat:energy.grid_export]]');
+                      const cov=h>0?Math.min(pv/h*100,100):0;
+                      let t='Équilibre énergétique stable.',c='#60a5fa';
+                      if(ex>150){t=`Surplus solaire : ${W(ex)} sont actuellement réinjectés.`;c='#34d399'}
+                      else if(im>500){t=`La maison prélève actuellement ${W(im)} sur le réseau.`;c='#fb7185'}
+                      else if(pv>50&&cov>=95){t='Le solaire couvre pratiquement toute la consommation actuelle.';c='#facc15'}
+                      else if(pv>50){t=`Le photovoltaïque couvre ${Math.round(cov)} % des besoins de la maison.`;c='#22d3ee'}
+                      return `<div class="p"><div class="t"><span>✨ Analyse énergétique</span></div>
+                        <div style="padding:14px;border-radius:14px;background:${c}14;border:1px solid ${c}55;font-size:14px;line-height:1.5">${t}</div>
+                        <div class="quote">« Le bon kWh est celui qu'on n'achète pas. »</div></div>`;
+                    ]]]
+
+  # ====================================================================
+  # ONDULEUR
+  # ====================================================================
+  - type: panel
+    title: Onduleur
+    path: onduleur
+    icon: mdi:solar-power
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: Onduleur, subtitle: 'EMS Onduleur · SolarEdge · RRCR', icon: mdi:solar-power-variant, color: '#facc15'}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                      const lvl=Math.min(Math.max(N(F('sensor',['niveau','puissance','pri','actuel']),100),0),100);
+                      const tgt=Math.round(N(F('sensor',['niveau','puissance','pri','cible']),lvl));
+                      const st=S(F('sensor',['ems','onduleur','etat']));
+                      const dir=S(F('sensor',['direction','pri']),'MAINTIEN');
+                      const n=nm(st);
+                      const c=n.includes('liberation')?'#35e59d':n.includes('reduction')?'#ff922b':n.includes('maintien')?'#19d8ff':n.includes('invalide')||n.includes('failed')?'#fb7185':'#94a3b8';
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:solar-power-variant"></ha-icon>Niveau onduleur</span><span class="chip" style="color:${c};background:${c}18">${st}</span></div>
+                        <div style="display:flex;align-items:center;justify-content:space-around">
+                          <div class="ring" style="width:150px;height:150px;background:conic-gradient(#facc15 ${lvl*3.6}deg,rgba(255,255,255,.08) 0)"><div style="width:120px;height:120px;font-size:36px">${Math.round(lvl)} %<small>NIVEAU ACTUEL</small></div></div>
+                          <div style="text-align:center"><div class="k">CIBLE</div><div class="v" style="font-size:30px">${tgt} %</div><div style="color:${c};font-weight:800;font-size:12px">${dir}</div><div class="k" style="margin-top:8px">Max ${Math.round(lvl*40)} W</div></div>
+                        </div></div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
+                      const W=v=>{v=Math.abs(v);return v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W'};
+                      const ceil=Math.max(N(F('sensor',['ems','onduleur','plafond','pv'])),0);
+                      const use=Math.min(Math.max(N(F('sensor',['ems','onduleur','utilisation','plafond'])),0),100);
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:gauge"></ha-icon>Plafond & réseau</span></div>
+                        <div class="g2">
+                          <div class="stat"><span>PRODUCTION PV</span><b class="o">${W(N('[[foxcat:energy.pv_power]]'))}</b></div>
+                          <div class="stat"><span>PLAFOND ONDULEUR</span><b style="color:#facc15">${W(ceil)}</b></div>
+                          <div class="stat"><span>IMPORT</span><b class="r">${W(N('[[foxcat:energy.grid_import]]'))}</b></div>
+                          <div class="stat"><span>RÉINJECTION</span><b class="gr">${W(N('[[foxcat:energy.grid_export]]'))}</b></div>
+                        </div>
+                        <div class="row" style="border:none;margin-top:8px"><span class="k">Utilisation du plafond</span><b class="b">${Math.round(use)} %</b></div>
+                        <div class="bar"><i style="width:${use}%;background:#19d8ff"></i></div>
+                        <div class="row" style="margin-top:10px"><span class="k">Potentiel solaire</span><b>${S(F('sensor',['ems','onduleur','potentiel','solaire']),'STABLE')}</b></div>
+                        <div class="row"><span class="k">Politique réseau</span><b class="pu">${S(F('sensor',['politique','reseau','active']),'Compensation')}</b></div></div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
+                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
+                      const col=v=>{const x=nm(v);return x.includes('ok')?'#35e59d':x.includes('pending')||x.includes('attente')?'#facc15':x.includes('failed')||x.includes('erreur')?'#fb7185':'#64748b'};
+                      const a=[['ACK RRCR',S(F('sensor',['ack','rrcr']))],['ACK ONDULEUR',S(F('sensor',['ack','onduleur']))],['ACK RÉSEAU',S(F('sensor',['ack','reseau']))]];
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:check-decagram"></ha-icon>Validation & décision</span></div>
+                        <div class="g3">${a.map(x=>`<div class="stat"><span>${x[0]}</span><b style="color:${col(x[1])}">${x[1]}</b></div>`).join('')}</div>
+                        <div class="row" style="margin-top:10px"><span class="k">Code RRCR</span><b>${S(F('sensor',['code','rrcr']))}</b></div>
+                        <div class="row"><span class="k">Dernière trame</span><b>${S(F('sensor',['derniere','trame','energetique']))}</b></div>
+                        <div style="margin-top:10px;padding:12px;border-radius:12px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);font-size:12px;line-height:1.45;color:#cfe0f2"><b class="b">Décision EMS onduleur</b><br>${S(F('sensor',['derniere','decision','pri']),'Aucune décision disponible.')}</div></div>`;
+                    ]]]
+              - type: vertical-stack
+                cards:
+                  - type: conditional
+                    conditions:
+                      - {entity: '[[foxcat:ems.mode]]', state: Manuel}
+                    card:
+                      type: custom:button-card
+                      template: fc_panel
+                      styles:
+                        card:
+                          - border-radius: 18px 18px 0 0
+                      custom_fields:
+                        c: |
+                          [[[ return `<div class="p" style="padding:14px 18px"><div class="t" style="margin:0"><span class="gr">✅ Commande manuelle autorisée</span><small>Niveau PRI</small></div></div>`; ]]]
+                  - type: conditional
+                    conditions:
+                      - {entity: '[[foxcat:ems.mode]]', state_not: Manuel}
+                    card:
+                      type: custom:button-card
+                      template: fc_panel
+                      custom_fields:
+                        c: |
+                          [[[ return `<div class="p"><div class="t"><span>🔒 Commande verrouillée</span></div><div class="k" style="font-size:12px;line-height:1.5">Passe l'EMS en <b style="color:#fff">Manuel</b> pour utiliser les boutons de niveau onduleur.</div></div>`; ]]]
+                  - type: conditional
+                    conditions:
+                      - {entity: '[[foxcat:ems.mode]]', state: Manuel}
+                    card:
+                      type: grid
+                      columns: 4
+                      square: false
+                      cards:
+                        - {type: custom:button-card, template: fc_btn, name: 100 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 100}}}
+                        - {type: custom:button-card, template: fc_btn, name: 90 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 90}}}
+                        - {type: custom:button-card, template: fc_btn, name: 80 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 80}}}
+                        - {type: custom:button-card, template: fc_btn, name: 70 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 70}}}
+                        - {type: custom:button-card, template: fc_btn, name: 60 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 60}}}
+                        - {type: custom:button-card, template: fc_btn, name: 50 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 50}}}
+                        - {type: custom:button-card, template: fc_btn, name: 40 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 40}}}
+                        - {type: custom:button-card, template: fc_btn, name: 30 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 30}}}
+                        - {type: custom:button-card, template: fc_btn, name: 20 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 20}}}
+                        - {type: custom:button-card, template: fc_btn, name: 10 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 10}}}
+                        - {type: custom:button-card, template: fc_btn, name: 0 %, icon: mdi:solar-power-off, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 0}}}
+                        - {type: custom:button-card, template: fc_btn, name: Libérer, icon: mdi:lock-open-variant, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 100}}}
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const t=[['100 %','4000 W','0000'],['90 %','3600 W','1001'],['80 %','3200 W','1000'],['70 %','2800 W','0111'],['60 %','2400 W','0110'],['50 %','2000 W','0101'],['40 %','1600 W','0100'],['30 %','1200 W','0011'],['20 %','800 W','0010'],['10 %','400 W','0001'],['0 %','0 W','1010']];
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:table"></ha-icon>Table onduleur</span><small>0000 = libéré = 100 %</small></div>
+                        <div class="row" style="border:none"><b class="k">Niveau</b><b class="k">P.out max</b><b class="k">RRCR</b></div>
+                        ${t.map(r=>`<div class="row" style="padding:4px 0"><b>${r[0]}</b><span>${r[1]}</span><span style="font-family:monospace;color:#facc15">${r[2]}</span></div>`).join('')}</div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Relais RRCR
+                  icon: mdi:electric-switch
+                  rows:
+                    - ['Relais L1', '[[foxcat:inverter.rrcr_l1]]']
+                    - ['Relais L2', '[[foxcat:inverter.rrcr_l2]]']
+                    - ['Relais L3', '[[foxcat:inverter.rrcr_l3]]']
+                    - ['Relais L4', '[[foxcat:inverter.rrcr_l4]]']
+                    - ['Régulation PRI', '[[foxcat:inverter.enabled]]']
+                    - ['Raison', '[[foxcat:inverter.reason]]']
+
+  # ====================================================================
+  # BOILER
+  # ====================================================================
+  - type: panel
+    title: Boiler ECS
+    path: boiler
+    icon: mdi:water-boiler
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: Boiler ECS, subtitle: 'Température · Chauffe · Historique', icon: mdi:water-boiler, color: '#fb923c'}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: vertical-stack
+                cards:
+                  - type: custom:button-card
+                    template: fc_panel
+                    styles:
+                      card:
+                        - border-radius: 18px 18px 0 0
+                    custom_fields:
+                      c: |
+                        [[[
+                          const S=(i,f='—')=>{const v=states[i]?.state;return (!v||['unknown','unavailable','none'].includes(v))?f:v};
+                          const N=i=>{const v=parseFloat(states[i]?.state);return isFinite(v)?v:NaN};
+                          const fm=(v,u='',d=1)=>Number.isFinite(v)?`${v.toFixed(d).replace('.',',')} ${u}`.trim():'—';
+                          const mode=S('[[foxcat:ems.mode]]'),regime=S('[[foxcat:pricing.regime]]'),pol=S('[[foxcat:pricing.network_policy]]');
+                          const t=N('[[foxcat:boiler.temperature]]'),avg=N('[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]'),p=N('[[foxcat:boiler.power]]');
+                          const miss=N('[[foxcat:boiler.thermal_energy_missing]]'),dur=N('[[foxcat:boiler.heating_duration]]');
+                          const pos=N('[[foxcat:pricing.dynamic_curve_position]]'),low=N('[[foxcat:pricing.day_ahead.threshold]]'),high=N('[[foxcat:pricing.day_ahead.peak_threshold]]');
+                          const run=states['[[foxcat:boiler.physical]]']?.state==='on'||(p>100);
+                          const dyn=regime==='Dynamique';
+                          const zone=!dyn?'HORS DYNAMIC':!Number.isFinite(pos)?'INDISPONIBLE':pos<=low?'TRÈS FAVORABLE':pos<=high?'ACCEPTABLE':'TROP CHER';
+                          const origin=S('[[foxcat:boiler.origin]]','AUCUNE'),dem=S('[[foxcat:boiler.demand]]','AUCUNE');
+                          const dec=origin!=='AUCUNE'?origin:dem;
+                          const dc=dec.includes('BOOST')?'#facc15':dec.includes('ATTENTE')||dec.includes('PRIX')?'#a78bfa':run?'#fb923c':'#94a3b8';
+                          return `<div class="p"><div class="t"><span><ha-icon class="o" icon="mdi:water-boiler"></ha-icon>Boiler ECS <small>FoxCat · ${mode}</small></span><span class="chip" style="color:${run?'#fb923c':'#94a3b8'};background:${run?'rgba(251,146,60,.14)':'rgba(148,163,184,.1)'}">${run?'● CHAUFFE':'○ ATTENTE'}</span></div>
+                            <div class="g3"><div class="stat"><span>COMPORTEMENT</span><b>${mode}</b></div><div class="stat"><span>TARIF</span><b>${regime}</b></div><div class="stat"><span>RÉSEAU</span><b>${pol}</b></div></div>
+                            <div class="g3" style="margin-top:8px">
+                              <div class="stat"><span>DOIGT DE GANT BAS</span><b>${fm(t,'°C')}</b></div><div class="stat"><span>MOYENNE BALLON</span><b>${fm(avg,'°C')}</b></div><div class="stat"><span>PUISSANCE</span><b>${fm(p,'W',0)}</b></div>
+                              <div class="stat"><span>ÉNERGIE MANQUANTE</span><b>${fm(miss,'kWh',2)}</b></div><div class="stat"><span>DURÉE ESTIMÉE</span><b>${fm(dur,'h',2)}</b></div><div class="stat"><span>EXÉCUTION</span><b>${S('[[foxcat:boiler.execution_status]]')}</b></div></div>
+                            <div style="margin-top:10px;padding:12px;border-radius:14px;background:${dyn?'rgba(139,92,246,.08)':'rgba(255,255,255,.025)'};border:1px solid ${dyn?'rgba(139,92,246,.25)':'rgba(255,255,255,.05)'}">
+                              <div class="k" style="font-weight:800;letter-spacing:.1em">DYNAMIC BOILER</div>
+                              <div class="g2" style="grid-template-columns:repeat(4,1fr);margin-top:8px"><div class="stat"><span>POSITION</span><b>${fm(pos,'%')}</b></div><div class="stat"><span>ZONE</span><b style="font-size:10px">${zone}</b></div><div class="stat"><span>FAVORABLE</span><b>${fm(low,'%',0)}</b></div><div class="stat"><span>PLAFOND</span><b>${fm(high,'%',0)}</b></div></div>
+                              <div style="text-align:center;margin-top:10px;font-weight:800;color:${dc}">${dec}</div>
+                              <div class="k" style="text-align:center;margin-top:4px;font-size:10px">BOOST 65 °C = solaire uniquement · réseau ≤ plafond = confort 45 °C</div></div></div>`;
+                        ]]]
+                  - type: grid
+                    columns: 3
+                    square: false
+                    cards:
+                      - {type: custom:button-card, template: fc_btn, name: Démarrer, icon: mdi:play-circle-outline, tap_action: {action: call-service, service: button.press, service_data: {entity_id: '[[foxcat:boiler.user_start]]'}}}
+                      - {type: custom:button-card, template: fc_btn, name: Arrêter, icon: mdi:stop-circle-outline, tap_action: {action: call-service, service: button.press, service_data: {entity_id: '[[foxcat:boiler.user_stop]]'}}}
+                      - {type: custom:button-card, template: fc_btn, name: Automatique, icon: mdi:autorenew, tap_action: {action: call-service, service: button.press, service_data: {entity_id: '[[foxcat:boiler.user_auto]]'}}}
+              - type: vertical-stack
+                cards:
+                  - type: custom:button-card
+                    template: fc_panel
+                    styles:
+                      card:
+                        - border-radius: 18px 18px 0 0
+                        - border-bottom: none
+                    custom_fields:
+                      c: |
+                        [[[ return `<div class="p" style="padding-bottom:0"><div class="t"><span>Températures & puissance</span><small>24 h</small></div></div>`; ]]]
+                  - type: custom:apexcharts-card
+                    graph_span: 24h
+                    update_interval: 1min
+                    now: {show: true, label: Maintenant}
+                    header: {show: false}
+                    apex_config:
+                      chart: {height: 300, background: transparent, toolbar: {show: false}}
+                      legend: {position: bottom, labels: {colors: '#9bb3cc'}}
+                      grid: {borderColor: 'rgba(255,255,255,.06)'}
+                      stroke: {curve: smooth}
+                      xaxis: {labels: {datetimeUTC: false}}
+                    yaxis:
+                      - {id: temp, decimals: 1}
+                      - {id: power, opposite: true, decimals: 0}
+                    series:
+                      - {entity: '[[foxcat:boiler.temperature_source]]', name: Doigt de gant bas, yaxis_id: temp, stroke_width: 3, color: '#fb923c'}
+                      - {entity: '[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]', name: Moyenne ballon, yaxis_id: temp, stroke_width: 2, color: '#38bdf8'}
+                      - {entity: '[[foxcat:boiler.power_source]]', name: Puissance, yaxis_id: power, type: area, stroke_width: 2, opacity: 0.14, color: '#facc15'}
+                    card_mod:
+                      style: |
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0 0 18px 18px!important;box-shadow:none!important}
+              - type: vertical-stack
+                cards:
+                  - type: custom:button-card
+                    template: fc_list
+                    variables:
+                      title: Estimateur thermique · V1.7.0
+                      icon: mdi:thermometer-lines
+                      rows:
+                        - ['Température estimée', '[[foxcat:boiler.estimated_temperature]]']
+                        - ['État thermique', '[[foxcat:boiler.thermal_state]]']
+                        - ['Confiance estimation', '[[foxcat:boiler.estimate_confidence]]']
+                        - ['Énergie manquante', '[[foxcat:boiler.thermal_energy_missing]]']
+                        - ['Durée de chauffe', '[[foxcat:boiler.heating_duration]]']
+                  - type: custom:button-card
+                    template: fc_list
+                    variables:
+                      title: Pilotage & cohérence
+                      icon: mdi:tune
+                      rows:
+                        - ['Comportement EMS', '[[foxcat:ems.mode]]']
+                        - ['Contrat énergie', '[[foxcat:pricing.regime]]']
+                        - ['Politique réseau', '[[foxcat:pricing.network_policy]]']
+                        - ['Seuil très favorable', '[[foxcat:pricing.day_ahead.threshold]]']
+                        - ['Plafond Boiler Dynamic', '[[foxcat:pricing.day_ahead.peak_threshold]]']
+                        - ['Gestion Boiler FoxCat', '[[foxcat:boiler.enabled]]']
+
+  # ====================================================================
+  # MACHINES / APPAREILS
+  # ====================================================================
+  - type: panel
+    title: Appareils
+    path: appareils
+    icon: mdi:washing-machine
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: Appareils, subtitle: 'Lave-linge · Sèche-linge · Lave-vaisselle · Chauffage', icon: mdi:washing-machine, color: '#c4b5fd'}
+          - type: grid
+            columns: 4
+            square: false
+            cards:
+              - type: custom:button-card
+                template: fc_device
+                entity: '[[foxcat:legacy.switch_boiler_prise_1]]'
+                variables:
+                  name: Boiler ECS
+                  sub: Chauffe-eau
+                  emoji: ♨️
+                  col: '#fb923c'
+                  cy: '[[foxcat:boiler.binary_source]]'
+                  pw: '[[foxcat:boiler.power_source]]'
+                  sw: '[[foxcat:legacy.switch_boiler_prise_1]]'
+              - type: custom:button-card
+                template: fc_device
+                entity: '[[foxcat:machines.washer.switch]]'
+                variables:
+                  name: Lave-linge
+                  emoji: 🧺
+                  col: '#60a5fa'
+                  cy: '[[foxcat:machines.washer.cycle]]'
+                  pw: '[[foxcat:legacy.sensor_lave_linge_puissance]]'
+                  sw: '[[foxcat:machines.washer.switch]]'
+              - type: custom:button-card
+                template: fc_device
+                entity: '[[foxcat:machines.dryer.switch]]'
+                variables:
+                  name: Sèche-linge
+                  emoji: 🌀
+                  col: '#c4b5fd'
+                  cy: '[[foxcat:machines.dryer.cycle]]'
+                  pw: '[[foxcat:legacy.sensor_seche_linge_puissance]]'
+                  sw: '[[foxcat:machines.dryer.switch]]'
+              - type: custom:button-card
+                template: fc_device
+                entity: '[[foxcat:machines.dishwasher.switch]]'
+                variables:
+                  name: Lave-vaisselle
+                  emoji: 🍽️
+                  col: '#34d399'
+                  cy: '[[foxcat:machines.dishwasher.cycle]]'
+                  pw: '[[foxcat:legacy.sensor_lave_vaisselle_puissance]]'
+                  sw: '[[foxcat:machines.dishwasher.switch]]'
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const units=[
+                        ['Salon','🛋️','[[foxcat:legacy.climate_salon_2]]'],
+                        ['Chambre parentale','🛏️','[[foxcat:legacy.climate_chambre_parentale]]'],
+                        ['Chambre Nathéo','🧸','[[foxcat:legacy.climate_chambre_natheo_2]]'],
+                        ['Salle de bain','🚿','[[foxcat:legacy.climate_salle_de_bain_2]]'],
+                        ['Chauffage sol','♨️','[[foxcat:legacy.climate_chauffage_sol_2]]'],
+                        ['Insert à pellet','🍳','[[foxcat:legacy.climate_poele_a_pellet]]']];
+                      const mode=states['[[foxcat:legacy.select_central_mode]]']?.state||'—';
+                      const act={heating:['CHAUFFE','#fb923c'],cooling:['RAFRAÎCHIT','#60a5fa'],drying:['DÉSHUMIDIFIE','#38bdf8'],fan:['VENTILATION','#c4b5fd'],fan_only:['VENTILATION','#c4b5fd']};
+                      const cells=units.map(u=>{const s=states[u[2]];if(!s)return '';
+                        const a=s.state==='off'?['ARRÊT','#64748b']:act[s.attributes.hvac_action]||['EN VEILLE','#94a3b8'];
+                        const cur=parseFloat(s.attributes.current_temperature),tg=parseFloat(s.attributes.temperature);
+                        return `<div class="stat" style="padding:14px 8px;border:1px solid ${a[1]}33"><div style="font-size:24px">${u[1]}</div><b style="font-size:14px">${u[0]}</b><span style="color:${a[1]};font-weight:800;margin-top:4px">● ${a[0]}</span><b style="font-size:26px;margin-top:6px">${isNaN(cur)?'--':cur.toFixed(1)}°</b><span>Consigne ${isNaN(tg)?'--':tg.toFixed(1)}°</span></div>`}).join('');
+                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:thermometer"></ha-icon>Chauffage & climatisation</span><span class="chip" style="color:#c4b5fd;background:rgba(196,181,253,.12)">Mode ${mode}</span></div><div class="g3">${cells}</div></div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Consommation du jour
+                  icon: mdi:chart-bar
+                  rows:
+                    - ['Boiler · énergie', '[[foxcat:legacy.sensor_boiler_energy_daily]]']
+                    - ['Boiler · coût', '[[foxcat:legacy.sensor_boiler_energy_daily_cost]]']
+                    - ['Lave-linge · énergie', '[[foxcat:legacy.sensor_lave_linge_energy_daily]]']
+                    - ['Lave-linge · coût', '[[foxcat:legacy.sensor_lave_linge_energy_daily_cost]]']
+                    - ['Sèche-linge · énergie', '[[foxcat:legacy.sensor_seche_linge_energy_daily]]']
+                    - ['Sèche-linge · coût', '[[foxcat:legacy.sensor_seche_linge_energy_daily_cost]]']
+                    - ['Lave-vaisselle · énergie', '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily]]']
+                    - ['Lave-vaisselle · coût', '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily_cost]]']
+
+  # ====================================================================
+  # ÉCONOMIE (Marché & Réseau)
+  # ====================================================================
+  - type: panel
+    title: Marché & Réseau
+    path: marche
+    icon: mdi:chart-timeline-variant-shimmer
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: Économie, subtitle: 'Contrat · Distribution · Prix', icon: mdi:chart-timeline-variant-shimmer, color: '#22d3ee'}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: conditional
+                conditions:
+                  - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+                card:
+                  type: custom:button-card
+                  template: fc_panel
+                  custom_fields:
+                    c: |
+                      [[[
+                        const f=(id,d=3)=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v.toFixed(d).replace('.',','):'—'};
+                        const a=states['[[foxcat:pricing.day_ahead.plan]]']?.attributes||{};
+                        const remain=a.temps_restant_creux||'—',end=a.fin_creux_actuel||'—';
+                        return `<div class="p"><div class="k" style="font-weight:800;letter-spacing:.14em">CONTRAT DYNAMIQUE · DAY-AHEAD</div>
+                          <div style="font-size:34px;font-weight:900;color:#67ddff;margin:12px 0">${f('[[foxcat:pricing.current]]')} <small style="font-size:12px;opacity:.6">€/kWh</small></div>
+                          <div class="g2" style="grid-template-columns:repeat(4,1fr)"><div class="stat"><span>H+1</span><b>${f('[[foxcat:pricing.next]]')}</b></div><div class="stat"><span>POSITION</span><b>${f('[[foxcat:pricing.dynamic_curve_position]]',1)} %</b></div><div class="stat"><span>FAVORABLE</span><b>${a.seuil_favorable_pct??'—'} %</b></div><div class="stat"><span>PLAFOND</span><b>${a.seuil_pic_pct??'—'} %</b></div></div>
+                          <div style="margin-top:10px;padding:12px;border-radius:14px;background:linear-gradient(90deg,rgba(0,207,255,.09),rgba(255,178,56,.05))"><div class="k" style="font-size:9px">CREUX ACTUEL &lt; SEUIL FAVORABLE</div><b style="font-size:15px">${remain==='—'?'Aucun creux actif':remain+' restantes'}</b>${end==='—'?'':`<div class="k" style="font-size:10px">Fin estimée : ${end}</div>`}</div></div>`;
+                      ]]]
+              - type: custom:button-card
+                template: fc_panel
+                custom_fields:
+                  c: |
+                    [[[
+                      const N=(i,d=0)=>{const v=parseFloat(states[i]?.state);return isFinite(v)?v:d};
+                      const e=v=>v.toFixed(2).replace('.',',')+' €';
+                      const k=v=>Math.max(v,0).toFixed(2).replace('.',',')+' kWh';
+                      const gross=Math.max(N('[[foxcat:pricing.cost_today]]'),0),revenue=Math.max(N('[[foxcat:pricing.export_revenue_today]]'),0),net=N('[[foxcat:pricing.net_today]]',gross-revenue);
+                      const gain=N('[[foxcat:pricing.solar_gain_today]]');
+                      return `<div class="p"><div class="t"><span><ha-icon class="gr" icon="mdi:cash-sync"></ha-icon>Coût journalier</span><small>depuis 00:00</small></div>
+                        <div style="text-align:center;margin-bottom:8px"><div class="k">COÛT NET DU JOUR</div><div class="v gr" style="font-size:34px">${e(net)}</div></div>
+                        <div class="g2">
+                          <div class="stat"><span>COÛT BRUT RÉSEAU</span><b class="r">${e(gross)}</b><span>${k(N('[[foxcat:energy.today.import]]'))} prélevés</span></div>
+                          <div class="stat"><span>REVENU RÉINJECTION</span><b class="gr">${e(revenue)}</b><span>${k(N('[[foxcat:energy.today.export]]'))} réinjectés</span></div>
+                          <div class="stat"><span>AVANTAGE PV</span><b class="o">${e(gain)}</b><span>${k(N('[[foxcat:energy.today.self_consumed]]'))} autoconsommés</span></div>
+                          <div class="stat"><span>COÛT SANS PV</span><b class="b">${e(gross+gain)}</b><span>${k(N('[[foxcat:energy.today.house]]'))} maison</span></div>
+                        </div></div>`;
+                    ]]]
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Configuration active
+                  icon: mdi:cog-outline
+                  rows:
+                    - ['Contrat énergie', '[[foxcat:pricing.regime]]']
+                    - ['Distribution / comptage', '[[foxcat:pricing.distribution_profile]]']
+                    - ['Période distribution', '[[foxcat:pricing.distribution_period]]']
+                    - ['Politique réseau', '[[foxcat:pricing.network_policy]]']
+                    - ['Prix achat actif', '[[foxcat:pricing.active_buy]]']
+                    - ['Décision économique', '[[foxcat:pricing.economic_decision]]']
+          - type: conditional
+            conditions:
+              - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+            card:
+              type: custom:apexcharts-card
+              update_interval: 1min
+              graph_span: 2d
+              span: {start: day}
+              now: {show: true, label: Maintenant}
+              header: {show: true, title: Courbe Luminus Dynamic, show_states: false}
+              yaxis:
+                - {decimals: 3}
+              apex_config:
+                chart: {height: 320, background: transparent, toolbar: {show: true}, zoom: {enabled: true}}
+                legend: {show: true, position: bottom, labels: {colors: '#9bb3cc'}}
+                grid: {borderColor: 'rgba(255,255,255,.06)'}
+                stroke: {curve: smooth}
+                xaxis: {type: datetime, labels: {datetimeUTC: false}}
+              series:
+                - entity: '[[foxcat:pricing.source.current]]'
+                  name: Achat
+                  type: area
+                  unit: €/kWh
+                  stroke_width: 3
+                  opacity: 0.16
+                  color: '#38bdf8'
+                  data_generator: |
+                    const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+                    return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new Date(r.start).getTime(),Number(r.all_in)]);
+                - entity: '[[foxcat:pricing.source.injection]]'
+                  name: Injection
+                  type: line
+                  unit: €/kWh
+                  stroke_width: 2
+                  color: '#34d399'
+                  data_generator: |
+                    const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+                    return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new Date(r.start).getTime(),Number(r.injection)]);
+              card_mod:
+                style: |
+                  ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: conditional
+                conditions:
+                  - {entity: '[[foxcat:pricing.regime]]', state: Bi-horaire HP/HC}
+                card:
+                  type: custom:button-card
+                  template: fc_list
+                  variables:
+                    title: Contrat bihoraire
+                    icon: mdi:clock-outline
+                    rows:
+                      - ['Période actuelle', '[[foxcat:pricing.period]]']
+                      - ['Prix heures pleines', '[[foxcat:pricing.source.hp]]']
+                      - ['Prix heures creuses', '[[foxcat:pricing.source.hc]]']
+                      - ['Prix actif', '[[foxcat:pricing.current]]']
+                      - ['Injection tarifée', '[[foxcat:pricing.injection]]']
+              - type: conditional
+                conditions:
+                  - {entity: '[[foxcat:pricing.regime]]', state: Fixe / Monohoraire}
+                card:
+                  type: custom:button-card
+                  template: fc_list
+                  variables:
+                    title: Contrat fixe / monohoraire
+                    icon: mdi:cash
+                    rows:
+                      - ['Prix actif', '[[foxcat:pricing.current]]']
+                      - ['Prix injection', '[[foxcat:pricing.injection]]']
+                      - ['Politique réseau', '[[foxcat:pricing.network_policy]]']
+              - type: conditional
+                conditions:
+                  - {entity: '[[foxcat:pricing.distribution_profile]]', state: Wallonie · Impact}
+                card:
+                  type: custom:button-card
+                  template: fc_panel
+                  custom_fields:
+                    c: |
+                      [[[
+                        const p=states['[[foxcat:pricing.distribution_period]]']?.state??'—';
+                        const m={ECO:['01–07 · 11–17','Déplacer les charges ici','#34d399'],MEDIUM:['07–11 · 22–01','Zone intermédiaire','#facc15'],PIC:['17–22','Éviter les nouvelles grosses charges','#f87171']};
+                        const v=m[p]||['—','Profil Impact actif','#94a3b8'];
+                        return `<div class="p"><div class="k" style="font-weight:800;letter-spacing:.13em">TARIF DE DISTRIBUTION · IMPACT</div><div style="font-size:30px;font-weight:900;color:${v[2]};margin:10px 0">${p}</div><b>${v[0]}</b><div class="k" style="margin-top:5px">${v[1]}</div></div>`;
+                      ]]]
+
+  # ====================================================================
+  # DIAGNOSTIC
+  # ====================================================================
+  - type: panel
+    title: Diagnostic
+    path: diagnostic
+    icon: mdi:stethoscope
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: Diagnostic, subtitle: 'État · Bus · Journal', icon: mdi:stethoscope, color: '#34d399'}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: EMS · Moteur
+                  icon: mdi:engine-outline
+                  rows:
+                    - ['Mode', '[[foxcat:ems.mode]]']
+                    - ['Phase actuelle', '[[foxcat:ems.phase]]']
+                    - ['Action en attente', '[[foxcat:ems.pending_action]]']
+                    - ['État de validation', '[[foxcat:ems.ack]]']
+                    - ['Autorisation de régulation', '[[foxcat:ems.regulation_active]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Dernière décision
+                  icon: mdi:chart-timeline-variant
+                  rows:
+                    - ['Justification EMS', '[[foxcat:legacy.input_text_ems_last_reason]]']
+                    - ['Origine Boiler', '[[foxcat:legacy.input_text_ems_boiler_origine]]']
+                    - ['Demande Boiler', '[[foxcat:legacy.input_select_ems_boiler_demande]]']
+                    - ['Ordre du CORE', '[[foxcat:legacy.input_text_ems_pending_action]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Validité · Contrôle
+                  icon: mdi:check-decagram-outline
+                  rows:
+                    - ['1 · Mesure de référence T0', '[[foxcat:legacy.input_number_ems_grid_t0]]']
+                    - ['2 · Réseau avant action', '[[foxcat:legacy.input_number_ems_action_reference_grid]]']
+                    - ['3 · Réseau attendu', '[[foxcat:legacy.input_number_ems_grid_expected]]']
+                    - ['4 · Erreur constatée', '[[foxcat:legacy.input_number_ems_ack_error]]']
+                    - ['Variation prévue', '[[foxcat:legacy.input_number_ems_pending_delta]]']
+                    - ['Tolérance validation', '[[foxcat:legacy.input_number_ems_ack_tolerance]]']
+                    - ['Tolérance stabilité', '[[foxcat:legacy.input_number_ems_stability_tolerance]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Exécution · Chaîne Boiler
+                  icon: mdi:connection
+                  rows:
+                    - ['1 · Demande stratégique', '[[foxcat:legacy.input_select_ems_boiler_demande]]']
+                    - ['2 · Ordre du CORE', '[[foxcat:legacy.input_text_ems_pending_action]]']
+                    - ['3 · Commande Climate', '[[foxcat:boiler.climate]]']
+                    - ['4 · Alimentation Boiler', '[[foxcat:legacy.switch_boiler_prise_1]]']
+                    - ['5 · État physique', '[[foxcat:boiler.binary_source]]']
+                    - ['6 · Puissance mesurée', '[[foxcat:boiler.power_source]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Énergie · Temps réel
+                  icon: mdi:transmission-tower
+                  rows:
+                    - ['Production PV', '[[foxcat:sources.pv]]']
+                    - ['Consommation maison', '[[foxcat:legacy.sensor_consommation_reelle_maison]]']
+                    - ['Réinjection réseau', '[[foxcat:sources.grid_fallback]]']
+                    - ['Prélèvement réseau', '[[foxcat:sources.grid_signed]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Boiler · Stockage thermique
+                  icon: mdi:thermometer-water
+                  rows:
+                    - ['Température basse', '[[foxcat:boiler.temperature_source]]']
+                    - ['Température isolant', '[[foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature]]']
+                    - ['Température FoxCat', '[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]']
+                    - ['Puissance de chauffe', '[[foxcat:boiler.power_source]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Machines · Autorisations EMS
+                  icon: mdi:washing-machine
+                  rows:
+                    - ['Lave-linge · cycle', '[[foxcat:machines.washer.cycle]]']
+                    - ['Sèche-linge · cycle', '[[foxcat:machines.dryer.cycle]]']
+                    - ['Lave-vaisselle · prise', '[[foxcat:machines.dishwasher.switch]]']
+                    - ['Gestion EMS lave-linge', '[[foxcat:legacy.input_boolean_ems_lave_linge]]']
+                    - ['Gestion EMS sèche-linge', '[[foxcat:legacy.input_boolean_ems_seche_linge]]']
+                    - ['Gestion EMS lave-vaisselle', '[[foxcat:legacy.input_boolean_ems_lave_vaisselle]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Prévision solaire
+                  icon: mdi:weather-sunny
+                  rows:
+                    - ['Fenêtre disponible', '[[foxcat:legacy.input_boolean_ems_prevision_solaire_disponible]]']
+                    - ['Confiance', '[[foxcat:legacy.input_number_ems_prevision_solaire_confiance]]']
+                    - ['Potentiel', '[[foxcat:legacy.input_select_ems_prevision_solaire_potentiel]]']
+                    - ['Début fenêtre', '[[foxcat:legacy.input_text_ems_prevision_solaire_debut]]']
+                    - ['Fin fenêtre', '[[foxcat:legacy.input_text_ems_prevision_solaire_fin]]']
+                    - ['Tendance', '[[foxcat:legacy.input_text_ems_prevision_solaire_tendance]]']
+                    - ['Justification', '[[foxcat:legacy.input_text_ems_prevision_solaire_raison]]']
+              - type: custom:button-card
+                template: fc_list
+                variables:
+                  title: Forecast Solar
+                  icon: mdi:solar-power-variant-outline
+                  rows:
+                    - ['Maintenant', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_electricite_estimee_maintenant]]']
+                    - ['Cette heure', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_cette_heure]]']
+                    - ['Heure suivante', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_heure_suivante]]']
+                    - ["Restant aujourd'hui", '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_restante_aujourd_hui]]']
+                    - ['Prévision du jour', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_aujourd_hui]]']
+                    - ['Prévision 12 h', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_en_12_heures]]']
+                    - ['Heure du pic', '[[foxcat:legacy.sensor_solar_production_forecast_heure_de_pointe_de_puissance_la_plus_elevee_aujourd_hui]]']
+
+  # ====================================================================
+  # PARAMÈTRES (Technique)
+  # ====================================================================
+  - type: panel
+    title: Technique
+    path: technique
+    icon: mdi:cog
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables: {title: EMS Configurator, subtitle: 'Comportement · Contrat · Distribution · Politique réseau · Installateur only', icon: mdi:cog, color: '#94a3b8'}
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+              - type: entities
+                title: 1 · Comportement du moteur
+                show_header_toggle: false
+                entities:
+                  - {entity: '[[foxcat:ems.mode]]', name: Comportement EMS}
+                  - {entity: '[[foxcat:ems.regulation_active]]', name: Régulation FoxCat}
+                  - {entity: '[[foxcat:pricing.behavior_relaxation]]', name: Assouplissement Confort}
+                card_mod:
+                  style: |
+                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
+                    .card-header{font-size:15px!important;font-weight:700!important}
+              - type: entities
+                title: 2 · Énergie, distribution et réseau
+                show_header_toggle: false
+                entities:
+                  - {entity: '[[foxcat:pricing.regime]]', name: Contrat énergie}
+                  - {entity: '[[foxcat:pricing.distribution_profile]]', name: Distribution / comptage}
+                  - {entity: '[[foxcat:pricing.network_policy]]', name: Politique réseau}
+                  - {entity: '[[foxcat:pricing.distribution_period]]', name: Période distribution}
+                card_mod:
+                  style: |
+                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
+                    .card-header{font-size:15px!important;font-weight:700!important}
+              - type: conditional
+                conditions:
+                  - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+                card:
+                  type: entities
+                  title: 3 · Réglages Dynamic
+                  show_header_toggle: false
+                  entities:
+                    - {entity: '[[foxcat:pricing.day_ahead.threshold]]', name: Seuil favorable}
+                    - {entity: '[[foxcat:pricing.day_ahead.peak_threshold]]', name: Plafond acceptable}
+                    - {entity: '[[foxcat:pricing.predictive_enabled]]', name: Planification prix}
+                    - {entity: '[[foxcat:pricing.solar_forecast_arbitrage]]', name: Arbitrage prévision solaire}
+                  card_mod:
+                    style: |
+                      ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
+                      .card-header{font-size:15px!important;font-weight:700!important}
+              - type: entities
+                title: 4 · Boiler · charge flexible
+                show_header_toggle: false
+                entities:
+                  - {entity: '[[foxcat:boiler.enabled]]', name: Charge flexible Boiler}
+                  - {entity: '[[foxcat:boiler.setting.start]]', name: Température de reprise}
+                  - {entity: '[[foxcat:boiler.setting.normal]]', name: Cible confort réseau}
+                  - {entity: '[[foxcat:boiler.setting.boost]]', name: Stockage solaire / boost}
+                  - {entity: '[[foxcat:boiler.setting.safety]]', name: Sécurité absolue}
+                  - {entity: '[[foxcat:boiler.setting.top_offset]]', name: Correction capteur tête cuve}
+                  - {entity: '[[foxcat:boiler.setting.heat_bias]]', name: Durée influence résistance}
+                  - {entity: '[[foxcat:boiler.setting.draw_drop]]', name: Chute de température = puisage}
+                  - {entity: '[[foxcat:boiler.setting.min_confidence]]', name: Confiance minimale fallback}
+                card_mod:
+                  style: |
+                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
+                    .card-header{font-size:15px!important;font-weight:700!important}
+              - type: entities
+                title: 5 · Onduleur / PRI
+                show_header_toggle: false
+                entities:
+                  - {entity: '[[foxcat:inverter.enabled]]', name: Régulation PRI}
+                  - {entity: '[[foxcat:inverter.setting.export_max]]', name: Injection maximale tolérée}
+                  - {entity: '[[foxcat:inverter.setting.import_target]]', name: Import cible}
+                  - {entity: '[[foxcat:inverter.setting.import_max]]', name: Import maximal avant libération PV}
+                  - {entity: '[[foxcat:inverter.setting.pv_min]]', name: Production PV minimale PRI}
+                card_mod:
+                  style: |
+                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
+                    .card-header{font-size:15px!important;font-weight:700!important}
+              - type: entities
+                title: 6 · Maintenance
+                show_header_toggle: false
+                entities:
+                  - {entity: '[[foxcat:diagnostic.dashboard_regenerate]]', name: Régénérer le dashboard}
+                  - {entity: '[[foxcat:diagnostic.button]]', name: Lancer diagnostic}
+                  - {entity: '[[foxcat:diagnostic.reset]]', name: Réinitialiser cycle EMS}
+                card_mod:
+                  style: |
+                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
+                    .card-header{font-size:15px!important;font-weight:700!important}
