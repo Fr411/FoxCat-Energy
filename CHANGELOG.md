@@ -1,3 +1,19 @@
+# Changelog — FoxCat Energy V1.7.4
+
+## V1.7.4
+- Enregistrement explicite du dashboard utilisateur et fusion avec la dernière version FoxCat.
+- La fusion à trois sources conserve les modifications non conflictuelles, signale les conflits et sauvegarde le dashboard courant avant application.
+
+# Changelog — FoxCat Energy V1.7.3
+
+## V1.7.3 (préparation)
+- Options des selects mode EMS, politique réseau et régime tarifaire cohérentes avec les valeurs migrées; descriptions et icônes disponibles dans les attributs.
+- Menu principal avec choix segmentés, état actif visible et versions moteur/dashboard affichées.
+- Templates d’appareils validés avec le catalogue matériel, switches dédiés et actions de désactivation sûres.
+- Vue Technique complétée avec paramètres natifs number/switch/time et services de profils JSON, chargement et réinitialisation.
+- Versions du dashboard détectées depuis les fichiers disponibles; sauvegarde et rollback, sans écraser un dashboard personnalisé.
+- Tests autonomes ajoutés. Aucune release/tag GitHub n’est créée par cette préparation.
+
 # Changelog — FoxCat Energy V1.7.2 Professional
 
 ## V1.7.2

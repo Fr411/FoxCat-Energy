@@ -1,0 +1,10 @@
+# Configuration modèle : remplacer les champs vides par votre matériel.
+device:
+  id: inverter
+  name: Onduleur
+  category: inverter
+  enabled_setting: device_inverter_enabled
+  brand: ""
+  model: ""
+  power_sensor: ""
+  disable_strategy: release_power

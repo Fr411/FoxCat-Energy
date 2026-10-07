@@ -9,7 +9,7 @@ from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfTemperature, Unit
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, CONF_GRID_SIGNED_SENSOR, CONF_PV_SENSOR
+from .const import DOMAIN, VERSION, CONF_GRID_SIGNED_SENSOR, CONF_PV_SENSOR
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .registry import registry_diagnostics
@@ -132,8 +132,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c,"price_analyzer_min_j","Price Analyzer • Minimum J","mdi:arrow-collapse-down","pricing",lambda d:(d.get("economic",{}).get("price_analyzer",{}).get("today") or {}).get("minimum"),"€/kWh"),
         FoxCatNumericSensor(c,"price_analyzer_min_j1","Price Analyzer • Minimum J+1","mdi:calendar-arrow-right","pricing",lambda d:(d.get("economic",{}).get("price_analyzer",{}).get("tomorrow") or {}).get("minimum"),"€/kWh"),
         FoxCatNumericSensor(c,"price_analyzer_temps_restant","Price Analyzer • Temps restant","mdi:timer-outline","pricing",lambda d:d.get("economic",{}).get("price_analyzer",{}).get("current_window_remaining_h"),"h"),
-        FoxCatValueSensor(c,"version_moteur","Version moteur FoxCat Energy","mdi:tag","diagnostic",lambda d:d.get("versions",{}).get("engine","1.7.2")),
-        FoxCatValueSensor(c,"version_dashboard_active","Version Dashboard active","mdi:view-dashboard-outline","diagnostic",lambda d:d.get("versions",{}).get("dashboard","1.7.1")),
+        FoxCatValueSensor(c,"version_moteur","Version moteur FoxCat Energy","mdi:tag","diagnostic",lambda d:d.get("versions",{}).get("engine",VERSION)),
+        FoxCatValueSensor(c,"version_dashboard_active","Version Dashboard active","mdi:view-dashboard-outline","diagnostic",lambda d:d.get("versions",{}).get("dashboard","Non installé")),
         FoxCatValueSensor(c, "day_ahead_prochain_creux", "Day-Ahead • Prochain creux", "mdi:chart-timeline-variant-shimmer", "pricing", lambda d: (d.get("economic", {}).get("day_ahead", {}).get("next_valley") or {}).get("start") or "Indisponible"),
         FoxCatValueSensor(c, "day_ahead_prochain_pic", "Day-Ahead • Prochain pic", "mdi:chart-line-variant", "pricing", lambda d: (d.get("economic", {}).get("day_ahead", {}).get("next_peak") or {}).get("start") or "Indisponible"),
         FoxCatNumericSensor(c, "day_ahead_horizon", "Day-Ahead • Horizon analysé", "mdi:timeline-clock-outline", "pricing", lambda d: d.get("economic", {}).get("day_ahead", {}).get("horizon_hours"), "h"),

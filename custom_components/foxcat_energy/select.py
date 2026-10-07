@@ -18,7 +18,12 @@ from .const import (
 )
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
-from .migration import compatibility_tariff_regime
+from .select_options import (
+    constrained_option,
+    mode_option,
+    network_policy_option,
+    tariff_regime_option,
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
@@ -28,45 +33,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatModeSelect(coordinator),
             FoxCatTariffRegimeSelect(coordinator),
             FoxCatDynamicStructureSelect(coordinator),
-            FoxCatPriceSourceSelect(coordinator), FoxCatTariffStructureSelect(coordinator),
+            FoxCatPriceSourceSelect(coordinator),
+            FoxCatTariffStructureSelect(coordinator),
             FoxCatNetworkPolicySelect(coordinator),
             FoxCatPriManualLevelSelect(coordinator),
+            FoxCatDashboardVersionSelect(coordinator),
         ]
     )
 
 
-class FoxCatModeSelect(FoxCatEntity, SelectEntity):
+class FoxCatDescribedSelect:
+    @property
+    def extra_state_attributes(self) -> dict[str, dict[str, str]]:
+        return {
+            "options_descriptions": self.option_descriptions,
+            "options_icons": self.option_icons,
+        }
+
+
+class FoxCatModeSelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
     _attr_options = MODES
+    option_descriptions = {
+        "Éco": "Priorité à l’autoconsommation et à l’optimisation automatique.",
+        "Confort": "Privilégie le confort tout en conservant les sécurités EMS.",
+        "Manuel": "Suspend les actions automatiques sur les charges.",
+    }
+    option_icons = {"Éco": "mdi:leaf", "Confort": "mdi:sofa", "Manuel": "mdi:hand"}
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "mode_ems", "Mode EMS", "mdi:home-lightning-bolt", "ems")
 
     @property
     def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("mode"))
-        return value if value in MODES else MODE_MANUAL
+        return mode_option(self.coordinator.settings)
 
     async def async_select_option(self, option: str) -> None:
         if option not in MODES:
             return
         await self.coordinator.async_set_mode(option)
 
-
-
-class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
-    _attr_options=PRICE_SOURCES
-    def __init__(self,c): super().__init__(c,"source_prix","Source du prix","mdi:database-clock-outline","pricing")
-    @property
-    def current_option(self): return self.coordinator.settings.get("price_source")
-    async def async_select_option(self,option):
-        if option in PRICE_SOURCES: await self.coordinator.async_set_setting("price_source",option)
-class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
-    _attr_options=TARIFF_STRUCTURES
-    def __init__(self,c): super().__init__(c,"structure_tarifaire","Structure tarifaire","mdi:timeline-clock-outline","pricing")
-    @property
-    def current_option(self): return self.coordinator.settings.get("tariff_structure")
-    async def async_select_option(self,option):
-        if option in TARIFF_STRUCTURES: await self.coordinator.async_set_setting("tariff_structure",option)
 
 class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
     def __init__(
@@ -94,7 +99,48 @@ class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
         self.async_write_ha_state()
 
 
-class FoxCatTariffRegimeSelect(FoxCatBaseSelect):
+class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
+    _attr_options = PRICE_SOURCES
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "source_prix", "Source du prix", "mdi:database-clock-outline", "pricing")
+
+    @property
+    def current_option(self) -> str:
+        return constrained_option(self.coordinator.settings, "price_source", PRICE_SOURCES)
+
+    async def async_select_option(self, option: str) -> None:
+        if option in PRICE_SOURCES:
+            await self.coordinator.async_set_setting("price_source", option)
+
+
+class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
+    _attr_options = TARIFF_STRUCTURES
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "structure_tarifaire", "Structure tarifaire", "mdi:timeline-clock-outline", "pricing")
+
+    @property
+    def current_option(self) -> str:
+        return constrained_option(self.coordinator.settings, "tariff_structure", TARIFF_STRUCTURES)
+
+    async def async_select_option(self, option: str) -> None:
+        if option in TARIFF_STRUCTURES:
+            await self.coordinator.async_set_setting("tariff_structure", option)
+
+
+class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
+    option_descriptions = {
+        "Mono-horaire": "Applique un prix fixe unique, sans plages HP/HC.",
+        "Bi-horaire (HP/HC)": "Applique les prix et plages horaires heures pleines / heures creuses.",
+        "Dynamique": "Utilise les prix variables disponibles dans Home Assistant.",
+    }
+    option_icons = {
+        "Mono-horaire": "mdi:cash",
+        "Bi-horaire (HP/HC)": "mdi:clock-time-eight-outline",
+        "Dynamique": "mdi:chart-timeline-variant",
+    }
+
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -107,8 +153,7 @@ class FoxCatTariffRegimeSelect(FoxCatBaseSelect):
 
     @property
     def current_option(self) -> str | None:
-        value = compatibility_tariff_regime(self.coordinator.settings)
-        return value if value in TARIFF_REGIMES else None
+        return tariff_regime_option(self.coordinator.settings)
 
     async def async_select_option(self, option: str) -> None:
         await super().async_select_option(option)
@@ -125,22 +170,76 @@ class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
             DYNAMIC_STRUCTURES,
         )
 
-
-class FoxCatNetworkPolicySelect(FoxCatEntity, SelectEntity):
+class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
     _attr_options = NETWORK_POLICIES
+    option_descriptions = {
+        "Compensation": "Valorise le prélèvement et l’injection dans le bilan réseau.",
+        "Injection tarifée": "L’injection est rémunérée au tarif configuré.",
+        "Injection non valorisée": "L’injection est comptabilisée sans recette.",
+        "Zéro injection": "Limite la production pour éviter la réinjection réseau.",
+    }
+    option_icons = {
+        "Compensation": "mdi:swap-horizontal",
+        "Injection tarifée": "mdi:cash-plus",
+        "Injection non valorisée": "mdi:transmission-tower-export",
+        "Zéro injection": "mdi:transmission-tower-off",
+    }
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "politique_reseau", "Politique réseau", "mdi:transmission-tower", "pricing")
 
     @property
     def current_option(self) -> str | None:
-        value = str(self.coordinator.settings.get("network_policy", NETWORK_POLICY_COMPENSATION))
-        return value if value in NETWORK_POLICIES else NETWORK_POLICY_COMPENSATION
+        return network_policy_option(self.coordinator.settings)
 
     async def async_select_option(self, option: str) -> None:
         if option not in NETWORK_POLICIES:
             return
         await self.coordinator.async_set_setting("network_policy", option)
+
+
+class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
+    @property
+    def options(self) -> list[str]:
+        from .dashboard import dashboard_select_options
+
+        return dashboard_select_options(self.coordinator.hass)
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "dashboard_version", "Version du dashboard", "mdi:view-dashboard", "diagnostic")
+
+    @property
+    def current_option(self) -> str | None:
+        from .dashboard import dashboard_status
+
+        active = dashboard_status(self.coordinator.hass).get("active_version")
+        return active if active in self.options else (self.options[0] if self.options else None)
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self.options:
+            return
+        from .dashboard import CUSTOM_DASHBOARD_OPTION, async_switch_dashboard
+
+        if option == CUSTOM_DASHBOARD_OPTION:
+            return
+
+        try:
+            await async_switch_dashboard(
+                self.coordinator.hass,
+                self.coordinator.entry,
+                self.coordinator.config,
+                option,
+            )
+        except ValueError as err:
+            from homeassistant.components import persistent_notification
+
+            persistent_notification.async_create(
+                self.coordinator.hass,
+                str(err),
+                title="Dashboard FoxCat Energy",
+            )
+            return
+        self.coordinator.async_set_updated_data(self.coordinator._build_data())
 
 
 class FoxCatPriManualLevelSelect(FoxCatEntity, SelectEntity):

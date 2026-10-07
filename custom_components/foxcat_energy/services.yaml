@@ -1,0 +1,27 @@
+save_settings_profile:
+  name: Enregistrer un profil
+  description: Exporte les réglages EMS dans /config/foxcat_energy/profiles/.
+  fields:
+    name:
+      name: Nom du profil
+      description: 1 à 64 lettres, chiffres, tirets ou caractères soulignés.
+      required: false
+      example: hiver
+      selector:
+        text:
+
+load_settings_profile:
+  name: Charger un profil
+  description: Valide puis applique un profil de réglages EMS.
+  fields:
+    name:
+      name: Nom du profil
+      description: Nom du fichier JSON, sans extension.
+      required: true
+      example: hiver
+      selector:
+        text:
+
+reset_settings:
+  name: Réinitialiser les réglages
+  description: Restaure les valeurs par défaut du moteur et des machines configurées.
