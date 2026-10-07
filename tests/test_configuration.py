@@ -16,6 +16,7 @@ from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
     recommended_dashboard_version,
 )
+from foxcat_energy.dashboard_merge import merge_dashboard_text
 from foxcat_energy.devices import apply_device_toggle, device_definitions
 from foxcat_energy.profiles import profile_path, validate_profile_settings
 from foxcat_energy.migration import migrate_settings_v173
@@ -86,6 +87,31 @@ class DeviceConfigurationTests(unittest.TestCase):
 
 
 class DashboardAndProfileTests(unittest.TestCase):
+    def test_dashboard_merge_keeps_disjoint_user_and_latest_changes(self) -> None:
+        base = "title: FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"
+        user = "title: My FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"
+        latest = "title: FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n      - type: glance\n"
+
+        self.assertEqual(
+            merge_dashboard_text(base, user, latest),
+            "title: My FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n      - type: glance\n",
+        )
+
+    def test_dashboard_merge_rejects_conflicting_changes(self) -> None:
+        base = "title: FoxCat\n"
+        with self.assertRaisesRegex(ValueError, "modifications incompatibles"):
+            merge_dashboard_text(
+                base,
+                "title: Mon dashboard\n",
+                "title: Nouveau FoxCat\n",
+            )
+
+    def test_dashboard_merge_applies_user_only_with_unchanged_latest(self) -> None:
+        base = "title: FoxCat\nviews: []\n"
+        user = "title: Mon FoxCat\nviews: []\n"
+
+        self.assertEqual(merge_dashboard_text(base, user, base), user)
+
     def test_dashboard_versions_are_discovered_and_sorted(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

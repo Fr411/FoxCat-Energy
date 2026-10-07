@@ -7,7 +7,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import FoxCatEnergyCoordinator
-from .dashboard import async_regenerate_dashboard
+from .dashboard import (
+    async_apply_user_dashboard_to_latest,
+    async_regenerate_dashboard,
+    async_save_user_dashboard,
+)
 from .entity import FoxCatEntity
 
 
@@ -92,6 +96,22 @@ async def async_setup_entry(
                 "mdi:view-dashboard-edit-outline",
                 "diagnostic",
                 "dashboard",
+            ),
+            FoxCatActionButton(
+                coordinator,
+                "sauvegarder_dashboard_utilisateur",
+                "Enregistrer mon dashboard personnalisé",
+                "mdi:content-save-outline",
+                "diagnostic",
+                "save_user_dashboard",
+            ),
+            FoxCatActionButton(
+                coordinator,
+                "fusionner_dashboard_utilisateur",
+                "Appliquer mes personnalisations à la dernière version",
+                "mdi:source-branch-sync",
+                "diagnostic",
+                "apply_user_dashboard",
             ),
         ]
     )
@@ -187,6 +207,32 @@ class FoxCatActionButton(FoxCatEntity, ButtonEntity):
 
         elif self._action == "dashboard":
             await async_regenerate_dashboard(self.hass, self.coordinator.entry, self.coordinator.config)
+
+        elif self._action in ("save_user_dashboard", "apply_user_dashboard"):
+            from homeassistant.components import persistent_notification
+
+            try:
+                if self._action == "save_user_dashboard":
+                    result = await async_save_user_dashboard(
+                        self.hass, self.coordinator.entry, self.coordinator.config
+                    )
+                    message = f"Dashboard personnalisé sauvegardé dans `{result}`."
+                else:
+                    status = await async_apply_user_dashboard_to_latest(
+                        self.hass, self.coordinator.entry, self.coordinator.config
+                    )
+                    message = (
+                        "Vos personnalisations ont été fusionnées avec la dernière "
+                        f"version FoxCat ({status['active_version']})."
+                    )
+            except (OSError, ValueError) as err:
+                persistent_notification.async_create(
+                    self.hass, str(err), title="Dashboard FoxCat Energy"
+                )
+                return
+            persistent_notification.async_create(
+                self.hass, message, title="Dashboard FoxCat Energy"
+            )
 
         self.coordinator.async_set_updated_data(
             self.coordinator._build_data()
