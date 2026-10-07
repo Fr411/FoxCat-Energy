@@ -188,7 +188,6 @@ RRCR_CODE_TO_LEVEL = {v: k for k, v in RRCR_LEVEL_TO_CODE.items()}
 DEFAULT_SETTINGS: dict[str, object] = {
     "price_source": PRICE_SOURCE_VARIABLE,
     "tariff_structure": TARIFF_STRUCTURE_SIMPLE,
-    "tariff_regime": TARIFF_MONO,
     "dynamic_structure": DYNAMIC_STRUCT_SIMPLE,
     "network_policy": NETWORK_POLICY_COMPENSATION,
     "price_curve_is_final": True,

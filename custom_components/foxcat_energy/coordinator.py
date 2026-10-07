@@ -510,6 +510,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self._entry_options_snapshot = self._entry_option_settings()
 
+        self.settings["tariff_regime"] = {
+            "Bi-horaire HP/HC": TARIFF_TOU,
+            "Simple": TARIFF_MONO,
+        }.get(str(self.settings.get("tariff_regime")), self.settings.get("tariff_regime"))
+
         # Les plages tarifaires sont des options de configuration. Elles sont
         # recopiées dans le contexte de stratégie à chaque chargement, sans
         # écraser les autres réglages persistants.
@@ -1427,14 +1432,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
         points = merge_price_points(points)
         if not points and self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
-            backup_kind = self._economic_backup_kind(entity_id)
+            backup_kind = self._economic_backup_kind(entity_id, source)
             if backup_kind:
                 points = self._price_backup_points(backup_kind, now, horizon_hours, source)
         if source == "DYNAMIC_IMPORT":
             return apply_final_price_components(points, self.settings)
         return points
 
-    def _economic_backup_kind(self, entity_id: str | None) -> str | None:
+    def _economic_backup_kind(self, entity_id: str | None, source: str) -> str | None:
+        if source == "DYNAMIC_IMPORT":
+            return "import"
+        if source == "DYNAMIC_EXPORT_RAW":
+            return "export"
         if entity_id and entity_id == (
             self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
         ):
