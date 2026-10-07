@@ -4,6 +4,7 @@ import sys
 import tempfile
 import types
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 COMPONENT_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
@@ -11,7 +12,17 @@ package = types.ModuleType("foxcat_energy")
 package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
-from foxcat_energy.const import MODES, NETWORK_POLICIES, PRICE_SOURCES, TARIFF_REGIMES
+from foxcat_energy.const import (
+    DYNAMIC_STRUCT_BI,
+    MODES,
+    NETWORK_POLICIES,
+    PRICE_SOURCE_INTEGRATION,
+    PRICE_SOURCES,
+    TARIFF_BI,
+    TARIFF_DYNAMIC,
+    TARIFF_REGIMES,
+    TARIFF_STRUCTURE_TOU,
+)
 from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
     recommended_dashboard_version,
@@ -20,6 +31,7 @@ from foxcat_energy.dashboard_merge import merge_dashboard_text
 from foxcat_energy.devices import apply_device_toggle, device_definitions
 from foxcat_energy.profiles import profile_path, validate_profile_settings
 from foxcat_energy.migration import migrate_settings_v173
+from foxcat_energy.tariff_model import final_client_price, tariff_dimensions
 from foxcat_energy.select_options import (
     mode_option,
     network_policy_option,
@@ -37,17 +49,30 @@ class SelectOptionTests(unittest.TestCase):
 
     def test_network_and_tariff_current_values_are_valid(self) -> None:
         self.assertEqual(network_policy_option({"network_policy": "obsolete"}), NETWORK_POLICIES[0])
-        self.assertEqual(tariff_regime_option({"price_source": "Dynamique Day-Ahead"}), TARIFF_REGIMES[1])
+        self.assertEqual(tariff_regime_option({"price_source": "Dynamique Day-Ahead"}), TARIFF_DYNAMIC)
         for policy in NETWORK_POLICIES:
             self.assertEqual(network_policy_option({"network_policy": policy}), policy)
         for regime in TARIFF_REGIMES:
-            if regime == TARIFF_REGIMES[0]:
+            if regime == TARIFF_BI:
                 settings = {"tariff_structure": "Bi-horaire"}
-            elif regime == TARIFF_REGIMES[1]:
+            elif regime == TARIFF_DYNAMIC:
                 settings = {"price_source": "Dynamique Day-Ahead"}
             else:
                 settings = {"tariff_structure": "Simple"}
             self.assertEqual(tariff_regime_option(settings), regime)
+
+    def test_external_integration_uses_dynamic_structure_for_prices(self) -> None:
+        settings = {
+            "price_source": PRICE_SOURCE_INTEGRATION,
+            "dynamic_structure": DYNAMIC_STRUCT_BI,
+            "tariff_tou_hp_adder_eur_kwh": 0.1,
+        }
+        dimensions = tariff_dimensions(settings)
+
+        self.assertTrue(dimensions.dynamic)
+        self.assertEqual(dimensions.structure, TARIFF_STRUCTURE_TOU)
+        self.assertAlmostEqual(final_client_price(0.2, datetime(2026, 1, 2, 8), settings), 0.3)
+        self.assertEqual(tariff_regime_option(settings), TARIFF_DYNAMIC)
 
     def test_legacy_invalid_values_migrate_to_supported_options(self) -> None:
         migrated, notes = migrate_settings_v173(

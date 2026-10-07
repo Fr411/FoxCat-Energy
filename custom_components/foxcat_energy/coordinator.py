@@ -116,7 +116,7 @@ from .const import (
     MODE_DYNAMIC,
     MODE_ECO,
     MODE_COMFORT, MODES,
-    PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_VARIABLE, PRICE_SOURCE_CONTRACT,
+    PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_VARIABLE, PRICE_SOURCE_CONTRACT, PRICE_SOURCE_INTEGRATION,
     TARIFF_STRUCTURE_SIMPLE, TARIFF_STRUCTURE_TOU, TARIFF_STRUCTURE_IMPACT,
     NETWORK_POLICY_NOT_VALUED, NETWORK_POLICY_ZERO_INJECTION,
     MODE_ECS,
@@ -132,6 +132,7 @@ from .const import (
     NETWORK_POLICY_BILLED_EXPORT,
     NETWORK_POLICY_LEGACY_BILLED_EXPORT,
     TARIFF_DYNAMIC,
+    TARIFF_MONO,
     TARIFF_TOU,
     TIME_SETTING_KEYS,
 )
@@ -296,6 +297,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._frame_dispatch_lock = asyncio.Lock()
         self._metronome_last_seen_report: dict[str, datetime] = {}
         self.solar_forecast = SolarForecast()
+        self.price_backup: dict[str, dict[str, float]] = {}
         self._unsubs: list[Any] = []
         # V1.6.150 : les deux corps sont cadencés par la même publication réseau
         # mais ne partagent plus aucun verrou d'exécution.
@@ -482,6 +484,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._entry_options_snapshot = option_settings
             self.accounting.restore(stored.get("accounting"))
             self.machine_learning.restore(stored.get("machine_learning"))
+            price_backup = stored.get("price_backup", {})
+            self.price_backup = (
+                {
+                    key: dict(points)
+                    for key, points in price_backup.items()
+                    if key in {"import", "export"} and isinstance(points, dict)
+                }
+                if isinstance(price_backup, dict)
+                else {}
+            )
             sf = stored.get("solar_forecast")
             if isinstance(sf, dict):
                 self.solar_forecast = SolarForecast(**{k: sf.get(k, getattr(SolarForecast(), k)) for k in SolarForecast.__dataclass_fields__})
@@ -503,6 +515,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 }
             )
             self._entry_options_snapshot = self._entry_option_settings()
+
+        self.settings["tariff_regime"] = {
+            "Bi-horaire HP/HC": TARIFF_TOU,
+            "Simple": TARIFF_MONO,
+        }.get(str(self.settings.get("tariff_regime")), self.settings.get("tariff_regime"))
 
         # Les plages tarifaires sont des options de configuration. Elles sont
         # recopiées dans le contexte de stratégie à chaque chargement, sans
@@ -582,6 +599,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "entry_option_settings": self._entry_options_snapshot,
                 "accounting": self.accounting.dump(),
                 "machine_learning": self.machine_learning.dump(),
+                "price_backup": self.price_backup,
                 "solar_forecast": {
                     "available": self.solar_forecast.available,
                     "start": self.solar_forecast.start,
@@ -1065,11 +1083,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @callback
     def _on_price_event(self, event: Event) -> None:
+        if self._capture_economic_price_backup():
+            self.hass.async_create_task(self._async_save())
         self.hass.async_create_task(self.async_handle_price_change())
 
     @callback
     def _on_economic_price_event(self, event: Event) -> None:
         """Rafraîchit le Day-Ahead; en Dynamique, réévalue les nouveaux départs machines."""
+        if self._capture_economic_price_backup():
+            self.hass.async_create_task(self._async_save())
         self.async_set_updated_data(self._build_data())
         if (
             bool(self.settings.get("regulation_active"))
@@ -1323,6 +1345,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
+        if self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+            source_entity = self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
+            state = self.hass.states.get(source_entity) if source_entity else None
+            if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+                backup = self._economic_series_from_entity(
+                    source_entity,
+                    source="DYNAMIC_IMPORT",
+                    now=now,
+                    horizon_hours=horizon,
+                    preferred_price_keys=("all_in",),
+                )
+                if backup:
+                    return backup
         if not tariff_dimensions(self.settings).dynamic and regime != TARIFF_TOU:
             if tariff_dimensions(self.settings).price_source == PRICE_SOURCE_CONTRACT:
                 base = self.settings.get(CONF_TARIFF_SIMPLE_PRICE, 0.30)
@@ -1374,39 +1409,148 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         preferred_price_keys: tuple[str, ...] = (),
     ) -> list[PricePoint]:
         """Extract a provider price curve without treating missing data as prices."""
-        if not entity_id:
-            return []
-        state = self.hass.states.get(entity_id)
-        if state is None or state.state in {"unknown", "unavailable", "none", ""}:
-            return []
-        raw = dict(state.attributes)
-        if state.attributes:
-            raw.setdefault("state", state.state)
-        else:
-            raw = state.state
-        points = extract_price_points(
-            raw,
-            now,
-            source=source,
-            horizon_hours=horizon_hours,
-            preferred_price_keys=preferred_price_keys,
-        )
-        for key in preferred_price_keys:
-            curve = state.attributes.get(key)
-            if isinstance(curve, (dict, list, tuple)):
-                points.extend(
-                    extract_price_points(
-                        curve,
-                        now,
-                        source=source,
-                        horizon_hours=horizon_hours,
-                        preferred_price_keys=preferred_price_keys,
-                    )
+        state = self.hass.states.get(entity_id) if entity_id else None
+        points: list[PricePoint] = []
+        if state is not None and state.state not in {"unknown", "unavailable", "none", ""}:
+            raw = dict(state.attributes)
+            if state.attributes:
+                raw.setdefault("state", state.state)
+            else:
+                raw = state.state
+            points.extend(
+                extract_price_points(
+                    raw,
+                    now,
+                    source=source,
+                    horizon_hours=horizon_hours,
+                    preferred_price_keys=preferred_price_keys,
                 )
+            )
+            for key in preferred_price_keys:
+                curve = state.attributes.get(key)
+                if isinstance(curve, (dict, list, tuple)):
+                    points.extend(
+                        extract_price_points(
+                            curve,
+                            now,
+                            source=source,
+                            horizon_hours=horizon_hours,
+                            preferred_price_keys=preferred_price_keys,
+                        )
+                    )
         points = merge_price_points(points)
+        if not points and self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+            backup_kind = self._economic_backup_kind(entity_id, source)
+            if backup_kind:
+                points = self._price_backup_points(backup_kind, now, horizon_hours, source)
         if source == "DYNAMIC_IMPORT":
             return apply_final_price_components(points, self.settings)
         return points
+
+    def _economic_backup_kind(self, entity_id: str | None, source: str) -> str | None:
+        if source == "DYNAMIC_IMPORT":
+            return "import"
+        if source == "DYNAMIC_EXPORT_RAW":
+            return "export"
+        if entity_id and entity_id == (
+            self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
+        ):
+            return "import"
+        if entity_id and entity_id == (
+            self.config.get(CONF_PRICE_FORECAST_EXPORT) or self.config.get(CONF_PRICE_INJECTION)
+        ):
+            return "export"
+        return None
+
+    def _price_backup_points(
+        self, kind: str, now: datetime, horizon_hours: int, source: str
+    ) -> list[PricePoint]:
+        stored_points = self.price_backup.get(kind, {})
+        if not isinstance(stored_points, dict):
+            return []
+        end = now + timedelta(hours=horizon_hours)
+        points: list[PricePoint] = []
+        for timestamp, price in stored_points.items():
+            try:
+                at = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+                if at.tzinfo is None and now.tzinfo is not None:
+                    at = at.replace(tzinfo=now.tzinfo)
+                value = float(price)
+            except (TypeError, ValueError):
+                continue
+            if now <= at <= end:
+                points.append(PricePoint(at, value, f"{source}_BACKUP"))
+        return merge_price_points(points)
+
+    def _capture_economic_price_backup(self) -> bool:
+        if self.settings.get("price_source") != PRICE_SOURCE_INTEGRATION:
+            return False
+        now = dt_util.now()
+        horizon = DYNAMIC_ARBITRAGE_HORIZON_HOURS
+        updated = False
+        for kind, entity_id, price_keys, source in (
+            (
+                "import",
+                self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT),
+                ("all_in",),
+                "DYNAMIC_IMPORT",
+            ),
+            (
+                "export",
+                self.config.get(CONF_PRICE_FORECAST_EXPORT) or self.config.get(CONF_PRICE_INJECTION),
+                ("injection",),
+                "DYNAMIC_EXPORT_RAW",
+            ),
+        ):
+            state = self.hass.states.get(entity_id) if entity_id else None
+            if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+                continue
+            raw: Any = dict(state.attributes)
+            if state.attributes:
+                raw.setdefault("state", state.state)
+            else:
+                raw = state.state
+            points = extract_price_points(
+                raw,
+                now,
+                source=source,
+                horizon_hours=horizon,
+                preferred_price_keys=price_keys,
+            )
+            for key in price_keys:
+                curve = state.attributes.get(key)
+                if isinstance(curve, (dict, list, tuple)):
+                    points.extend(
+                        extract_price_points(
+                            curve,
+                            now,
+                            source=source,
+                            horizon_hours=horizon,
+                            preferred_price_keys=price_keys,
+                        )
+                    )
+            cached = self.price_backup.setdefault(kind, {})
+            for point in merge_price_points(points):
+                if point.at <= now:
+                    continue
+                key = point.at.isoformat()
+                price = float(point.price)
+                if cached.get(key) != price:
+                    cached[key] = price
+                    updated = True
+            for key in list(cached):
+                try:
+                    at = datetime.fromisoformat(str(key).replace("Z", "+00:00"))
+                    if at.tzinfo is None and now.tzinfo is not None:
+                        at = at.replace(tzinfo=now.tzinfo)
+                except (TypeError, ValueError):
+                    del cached[key]
+                    updated = True
+                    continue
+                if at < now or at > now + timedelta(hours=horizon):
+                    del cached[key]
+                    updated = True
+        return updated
 
     def _economic_export_points(
         self, prices: dict[str, Any], now: datetime
@@ -1418,6 +1562,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
+        if self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+            source_entity = self.config.get(CONF_PRICE_FORECAST_EXPORT) or self.config.get(CONF_PRICE_INJECTION)
+            state = self.hass.states.get(source_entity) if source_entity else None
+            if state is None or state.state in {"unknown", "unavailable", "none", ""}:
+                raw = self._economic_series_from_entity(
+                    source_entity,
+                    source="DYNAMIC_EXPORT_RAW",
+                    now=now,
+                    horizon_hours=horizon,
+                    preferred_price_keys=("injection",),
+                )
+                if raw:
+                    source_name = str(source_entity or "").lower()
+                    export_sign = (
+                        DYNAMIC_EXPORT_POSITIVE_IS_REVENUE
+                        if "luminus_luminus_dynamic" in source_name
+                        else str(self.config.get(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, DYNAMIC_EXPORT_POSITIVE_IS_REVENUE))
+                    )
+                    factor = 1.0 if export_sign == DYNAMIC_EXPORT_POSITIVE_IS_REVENUE else -1.0
+                    return merge_price_points(
+                        [PricePoint(point.at, factor * point.price, "DYNAMIC_EXPORT_BACKUP") for point in raw]
+                    )
         if not tariff_dimensions(self.settings).dynamic:
             value = prices.get("export_value")
             if not isinstance(value, (int, float)):
@@ -1783,10 +1949,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ):
             value = False
 
+        if key == "price_source" and value in {PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_INTEGRATION}:
+            self.settings["tariff_regime"] = TARIFF_DYNAMIC
+
         if key == "tariff_regime":
             if value == TARIFF_DYNAMIC:
                 self.settings["price_source"] = PRICE_SOURCE_DYNAMIC
-            elif value in {TARIFF_TOU, TARIFF_SIMPLE}:
+            elif value in {TARIFF_TOU, TARIFF_SIMPLE, TARIFF_MONO}:
                 if tariff_dimensions(self.settings).dynamic:
                     self.settings["price_source"] = PRICE_SOURCE_VARIABLE
                 self.settings["tariff_structure"] = (

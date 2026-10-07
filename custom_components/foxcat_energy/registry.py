@@ -229,6 +229,7 @@ _native("machines.protected", "Machines", "machine_protegee_active")
 
 # Tarification
 _native("pricing.regime", "Tarification", "regime_tarifaire", "select.foxcat_energy_tarification_regime_tarifaire")
+_native("pricing.dynamic_structure", "Tarification", "structure_dynamique")
 _native("pricing.price_source", "Tarification", "source_prix")
 _native("pricing.tariff_structure", "Tarification", "structure_tarifaire")
 _native("pricing.price_analyzer", "Tarification", "price_analyzer_v2")

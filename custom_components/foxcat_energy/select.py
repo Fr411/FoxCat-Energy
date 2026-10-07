@@ -7,8 +7,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DOMAIN,
+    DYNAMIC_STRUCTURES,
+    MODE_MANUAL,
     MODES,
     NETWORK_POLICIES,
+    NETWORK_POLICY_COMPENSATION,
     PRICE_SOURCES,
     TARIFF_REGIMES,
     TARIFF_STRUCTURES,
@@ -29,6 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         [
             FoxCatModeSelect(coordinator),
             FoxCatTariffRegimeSelect(coordinator),
+            FoxCatDynamicStructureSelect(coordinator),
             FoxCatPriceSourceSelect(coordinator),
             FoxCatTariffStructureSelect(coordinator),
             FoxCatNetworkPolicySelect(coordinator),
@@ -69,17 +73,43 @@ class FoxCatModeSelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
         await self.coordinator.async_set_mode(option)
 
 
+class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
+    def __init__(
+        self,
+        coordinator: FoxCatEnergyCoordinator,
+        key: str,
+        name: str,
+        icon: str,
+        setting_key: str,
+        options: list[str],
+    ) -> None:
+        super().__init__(coordinator, key, name, icon, "pricing")
+        self._setting_key = setting_key
+        self._attr_options = options
+
+    @property
+    def current_option(self) -> str | None:
+        value = self.coordinator.settings.get(self._setting_key)
+        return str(value) if value in self._attr_options else None
+
+    async def async_select_option(self, option: str) -> None:
+        if option not in self._attr_options:
+            return
+        await self.coordinator.async_set_setting(self._setting_key, option)
+        self.async_write_ha_state()
+
+
 class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
     _attr_options = PRICE_SOURCES
 
-    def __init__(self, c):
-        super().__init__(c, "source_prix", "Source du prix", "mdi:database-clock-outline", "pricing")
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "source_prix", "Source du prix", "mdi:database-clock-outline", "pricing")
 
     @property
-    def current_option(self):
+    def current_option(self) -> str:
         return constrained_option(self.coordinator.settings, "price_source", PRICE_SOURCES)
 
-    async def async_select_option(self,option):
+    async def async_select_option(self, option: str) -> None:
         if option in PRICE_SOURCES:
             await self.coordinator.async_set_setting("price_source", option)
 
@@ -87,43 +117,58 @@ class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
 class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
     _attr_options = TARIFF_STRUCTURES
 
-    def __init__(self, c):
-        super().__init__(c, "structure_tarifaire", "Structure tarifaire", "mdi:timeline-clock-outline", "pricing")
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "structure_tarifaire", "Structure tarifaire", "mdi:timeline-clock-outline", "pricing")
 
     @property
-    def current_option(self):
+    def current_option(self) -> str:
         return constrained_option(self.coordinator.settings, "tariff_structure", TARIFF_STRUCTURES)
 
-    async def async_select_option(self,option):
+    async def async_select_option(self, option: str) -> None:
         if option in TARIFF_STRUCTURES:
             await self.coordinator.async_set_setting("tariff_structure", option)
 
 
-class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
-    _attr_options = TARIFF_REGIMES
+class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
     option_descriptions = {
-        "Bi-horaire HP/HC": "Applique les prix et plages horaires heures pleines / heures creuses.",
-        "Dynamique": "Utilise les prix variables Day-Ahead disponibles dans Home Assistant.",
-        "Simple": "Applique un prix fixe unique, sans plages HP/HC.",
+        "Mono-horaire": "Applique un prix fixe unique, sans plages HP/HC.",
+        "Bi-horaire (HP/HC)": "Applique les prix et plages horaires heures pleines / heures creuses.",
+        "Dynamique": "Utilise les prix variables disponibles dans Home Assistant.",
     }
     option_icons = {
-        "Bi-horaire HP/HC": "mdi:clock-time-eight-outline",
+        "Mono-horaire": "mdi:cash",
+        "Bi-horaire (HP/HC)": "mdi:clock-time-eight-outline",
         "Dynamique": "mdi:chart-timeline-variant",
-        "Simple": "mdi:cash",
     }
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
-        super().__init__(coordinator, "regime_tarifaire", "Régime tarifaire", "mdi:cash-sync", "pricing")
+        super().__init__(
+            coordinator,
+            "regime_tarifaire",
+            "Régime Tarifaire",
+            "mdi:file-document-outline",
+            "tariff_regime",
+            TARIFF_REGIMES,
+        )
 
     @property
     def current_option(self) -> str | None:
         return tariff_regime_option(self.coordinator.settings)
 
     async def async_select_option(self, option: str) -> None:
-        if option not in TARIFF_REGIMES:
-            return
-        await self.coordinator.async_set_setting("tariff_regime", option)
+        await super().async_select_option(option)
 
+
+class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            "structure_dynamique",
+            "Structure (Si Dynamique)",
+            "mdi:chart-bell-curve-cumulative",
+            "dynamic_structure",
+            DYNAMIC_STRUCTURES,
+        )
 
 class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
     _attr_options = NETWORK_POLICIES

@@ -460,7 +460,7 @@ views:
             cards:
               - type: custom:button-card
                 entity: [[foxcat:pricing.regime]]
-                name: Bi-horaire HP/HC
+                name: Bi-horaire
                 icon: mdi:clock-time-eight-outline
                 tap_action:
                   action: call-service
@@ -468,9 +468,9 @@ views:
                   target:
                     entity_id: [[foxcat:pricing.regime]]
                   data:
-                    option: Bi-horaire HP/HC
+                    option: Bi-horaire (HP/HC)
                 state:
-                  - value: Bi-horaire HP/HC
+                  - value: Bi-horaire (HP/HC)
                     styles:
                       card:
                         - background: rgba(251, 191, 36, 0.20)
@@ -502,7 +502,7 @@ views:
                     - padding: 12px
               - type: custom:button-card
                 entity: [[foxcat:pricing.regime]]
-                name: Simple
+                name: Mono-horaire
                 icon: mdi:cash
                 tap_action:
                   action: call-service
@@ -510,9 +510,9 @@ views:
                   target:
                     entity_id: [[foxcat:pricing.regime]]
                   data:
-                    option: Simple
+                    option: Mono-horaire
                 state:
-                  - value: Simple
+                  - value: Mono-horaire
                     styles:
                       card:
                         - background: rgba(34, 211, 238, 0.20)
@@ -521,6 +521,11 @@ views:
                   card:
                     - border-radius: 14px
                     - padding: 12px
+          - type: entities
+            title: Structure dynamique
+            show_header_toggle: false
+            entities:
+              - entity: [[foxcat:pricing.dynamic_structure]]
           - type: custom:bubble-card
             card_type: select
             entity: [[foxcat:ems.mode]]
@@ -5880,6 +5885,9 @@ views:
 
                       /* Régime tarifaire sélectionné */
                       regime_tarifaire:
+                        '',
+
+                      structure_dynamique:
                         '',
 
                       /* Régime tarifaire réellement actif */
@@ -14131,6 +14139,7 @@ views:
               - type: section
                 label: Tarifs, régimes et fenêtres horaires
               - entity: [[foxcat:pricing.regime]]
+              - entity: [[foxcat:pricing.dynamic_structure]]
               - entity: [[foxcat:pricing.price_source]]
               - entity: [[foxcat:pricing.tariff_structure]]
               - entity: [[foxcat:settings.tariff_fixed_injection_eur_kwh]]

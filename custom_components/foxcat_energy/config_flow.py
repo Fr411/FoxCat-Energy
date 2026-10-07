@@ -149,8 +149,6 @@ def _core_schema() -> vol.Schema:
             _required(CONF_PV_SENSOR, "sensor.homefoxcat_load_solaire"): _entity("sensor"),
             _optional(CONF_METRONOME_FALLBACK_SENSOR): _entity("sensor"),
             vol.Optional("mode", default="Éco"): selector.SelectSelector(selector.SelectSelectorConfig(options=["Éco","Confort","Manuel"],mode=selector.SelectSelectorMode.DROPDOWN)),
-            vol.Optional("price_source", default="Variable via entités Home Assistant"): selector.SelectSelector(selector.SelectSelectorConfig(options=["Contractuelle / fixe","Variable via entités Home Assistant","Dynamique Day-Ahead"],mode=selector.SelectSelectorMode.DROPDOWN)),
-            vol.Optional("tariff_structure", default="Bi-horaire"): selector.SelectSelector(selector.SelectSelectorConfig(options=["Simple","Bi-horaire","Impact"],mode=selector.SelectSelectorMode.DROPDOWN)),
             vol.Optional("network_policy", default="Compensation"): selector.SelectSelector(selector.SelectSelectorConfig(options=["Compensation","Injection tarifée","Injection non valorisée","Zéro injection"],mode=selector.SelectSelectorMode.DROPDOWN)),
         }
     )
