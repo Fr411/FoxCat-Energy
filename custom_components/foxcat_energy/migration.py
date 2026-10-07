@@ -14,5 +14,5 @@ def migrate_settings_v171(settings:dict[str,Any]):
  return out,notes
 def compatibility_tariff_regime(settings):
  if settings.get("price_source")==PRICE_SOURCE_DYNAMIC:return TARIFF_DYNAMIC
- if settings.get("tariff_structure")==TARIFF_STRUCTURE_TOU:return TARIFF_TOU
- return TARIFF_SIMPLE
+ if settings.get("tariff_structure")==TARIFF_STRUCTURE_TOU:return TARIFF_BI
+ return TARIFF_MONO
