@@ -60,6 +60,7 @@ from .const import (
     TIME_SETTING_KEYS,
     OFFICIAL_SECTION_ORDER,
 )
+from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, foreign_price_keys
 
 BindingKind = Literal["native", "config", "literal"]
 
@@ -466,6 +467,64 @@ _literal('legacy.sensor_temperature_boiler_2sondes_moyenne', 'Boiler', 'sensor.t
 _literal('legacy.sensor_xxx', 'Diagnostic', 'sensor.xxx')
 _literal('legacy.switch_boiler_prise_1', 'Boiler', 'switch.boiler_prise_1')
 
+# Prix du tarif HP/HC mono-horaire
+_config("pricing.source.mono", "Tarification", CONF_TARIFF_MONO_PRICE_SENSOR)
+
+# Rôles du dashboard premium sans entité native dédiée : liés à un identifiant
+# littéral ; une entité absente rend « — » sans casser la carte.
+_literal("boiler.estimated_temperature", "Boiler", "sensor.foxcat_energy_boiler_temperature_chauffe_eau")
+_literal("boiler.thermal_state", "Boiler", "sensor.foxcat_energy_boiler_etat_thermique")
+_literal("boiler.estimate_confidence", "Boiler", "sensor.foxcat_energy_boiler_confiance_estimation")
+_literal("pricing.distribution_profile", "Tarification", "select.foxcat_energy_tarification_profil_distribution_belgique")
+_literal("pricing.distribution_period", "Tarification", "sensor.foxcat_energy_tarification_periode_de_distribution")
+# Entités du dashboard premium 1.7.0 auparavant référencées en dur
+_literal('legacy.binary_sensor_foxcat_energy_boiler_boiler_physique', 'Boiler', 'binary_sensor.foxcat_energy_boiler_boiler_physique')
+_literal('legacy.button_foxcat_energy_diagnostic_lancer_un_diagnostic_ems', 'Diagnostic', 'button.foxcat_energy_diagnostic_lancer_un_diagnostic_ems')
+_literal('legacy.button_foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat', 'Diagnostic', 'button.foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat')
+_literal('legacy.button_foxcat_energy_ems_reinitialiser_le_cycle_ems', 'EMS', 'button.foxcat_energy_ems_reinitialiser_le_cycle_ems')
+_literal('legacy.number_foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs', 'Boiler', 'number.foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs')
+_literal('legacy.number_foxcat_energy_boiler_confiance_minimale_fallback_boiler', 'Boiler', 'number.foxcat_energy_boiler_confiance_minimale_fallback_boiler')
+_literal('legacy.number_foxcat_energy_boiler_correction_sonde_haute_boiler', 'Boiler', 'number.foxcat_energy_boiler_correction_sonde_haute_boiler')
+_literal('legacy.number_foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse', 'Boiler', 'number.foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse')
+_literal('legacy.number_foxcat_energy_boiler_securite_temperature_boiler', 'Boiler', 'number.foxcat_energy_boiler_securite_temperature_boiler')
+_literal('legacy.number_foxcat_energy_boiler_temperature_boost_solaire', 'Boiler', 'number.foxcat_energy_boiler_temperature_boost_solaire')
+_literal('legacy.number_foxcat_energy_boiler_temperature_confort_boiler', 'Boiler', 'number.foxcat_energy_boiler_temperature_confort_boiler')
+_literal('legacy.number_foxcat_energy_boiler_temperature_reprise_boiler', 'Boiler', 'number.foxcat_energy_boiler_temperature_reprise_boiler')
+_literal('legacy.number_foxcat_energy_ems_assouplissement_economique_mode_confort', 'EMS', 'number.foxcat_energy_ems_assouplissement_economique_mode_confort')
+_literal('legacy.number_foxcat_energy_ems_import_cible', 'EMS', 'number.foxcat_energy_ems_import_cible')
+_literal('legacy.number_foxcat_energy_ems_import_maximal_avant_liberation_pv', 'EMS', 'number.foxcat_energy_ems_import_maximal_avant_liberation_pv')
+_literal('legacy.number_foxcat_energy_ems_injection_maximale_toleree', 'EMS', 'number.foxcat_energy_ems_injection_maximale_toleree')
+_literal('legacy.number_foxcat_energy_ems_tolerance_ack', 'EMS', 'number.foxcat_energy_ems_tolerance_ack')
+_literal('legacy.number_foxcat_energy_ems_tolerance_stabilite_t0_t1', 'EMS', 'number.foxcat_energy_ems_tolerance_stabilite_t0_t1')
+_literal('legacy.number_foxcat_energy_tarification_seuil_prix_favorable_day_ahead', 'Tarification', 'number.foxcat_energy_tarification_seuil_prix_favorable_day_ahead')
+_literal('legacy.number_foxcat_energy_tarification_seuil_zone_pic_day_ahead', 'Tarification', 'number.foxcat_energy_tarification_seuil_zone_pic_day_ahead')
+_literal('legacy.select_foxcat_energy_tarification_profil_distribution_belgique', 'Tarification', 'select.foxcat_energy_tarification_profil_distribution_belgique')
+_literal('legacy.sensor_foxcat_energy_boiler_demande_chauffe_eau', 'Boiler', 'sensor.foxcat_energy_boiler_demande_chauffe_eau')
+_literal('legacy.sensor_foxcat_energy_boiler_origine_de_la_demande_chauffe_eau', 'Boiler', 'sensor.foxcat_energy_boiler_origine_de_la_demande_chauffe_eau')
+_literal('legacy.sensor_foxcat_energy_boiler_puissance_chauffe_eau', 'Boiler', 'sensor.foxcat_energy_boiler_puissance_chauffe_eau')
+_literal('legacy.sensor_foxcat_energy_boiler_temperature_chauffe_eau', 'Boiler', 'sensor.foxcat_energy_boiler_temperature_chauffe_eau')
+_literal('legacy.sensor_foxcat_energy_ems_derniere_action_ems', 'EMS', 'sensor.foxcat_energy_ems_derniere_action_ems')
+_literal('legacy.sensor_foxcat_energy_ems_derniere_decision_ems', 'EMS', 'sensor.foxcat_energy_ems_derniere_decision_ems')
+_literal('legacy.sensor_foxcat_energy_ems_erreur_ack', 'EMS', 'sensor.foxcat_energy_ems_erreur_ack')
+_literal('legacy.sensor_foxcat_energy_ems_reseau_attendu', 'EMS', 'sensor.foxcat_energy_ems_reseau_attendu')
+_literal('legacy.sensor_foxcat_energy_ems_reseau_avant_action', 'EMS', 'sensor.foxcat_energy_ems_reseau_avant_action')
+_literal('legacy.sensor_foxcat_energy_ems_variation_attendue', 'EMS', 'sensor.foxcat_energy_ems_variation_attendue')
+_literal('legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison', 'Énergie', 'sensor.foxcat_energy_energie_puissance_de_consommation_maison')
+_literal('legacy.sensor_foxcat_energy_energie_puissance_de_production_photovoltaique', 'Énergie', 'sensor.foxcat_energy_energie_puissance_de_production_photovoltaique')
+_literal('legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau', 'Énergie', 'sensor.foxcat_energy_energie_puissance_prelevee_au_reseau')
+_literal('legacy.sensor_foxcat_energy_energie_puissance_reinjectee_au_reseau', 'Énergie', 'sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau')
+_literal('legacy.sensor_foxcat_energy_onduleur_ems_onduleur_etat', 'EMS', 'sensor.foxcat_energy_onduleur_ems_onduleur_etat')
+_literal('legacy.sensor_foxcat_energy_tarification_periode_de_distribution', 'Tarification', 'sensor.foxcat_energy_tarification_periode_de_distribution')
+_literal('legacy.sensor_foxcat_energy_tarification_prix_d_achat_actif', 'Tarification', 'sensor.foxcat_energy_tarification_prix_d_achat_actif')
+_literal('legacy.switch_chauffe_eau', 'Diagnostic', 'switch.chauffe_eau')
+_literal('legacy.switch_foxcat_energy_boiler_boiler_ecs_active', 'Boiler', 'switch.foxcat_energy_boiler_boiler_ecs_active')
+_literal('legacy.switch_foxcat_energy_boiler_boiler_gere_par_foxcat', 'Boiler', 'switch.foxcat_energy_boiler_boiler_gere_par_foxcat')
+_literal('legacy.switch_foxcat_energy_machines_gestion_lave_linge', 'Machines', 'switch.foxcat_energy_machines_gestion_lave_linge')
+_literal('legacy.switch_foxcat_energy_machines_gestion_lave_vaisselle', 'Machines', 'switch.foxcat_energy_machines_gestion_lave_vaisselle')
+_literal('legacy.switch_foxcat_energy_machines_gestion_seche_linge', 'Machines', 'switch.foxcat_energy_machines_gestion_seche_linge')
+_literal('legacy.switch_foxcat_energy_tarification_optimisation_economique_des_charges_flexibles', 'Tarification', 'switch.foxcat_energy_tarification_optimisation_economique_des_charges_flexibles')
+_literal('legacy.switch_foxcat_energy_tarification_predictif_prix_dynamique', 'Tarification', 'switch.foxcat_energy_tarification_predictif_prix_dynamique')
+
 _TOKEN_RE = re.compile(r"\[\[foxcat:([a-zA-Z0-9_.-]+)\]\]")
 
 
@@ -506,9 +565,13 @@ def resolve_registry(
     """
     native = _native_entities_by_key(hass, entry)
     resolved: dict[str, str] = {}
+    foreign = foreign_price_keys(config)
 
     for role, binding in BINDINGS.items():
         entity_id: str | None = None
+        if binding.kind == "config" and binding.key in foreign:
+            # Prix d'un autre tarif : jamais exposé (ni valeur, ni défaut).
+            continue
         if binding.kind == "native" and binding.key:
             entity_id = native.get(binding.key)
         elif binding.kind == "config" and binding.key:
