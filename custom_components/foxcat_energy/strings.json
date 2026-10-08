@@ -56,7 +56,7 @@
       },
       "dynamique": {
         "title": "Tarif Dynamique",
-        "description": "Choisissez la structure du tarif.",
+        "description": "Choisissez Simple pour suivre le prix dynamique seul, ou Impact pour appliquer les périodes et majorations configurées.",
         "data": {
           "tariff_structure": "Structure"
         }

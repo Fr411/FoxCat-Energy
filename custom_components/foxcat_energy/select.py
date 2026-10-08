@@ -103,7 +103,7 @@ PRICE_SOURCE_BIHORAIRE = "Bihoraire"
 PRICE_SOURCE_DYNAMIQUE = "Dynamique"
 PRICE_SOURCE_CHOICES = [PRICE_SOURCE_BIHORAIRE, PRICE_SOURCE_DYNAMIQUE]
 # Structures applicables aux contrats dynamiques : Simple suit le spot,
-# Impact suit les tarifs dynamiques Impact. Bi-horaire n'est pas utilisé pour l'instant.
+# Impact suit les tarifs dynamiques Impact.
 DYNAMIC_STRUCTURE_CHOICES = ["Simple", "Impact"]
 _STRUCTURE_TO_DYNAMIC = {"Simple": "Simple", "Impact": "Impact (Capacitaire)"}
 

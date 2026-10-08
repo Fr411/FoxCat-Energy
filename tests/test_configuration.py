@@ -14,6 +14,7 @@ sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.const import (
     DYNAMIC_STRUCT_BI,
+    DYNAMIC_STRUCT_IMPACT,
     MODES,
     NETWORK_POLICIES,
     PRICE_SOURCE_INTEGRATION,
@@ -33,6 +34,12 @@ from foxcat_energy.devices import apply_device_toggle, device_definitions
 from foxcat_energy.profiles import profile_path, validate_profile_settings
 from foxcat_energy.migration import migrate_settings_v173
 from foxcat_energy.tariff_model import final_client_price, tariff_dimensions
+from foxcat_energy.tariff_prices import (
+    CONF_TARIFF_HC_PRICE_SENSOR,
+    CONF_TARIFF_HP_PRICE_SENSOR,
+    apply_configured_tariff,
+    scoped_config,
+)
 from foxcat_energy.select_options import (
     mode_option,
     network_policy_option,
@@ -74,6 +81,57 @@ class SelectOptionTests(unittest.TestCase):
         self.assertEqual(dimensions.structure, TARIFF_STRUCTURE_TOU)
         self.assertAlmostEqual(final_client_price(0.2, datetime(2026, 1, 2, 8), settings), 0.3)
         self.assertEqual(tariff_regime_option(settings), TARIFF_DYNAMIC)
+
+    def test_configured_bihourly_tariff_uses_its_configured_price_entities(self) -> None:
+        config = {
+            "tariff_family": "hphc",
+            "tariff_structure": "Bi-horaire",
+            CONF_TARIFF_HP_PRICE_SENSOR: "sensor.custom_hp",
+            CONF_TARIFF_HC_PRICE_SENSOR: "sensor.custom_hc",
+            "price_current": "sensor.dynamic_price",
+        }
+        settings: dict[str, object] = {}
+
+        apply_configured_tariff(settings, config)
+
+        self.assertEqual(settings["tariff_regime"], TARIFF_BI)
+        self.assertEqual(settings["tariff_structure"], TARIFF_STRUCTURE_TOU)
+        self.assertEqual(
+            scoped_config(config),
+            {
+                "tariff_family": "hphc",
+                "tariff_structure": "Bi-horaire",
+                CONF_TARIFF_HP_PRICE_SENSOR: "sensor.custom_hp",
+                CONF_TARIFF_HC_PRICE_SENSOR: "sensor.custom_hc",
+            },
+        )
+
+    def test_configured_dynamic_tariff_supports_simple_or_impact(self) -> None:
+        for selected, expected_structure in (
+            ("Simple", "Simple"),
+            ("Impact", DYNAMIC_STRUCT_IMPACT),
+        ):
+            settings: dict[str, object] = {}
+            apply_configured_tariff(
+                settings,
+                {"tariff_family": "dynamique", "tariff_structure": selected},
+            )
+
+            self.assertEqual(settings["price_source"], "Dynamique Day-Ahead")
+            self.assertEqual(settings["tariff_regime"], TARIFF_DYNAMIC)
+            self.assertEqual(settings["dynamic_structure"], expected_structure)
+
+    def test_dynamic_impact_structure_is_normalized(self) -> None:
+        settings = {
+            "price_source": "Dynamique Day-Ahead",
+            "dynamic_structure": "Impact",
+            "impact_peak_adder_eur_kwh": 0.2,
+        }
+
+        self.assertAlmostEqual(
+            final_client_price(0.1, datetime(2026, 1, 2, 18), settings),
+            0.3,
+        )
 
     def test_legacy_invalid_values_migrate_to_supported_options(self) -> None:
         migrated, notes = migrate_settings_v173(
