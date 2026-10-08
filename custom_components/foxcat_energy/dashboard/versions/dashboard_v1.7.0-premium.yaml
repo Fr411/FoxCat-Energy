@@ -1,12 +1,7 @@
 kiosk_mode:
   hide_header: '{{ is_state("[[foxcat:legacy.input_boolean_ems_head_menu]]", "on") }}'
   hide_sidebar: '{{ is_state("[[foxcat:legacy.input_boolean_ems_head_lateral]]", "on") }}'
-
 button_card_templates:
-
-  # ------------------------------------------------------------------
-  # Carte de base : fond, bordure, CSS partagé
-  # ------------------------------------------------------------------
   fc_panel:
     show_name: false
     show_icon: false
@@ -31,46 +26,84 @@ button_card_templates:
       custom_fields:
         c:
           - width: 100%
-    extra_styles: |
-      .p{padding:16px 18px;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
-      .t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;font-weight:700;margin-bottom:12px}
-      .t small{font-weight:400;color:#8fa6bf;font-size:12px}
-      .t ha-icon{--mdc-icon-size:20px;color:#38bdf8;margin-right:6px}
-      .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-      .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-      .tile{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}
-      .tile ha-icon{--mdc-icon-size:26px;flex:none}
-      .tile span{display:block;font-size:11px;color:#9bb3cc}
-      .tile b{font-size:17px}
-      .stat{padding:9px 6px;border-radius:12px;background:rgba(255,255,255,.04);text-align:center}
-      .stat span{display:block;font-size:10px;color:#8fa6bf}
-      .stat b{display:block;font-size:14px;margin-top:3px}
-      .k{font-size:11px;color:#8fa6bf}
-      .v{font-size:20px;font-weight:800}
-      .bar{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
-      .bar i{display:block;height:100%;border-radius:5px}
-      .chip{display:inline-block;padding:3px 9px;border-radius:7px;font-size:11px;font-weight:600}
-      .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;font-size:13px;border-top:1px solid rgba(255,255,255,.05)}
-      .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:8px}
-      .o{color:#ffb020}.b{color:#38bdf8}.r{color:#f87171}.gr{color:#34d399}.pu{color:#a78bfa}
-      .ring{border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
-      .ring>div{border-radius:50%;background:#0b1626;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800}
-      .ring small{font-size:9px;color:#8fa6bf;font-weight:400}
-      .flux{display:grid;grid-template-columns:1fr 54px 1fr 54px 1fr;align-items:center;text-align:center;gap:6px}
-      .n ha-icon{--mdc-icon-size:34px}
-      .n b{display:block;font-size:20px;font-weight:800}
-      .n span{font-size:11px;color:#9bb3cc}
-      .ar{font-size:28px;font-weight:300}
-      .img{height:96px;background-size:contain;background-repeat:no-repeat;background-position:center}
-      .seg{display:flex;height:9px;border-radius:9px;overflow:hidden;margin:8px 0 10px}
-      .legend{display:flex;justify-content:space-between;font-size:11px}
-      .legend b{display:block;font-size:15px;color:#fff}
-      .legend span{color:#8fa6bf}
-      .quote{font-style:italic;color:#8fa6bf;font-size:12px;text-align:right;margin-top:10px}
+    extra_styles: >
+      .p{padding:16px 18px;font-family:-apple-system,"Segoe
+      UI",Roboto,sans-serif;text-align:left;box-sizing:border-box}
 
-  # ------------------------------------------------------------------
-  # Onglet de navigation (surbrillance automatique de l'onglet actif)
-  # ------------------------------------------------------------------
+      .t{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;font-weight:700;margin-bottom:12px}
+
+      .t small{font-weight:400;color:#8fa6bf;font-size:12px}
+
+      .t ha-icon{--mdc-icon-size:20px;color:#38bdf8;margin-right:6px}
+
+      .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+      .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+      .tile{display:flex;align-items:center;gap:10px;padding:10px
+      12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid
+      rgba(255,255,255,.06)}
+
+      .tile ha-icon{--mdc-icon-size:26px;flex:none}
+
+      .tile span{display:block;font-size:11px;color:#9bb3cc}
+
+      .tile b{font-size:17px}
+
+      .stat{padding:9px
+      6px;border-radius:12px;background:rgba(255,255,255,.04);text-align:center}
+
+      .stat span{display:block;font-size:10px;color:#8fa6bf}
+
+      .stat b{display:block;font-size:14px;margin-top:3px}
+
+      .k{font-size:11px;color:#8fa6bf}
+
+      .v{font-size:20px;font-weight:800}
+
+      .bar{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:8px}
+
+      .bar i{display:block;height:100%;border-radius:5px}
+
+      .chip{display:inline-block;padding:3px
+      9px;border-radius:7px;font-size:11px;font-weight:600}
+
+      .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px
+      0;font-size:13px;border-top:1px solid rgba(255,255,255,.05)}
+
+      .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:8px}
+
+      .o{color:#ffb020}.b{color:#38bdf8}.r{color:#f87171}.gr{color:#34d399}.pu{color:#a78bfa}
+
+      .ring{border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+
+      .ring>div{border-radius:50%;background:#0b1626;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800}
+
+      .ring small{font-size:9px;color:#8fa6bf;font-weight:400}
+
+      .flux{display:grid;grid-template-columns:1fr 54px 1fr 54px
+      1fr;align-items:center;text-align:center;gap:6px}
+
+      .n ha-icon{--mdc-icon-size:34px}
+
+      .n b{display:block;font-size:20px;font-weight:800}
+
+      .n span{font-size:11px;color:#9bb3cc}
+
+      .ar{font-size:28px;font-weight:300}
+
+      .img{height:96px;background-size:contain;background-repeat:no-repeat;background-position:center}
+
+      .seg{display:flex;height:9px;border-radius:9px;overflow:hidden;margin:8px
+      0 10px}
+
+      .legend{display:flex;justify-content:space-between;font-size:11px}
+
+      .legend b{display:block;font-size:15px;color:#fff}
+
+      .legend span{color:#8fa6bf}
+
+      .quote{font-style:italic;color:#8fa6bf;font-size:12px;text-align:right;margin-top:10px}
   fc_nav:
     show_name: true
     show_icon: true
@@ -87,12 +120,19 @@ button_card_templates:
       card:
         - padding: 11px 6px
         - border-radius: 12px
-        - background: |
-            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? 'rgba(56,189,248,.12)' : 'rgba(255,255,255,.03)'; ]]]
-        - border: |
-            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? '1px solid rgba(56,189,248,.6)' : '1px solid rgba(255,255,255,.07)'; ]]]
-        - color: |
-            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? '#38bdf8' : '#c4d4e6'; ]]]
+        - background: >
+            [[[ return
+            location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase())
+            ? 'rgba(56,189,248,.12)' : 'rgba(255,255,255,.03)'; ]]]
+        - border: >
+            [[[ return
+            location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase())
+            ? '1px solid rgba(56,189,248,.6)' : '1px solid
+            rgba(255,255,255,.07)'; ]]]
+        - color: >
+            [[[ return
+            location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase())
+            ? '#38bdf8' : '#c4d4e6'; ]]]
       grid:
         - grid-template-areas: '"i n"'
         - grid-template-columns: auto auto
@@ -100,15 +140,13 @@ button_card_templates:
         - column-gap: 7px
       icon:
         - width: 18px
-        - color: |
-            [[[ return location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase()) ? '#38bdf8' : '#8fa6bf'; ]]]
+        - color: >
+            [[[ return
+            location.pathname.toLowerCase().endsWith('/'+variables.path.toLowerCase())
+            ? '#38bdf8' : '#8fa6bf'; ]]]
       name:
         - font-size: 12px
         - font-weight: 600
-
-  # ------------------------------------------------------------------
-  # Barre de navigation complète (8 onglets)
-  # ------------------------------------------------------------------
   fc_navbar:
     show_name: false
     show_icon: false
@@ -124,18 +162,70 @@ button_card_templates:
         - grid-template-columns: repeat(8,1fr)
         - column-gap: 8px
     custom_fields:
-      a: {card: {type: custom:button-card, template: fc_nav, name: Accueil, icon: mdi:home, variables: {path: Emsdash}}}
-      b: {card: {type: custom:button-card, template: fc_nav, name: Énergie, icon: mdi:lightning-bolt, variables: {path: energie}}}
-      c: {card: {type: custom:button-card, template: fc_nav, name: Onduleur, icon: mdi:solar-power, variables: {path: onduleur}}}
-      d: {card: {type: custom:button-card, template: fc_nav, name: Boiler, icon: mdi:water-boiler, variables: {path: boiler}}}
-      e: {card: {type: custom:button-card, template: fc_nav, name: Machines, icon: mdi:washing-machine, variables: {path: appareils}}}
-      f: {card: {type: custom:button-card, template: fc_nav, name: Économie, icon: mdi:chart-timeline-variant-shimmer, variables: {path: marche}}}
-      g: {card: {type: custom:button-card, template: fc_nav, name: Diagnostic, icon: mdi:stethoscope, variables: {path: diagnostic}}}
-      h: {card: {type: custom:button-card, template: fc_nav, name: Paramètres, icon: mdi:cog, variables: {path: technique}}}
-
-  # ------------------------------------------------------------------
-  # En-tête de sous-vue
-  # ------------------------------------------------------------------
+      a:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Accueil
+          icon: mdi:home
+          variables:
+            path: Emsdash
+      b:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Énergie
+          icon: mdi:lightning-bolt
+          variables:
+            path: energie
+      c:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Onduleur
+          icon: mdi:solar-power
+          variables:
+            path: onduleur
+      d:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Boiler
+          icon: mdi:water-boiler
+          variables:
+            path: boiler
+      e:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Machines
+          icon: mdi:washing-machine
+          variables:
+            path: appareils
+      f:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Économie
+          icon: mdi:chart-timeline-variant-shimmer
+          variables:
+            path: marche
+      g:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Diagnostic
+          icon: mdi:stethoscope
+          variables:
+            path: diagnostic
+      h:
+        card:
+          type: custom:button-card
+          template: fc_nav
+          name: Paramètres
+          icon: mdi:cog
+          variables:
+            path: technique
   fc_head:
     template: fc_panel
     variables:
@@ -153,10 +243,6 @@ button_card_templates:
             <div style="margin-left:auto;font-weight:800;letter-spacing:.04em"><span style="color:#38bdf8">FOX</span>CAT <span style="font-weight:500">ENERGY</span></div>
           </div>`;
         ]]]
-
-  # ------------------------------------------------------------------
-  # Liste de lignes "libellé / valeur" (une ligne YAML par entité)
-  # ------------------------------------------------------------------
   fc_list:
     template: fc_panel
     variables:
@@ -176,10 +262,6 @@ button_card_templates:
             return `<div class="row"><span class="k" style="font-size:12px">${r[0]}</span><b style="font-size:13px;text-align:right;max-width:58%;${f[1]?'color:'+f[1]:''}">${f[0]}</b></div>`}).join('');
           return `<div class="p"><div class="t"><span><ha-icon icon="${variables.icon}"></ha-icon>${variables.title}</span></div>${rows}</div>`;
         ]]]
-
-  # ------------------------------------------------------------------
-  # Bouton compact (niveaux onduleur, boiler)
-  # ------------------------------------------------------------------
   fc_btn:
     show_name: true
     show_icon: true
@@ -196,10 +278,6 @@ button_card_templates:
       name:
         - font-size: 12px
         - font-weight: 700
-
-  # ------------------------------------------------------------------
-  # Carte appareil (prise + cycle + puissance)
-  # ------------------------------------------------------------------
   fc_device:
     template: fc_panel
     variables:
@@ -232,12 +310,7 @@ button_card_templates:
             <div class="k" style="margin-top:10px;font-size:11px">${sock?'⚡ Prise active':'○ Prise coupée'}</div>
           </div>`;
         ]]]
-
 views:
-
-  # ====================================================================
-  # ACCUEIL
-  # ====================================================================
   - type: panel
     title: Accueil
     path: Emsdash
@@ -245,8 +318,6 @@ views:
     cards:
       - type: vertical-stack
         cards:
-
-          # ---------- Barre du haut ----------
           - type: custom:button-card
             template: fc_panel
             styles:
@@ -263,7 +334,7 @@ views:
                   return `
                   <div class="p" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px">
                     <div style="display:flex;align-items:center;gap:12px">
-                      <div class="img" style="width:44px;height:44px;background-image:url(/foxcat_energy_assets/logo.png)"></div>
+                      <div class="img" style="width:44px;height:44px;background-image:url(/homeassistant/custom_components/foxcat_energy/dashboard/assets/hero_house.webp)"></div>
                       <div>
                         <div style="font-size:20px;font-weight:800;letter-spacing:.04em"><span style="color:#38bdf8">FOX</span>CAT <span style="font-weight:500">ENERGY</span></div>
                         <div class="k">Home Assistant • EMS intelligent</div>
@@ -275,21 +346,20 @@ views:
                     </div>
                   </div>`;
                 ]]]
-
-          # ---------- Navigation ----------
           - type: custom:button-card
             template: fc_navbar
-
-          # ---------- Héros ----------
           - type: custom:button-card
             template: fc_panel
             styles:
               card:
                 - border-radius: 0
                 - min-height: 170px
-                - background: |
-                    linear-gradient(90deg,rgba(6,13,24,.95),rgba(6,13,24,.35) 55%,rgba(6,13,24,.9)),
+                - background: >
+                    linear-gradient(90deg,rgba(6,13,24,.95),rgba(6,13,24,.35)
+                    55%,rgba(6,13,24,.9)),
+
                     url('/foxcat_energy_assets/hero.jpg') center/cover,
+
                     linear-gradient(160deg,#0d1a2c,#08111e)
             custom_fields:
               c: |
@@ -325,50 +395,241 @@ views:
                     </div>
                   </div>`;
                 ]]]
-
-          # ---------- Grille 3 x 3 ----------
           - type: grid
             columns: 3
             square: false
             cards:
-
-              # 1. Flux énergétique
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
                   c: |
                     [[[
-                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
-                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
-                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
-                      const W=v=>{v=Math.abs(v);return v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W'};
-                      const pv=Math.max(N('[[foxcat:energy.pv_power]]'),0), house=Math.max(N('[[foxcat:energy.house_power]]'),0);
-                      const imp=Math.max(N('[[foxcat:energy.grid_import]]'),0), exp=Math.max(N('[[foxcat:energy.grid_export]]'),0);
-                      const pri=N(F('sensor',['niveau','puissance','pri','actuel']),100);
-                      const bT=N('[[foxcat:boiler.temperature_source]]'), bP=Math.max(N('[[foxcat:boiler.power_source]]'),0);
+                      // 1. Outils et normalisation
+                      const nm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                      const F = (d, w) => Object.keys(states).find(i => {
+                        if (!i.startsWith(d + '.')) return false;
+                        const t = nm(i + ' ' + (states[i].attributes.friendly_name || ''));
+                        return t.includes('foxcat energy') && w.every(x => t.includes(nm(x)));
+                      }) || null;
+                      
+                      const S = (i, f = '—') => {
+                        if (!i || !states[i]) return f;
+                        const v = states[i].state;
+                        return ['unknown', 'unavailable', 'none', ''].includes(v) ? f : v;
+                      };
+                      
+                      const N = (i, f = 0) => {
+                        const v = parseFloat(S(i, ''));
+                        return isFinite(v) ? v : f;
+                      };
+                      
+                      const W = (v, decimals = 2) => {
+                        v = Math.abs(v);
+                        return v >= 1000 ? (v / 1000).toFixed(decimals).replace('.', ',') + ' kW' : Math.round(v) + ' W';
+                      };
+
+                      // 2. Récupération des données FoxCat
+                      const pv = Math.max(N('[[foxcat:energy.pv_power]]'), 0);
+                      const house = Math.max(N('[[foxcat:energy.house_power]]'), 0);
+                      const imp = Math.max(N('[[foxcat:energy.grid_import]]'), 0);
+                      const exp = Math.max(N('[[foxcat:energy.grid_export]]'), 0);
+                      
+                      const priId = F('sensor', ['niveau', 'puissance', 'pri', 'actuel']);
+                      const pri = N(priId, 100);
+                      
+                      const bT = N('[[foxcat:boiler.temperature_source]]');
+                      const bP = Math.max(N('[[foxcat:boiler.power_source]]'), 0);
+
+                      // 3. Logique d'état des flux
+                      const hasImport = imp > 20;
+                      const hasExport = exp > 20;
+                      const hasSolar = pv > 20;
+
+                      // 4. Rendu HTML & CSS
                       return `
-                      <div class="p">
-                        <div class="t"><span><ha-icon icon="mdi:flash-circle"></ha-icon>Flux énergétique <small>(temps réel)</small></span></div>
-                        <div class="flux">
-                          <div></div><div></div>
-                          <div class="n"><ha-icon class="o" icon="mdi:white-balance-sunny"></ha-icon><span>SOLAIRE</span><b class="o">${W(pv)}</b></div>
-                          <div></div><div></div>
+                        <style>
+                          .fc-flux-container {
+                            width: 100%;
+                            padding: 10px 5px;
+                            color: #f8fafc;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                          }
+                          .fc-header {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            margin-bottom: 25px;
+                            font-size: 14px;
+                            font-weight: 800;
+                            color: #ffffff;
+                          }
+                          .fc-header ha-icon {
+                            color: #19d8ff;
+                            --mdc-icon-size: 22px;
+                          }
+                          .fc-grid {
+                            display: grid;
+                            grid-template-columns: 1fr 40px 1fr 40px 1fr;
+                            grid-template-rows: auto auto auto;
+                            gap: 20px 0;
+                            align-items: center;
+                            justify-items: center;
+                            position: relative;
+                          }
+                          
+                          /* Noeuds */
+                          .node {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            text-align: center;
+                            z-index: 2;
+                          }
+                          .node ha-icon {
+                            --mdc-icon-size: 34px;
+                            margin-bottom: 6px;
+                          }
+                          .node .img-wrapper {
+                            height: 60px;
+                            width: 60px;
+                            background-size: contain;
+                            background-repeat: no-repeat;
+                            background-position: center;
+                            margin-bottom: 6px;
+                            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.4));
+                          }
+                          .lbl { font-size: 9px; font-weight: 800; letter-spacing: 1px; opacity: 0.6; text-transform: uppercase; }
+                          .val { font-size: 18px; font-weight: 900; margin-top: 4px; line-height: 1; }
+                          .sub { font-size: 9px; opacity: 0.5; margin-top: 4px; font-weight: bold; }
+                          
+                          /* Couleurs Spécifiques et Glow */
+                          .c-solar { color: #ff982f; }
+                          .c-solar ha-icon { filter: drop-shadow(0 0 10px rgba(255,152,47,0.5)); }
+                          
+                          .c-house { color: #21d7ff; }
+                          .c-house ha-icon { filter: drop-shadow(0 0 10px rgba(33,215,255,0.5)); }
+                          
+                          .c-import { color: #fb7185; }
+                          .c-import ha-icon { filter: drop-shadow(0 0 10px rgba(251,113,133,0.5)); }
+                          
+                          .c-export { color: #35e59d; }
+                          .c-export ha-icon { filter: drop-shadow(0 0 10px rgba(53,229,157,0.5)); }
+                          
+                          .c-neutral { color: #cbd5e1; }
+                          
+                          /* Placement sur la Grille */
+                          .n-solar { grid-column: 3; grid-row: 1; }
+                          .n-import { grid-column: 1; grid-row: 2; }
+                          .n-house { grid-column: 3; grid-row: 2; }
+                          .n-export { grid-column: 5; grid-row: 2; }
+                          .n-inverter { grid-column: 1; grid-row: 3; }
+                          .n-boiler { grid-column: 5; grid-row: 3; }
+                          
+                          /* Flèches et Lignes */
+                          .arrow-h {
+                            grid-row: 2;
+                            width: 100%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 24px;
+                            font-weight: bold;
+                            opacity: 0.2;
+                            transition: all 0.3s ease;
+                          }
+                          .arrow-v {
+                            grid-column: 3;
+                            grid-row: 1 / 3;
+                            width: 2px;
+                            height: 100%;
+                            background: rgba(255, 152, 47, 0.2);
+                            z-index: 1;
+                            border-radius: 2px;
+                          }
+                          
+                          /* Animations de Flux */
+                          @keyframes pulse-flow {
+                            0% { transform: scale(0.95) translateX(-2px); opacity: 0.5; }
+                            50% { transform: scale(1.1) translateX(2px); opacity: 1; }
+                            100% { transform: scale(0.95) translateX(-2px); opacity: 0.5; }
+                          }
+                          .active-imp { color: #fb7185; opacity: 1; animation: pulse-flow 1.5s infinite ease-in-out; }
+                          .active-exp { color: #35e59d; opacity: 1; animation: pulse-flow 1.5s infinite ease-in-out; }
+                          
+                        </style>
 
-                          <div class="n"><ha-icon style="color:#cbd5e1" icon="mdi:transmission-tower"></ha-icon><span>RÉSEAU</span><b class="${imp>20?'r':''}">${W(imp>20?imp:0)}</b><span>(Import)</span></div>
-                          <div class="ar ${imp>20?'r':''}" style="${imp>20?'':'opacity:.25'}">${imp>20?'←':'→'}</div>
-                          <div class="n"><ha-icon class="b" icon="mdi:home-lightning-bolt-outline"></ha-icon><span>MAISON</span><b>${W(house)}</b></div>
-                          <div class="ar ${exp>20?'gr':''}" style="${exp>20?'':'opacity:.25'}">→</div>
-                          <div class="n"><ha-icon class="gr" icon="mdi:leaf"></ha-icon><span>RÉINJECTION</span><b class="gr">${W(exp)}</b><span>(Export)</span></div>
+                        <div class="fc-flux-container">
+                          
+                          <div class="fc-header">
+                            <ha-icon icon="mdi:flash-circle"></ha-icon>
+                            <span>Flux énergétique <span style="opacity:0.5; font-weight:normal;">(temps réel)</span></span>
+                          </div>
+                          
+                          <div class="fc-grid">
+                            
+                            <!-- Ligne Solaire vers Maison -->
+                            <div class="arrow-v" style="opacity: ${hasSolar ? '1' : '0.2'}; box-shadow: ${hasSolar ? '0 0 10px rgba(255,152,47,0.5)' : 'none'};"></div>
 
-                          <div class="n"><div class="img" style="height:56px;background-image:url(/foxcat_energy_assets/inverter.png)"></div><span>ONDULEUR</span><b class="b">${W(pv)}</b><span>PRI ${Math.round(pri)} %</span></div>
-                          <div></div><div></div><div></div>
-                          <div class="n"><div class="img" style="height:56px;background-image:url(/foxcat_energy_assets/boiler.png)"></div><span>BOILER</span><b>${W(bP)}</b><span class="o">${bT.toFixed(1).replace('.',',')} °C</span></div>
+                            <!-- Solaire -->
+                            <div class="node n-solar c-solar">
+                              <ha-icon icon="mdi:white-balance-sunny"></ha-icon>
+                              <span class="lbl">SOLAIRE</span>
+                              <span class="val">${W(pv)}</span>
+                            </div>
+
+                            <!-- Réseau Import -->
+                            <div class="node n-import ${hasImport ? 'c-import' : 'c-neutral'}">
+                              <ha-icon icon="mdi:transmission-tower"></ha-icon>
+                              <span class="lbl">RÉSEAU</span>
+                              <span class="val">${W(hasImport ? imp : 0)}</span>
+                              <span class="sub">(Import)</span>
+                            </div>
+
+                            <!-- Flèche Import -->
+                            <div class="arrow-h" style="grid-column: 2;">
+                              <span class="${hasImport ? 'active-imp' : ''}">${hasImport ? '→' : '—'}</span>
+                            </div>
+
+                            <!-- Maison -->
+                            <div class="node n-house c-house">
+                              <ha-icon icon="mdi:home-lightning-bolt-outline"></ha-icon>
+                              <span class="lbl">MAISON</span>
+                              <span class="val">${W(house)}</span>
+                            </div>
+
+                            <!-- Flèche Export -->
+                            <div class="arrow-h" style="grid-column: 4;">
+                              <span class="${hasExport ? 'active-exp' : ''}">${hasExport ? '→' : '—'}</span>
+                            </div>
+
+                            <!-- Réseau Export -->
+                            <div class="node n-export ${hasExport ? 'c-export' : 'c-neutral'}">
+                              <ha-icon icon="mdi:leaf"></ha-icon>
+                              <span class="lbl">RÉINJECTION</span>
+                              <span class="val">${W(exp)}</span>
+                              <span class="sub">(Export)</span>
+                            </div>
+
+                            <!-- Onduleur -->
+                            <div class="node n-inverter">
+                              <div class="img-wrapper" style="background-image:url('/foxcat_assets/inverter.png')"></div>
+                              <span class="lbl">ONDULEUR</span>
+                              <span class="val" style="color:#21d7ff; font-size:15px;">${W(pv, 1)}</span>
+                              <span class="sub">PRI ${Math.round(pri)} %</span>
+                            </div>
+
+                            <!-- Boiler -->
+                            <div class="node n-boiler">
+                              <div class="img-wrapper" style="background-image:url('/foxcat_assets/boiler.png')"></div>
+                              <span class="lbl">BOILER</span>
+                              <span class="val" style="font-size:15px;">${W(bP)}</span>
+                              <span class="sub c-solar" style="font-size:11px;">${bT.toFixed(1).replace('.', ',')} °C</span>
+                            </div>
+
+                          </div>
                         </div>
-                      </div>`;
+                      `;
                     ]]]
-
-              # 2. Bilan du jour
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
@@ -398,8 +659,6 @@ views:
                         </div>
                       </div>`;
                     ]]]
-
-              # 3. Production et consommation
               - type: vertical-stack
                 cards:
                   - type: custom:button-card
@@ -409,53 +668,96 @@ views:
                         - border-radius: 18px 18px 0 0
                         - border-bottom: none
                     custom_fields:
-                      c: |
-                        [[[ return `<div class="p" style="padding-bottom:0"><div class="t"><span>Production et consommation</span><small>Aujourd'hui ▾</small></div></div>`; ]]]
+                      c: >
+                        [[[ return `<div class="p" style="padding-bottom:0"><div
+                        class="t"><span>Production et
+                        consommation</span><small>Aujourd'hui
+                        ▾</small></div></div>`; ]]]
                   - type: custom:apexcharts-card
                     graph_span: 24h
                     span:
                       start: day
-                    update_interval: 1min
+                    update_interval: 5min
                     header:
                       show: false
                     apex_config:
                       chart:
-                        height: 190
+                        height: 220
                         background: transparent
                         toolbar:
                           show: false
+                      theme:
+                        mode: dark
                       legend:
                         position: top
                         labels:
                           colors: '#9bb3cc'
                       grid:
-                        borderColor: rgba(255,255,255,.06)
+                        borderColor: rgba(255,255,255,.08)
+                        strokeDashArray: 3
                       stroke:
                         width: 2
                         curve: smooth
+                      fill:
+                        type:
+                          - gradient
+                          - solid
+                          - solid
+                          - solid
+                        gradient:
+                          shade: dark
+                          type: vertical
+                          shadeIntensity: 0.5
+                          opacityFrom: 0.4
+                          opacityTo: 0.05
+                          stops:
+                            - 0
+                            - 100
                       xaxis:
                         labels:
                           datetimeUTC: false
+                        tooltip:
+                          enabled: false
+                      yaxis:
+                        - decimals: 1
+                          labels:
+                            formatter: |
+                              EVAL:function(value) {
+                                return value.toFixed(1) + " kW";
+                              }
+                    all_series_config:
+                      unit: kW
+                      float_precision: 2
+                      transform: return x/1000;
+                      group_by:
+                        func: avg
+                        duration: 5min
                     series:
-                      - entity: '[[foxcat:energy.pv_power]]'
+                      - entity: >-
+                          sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
                         name: Solaire
                         type: area
                         color: '#ffb020'
-                        opacity: 0.25
-                        transform: return x/1000;
-                      - entity: '[[foxcat:energy.house_power]]'
+                      - entity: >-
+                          sensor.foxcat_energy_energie_puissance_de_consommation_maison
                         name: Maison
                         type: line
                         color: '#38bdf8'
-                        transform: return x/1000;
-                      - entity: '[[foxcat:energy.grid_import]]'
-                        name: Réseau
+                      - entity: >-
+                          sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
+                        name: Prélèvement
                         type: line
                         color: '#f87171'
-                        transform: return x/1000;
+                      - entity: >-
+                          sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
+                        name: Réinjection
+                        type: line
+                        color: '#34d399'
                     card_mod:
-                      style: |
-                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important}
+                      style: >
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
+                        solid
+                        rgba(90,150,220,.18)!important;border-top:none!important;border-bottom:none!important;border-radius:0!important;box-shadow:none!important}
                   - type: custom:button-card
                     template: fc_panel
                     styles:
@@ -480,76 +782,558 @@ views:
                             <div class="legend">${d.map(x=>`<div><b>${x[1].toFixed(2).replace('.',',')}</b><span>${x[0]}</span></div>`).join('')}</div>
                           </div>`;
                         ]]]
-
-              # 4. Onduleur SolarEdge
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
                   c: |
                     [[[
-                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
-                      const S=(i,f='—')=>{if(!i||!states[i])return f;const v=states[i].state;return ['unknown','unavailable','none',''].includes(v)?f:v};
-                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
-                      const W=v=>{v=Math.abs(v);return v>=1000?(v/1000).toFixed(2).replace('.',',')+' kW':Math.round(v)+' W'};
-                      const lvl=Math.min(Math.max(N(F('sensor',['niveau','puissance','pri','actuel']),100),0),100);
-                      const tgt=Math.round(N(F('sensor',['niveau','puissance','pri','cible']),lvl));
-                      const dir=S(F('sensor',['direction','pri']),'Maintien');
-                      const ackInv=S(F('sensor',['ack','onduleur']));
-                      const ackR=S(F('sensor',['ack','rrcr']));
-                      const ok=!/FAILED|ERREUR/i.test(ackInv+ackR);
-                      const pv=Math.max(N('[[foxcat:energy.pv_power]]'),0), ex=Math.max(N('[[foxcat:energy.grid_export]]'),0);
+                      // 1. Outils et normalisation FoxCat
+                      const nm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                      const F = (d, w) => Object.keys(states).find(i => {
+                        if (!i.startsWith(d + '.')) return false;
+                        const t = nm(i + ' ' + (states[i].attributes.friendly_name || ''));
+                        return t.includes('foxcat energy') && w.every(x => t.includes(nm(x)));
+                      }) || null;
+                      
+                      const S = (i, f = '—') => {
+                        if (!i || !states[i]) return f;
+                        const v = states[i].state;
+                        return ['unknown', 'unavailable', 'none', ''].includes(v) ? f : v;
+                      };
+                      
+                      const N = (i, f = 0) => {
+                        const v = parseFloat(S(i, ''));
+                        return isFinite(v) ? v : f;
+                      };
+                      
+                      const W = v => {
+                        v = Math.abs(v);
+                        return v >= 1000 ? (v / 1000).toFixed(2).replace('.', ',') + ' kW' : Math.round(v) + ' W';
+                      };
+
+                      // 2. Récupération des variables
+                      const lvl = Math.min(Math.max(N(F('sensor', ['niveau', 'puissance', 'pri', 'actuel']), 100), 0), 100);
+                      const tgt = Math.round(N(F('sensor', ['niveau', 'puissance', 'pri', 'cible']), lvl));
+                      const dir = S(F('sensor', ['direction', 'pri']), 'Maintien');
+                      const ackInv = S(F('sensor', ['ack', 'onduleur']));
+                      const ackR = S(F('sensor', ['ack', 'rrcr']));
+                      const ok = !/FAILED|ERREUR/i.test(ackInv + ackR);
+                      const pv = Math.max(N('[[foxcat:energy.pv_power]]'), 0);
+                      const ex = Math.max(N('[[foxcat:energy.grid_export]]'), 0);
+
+                      // 3. Calcul de la jauge SVG
+                      const radius = 40;
+                      const circumference = 2 * Math.PI * radius;
+                      const dashoffset = circumference - (circumference * lvl / 100);
+                      
+                      // Couleurs dynamiques
+                      const statusColor = ok ? '#35e59d' : '#fb7185';
+                      const statusBg = ok ? 'rgba(53,229,157,0.12)' : 'rgba(251,113,133,0.12)';
+                      const dirColor = dir.toLowerCase().includes('baisse') ? '#35e59d' : dir.toLowerCase().includes('hausse') ? '#fb7185' : '#19d8ff';
+
+                      // 4. Rendu HTML Premium
                       return `
-                      <div class="p">
-                        <div class="t"><span><ha-icon icon="mdi:solar-power-variant"></ha-icon>Onduleur SolarEdge</span>
-                          <span class="chip ${ok?'gr':'r'}" style="background:${ok?'rgba(52,211,153,.12)':'rgba(248,113,113,.12)'}">● ${ok?'Connecté':'Défaut'}</span></div>
-                        <div style="display:flex;align-items:center;gap:16px">
-                          <div class="img" style="width:34%;height:110px;background-image:url(/foxcat_energy_assets/inverter.png)"></div>
-                          <div style="flex:1;text-align:center">
-                            <div class="ring" style="width:118px;height:118px;margin:0 auto;background:conic-gradient(#38bdf8 ${lvl*3.6}deg,rgba(255,255,255,.08) 0)">
-                              <div style="width:94px;height:94px;font-size:28px">${Math.round(lvl)} %<small>Palier actuel</small></div>
+                        <style>
+                          * { box-sizing: border-box; }
+                          .prem-card {
+                            padding: 20px;
+                            color: #f8fafc;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            background: linear-gradient(145deg, rgba(11,20,31,0.6), rgba(8,14,22,0.8));
+                            border-radius: 24px;
+                          }
+                          
+                          /* En-tête */
+                          .prem-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 24px;
+                          }
+                          .prem-title {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            font-size: 15px;
+                            font-weight: 800;
+                            color: #ffffff;
+                            letter-spacing: 0.02em;
+                          }
+                          .prem-title ha-icon {
+                            color: #19d8ff;
+                            --mdc-icon-size: 22px;
+                            filter: drop-shadow(0 0 8px rgba(25,216,255,0.4));
+                          }
+                          .prem-chip {
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 5px 10px;
+                            border-radius: 12px;
+                            font-size: 9px;
+                            font-weight: 900;
+                            letter-spacing: 0.05em;
+                            border: 1px solid transparent;
+                          }
+                          .prem-dot {
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 50%;
+                          }
+                          
+                          /* Section centrale */
+                          .prem-body {
+                            display: flex;
+                            align-items: center;
+                            justify-content: space-between;
+                            margin-bottom: 24px;
+                            padding: 0 10px;
+                          }
+                          
+                          /* Onduleur CSS 3D */
+                          .css-inverter {
+                            width: 76px;
+                            height: 100px;
+                            border-radius: 12px;
+                            background: linear-gradient(145deg, #1e293b, #0f172a);
+                            border: 1px solid rgba(255,255,255,0.1);
+                            box-shadow: 
+                              0 15px 25px rgba(0,0,0,0.5),
+                              inset 0 2px 0 rgba(255,255,255,0.08),
+                              inset 0 -2px 0 rgba(0,0,0,0.4);
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            position: relative;
+                            flex: none;
+                          }
+                          .css-inverter ha-icon {
+                            color: #94a3b8;
+                            --mdc-icon-size: 32px;
+                            opacity: 0.6;
+                          }
+                          .css-inverter .led {
+                            position: absolute;
+                            bottom: 16px;
+                            width: 34px;
+                            height: 3px;
+                            background: #19d8ff;
+                            border-radius: 3px;
+                            box-shadow: 0 0 10px #19d8ff;
+                          }
+                          
+                          /* Jauge SVG */
+                          .svg-gauge {
+                            position: relative;
+                            width: 120px;
+                            height: 120px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex: none;
+                          }
+                          .svg-gauge svg {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            transform: rotate(-90deg);
+                            filter: drop-shadow(0 0 8px rgba(25,216,255,0.4));
+                          }
+                          .svg-bg {
+                            fill: none;
+                            stroke: rgba(255,255,255,0.05);
+                            stroke-width: 6;
+                          }
+                          .svg-val {
+                            fill: none;
+                            stroke: #19d8ff;
+                            stroke-width: 6;
+                            stroke-linecap: round;
+                            stroke-dasharray: ${circumference};
+                            stroke-dashoffset: ${dashoffset};
+                            transition: stroke-dashoffset 1s ease-out;
+                          }
+                          .gauge-center {
+                            text-align: center;
+                            z-index: 2;
+                          }
+                          .gauge-val {
+                            font-size: 26px;
+                            font-weight: 900;
+                            color: #ffffff;
+                            line-height: 1;
+                          }
+                          .gauge-lbl {
+                            display: block;
+                            margin-top: 4px;
+                            font-size: 8px;
+                            font-weight: 800;
+                            color: #94a3b8;
+                            letter-spacing: 0.05em;
+                          }
+                          
+                          /* Cible */
+                          .target-block {
+                            text-align: right;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: flex-end;
+                          }
+                          .t-lbl { font-size: 8px; color: #64748b; font-weight: 900; letter-spacing: 0.1em; }
+                          .t-val { font-size: 22px; font-weight: 900; color: #ffffff; margin: 2px 0; }
+                          .t-dir { font-size: 10px; font-weight: 800; color: ${dirColor}; }
+                          .t-max { margin-top: 8px; font-size: 9px; color: #475569; font-weight: 800; background: rgba(255,255,255,0.03); padding: 4px 8px; border-radius: 8px; }
+                          
+                          /* Ligne du bas */
+                          .prem-footer {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 10px;
+                            padding-top: 16px;
+                            border-top: 1px solid rgba(255,255,255,0.05);
+                          }
+                          .metric {
+                            background: rgba(255,255,255,0.02);
+                            border: 1px solid rgba(255,255,255,0.04);
+                            padding: 12px;
+                            border-radius: 14px;
+                            text-align: center;
+                          }
+                          .m-val { display: block; font-size: 16px; font-weight: 900; }
+                          .m-lbl { display: block; margin-top: 4px; font-size: 8px; font-weight: 800; color: #64748b; letter-spacing: 0.05em; }
+                          
+                          .c-solar { color: #ff982f; }
+                          .c-export { color: #35e59d; }
+                          .c-neutral { color: #cbd5e1; }
+                        </style>
+
+                        <div class="prem-card">
+                          
+                          <!-- HEADER -->
+                          <div class="prem-header">
+                            <div class="prem-title">
+                              <ha-icon icon="mdi:solar-power-variant"></ha-icon>
+                              <span>Onduleur SolarEdge</span>
                             </div>
-                            <div class="stat" style="margin-top:8px"><span>Cible EMS : ${tgt} %</span><b style="font-size:12px">${dir}</b></div>
+                            <div class="prem-chip" style="color: ${statusColor}; background: ${statusBg}; border-color: ${statusColor}40;">
+                              <span class="prem-dot" style="background: ${statusColor}; box-shadow: 0 0 6px ${statusColor};"></span>
+                              ${ok ? 'CONNECTÉ' : 'DÉFAUT'}
+                            </div>
                           </div>
+                          
+                          <!-- BODY -->
+                          <div class="prem-body">
+                            
+                            <!-- Inverter 3D CSS -->
+                            <div class="css-inverter">
+                              <ha-icon icon="mdi:solar-power"></ha-icon>
+                              <div class="led"></div>
+                            </div>
+                            
+                            <!-- Jauge SVG -->
+                            <div class="svg-gauge">
+                              <svg>
+                                <circle class="svg-bg" cx="60" cy="60" r="40"></circle>
+                                <circle class="svg-val" cx="60" cy="60" r="40"></circle>
+                              </svg>
+                              <div class="gauge-center">
+                                <div class="gauge-val">${Math.round(lvl)} <span style="font-size:14px;">%</span></div>
+                                <div class="gauge-lbl">PALIER ACTUEL</div>
+                              </div>
+                            </div>
+                            
+                            <!-- Infos Cible -->
+                            <div class="target-block">
+                              <span class="t-lbl">CIBLE EMS</span>
+                              <span class="t-val">${tgt} %</span>
+                              <span class="t-dir">${dir}</span>
+                              <span class="t-max">Max ${Math.round(lvl * 40)} W</span>
+                            </div>
+                            
+                          </div>
+                          
+                          <!-- FOOTER -->
+                          <div class="prem-footer">
+                            <div class="metric">
+                              <span class="m-val c-solar">${W(pv)}</span>
+                              <span class="m-lbl">PRODUCTION PV</span>
+                            </div>
+                            <div class="metric">
+                              <span class="m-val c-export">${W(ex)}</span>
+                              <span class="m-lbl">RÉINJECTION</span>
+                            </div>
+                            <div class="metric">
+                              <span class="m-val c-neutral">${ackR}</span>
+                              <span class="m-lbl">STATUT RRCR</span>
+                            </div>
+                          </div>
+                          
                         </div>
-                        <div class="g3" style="margin-top:12px">
-                          <div class="stat"><b class="b">${W(pv)}</b><span>Production</span></div>
-                          <div class="stat"><b>${W(ex)}</b><span>Injection réseau</span></div>
-                          <div class="stat"><b>${ackR}</b><span>RRCR</span></div>
-                        </div>
-                      </div>`;
+                      `;
                     ]]]
-
-              # 5. Boiler / ECS
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
                   c: |
                     [[[
-                      const S=(i,f='—')=>{const v=states[i]?.state;return (!v||['unknown','unavailable','none'].includes(v))?f:v};
-                      const N=(i,f=0)=>{const v=parseFloat(S(i,''));return isFinite(v)?v:f};
-                      const t=N('[[foxcat:boiler.temperature_source]]'), p=Math.max(N('[[foxcat:boiler.power_source]]'),0);
-                      const run=states['[[foxcat:boiler.binary_source]]']?.state==='on'||p>100;
-                      return `
-                      <div class="p">
-                        <div class="t"><span><ha-icon class="o" icon="mdi:water-boiler"></ha-icon>Boiler / ECS</span>
-                          <span class="chip gr" style="border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.1)">⟳ Mode ${S('[[foxcat:ems.mode]]')}</span></div>
-                        <div style="display:flex;gap:14px;align-items:center">
-                          <div class="img" style="width:30%;height:150px;background-image:url(/foxcat_energy_assets/boiler.png)"></div>
-                          <div style="flex:1">
-                            <div class="tile" style="margin-bottom:8px"><ha-icon class="o" icon="mdi:thermometer"></ha-icon><div><b style="font-size:20px">${t.toFixed(1).replace('.',',')} °C</b><span>Température actuelle</span></div></div>
-                            <div class="tile"><ha-icon class="b" icon="mdi:flash"></ha-icon><div><b style="font-size:20px">${Math.round(p)} W</b><span>Puissance ${run?'· chauffe':''}</span></div></div>
-                          </div>
-                        </div>
-                        <div class="g3" style="margin-top:12px">
-                          <div class="stat"><b>${S('[[foxcat:boiler.demand]]','Aucune')}</b><span>Demande</span></div>
-                          <div class="stat"><b>${S('[[foxcat:boiler.origin]]','Aucune')}</b><span>Origine</span></div>
-                          <div class="stat"><b>${S('[[foxcat:boiler.execution_status]]','Attente')}</b><span>État</span></div>
-                        </div>
-                      </div>`;
-                    ]]]
+                      // 1. Outils
+                      const S = (i, f = '—') => {
+                        const v = states[i]?.state;
+                        return (!v || ['unknown', 'unavailable', 'none'].includes(v)) ? f : v;
+                      };
+                      const N = (i, f = 0) => {
+                        const v = parseFloat(S(i, ''));
+                        return isFinite(v) ? v : f;
+                      };
+                      
+                      // 2. Variables du Boiler
+                      const t = N('[[foxcat:boiler.temperature_source]]');
+                      const p = Math.max(N('[[foxcat:boiler.power_source]]'), 0);
+                      const run = states['[[foxcat:boiler.binary_source]]']?.state === 'on' || p > 100;
+                      
+                      const mode = S('[[foxcat:ems.mode]]', 'AUTO');
+                      const demand = S('[[foxcat:boiler.demand]]', 'Aucune');
+                      const origin = S('[[foxcat:boiler.origin]]', 'Aucune');
+                      const exec = S('[[foxcat:boiler.execution_status]]', 'Attente');
 
-              # 6. Appareils et charges pilotées
+                      // 3. Logique d'affichage dynamique
+                      // Couleur de la chauffe
+                      const runColor = run ? '#fb923c' : '#1e293b';
+                      const runGlow = run ? 'box-shadow: 0 0 12px #fb923c;' : '';
+                      
+                      // Calcul du pourcentage de remplissage thermique (entre 20°C et 65°C)
+                      const fillPct = Math.min(Math.max(((t - 20) / 45) * 100, 5), 100);
+
+                      // 4. Rendu HTML & CSS
+                      return `
+                        <style>
+                          * { box-sizing: border-box; }
+                          .prem-card {
+                            padding: 20px;
+                            color: #f8fafc;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            background: linear-gradient(145deg, rgba(11,20,31,0.6), rgba(8,14,22,0.8));
+                            border-radius: 24px;
+                          }
+                          
+                          /* En-tête */
+                          .prem-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 24px;
+                          }
+                          .prem-title {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            font-size: 15px;
+                            font-weight: 800;
+                            color: #ffffff;
+                            letter-spacing: 0.02em;
+                          }
+                          .prem-title ha-icon {
+                            color: #fb923c;
+                            --mdc-icon-size: 22px;
+                            filter: drop-shadow(0 0 8px rgba(251,146,60,0.4));
+                          }
+                          .prem-chip {
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 5px 10px;
+                            border-radius: 12px;
+                            font-size: 9px;
+                            font-weight: 900;
+                            letter-spacing: 0.05em;
+                            color: #35e59d;
+                            background: rgba(53,229,157,0.12);
+                            border: 1px solid rgba(53,229,157,0.3);
+                          }
+                          
+                          /* Section centrale */
+                          .prem-body {
+                            display: flex;
+                            align-items: center;
+                            gap: 25px;
+                            margin-bottom: 24px;
+                            padding: 0 10px;
+                          }
+                          
+                          /* Boiler CSS 3D */
+                          .css-boiler {
+                            width: 60px;
+                            height: 110px;
+                            border-radius: 30px;
+                            background: linear-gradient(145deg, #1e293b, #0f172a);
+                            border: 1px solid rgba(255,255,255,0.1);
+                            box-shadow: 
+                              0 15px 25px rgba(0,0,0,0.5),
+                              inset 0 4px 10px rgba(255,255,255,0.1),
+                              inset -4px -4px 15px rgba(0,0,0,0.5);
+                            position: relative;
+                            overflow: hidden;
+                            display: flex;
+                            align-items: flex-end;
+                            justify-content: center;
+                            flex: none;
+                          }
+                          
+                          /* Remplissage thermique (Jauge interne) */
+                          .boiler-fill {
+                            width: 100%;
+                            height: ${fillPct}%;
+                            background: linear-gradient(0deg, rgba(251,146,60,0.4), rgba(248,113,133,0.5));
+                            transition: height 1s ease-out;
+                            box-shadow: 0 -5px 15px rgba(251,146,60,0.2);
+                          }
+                          
+                          /* LED / Résistance (S'allume si en chauffe) */
+                          .boiler-led {
+                            position: absolute;
+                            bottom: 20px;
+                            width: 8px;
+                            height: 26px;
+                            border-radius: 4px;
+                            background: ${runColor};
+                            ${runGlow}
+                            transition: all 0.3s ease;
+                            z-index: 2;
+                          }
+                          
+                          /* Métriques côté */
+                          .metrics-col {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 15px;
+                            flex: 1;
+                          }
+                          .m-row {
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                          }
+                          .m-icon {
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 10px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            flex: none;
+                          }
+                          .m-icon ha-icon {
+                            --mdc-icon-size: 20px;
+                          }
+                          .m-icon.temp {
+                            color: #fb923c;
+                            background: rgba(251,146,60,0.1);
+                          }
+                          .m-icon.pwr {
+                            color: #21d7ff;
+                            background: rgba(33,215,255,0.1);
+                          }
+                          .m-val {
+                            font-size: 20px;
+                            font-weight: 900;
+                            color: #ffffff;
+                            line-height: 1.1;
+                          }
+                          .m-lbl {
+                            display: block;
+                            margin-top: 4px;
+                            font-size: 9px;
+                            font-weight: 800;
+                            color: #64748b;
+                            letter-spacing: 0.05em;
+                            text-transform: uppercase;
+                          }
+                          
+                          /* Ligne du bas */
+                          .prem-footer {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 10px;
+                            padding-top: 16px;
+                            border-top: 1px solid rgba(255,255,255,0.05);
+                          }
+                          .f-metric {
+                            background: rgba(255,255,255,0.02);
+                            border: 1px solid rgba(255,255,255,0.04);
+                            padding: 12px 6px;
+                            border-radius: 14px;
+                            text-align: center;
+                          }
+                          .f-val { display: block; font-size: 11px; font-weight: 900; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                          .f-lbl { display: block; margin-top: 4px; font-size: 8px; font-weight: 800; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase; }
+                          
+                        </style>
+
+                        <div class="prem-card">
+                          
+                          <!-- HEADER -->
+                          <div class="prem-header">
+                            <div class="prem-title">
+                              <ha-icon icon="mdi:water-boiler"></ha-icon>
+                              <span>Boiler / ECS</span>
+                            </div>
+                            <div class="prem-chip">
+                              <ha-icon icon="mdi:refresh" style="--mdc-icon-size:12px; margin-right:2px;"></ha-icon>
+                              MODE ${mode.toUpperCase()}
+                            </div>
+                          </div>
+                          
+                          <!-- BODY -->
+                          <div class="prem-body">
+                            
+                            <!-- Boiler 3D CSS -->
+                            <div class="css-boiler">
+                              <div class="boiler-fill"></div>
+                              <div class="boiler-led"></div>
+                            </div>
+                            
+                            <!-- Métriques -->
+                            <div class="metrics-col">
+                              <div class="m-row">
+                                <div class="m-icon temp"><ha-icon icon="mdi:thermometer"></ha-icon></div>
+                                <div>
+                                  <div class="m-val">${t.toFixed(1).replace('.', ',')} °C</div>
+                                  <span class="m-lbl">Température actuelle</span>
+                                </div>
+                              </div>
+                              <div class="m-row">
+                                <div class="m-icon pwr"><ha-icon icon="mdi:flash"></ha-icon></div>
+                                <div>
+                                  <div class="m-val">${Math.round(p)} W</div>
+                                  <span class="m-lbl">Puissance ${run ? '· En chauffe' : ''}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                          </div>
+                          
+                          <!-- FOOTER -->
+                          <div class="prem-footer">
+                            <div class="f-metric">
+                              <span class="f-val">${demand}</span>
+                              <span class="f-lbl">Demande</span>
+                            </div>
+                            <div class="f-metric">
+                              <span class="f-val">${origin}</span>
+                              <span class="f-lbl">Origine</span>
+                            </div>
+                            <div class="f-metric">
+                              <span class="f-val" style="color: ${run ? '#fb923c' : '#cbd5e1'};">${exec}</span>
+                              <span class="f-lbl">État</span>
+                            </div>
+                          </div>
+                          
+                        </div>
+                      `;
+                    ]]]
               - type: custom:button-card
                 template: fc_panel
                 tap_action:
@@ -558,34 +1342,255 @@ views:
                 custom_fields:
                   c: |
                     [[[
-                      const nm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-                      const F=(d,w)=>Object.keys(states).find(i=>{if(!i.startsWith(d+'.'))return false;const t=nm(i+' '+(states[i].attributes.friendly_name||''));return t.includes('foxcat energy')&&w.every(x=>t.includes(nm(x)))})||null;
-                      const N=(i)=>{const v=parseFloat(states[i]?.state);return isFinite(v)?Math.max(v,0):0};
-                      const prot=states[F('binary_sensor',['machine','protegee','active'])]?.state==='on';
-                      const dev=[
-                        ['Lave-linge','[[foxcat:machines.washer.cycle]]','[[foxcat:legacy.sensor_lave_linge_puissance]]','/foxcat_energy_assets/washer.png',2200],
-                        ['Sèche-linge','[[foxcat:machines.dryer.cycle]]','[[foxcat:legacy.sensor_seche_linge_puissance]]','/foxcat_energy_assets/dryer.png',2500],
-                        ['Lave-vaisselle','[[foxcat:machines.dishwasher.cycle]]','[[foxcat:legacy.sensor_lave_vaisselle_puissance]]','/foxcat_energy_assets/dishwasher.png',2000]
-                      ].map(([n,c,p,img,max])=>{
-                        const pw=N(p), cyc=states[c]?.state==='on';
-                        let chip='En attente',col='#8fa6bf',bg='rgba(255,255,255,.08)';
-                        if(cyc&&prot){chip='Cycle protégé';col='#052e16';bg='#4ade80'}
-                        else if(cyc){chip='Cycle actif';col='#fff';bg='#0ea5e9'}
-                        else if(pw>20){chip='En marche';col='#fff';bg='#0ea5e9'}
-                        return `<div>
-                          <div class="k" style="color:#e8f1fb;font-weight:600">${n}</div>
-                          <span class="chip" style="color:${col};background:${bg};margin:4px 0">${chip}</span>
-                          <div class="img" style="height:64px;background-image:url(${img})"></div>
-                          <div class="v" style="font-size:18px;margin-top:4px">${Math.round(pw)} W</div>
-                          <div class="k">${cyc||pw>20?'En cours':'Prêt'}</div>
-                          <div class="bar"><i style="width:${Math.min(pw/max*100,100)}%;background:${cyc?'#38bdf8':'#64748b'}"></i></div>
-                        </div>`;
-                      }).join('');
-                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:washing-machine"></ha-icon>Appareils et charges pilotées</span><span class="k">›</span></div>
-                        <div class="g3" style="gap:14px">${dev}</div></div>`;
-                    ]]]
+                      // 1. Outils
+                      const nm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+                      const F = (d, w) => Object.keys(states).find(i => {
+                        if (!i.startsWith(d + '.')) return false;
+                        const t = nm(i + ' ' + (states[i].attributes.friendly_name || ''));
+                        return t.includes('foxcat energy') && w.every(x => t.includes(nm(x)));
+                      }) || null;
+                      
+                      const N = i => {
+                        const v = parseFloat(states[i]?.state);
+                        return isFinite(v) ? Math.max(v, 0) : 0;
+                      };
 
-              # 7. Coûts et tarifs
+                      // 2. Détection de la protection cycle
+                      const protEntity = F('binary_sensor', ['machine', 'protegee', 'active']);
+                      const prot = states[protEntity]?.state === 'on';
+
+                      // 3. Définition des machines
+                      const devices = [
+                        {
+                          name: 'Lave-linge',
+                          icon: 'mdi:washing-machine',
+                          color: '#19d8ff',
+                          cycle: '[[foxcat:machines.washer.cycle]]',
+                          power: '[[foxcat:legacy.sensor_lave_linge_puissance]]',
+                          max: 2200
+                        },
+                        {
+                          name: 'Sèche-linge',
+                          icon: 'mdi:tumble-dryer',
+                          color: '#a78bfa',
+                          cycle: '[[foxcat:machines.dryer.cycle]]',
+                          power: '[[foxcat:legacy.sensor_seche_linge_puissance]]',
+                          max: 2500
+                        },
+                        {
+                          name: 'Lave-vaisselle',
+                          icon: 'mdi:dishwasher',
+                          color: '#35e59d',
+                          cycle: '[[foxcat:machines.dishwasher.cycle]]',
+                          power: '[[foxcat:legacy.sensor_lave_vaisselle_puissance]]',
+                          max: 2000
+                        }
+                      ];
+
+                      // 4. Génération des cartes internes
+                      const devHtml = devices.map(d => {
+                        const pw = N(d.power);
+                        const cyc = states[d.cycle]?.state === 'on';
+                        
+                        let chipTxt = 'En attente';
+                        let chipBg = 'rgba(255,255,255,0.05)';
+                        let chipCol = '#94a3b8';
+                        let glow = '';
+                        
+                        if (cyc && prot) {
+                          chipTxt = 'Protégé';
+                          chipBg = 'rgba(53,229,157,0.15)';
+                          chipCol = '#35e59d';
+                          glow = 'box-shadow: 0 0 10px rgba(53,229,157,0.4); border: 1px solid rgba(53,229,157,0.3);';
+                        } else if (cyc) {
+                          chipTxt = 'Actif';
+                          chipBg = `${d.color}25`;
+                          chipCol = d.color;
+                          glow = `box-shadow: 0 0 10px ${d.color}60; border: 1px solid ${d.color}40;`;
+                        } else if (pw > 20) {
+                          chipTxt = 'En marche';
+                          chipBg = `${d.color}25`;
+                          chipCol = d.color;
+                          glow = `border: 1px solid ${d.color}40;`;
+                        }
+
+                        const pct = Math.min((pw / d.max) * 100, 100);
+
+                        return `
+                          <div class="mac-card">
+                            <!-- Icône en fond -->
+                            <ha-icon class="mac-bg-icon" icon="${d.icon}" style="color:${d.color};"></ha-icon>
+                            
+                            <div class="mac-head">
+                              <span class="mac-name">${d.name}</span>
+                              <span class="mac-chip" style="background:${chipBg}; color:${chipCol}; ${glow}">${chipTxt}</span>
+                            </div>
+                            
+                            <div class="mac-body">
+                              <div class="mac-val">${Math.round(pw)} <span style="font-size:12px; opacity:0.5;">W</span></div>
+                              <div class="mac-state">${cyc || pw > 20 ? 'En cours' : 'Prêt'}</div>
+                            </div>
+                            
+                            <div class="mac-bar">
+                              <div class="mac-fill" style="width:${pct}%; background:${cyc || pw > 20 ? d.color : '#475569'};"></div>
+                            </div>
+                          </div>
+                        `;
+                      }).join('');
+
+                      // 5. Rendu HTML & CSS principal
+                      return `
+                        <style>
+                          * { box-sizing: border-box; }
+                          .prem-card {
+                            padding: 20px;
+                            color: #f8fafc;
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            background: linear-gradient(145deg, rgba(11,20,31,0.6), rgba(8,14,22,0.8));
+                            border-radius: 24px;
+                          }
+                          
+                          /* En-tête */
+                          .prem-header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 20px;
+                          }
+                          .prem-title {
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                            font-size: 15px;
+                            font-weight: 800;
+                            color: #ffffff;
+                            letter-spacing: 0.02em;
+                          }
+                          .prem-title ha-icon {
+                            color: #19d8ff;
+                            --mdc-icon-size: 22px;
+                            filter: drop-shadow(0 0 8px rgba(25,216,255,0.4));
+                          }
+                          .prem-arrow {
+                            color: #64748b;
+                            font-size: 16px;
+                            font-weight: bold;
+                          }
+                          
+                          /* Grille Machines */
+                          .mac-grid {
+                            display: grid;
+                            grid-template-columns: repeat(3, 1fr);
+                            gap: 12px;
+                          }
+                          
+                          /* Carte Machine Individuelle */
+                          .mac-card {
+                            position: relative;
+                            overflow: hidden;
+                            background: rgba(255,255,255,0.03);
+                            border: 1px solid rgba(255,255,255,0.06);
+                            border-radius: 18px;
+                            padding: 14px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: space-between;
+                            min-height: 130px;
+                          }
+                          
+                          .mac-bg-icon {
+                            position: absolute;
+                            right: -15px;
+                            bottom: -10px;
+                            --mdc-icon-size: 80px;
+                            opacity: 0.08;
+                            transform: rotate(-10deg);
+                            pointer-events: none;
+                          }
+                          
+                          .mac-head {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: flex-start;
+                            gap: 6px;
+                            position: relative;
+                            z-index: 2;
+                          }
+                          
+                          .mac-name {
+                            font-size: 12px;
+                            font-weight: 800;
+                            color: #e2e8f0;
+                          }
+                          
+                          .mac-chip {
+                            padding: 4px 8px;
+                            border-radius: 8px;
+                            font-size: 8px;
+                            font-weight: 900;
+                            text-transform: uppercase;
+                            letter-spacing: 0.05em;
+                          }
+                          
+                          .mac-body {
+                            margin-top: 15px;
+                            position: relative;
+                            z-index: 2;
+                          }
+                          
+                          .mac-val {
+                            font-size: 22px;
+                            font-weight: 950;
+                            line-height: 1;
+                            color: #ffffff;
+                          }
+                          
+                          .mac-state {
+                            margin-top: 4px;
+                            font-size: 9px;
+                            color: #94a3b8;
+                            font-weight: 700;
+                          }
+                          
+                          .mac-bar {
+                            width: 100%;
+                            height: 4px;
+                            background: rgba(255,255,255,0.05);
+                            border-radius: 4px;
+                            margin-top: 12px;
+                            overflow: hidden;
+                            position: relative;
+                            z-index: 2;
+                          }
+                          
+                          .mac-fill {
+                            height: 100%;
+                            border-radius: 4px;
+                            transition: width 0.5s ease-out;
+                          }
+                          
+                          @media (max-width: 600px) {
+                            .mac-grid { grid-template-columns: 1fr; }
+                            .mac-card { min-height: auto; }
+                            .mac-bg-icon { --mdc-icon-size: 100px; right: -5px; bottom: -20px; }
+                          }
+                        </style>
+
+                        <div class="prem-card">
+                          <div class="prem-header">
+                            <div class="prem-title">
+                              <ha-icon icon="mdi:washing-machine"></ha-icon>
+                              <span>Appareils et charges pilotées</span>
+                            </div>
+                            <div class="prem-arrow">›</div>
+                          </div>
+                          
+                          <div class="mac-grid">
+                            ${devHtml}
+                          </div>
+                        </div>
+                      `;
+                    ]]]
               - type: vertical-stack
                 cards:
                   - type: custom:button-card
@@ -617,31 +1622,56 @@ views:
                       show: false
                     apex_config:
                       chart:
-                        height: 150
+                        height: 160
                         background: transparent
                         toolbar:
                           show: false
+                      theme:
+                        mode: dark
                       legend:
                         show: false
                       grid:
-                        borderColor: rgba(255,255,255,.06)
+                        borderColor: rgba(255,255,255,.08)
+                        strokeDashArray: 3
                       stroke:
                         width: 2
                         curve: stepline
+                      fill:
+                        type: gradient
+                        gradient:
+                          shade: dark
+                          type: vertical
+                          shadeIntensity: 0.5
+                          opacityFrom: 0.4
+                          opacityTo: 0.05
+                          stops:
+                            - 0
+                            - 100
                       xaxis:
                         labels:
                           datetimeUTC: false
+                        tooltip:
+                          enabled: false
+                      yaxis:
+                        - decimals: 3
+                          labels:
+                            formatter: |
+                              EVAL:function(value) {
+                                return value.toFixed(3) + " €";
+                              }
                     series:
-                      - entity: '[[foxcat:pricing.active_buy]]'
-                        name: Prix
+                      - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                        name: Prix d'achat
                         type: area
                         color: '#38bdf8'
-                        opacity: 0.2
+                        extend_to: now
+                        float_precision: 3
                     card_mod:
-                      style: |
-                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0 0 18px 18px!important;box-shadow:none!important}
-
-              # 8. Décision économique EMS
+                      style: >
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
+                        solid
+                        rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0
+                        0 18px 18px!important;box-shadow:none!important}
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
@@ -669,8 +1699,6 @@ views:
                         <div class="quote">« Le bon kWh est celui qu'on n'achète pas. »</div>
                       </div>`;
                     ]]]
-
-              # 9. Système et diagnostics
               - type: custom:button-card
                 template: fc_panel
                 tap_action:
@@ -698,10 +1726,25 @@ views:
                         <div class="k" style="margin-top:10px;display:flex;justify-content:space-between"><span>Version 1.7.0</span><span style="color:#38bdf8;font-weight:700">FOXCAT ENERGY</span></div>
                       </div>`;
                     ]]]
-
-  # ====================================================================
-  # ÉNERGIE
-  # ====================================================================
+    theme: ios-dark-mode-blue-red
+    background:
+      opacity: 33
+      alignment: center
+      size: cover
+      repeat: repeat
+      attachment: fixed
+      image:
+        media_content_id: media-source://image_upload/55f1853c5d52832afc582a1ce8bc384f
+        media_content_type: image/png
+        metadata:
+          title: ChatGPT Image 4 nov. 2025, 14_12_34.png
+          thumbnail: /api/image/serve/55f1853c5d52832afc582a1ce8bc384f/256x256
+          media_class: image
+          children_media_class: null
+          navigateIds:
+            - {}
+            - media_content_type: app
+              media_content_id: media-source://image_upload
   - type: panel
     title: Énergie
     path: energie
@@ -714,7 +1757,11 @@ views:
             template: fc_navbar
           - type: custom:button-card
             template: fc_head
-            variables: {title: Énergie, subtitle: 'Flux · Maison · Réseau', icon: mdi:lightning-bolt, color: '#38bdf8'}
+            variables:
+              title: Énergie
+              subtitle: Flux · Maison · Réseau
+              icon: mdi:lightning-bolt
+              color: '#38bdf8'
           - type: grid
             columns: 3
             square: false
@@ -781,39 +1828,81 @@ views:
                         - border-radius: 18px 18px 0 0
                         - border-bottom: none
                     custom_fields:
-                      c: |
-                        [[[ return `<div class="p" style="padding-bottom:0"><div class="t"><span>Production · Consommation · Réseau</span><small>24 h (kW)</small></div></div>`; ]]]
+                      c: >
+                        [[[ return `<div class="p" style="padding-bottom:0"><div
+                        class="t"><span>Production · Consommation ·
+                        Réseau</span><small>24 h (kW)</small></div></div>`; ]]]
                   - type: custom:apexcharts-card
                     graph_span: 24h
-                    span: {start: day}
+                    span:
+                      start: day
                     update_interval: 1min
-                    header: {show: false}
+                    header:
+                      show: false
                     apex_config:
-                      chart: {height: 260, background: transparent, toolbar: {show: false}}
-                      legend: {position: top, labels: {colors: '#9bb3cc'}}
-                      grid: {borderColor: 'rgba(255,255,255,.06)'}
-                      stroke: {width: 2, curve: smooth}
-                      xaxis: {labels: {datetimeUTC: false}}
+                      chart:
+                        height: 260
+                        background: transparent
+                        toolbar:
+                          show: false
+                      legend:
+                        position: top
+                        labels:
+                          colors: '#9bb3cc'
+                      grid:
+                        borderColor: rgba(255,255,255,.06)
+                      stroke:
+                        width: 2
+                        curve: smooth
+                      xaxis:
+                        labels:
+                          datetimeUTC: false
                     series:
-                      - {entity: '[[foxcat:energy.pv_power]]', name: Solaire, type: area, color: '#ffb020', opacity: 0.25, transform: 'return x/1000;'}
-                      - {entity: '[[foxcat:energy.house_power]]', name: Maison, type: line, color: '#38bdf8', transform: 'return x/1000;'}
-                      - {entity: '[[foxcat:energy.grid_import]]', name: Prélèvement, type: line, color: '#f87171', transform: 'return x/1000;'}
-                      - {entity: '[[foxcat:energy.grid_export]]', name: Réinjection, type: line, color: '#34d399', transform: 'return x/1000;'}
+                      - entity: '[[foxcat:energy.pv_power]]'
+                        name: Solaire
+                        type: area
+                        color: '#ffb020'
+                        opacity: 0.25
+                        transform: return x/1000;
+                      - entity: '[[foxcat:energy.house_power]]'
+                        name: Maison
+                        type: line
+                        color: '#38bdf8'
+                        transform: return x/1000;
+                      - entity: '[[foxcat:energy.grid_import]]'
+                        name: Prélèvement
+                        type: line
+                        color: '#f87171'
+                        transform: return x/1000;
+                      - entity: '[[foxcat:energy.grid_export]]'
+                        name: Réinjection
+                        type: line
+                        color: '#34d399'
+                        transform: return x/1000;
                     card_mod:
-                      style: |
-                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0 0 18px 18px!important;box-shadow:none!important}
+                      style: >
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
+                        solid
+                        rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0
+                        0 18px 18px!important;box-shadow:none!important}
               - type: custom:button-card
                 template: fc_list
                 variables:
                   title: FoxCat · EMS
                   icon: mdi:cat
                   rows:
-                    - ['Mode EMS', '[[foxcat:ems.mode]]']
-                    - ['Régulation active', '[[foxcat:ems.regulation_active]]']
-                    - ['Demande Boiler', '[[foxcat:boiler.demand]]']
-                    - ['Origine Boiler', '[[foxcat:boiler.origin]]']
-                    - ['Exécution Boiler', '[[foxcat:boiler.execution_status]]']
-                    - ['Statut du prix', '[[foxcat:pricing.status]]']
+                    - - Mode EMS
+                      - '[[foxcat:ems.mode]]'
+                    - - Régulation active
+                      - '[[foxcat:ems.regulation_active]]'
+                    - - Demande Boiler
+                      - '[[foxcat:boiler.demand]]'
+                    - - Origine Boiler
+                      - '[[foxcat:boiler.origin]]'
+                    - - Exécution Boiler
+                      - '[[foxcat:boiler.execution_status]]'
+                    - - Statut du prix
+                      - '[[foxcat:pricing.status]]'
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
@@ -832,10 +1921,7 @@ views:
                         <div style="padding:14px;border-radius:14px;background:${c}14;border:1px solid ${c}55;font-size:14px;line-height:1.5">${t}</div>
                         <div class="quote">« Le bon kWh est celui qu'on n'achète pas. »</div></div>`;
                     ]]]
-
-  # ====================================================================
-  # ONDULEUR
-  # ====================================================================
+    theme: ios-dark-mode-blue-red
   - type: panel
     title: Onduleur
     path: onduleur
@@ -848,7 +1934,11 @@ views:
             template: fc_navbar
           - type: custom:button-card
             template: fc_head
-            variables: {title: Onduleur, subtitle: 'EMS Onduleur · SolarEdge · RRCR', icon: mdi:solar-power-variant, color: '#facc15'}
+            variables:
+              title: Onduleur
+              subtitle: EMS Onduleur · SolarEdge · RRCR
+              icon: mdi:solar-power-variant
+              color: '#facc15'
           - type: grid
             columns: 3
             square: false
@@ -918,7 +2008,8 @@ views:
                 cards:
                   - type: conditional
                     conditions:
-                      - {entity: '[[foxcat:ems.mode]]', state: Manuel}
+                      - entity: '[[foxcat:ems.mode]]'
+                        state: Manuel
                     card:
                       type: custom:button-card
                       template: fc_panel
@@ -926,37 +2017,143 @@ views:
                         card:
                           - border-radius: 18px 18px 0 0
                       custom_fields:
-                        c: |
-                          [[[ return `<div class="p" style="padding:14px 18px"><div class="t" style="margin:0"><span class="gr">✅ Commande manuelle autorisée</span><small>Niveau PRI</small></div></div>`; ]]]
+                        c: >
+                          [[[ return `<div class="p" style="padding:14px
+                          18px"><div class="t" style="margin:0"><span
+                          class="gr">✅ Commande manuelle
+                          autorisée</span><small>Niveau
+                          PRI</small></div></div>`; ]]]
                   - type: conditional
                     conditions:
-                      - {entity: '[[foxcat:ems.mode]]', state_not: Manuel}
+                      - entity: '[[foxcat:ems.mode]]'
+                        state_not: Manuel
                     card:
                       type: custom:button-card
                       template: fc_panel
                       custom_fields:
-                        c: |
-                          [[[ return `<div class="p"><div class="t"><span>🔒 Commande verrouillée</span></div><div class="k" style="font-size:12px;line-height:1.5">Passe l'EMS en <b style="color:#fff">Manuel</b> pour utiliser les boutons de niveau onduleur.</div></div>`; ]]]
+                        c: >
+                          [[[ return `<div class="p"><div class="t"><span>🔒
+                          Commande verrouillée</span></div><div class="k"
+                          style="font-size:12px;line-height:1.5">Passe l'EMS en
+                          <b style="color:#fff">Manuel</b> pour utiliser les
+                          boutons de niveau onduleur.</div></div>`; ]]]
                   - type: conditional
                     conditions:
-                      - {entity: '[[foxcat:ems.mode]]', state: Manuel}
+                      - entity: '[[foxcat:ems.mode]]'
+                        state: Manuel
                     card:
                       type: grid
                       columns: 4
                       square: false
                       cards:
-                        - {type: custom:button-card, template: fc_btn, name: 100 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 100}}}
-                        - {type: custom:button-card, template: fc_btn, name: 90 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 90}}}
-                        - {type: custom:button-card, template: fc_btn, name: 80 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 80}}}
-                        - {type: custom:button-card, template: fc_btn, name: 70 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 70}}}
-                        - {type: custom:button-card, template: fc_btn, name: 60 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 60}}}
-                        - {type: custom:button-card, template: fc_btn, name: 50 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 50}}}
-                        - {type: custom:button-card, template: fc_btn, name: 40 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 40}}}
-                        - {type: custom:button-card, template: fc_btn, name: 30 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 30}}}
-                        - {type: custom:button-card, template: fc_btn, name: 20 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 20}}}
-                        - {type: custom:button-card, template: fc_btn, name: 10 %, icon: mdi:solar-power, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 10}}}
-                        - {type: custom:button-card, template: fc_btn, name: 0 %, icon: mdi:solar-power-off, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 0}}}
-                        - {type: custom:button-card, template: fc_btn, name: Libérer, icon: mdi:lock-open-variant, tap_action: {action: call-service, service: script.pri_rrcr_forcer_un_niveau, data: {niveau: 100}}}
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 100 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 100
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 90 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 90
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 80 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 80
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 70 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 70
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 60 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 60
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 50 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 50
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 40 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 40
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 30 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 30
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 20 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 20
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 10 %
+                          icon: mdi:solar-power
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 10
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: 0 %
+                          icon: mdi:solar-power-off
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 0
+                        - type: custom:button-card
+                          template: fc_btn
+                          name: Libérer
+                          icon: mdi:lock-open-variant
+                          tap_action:
+                            action: call-service
+                            service: script.pri_rrcr_forcer_un_niveau
+                            data:
+                              niveau: 100
               - type: custom:button-card
                 template: fc_panel
                 custom_fields:
@@ -973,16 +2170,19 @@ views:
                   title: Relais RRCR
                   icon: mdi:electric-switch
                   rows:
-                    - ['Relais L1', '[[foxcat:inverter.rrcr_l1]]']
-                    - ['Relais L2', '[[foxcat:inverter.rrcr_l2]]']
-                    - ['Relais L3', '[[foxcat:inverter.rrcr_l3]]']
-                    - ['Relais L4', '[[foxcat:inverter.rrcr_l4]]']
-                    - ['Régulation PRI', '[[foxcat:inverter.enabled]]']
-                    - ['Raison', '[[foxcat:inverter.reason]]']
-
-  # ====================================================================
-  # BOILER
-  # ====================================================================
+                    - - Relais L1
+                      - '[[foxcat:inverter.rrcr_l1]]'
+                    - - Relais L2
+                      - '[[foxcat:inverter.rrcr_l2]]'
+                    - - Relais L3
+                      - '[[foxcat:inverter.rrcr_l3]]'
+                    - - Relais L4
+                      - '[[foxcat:inverter.rrcr_l4]]'
+                    - - Régulation PRI
+                      - '[[foxcat:inverter.enabled]]'
+                    - - Raison
+                      - '[[foxcat:inverter.reason]]'
+    theme: ios-dark-mode-blue-red
   - type: panel
     title: Boiler ECS
     path: boiler
@@ -995,7 +2195,11 @@ views:
             template: fc_navbar
           - type: custom:button-card
             template: fc_head
-            variables: {title: Boiler ECS, subtitle: 'Température · Chauffe · Historique', icon: mdi:water-boiler, color: '#fb923c'}
+            variables:
+              title: Boiler ECS
+              subtitle: Température · Chauffe · Historique
+              icon: mdi:water-boiler
+              color: '#fb923c'
           - type: grid
             columns: 3
             square: false
@@ -1038,9 +2242,33 @@ views:
                     columns: 3
                     square: false
                     cards:
-                      - {type: custom:button-card, template: fc_btn, name: Démarrer, icon: mdi:play-circle-outline, tap_action: {action: call-service, service: button.press, service_data: {entity_id: '[[foxcat:boiler.user_start]]'}}}
-                      - {type: custom:button-card, template: fc_btn, name: Arrêter, icon: mdi:stop-circle-outline, tap_action: {action: call-service, service: button.press, service_data: {entity_id: '[[foxcat:boiler.user_stop]]'}}}
-                      - {type: custom:button-card, template: fc_btn, name: Automatique, icon: mdi:autorenew, tap_action: {action: call-service, service: button.press, service_data: {entity_id: '[[foxcat:boiler.user_auto]]'}}}
+                      - type: custom:button-card
+                        template: fc_btn
+                        name: Démarrer
+                        icon: mdi:play-circle-outline
+                        tap_action:
+                          action: call-service
+                          service: button.press
+                          service_data:
+                            entity_id: '[[foxcat:boiler.user_start]]'
+                      - type: custom:button-card
+                        template: fc_btn
+                        name: Arrêter
+                        icon: mdi:stop-circle-outline
+                        tap_action:
+                          action: call-service
+                          service: button.press
+                          service_data:
+                            entity_id: '[[foxcat:boiler.user_stop]]'
+                      - type: custom:button-card
+                        template: fc_btn
+                        name: Automatique
+                        icon: mdi:autorenew
+                        tap_action:
+                          action: call-service
+                          service: button.press
+                          service_data:
+                            entity_id: '[[foxcat:boiler.user_auto]]'
               - type: vertical-stack
                 cards:
                   - type: custom:button-card
@@ -1050,29 +2278,66 @@ views:
                         - border-radius: 18px 18px 0 0
                         - border-bottom: none
                     custom_fields:
-                      c: |
-                        [[[ return `<div class="p" style="padding-bottom:0"><div class="t"><span>Températures & puissance</span><small>24 h</small></div></div>`; ]]]
+                      c: >
+                        [[[ return `<div class="p" style="padding-bottom:0"><div
+                        class="t"><span>Températures & puissance</span><small>24
+                        h</small></div></div>`; ]]]
                   - type: custom:apexcharts-card
                     graph_span: 24h
                     update_interval: 1min
-                    now: {show: true, label: Maintenant}
-                    header: {show: false}
+                    now:
+                      show: true
+                      label: Maintenant
+                    header:
+                      show: false
                     apex_config:
-                      chart: {height: 300, background: transparent, toolbar: {show: false}}
-                      legend: {position: bottom, labels: {colors: '#9bb3cc'}}
-                      grid: {borderColor: 'rgba(255,255,255,.06)'}
-                      stroke: {curve: smooth}
-                      xaxis: {labels: {datetimeUTC: false}}
+                      chart:
+                        height: 300
+                        background: transparent
+                        toolbar:
+                          show: false
+                      legend:
+                        position: bottom
+                        labels:
+                          colors: '#9bb3cc'
+                      grid:
+                        borderColor: rgba(255,255,255,.06)
+                      stroke:
+                        curve: smooth
+                      xaxis:
+                        labels:
+                          datetimeUTC: false
                     yaxis:
-                      - {id: temp, decimals: 1}
-                      - {id: power, opposite: true, decimals: 0}
+                      - id: temp
+                        decimals: 1
+                      - id: power
+                        opposite: true
+                        decimals: 0
                     series:
-                      - {entity: '[[foxcat:boiler.temperature_source]]', name: Doigt de gant bas, yaxis_id: temp, stroke_width: 3, color: '#fb923c'}
-                      - {entity: '[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]', name: Moyenne ballon, yaxis_id: temp, stroke_width: 2, color: '#38bdf8'}
-                      - {entity: '[[foxcat:boiler.power_source]]', name: Puissance, yaxis_id: power, type: area, stroke_width: 2, opacity: 0.14, color: '#facc15'}
+                      - entity: '[[foxcat:boiler.temperature_source]]'
+                        name: Doigt de gant bas
+                        yaxis_id: temp
+                        stroke_width: 3
+                        color: '#fb923c'
+                      - entity: >-
+                          [[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]
+                        name: Moyenne ballon
+                        yaxis_id: temp
+                        stroke_width: 2
+                        color: '#38bdf8'
+                      - entity: '[[foxcat:boiler.power_source]]'
+                        name: Puissance
+                        yaxis_id: power
+                        type: area
+                        stroke_width: 2
+                        opacity: 0.14
+                        color: '#facc15'
                     card_mod:
-                      style: |
-                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0 0 18px 18px!important;box-shadow:none!important}
+                      style: >
+                        ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
+                        solid
+                        rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0
+                        0 18px 18px!important;box-shadow:none!important}
               - type: vertical-stack
                 cards:
                   - type: custom:button-card
@@ -1081,27 +2346,35 @@ views:
                       title: Estimateur thermique · V1.7.0
                       icon: mdi:thermometer-lines
                       rows:
-                        - ['Température estimée', '[[foxcat:boiler.estimated_temperature]]']
-                        - ['État thermique', '[[foxcat:boiler.thermal_state]]']
-                        - ['Confiance estimation', '[[foxcat:boiler.estimate_confidence]]']
-                        - ['Énergie manquante', '[[foxcat:boiler.thermal_energy_missing]]']
-                        - ['Durée de chauffe', '[[foxcat:boiler.heating_duration]]']
+                        - - Température estimée
+                          - '[[foxcat:boiler.estimated_temperature]]'
+                        - - État thermique
+                          - '[[foxcat:boiler.thermal_state]]'
+                        - - Confiance estimation
+                          - '[[foxcat:boiler.estimate_confidence]]'
+                        - - Énergie manquante
+                          - '[[foxcat:boiler.thermal_energy_missing]]'
+                        - - Durée de chauffe
+                          - '[[foxcat:boiler.heating_duration]]'
                   - type: custom:button-card
                     template: fc_list
                     variables:
                       title: Pilotage & cohérence
                       icon: mdi:tune
                       rows:
-                        - ['Comportement EMS', '[[foxcat:ems.mode]]']
-                        - ['Contrat énergie', '[[foxcat:pricing.regime]]']
-                        - ['Politique réseau', '[[foxcat:pricing.network_policy]]']
-                        - ['Seuil très favorable', '[[foxcat:pricing.day_ahead.threshold]]']
-                        - ['Plafond Boiler Dynamic', '[[foxcat:pricing.day_ahead.peak_threshold]]']
-                        - ['Gestion Boiler FoxCat', '[[foxcat:boiler.enabled]]']
-
-  # ====================================================================
-  # MACHINES / APPAREILS
-  # ====================================================================
+                        - - Comportement EMS
+                          - '[[foxcat:ems.mode]]'
+                        - - Contrat énergie
+                          - '[[foxcat:pricing.regime]]'
+                        - - Politique réseau
+                          - '[[foxcat:pricing.network_policy]]'
+                        - - Seuil très favorable
+                          - '[[foxcat:pricing.day_ahead.threshold]]'
+                        - - Plafond Boiler Dynamic
+                          - '[[foxcat:pricing.day_ahead.peak_threshold]]'
+                        - - Gestion Boiler FoxCat
+                          - '[[foxcat:boiler.enabled]]'
+    theme: ios-dark-mode-blue-red
   - type: panel
     title: Appareils
     path: appareils
@@ -1114,7 +2387,11 @@ views:
             template: fc_navbar
           - type: custom:button-card
             template: fc_head
-            variables: {title: Appareils, subtitle: 'Lave-linge · Sèche-linge · Lave-vaisselle · Chauffage', icon: mdi:washing-machine, color: '#c4b5fd'}
+            variables:
+              title: Appareils
+              subtitle: Lave-linge · Sèche-linge · Lave-vaisselle · Chauffage
+              icon: mdi:washing-machine
+              color: '#c4b5fd'
           - type: grid
             columns: 4
             square: false
@@ -1190,18 +2467,24 @@ views:
                   title: Consommation du jour
                   icon: mdi:chart-bar
                   rows:
-                    - ['Boiler · énergie', '[[foxcat:legacy.sensor_boiler_energy_daily]]']
-                    - ['Boiler · coût', '[[foxcat:legacy.sensor_boiler_energy_daily_cost]]']
-                    - ['Lave-linge · énergie', '[[foxcat:legacy.sensor_lave_linge_energy_daily]]']
-                    - ['Lave-linge · coût', '[[foxcat:legacy.sensor_lave_linge_energy_daily_cost]]']
-                    - ['Sèche-linge · énergie', '[[foxcat:legacy.sensor_seche_linge_energy_daily]]']
-                    - ['Sèche-linge · coût', '[[foxcat:legacy.sensor_seche_linge_energy_daily_cost]]']
-                    - ['Lave-vaisselle · énergie', '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily]]']
-                    - ['Lave-vaisselle · coût', '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily_cost]]']
-
-  # ====================================================================
-  # ÉCONOMIE (Marché & Réseau)
-  # ====================================================================
+                    - - Boiler · énergie
+                      - '[[foxcat:legacy.sensor_boiler_energy_daily]]'
+                    - - Boiler · coût
+                      - '[[foxcat:legacy.sensor_boiler_energy_daily_cost]]'
+                    - - Lave-linge · énergie
+                      - '[[foxcat:legacy.sensor_lave_linge_energy_daily]]'
+                    - - Lave-linge · coût
+                      - '[[foxcat:legacy.sensor_lave_linge_energy_daily_cost]]'
+                    - - Sèche-linge · énergie
+                      - '[[foxcat:legacy.sensor_seche_linge_energy_daily]]'
+                    - - Sèche-linge · coût
+                      - '[[foxcat:legacy.sensor_seche_linge_energy_daily_cost]]'
+                    - - Lave-vaisselle · énergie
+                      - '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily]]'
+                    - - Lave-vaisselle · coût
+                      - >-
+                        [[foxcat:legacy.sensor_lave_vaisselle_energy_daily_cost]]
+    theme: ios-dark-mode-blue-red
   - type: panel
     title: Marché & Réseau
     path: marche
@@ -1214,14 +2497,19 @@ views:
             template: fc_navbar
           - type: custom:button-card
             template: fc_head
-            variables: {title: Économie, subtitle: 'Contrat · Distribution · Prix', icon: mdi:chart-timeline-variant-shimmer, color: '#22d3ee'}
+            variables:
+              title: Économie
+              subtitle: Contrat · Distribution · Prix
+              icon: mdi:chart-timeline-variant-shimmer
+              color: '#22d3ee'
           - type: grid
             columns: 3
             square: false
             cards:
               - type: conditional
                 conditions:
-                  - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+                  - entity: '[[foxcat:pricing.regime]]'
+                    state: Dynamique
                 card:
                   type: custom:button-card
                   template: fc_panel
@@ -1261,30 +2549,58 @@ views:
                   title: Configuration active
                   icon: mdi:cog-outline
                   rows:
-                    - ['Contrat énergie', '[[foxcat:pricing.regime]]']
-                    - ['Distribution / comptage', '[[foxcat:pricing.distribution_profile]]']
-                    - ['Période distribution', '[[foxcat:pricing.distribution_period]]']
-                    - ['Politique réseau', '[[foxcat:pricing.network_policy]]']
-                    - ['Prix achat actif', '[[foxcat:pricing.active_buy]]']
-                    - ['Décision économique', '[[foxcat:pricing.economic_decision]]']
+                    - - Contrat énergie
+                      - '[[foxcat:pricing.regime]]'
+                    - - Distribution / comptage
+                      - '[[foxcat:pricing.distribution_profile]]'
+                    - - Période distribution
+                      - '[[foxcat:pricing.distribution_period]]'
+                    - - Politique réseau
+                      - '[[foxcat:pricing.network_policy]]'
+                    - - Prix achat actif
+                      - '[[foxcat:pricing.active_buy]]'
+                    - - Décision économique
+                      - '[[foxcat:pricing.economic_decision]]'
           - type: conditional
             conditions:
-              - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
+              - entity: '[[foxcat:pricing.regime]]'
+                state: Dynamique
             card:
               type: custom:apexcharts-card
               update_interval: 1min
               graph_span: 2d
-              span: {start: day}
-              now: {show: true, label: Maintenant}
-              header: {show: true, title: Courbe Luminus Dynamic, show_states: false}
+              span:
+                start: day
+              now:
+                show: true
+                label: Maintenant
+              header:
+                show: true
+                title: Courbe Luminus Dynamic
+                show_states: false
               yaxis:
-                - {decimals: 3}
+                - decimals: 3
               apex_config:
-                chart: {height: 320, background: transparent, toolbar: {show: true}, zoom: {enabled: true}}
-                legend: {show: true, position: bottom, labels: {colors: '#9bb3cc'}}
-                grid: {borderColor: 'rgba(255,255,255,.06)'}
-                stroke: {curve: smooth}
-                xaxis: {type: datetime, labels: {datetimeUTC: false}}
+                chart:
+                  height: 320
+                  background: transparent
+                  toolbar:
+                    show: true
+                  zoom:
+                    enabled: true
+                legend:
+                  show: true
+                  position: bottom
+                  labels:
+                    colors: '#9bb3cc'
+                grid:
+                  borderColor: rgba(255,255,255,.06)
+                stroke:
+                  curve: smooth
+                xaxis:
+                  type: datetime
+                  labels:
+                    datetimeUTC: false
               series:
                 - entity: '[[foxcat:pricing.source.current]]'
                   name: Achat
@@ -1293,28 +2609,40 @@ views:
                   stroke_width: 3
                   opacity: 0.16
                   color: '#38bdf8'
-                  data_generator: |
-                    const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-                    return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new Date(r.start).getTime(),Number(r.all_in)]);
+                  data_generator: >
+                    const
+                    rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+
+                    return
+                    rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new
+                    Date(r.start).getTime(),Number(r.all_in)]);
                 - entity: '[[foxcat:pricing.source.injection]]'
                   name: Injection
                   type: line
                   unit: €/kWh
                   stroke_width: 2
                   color: '#34d399'
-                  data_generator: |
-                    const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-                    return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new Date(r.start).getTime(),Number(r.injection)]);
+                  data_generator: >
+                    const
+                    rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+
+                    return
+                    rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new
+                    Date(r.start).getTime(),Number(r.injection)]);
               card_mod:
-                style: |
-                  ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important}
+                style: >
+                  ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
+                  solid
+                  rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0
+                  10px 30px rgba(0,0,0,.35)!important}
           - type: grid
             columns: 3
             square: false
             cards:
               - type: conditional
                 conditions:
-                  - {entity: '[[foxcat:pricing.regime]]', state: Bi-horaire HP/HC}
+                  - entity: '[[foxcat:pricing.regime]]'
+                    state: Bi-horaire HP/HC
                 card:
                   type: custom:button-card
                   template: fc_list
@@ -1322,14 +2650,20 @@ views:
                     title: Contrat bihoraire
                     icon: mdi:clock-outline
                     rows:
-                      - ['Période actuelle', '[[foxcat:pricing.period]]']
-                      - ['Prix heures pleines', '[[foxcat:pricing.source.hp]]']
-                      - ['Prix heures creuses', '[[foxcat:pricing.source.hc]]']
-                      - ['Prix actif', '[[foxcat:pricing.current]]']
-                      - ['Injection tarifée', '[[foxcat:pricing.injection]]']
+                      - - Période actuelle
+                        - '[[foxcat:pricing.period]]'
+                      - - Prix heures pleines
+                        - '[[foxcat:pricing.source.hp]]'
+                      - - Prix heures creuses
+                        - '[[foxcat:pricing.source.hc]]'
+                      - - Prix actif
+                        - '[[foxcat:pricing.current]]'
+                      - - Injection tarifée
+                        - '[[foxcat:pricing.injection]]'
               - type: conditional
                 conditions:
-                  - {entity: '[[foxcat:pricing.regime]]', state: Fixe / Monohoraire}
+                  - entity: '[[foxcat:pricing.regime]]'
+                    state: Fixe / Monohoraire
                 card:
                   type: custom:button-card
                   template: fc_list
@@ -1337,12 +2671,16 @@ views:
                     title: Contrat fixe / monohoraire
                     icon: mdi:cash
                     rows:
-                      - ['Prix actif', '[[foxcat:pricing.current]]']
-                      - ['Prix injection', '[[foxcat:pricing.injection]]']
-                      - ['Politique réseau', '[[foxcat:pricing.network_policy]]']
+                      - - Prix actif
+                        - '[[foxcat:pricing.current]]'
+                      - - Prix injection
+                        - '[[foxcat:pricing.injection]]'
+                      - - Politique réseau
+                        - '[[foxcat:pricing.network_policy]]'
               - type: conditional
                 conditions:
-                  - {entity: '[[foxcat:pricing.distribution_profile]]', state: Wallonie · Impact}
+                  - entity: '[[foxcat:pricing.distribution_profile]]'
+                    state: Wallonie · Impact
                 card:
                   type: custom:button-card
                   template: fc_panel
@@ -1354,229 +2692,374 @@ views:
                         const v=m[p]||['—','Profil Impact actif','#94a3b8'];
                         return `<div class="p"><div class="k" style="font-weight:800;letter-spacing:.13em">TARIF DE DISTRIBUTION · IMPACT</div><div style="font-size:30px;font-weight:900;color:${v[2]};margin:10px 0">${p}</div><b>${v[0]}</b><div class="k" style="margin-top:5px">${v[1]}</div></div>`;
                       ]]]
-
-  # ====================================================================
-  # DIAGNOSTIC
-  # ====================================================================
-  - type: panel
-    title: Diagnostic
+    theme: ios-dark-mode-blue-red
+  - title: Diagnostic
     path: diagnostic
     icon: mdi:stethoscope
     subview: true
-    cards:
-      - type: vertical-stack
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 7% 8%, rgba(255,160,39,.16), transparent 26%),
+      radial-gradient(circle at 94% 9%, rgba(0,198,255,.18), transparent 29%),
+      linear-gradient(150deg,#05080c,#0b121a 58%,#05070a)
+    sections:
+      - type: grid
+        column_span: 4
         cards:
           - type: custom:button-card
-            template: fc_navbar
-          - type: custom:button-card
-            template: fc_head
-            variables: {title: Diagnostic, subtitle: 'État · Bus · Journal', icon: mdi:stethoscope, color: '#34d399'}
-          - type: grid
-            columns: 3
-            square: false
-            cards:
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: EMS · Moteur
-                  icon: mdi:engine-outline
-                  rows:
-                    - ['Mode', '[[foxcat:ems.mode]]']
-                    - ['Phase actuelle', '[[foxcat:ems.phase]]']
-                    - ['Action en attente', '[[foxcat:ems.pending_action]]']
-                    - ['État de validation', '[[foxcat:ems.ack]]']
-                    - ['Autorisation de régulation', '[[foxcat:ems.regulation_active]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Dernière décision
-                  icon: mdi:chart-timeline-variant
-                  rows:
-                    - ['Justification EMS', '[[foxcat:legacy.input_text_ems_last_reason]]']
-                    - ['Origine Boiler', '[[foxcat:legacy.input_text_ems_boiler_origine]]']
-                    - ['Demande Boiler', '[[foxcat:legacy.input_select_ems_boiler_demande]]']
-                    - ['Ordre du CORE', '[[foxcat:legacy.input_text_ems_pending_action]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Validité · Contrôle
-                  icon: mdi:check-decagram-outline
-                  rows:
-                    - ['1 · Mesure de référence T0', '[[foxcat:legacy.input_number_ems_grid_t0]]']
-                    - ['2 · Réseau avant action', '[[foxcat:legacy.input_number_ems_action_reference_grid]]']
-                    - ['3 · Réseau attendu', '[[foxcat:legacy.input_number_ems_grid_expected]]']
-                    - ['4 · Erreur constatée', '[[foxcat:legacy.input_number_ems_ack_error]]']
-                    - ['Variation prévue', '[[foxcat:legacy.input_number_ems_pending_delta]]']
-                    - ['Tolérance validation', '[[foxcat:legacy.input_number_ems_ack_tolerance]]']
-                    - ['Tolérance stabilité', '[[foxcat:legacy.input_number_ems_stability_tolerance]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Exécution · Chaîne Boiler
-                  icon: mdi:connection
-                  rows:
-                    - ['1 · Demande stratégique', '[[foxcat:legacy.input_select_ems_boiler_demande]]']
-                    - ['2 · Ordre du CORE', '[[foxcat:legacy.input_text_ems_pending_action]]']
-                    - ['3 · Commande Climate', '[[foxcat:boiler.climate]]']
-                    - ['4 · Alimentation Boiler', '[[foxcat:legacy.switch_boiler_prise_1]]']
-                    - ['5 · État physique', '[[foxcat:boiler.binary_source]]']
-                    - ['6 · Puissance mesurée', '[[foxcat:boiler.power_source]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Énergie · Temps réel
-                  icon: mdi:transmission-tower
-                  rows:
-                    - ['Production PV', '[[foxcat:sources.pv]]']
-                    - ['Consommation maison', '[[foxcat:legacy.sensor_consommation_reelle_maison]]']
-                    - ['Réinjection réseau', '[[foxcat:sources.grid_fallback]]']
-                    - ['Prélèvement réseau', '[[foxcat:sources.grid_signed]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Boiler · Stockage thermique
-                  icon: mdi:thermometer-water
-                  rows:
-                    - ['Température basse', '[[foxcat:boiler.temperature_source]]']
-                    - ['Température isolant', '[[foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature]]']
-                    - ['Température FoxCat', '[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]']
-                    - ['Puissance de chauffe', '[[foxcat:boiler.power_source]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Machines · Autorisations EMS
-                  icon: mdi:washing-machine
-                  rows:
-                    - ['Lave-linge · cycle', '[[foxcat:machines.washer.cycle]]']
-                    - ['Sèche-linge · cycle', '[[foxcat:machines.dryer.cycle]]']
-                    - ['Lave-vaisselle · prise', '[[foxcat:machines.dishwasher.switch]]']
-                    - ['Gestion EMS lave-linge', '[[foxcat:legacy.input_boolean_ems_lave_linge]]']
-                    - ['Gestion EMS sèche-linge', '[[foxcat:legacy.input_boolean_ems_seche_linge]]']
-                    - ['Gestion EMS lave-vaisselle', '[[foxcat:legacy.input_boolean_ems_lave_vaisselle]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Prévision solaire
-                  icon: mdi:weather-sunny
-                  rows:
-                    - ['Fenêtre disponible', '[[foxcat:legacy.input_boolean_ems_prevision_solaire_disponible]]']
-                    - ['Confiance', '[[foxcat:legacy.input_number_ems_prevision_solaire_confiance]]']
-                    - ['Potentiel', '[[foxcat:legacy.input_select_ems_prevision_solaire_potentiel]]']
-                    - ['Début fenêtre', '[[foxcat:legacy.input_text_ems_prevision_solaire_debut]]']
-                    - ['Fin fenêtre', '[[foxcat:legacy.input_text_ems_prevision_solaire_fin]]']
-                    - ['Tendance', '[[foxcat:legacy.input_text_ems_prevision_solaire_tendance]]']
-                    - ['Justification', '[[foxcat:legacy.input_text_ems_prevision_solaire_raison]]']
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Forecast Solar
-                  icon: mdi:solar-power-variant-outline
-                  rows:
-                    - ['Maintenant', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_electricite_estimee_maintenant]]']
-                    - ['Cette heure', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_cette_heure]]']
-                    - ['Heure suivante', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_heure_suivante]]']
-                    - ["Restant aujourd'hui", '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_restante_aujourd_hui]]']
-                    - ['Prévision du jour', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_aujourd_hui]]']
-                    - ['Prévision 12 h', '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_en_12_heures]]']
-                    - ['Heure du pic', '[[foxcat:legacy.sensor_solar_production_forecast_heure_de_pointe_de_puissance_la_plus_elevee_aujourd_hui]]']
+            show_name: false
+            show_icon: false
+            custom_fields:
+              content: |
+                [[[
+                  const mode=states['select.foxcat_energy_ems_mode_ems']?.state??'—', 
+                        c=states['select.foxcat_energy_tarification_regime_tarifaire']?.state??'—', 
+                        d=states['select.foxcat_energy_tarification_profil_distribution_belgique']?.state??'—', 
+                        p=states['select.foxcat_energy_tarification_politique_reseau']?.state??'—';
+                  return `<div class="confighead"><span>FOXCAT ENERGY · DIAGNOSTIC</span><h2>EMS DIAGNOSTIC</h2><p>État complet des capteurs, exécutions et variables internes.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
+                ]]]
+            styles:
+              card:
+                - padding: 27px
+                - border-radius: 30px
+                - background: linear-gradient(130deg,rgba(15,35,30,.75),rgba(5,20,30,.82))
+                - border: 1px solid rgba(53,229,157,.20)
+                - box-shadow: 0 20px 60px rgba(0,0,0,.28)
+            extra_styles: >
+              .confighead>span{font-size:9px;font-weight:900;letter-spacing:.15em;opacity:.5;color:white;}.confighead
+              h2{font-size:24px;letter-spacing:.08em;margin:6px
+              0;color:white;}.confighead
+              p{font-size:11px;opacity:.55;max-width:700px;color:white;}.confighead>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}.confighead
+              b{font-size:10px;padding:8px
+              10px;border-radius:14px;background:rgba(255,255,255,.055);border:1px
+              solid rgba(255,255,255,.06);color:white;}
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### EMS · Moteur
+              Variables de contrôle principales du cœur d'optimisation FoxCat.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: select.foxcat_energy_ems_mode_ems
+                name: Mode
+              - entity: sensor.foxcat_energy_ems_phase_de_regulation
+                name: Phase actuelle
+              - entity: sensor.foxcat_energy_ems_action_en_attente
+                name: Action en attente
+              - entity: sensor.foxcat_energy_ems_validation_dexecution_ems
+                name: État de validation
+              - entity: switch.foxcat_energy_ems_regulation_foxcat_active
+                name: Autorisation de régulation
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### Dernière décision
 
-  # ====================================================================
-  # PARAMÈTRES (Technique)
-  # ====================================================================
-  - type: panel
-    title: Technique
+              Historique et justification de la dernière action générée par le
+              moteur.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.foxcat_energy_ems_derniere_decision_ems
+                name: Justification EMS
+              - entity: sensor.foxcat_energy_boiler_origine_de_la_demande_chauffe_eau
+                name: Origine Boiler
+              - entity: sensor.foxcat_energy_boiler_demande_chauffe_eau
+                name: Demande Boiler
+              - entity: sensor.foxcat_energy_ems_derniere_action_ems
+                name: Ordre du CORE
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### Validité · Contrôle
+
+              Paramètres de validation et tolérances appliquées aux
+              vérifications de réseau.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: number.foxcat_energy_ems_tolerance_stabilite_t0_t1
+                name: 1 · Mesure de référence T0
+              - entity: sensor.foxcat_energy_ems_reseau_avant_action
+                name: 2 · Réseau avant action
+              - entity: sensor.foxcat_energy_ems_reseau_attendu
+                name: 3 · Réseau attendu
+              - entity: sensor.foxcat_energy_ems_erreur_ack
+                name: 4 · Erreur constatée
+              - entity: sensor.foxcat_energy_ems_variation_attendue
+                name: Variation prévue
+              - entity: number.foxcat_energy_ems_tolerance_ack
+                name: Tolérance validation
+              - entity: number.foxcat_energy_ems_tolerance_stabilite_t0_t1
+                name: Tolérance stabilité
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### Exécution · Chaîne Boiler
+
+              Vérification de la transmission de l'ordre jusqu'à l'activation
+              physique.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.foxcat_energy_boiler_demande_chauffe_eau
+                name: 1 · Demande stratégique
+              - entity: sensor.foxcat_energy_ems_action_en_attente
+                name: 2 · Ordre du CORE
+              - entity: switch.foxcat_energy_boiler_boiler_ecs_active
+                name: 3 · Commande Climate (Boiler)
+              - entity: switch.chauffe_eau
+                name: 4 · Alimentation Boiler (Prise physique)
+              - entity: binary_sensor.foxcat_energy_boiler_boiler_physique
+                name: 5 · État physique
+              - entity: sensor.foxcat_energy_boiler_puissance_chauffe_eau
+                name: 6 · Puissance mesurée
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### Énergie · Temps réel
+              Valeurs brutes instantanées collectées.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: >-
+                  sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
+                name: Production PV
+              - entity: sensor.foxcat_energy_energie_puissance_de_consommation_maison
+                name: Consommation maison
+              - entity: sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
+                name: Réinjection réseau
+              - entity: sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
+                name: Prélèvement réseau
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### Boiler · Stockage thermique
+              Diagnostics des capteurs de température.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.garage_boiler_sonde_temperature_temperature
+                name: Température basse (Eau froide)
+              - entity: sensor.temperature_boiler_2sondes_moyenne
+                name: Température isolant
+              - entity: sensor.foxcat_energy_boiler_temperature_chauffe_eau
+                name: Température FoxCat
+              - entity: sensor.foxcat_energy_boiler_puissance_chauffe_eau
+                name: Puissance de chauffe
+      - type: grid
+        cards:
+          - type: markdown
+            content: |
+              ### Machines · Autorisations EMS
+              Statut des cycles et permissions d'exécution.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: switch.lave_linge_prise_1
+                name: Lave-linge · cycle
+              - entity: switch.seche_linge_prise_1
+                name: Sèche-linge · cycle
+              - entity: switch.lave_vaisselle_prise_1
+                name: Lave-vaisselle · prise
+              - entity: switch.foxcat_energy_machines_gestion_lave_linge
+                name: Gestion EMS lave-linge
+              - entity: switch.foxcat_energy_machines_gestion_seche_linge
+                name: Gestion EMS sèche-linge
+              - entity: switch.foxcat_energy_machines_gestion_lave_vaisselle
+                name: Gestion EMS lave-vaisselle
+    cards: []
+    theme: ios-dark-mode-blue-red
+  - title: Technique
     path: technique
-    icon: mdi:cog
+    icon: mdi:tune-vertical-variant
     subview: true
-    cards:
-      - type: vertical-stack
+    type: sections
+    max_columns: 4
+    background: >-
+      radial-gradient(circle at 7% 8%, rgba(255,160,39,.16), transparent 26%),
+      radial-gradient(circle at 94% 9%, rgba(0,198,255,.18), transparent 29%),
+      linear-gradient(150deg,#05080c,#0b121a 58%,#05070a)
+    sections:
+      - type: grid
+        column_span: 4
         cards:
           - type: custom:button-card
-            template: fc_navbar
-          - type: custom:button-card
-            template: fc_head
-            variables: {title: EMS Configurator, subtitle: 'Comportement · Contrat · Distribution · Politique réseau · Installateur only', icon: mdi:cog, color: '#94a3b8'}
-          - type: grid
-            columns: 3
-            square: false
-            cards:
-              - type: entities
-                title: 1 · Comportement du moteur
-                show_header_toggle: false
-                entities:
-                  - {entity: '[[foxcat:ems.mode]]', name: Comportement EMS}
-                  - {entity: '[[foxcat:ems.regulation_active]]', name: Régulation FoxCat}
-                  - {entity: '[[foxcat:pricing.behavior_relaxation]]', name: Assouplissement Confort}
-                card_mod:
-                  style: |
-                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
-                    .card-header{font-size:15px!important;font-weight:700!important}
-              - type: entities
-                title: 2 · Énergie, distribution et réseau
-                show_header_toggle: false
-                entities:
-                  - {entity: '[[foxcat:pricing.regime]]', name: Contrat énergie}
-                  - {entity: '[[foxcat:pricing.distribution_profile]]', name: Distribution / comptage}
-                  - {entity: '[[foxcat:pricing.network_policy]]', name: Politique réseau}
-                  - {entity: '[[foxcat:pricing.distribution_period]]', name: Période distribution}
-                card_mod:
-                  style: |
-                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
-                    .card-header{font-size:15px!important;font-weight:700!important}
-              - type: conditional
-                conditions:
-                  - {entity: '[[foxcat:pricing.regime]]', state: Dynamique}
-                card:
-                  type: entities
-                  title: 3 · Réglages Dynamic
+            show_name: false
+            show_icon: false
+            custom_fields:
+              content: |
+                [[[
+                  const mode=states['select.foxcat_energy_ems_mode_ems']?.state??'—', 
+                        c=states['select.foxcat_energy_tarification_regime_tarifaire']?.state??'—', 
+                        d=states['select.foxcat_energy_tarification_profil_distribution_belgique']?.state??'—', 
+                        p=states['select.foxcat_energy_tarification_politique_reseau']?.state??'—';
+                  return `<div class="confighead"><span>FOXCAT ENERGY · 1.7.0</span><h2>EMS CONFIGURATOR</h2><p>Le comportement du moteur, le contrat d’énergie, la distribution et la politique réseau sont indépendants.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
+                ]]]
+            styles:
+              card:
+                - padding: 27px
+                - border-radius: 30px
+                - background: linear-gradient(430deg,rgba(36,23,8,.75),rgba(5,31,46,.82))
+                - border: 1px solid rgba(255,255,255,.10)
+                - box-shadow: 0 40px 60px rgba(0,0,0,.240)
+            extra_styles: >
+              .confighead>span{font-size:9px;font-weight:900;letter-spacing:.15em;opacity:.5;color:white;}.confighead
+              h2{font-size:24px;letter-spacing:.08em;margin:6px
+              0;color:white;}.confighead
+              p{font-size:11px;opacity:.55;max-width:700px;color:white;}.confighead>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}.confighead
+              b{font-size:10px;padding:8px
+              10px;border-radius:14px;background:rgba(255,255,255,.055);border:1px
+              solid rgba(255,255,255,.06);color:white;}
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### 1 · Comportement du moteur
+
+              **Éco** applique les règles économiques de façon stricte.
+              **Confort** conserve l’optimisation mais autorise davantage
+              d’assouplissement.  **Manuel** désactive les décisions
+              automatiques.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: select.foxcat_energy_ems_mode_ems
+                name: Comportement EMS
+              - entity: switch.foxcat_energy_ems_regulation_foxcat_active
+                name: Régulation FoxCat
+              - entity: >-
+                  number.foxcat_energy_ems_assouplissement_economique_mode_confort
+                name: Assouplissement Confort
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### 2 · Énergie, distribution et réseau
+
+              Le **contrat énergie** détermine le prix d’achat. Le **profil
+              distribution** décrit la structure du réseau belge. La **politique
+              réseau** définit le traitement de l’injection.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: select.foxcat_energy_tarification_regime_tarifaire
+                name: Contrat énergie
+              - entity: select.foxcat_energy_tarification_profil_distribution_belgique
+                name: Distribution / comptage
+              - entity: select.foxcat_energy_tarification_politique_reseau
+                name: Politique réseau
+              - entity: sensor.foxcat_energy_tarification_periode_de_distribution
+                name: Période distribution
+      - type: grid
+        cards:
+          - type: conditional
+            conditions:
+              - entity: select.foxcat_energy_tarification_regime_tarifaire
+                state: Dynamique
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: >
+                    ### 3 · Réglages Dynamic
+
+                    Le **seuil favorable** définit le bas de la courbe
+                    Day-Ahead. Le **plafond acceptable** bloque les nouveaux
+                    achats flexibles au-delà de cette position.
+                - type: entities
                   show_header_toggle: false
                   entities:
-                    - {entity: '[[foxcat:pricing.day_ahead.threshold]]', name: Seuil favorable}
-                    - {entity: '[[foxcat:pricing.day_ahead.peak_threshold]]', name: Plafond acceptable}
-                    - {entity: '[[foxcat:pricing.predictive_enabled]]', name: Planification prix}
-                    - {entity: '[[foxcat:pricing.solar_forecast_arbitrage]]', name: Arbitrage prévision solaire}
-                  card_mod:
-                    style: |
-                      ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
-                      .card-header{font-size:15px!important;font-weight:700!important}
-              - type: entities
-                title: 4 · Boiler · charge flexible
-                show_header_toggle: false
-                entities:
-                  - {entity: '[[foxcat:boiler.enabled]]', name: Charge flexible Boiler}
-                  - {entity: '[[foxcat:boiler.setting.start]]', name: Température de reprise}
-                  - {entity: '[[foxcat:boiler.setting.normal]]', name: Cible confort réseau}
-                  - {entity: '[[foxcat:boiler.setting.boost]]', name: Stockage solaire / boost}
-                  - {entity: '[[foxcat:boiler.setting.safety]]', name: Sécurité absolue}
-                  - {entity: '[[foxcat:boiler.setting.top_offset]]', name: Correction capteur tête cuve}
-                  - {entity: '[[foxcat:boiler.setting.heat_bias]]', name: Durée influence résistance}
-                  - {entity: '[[foxcat:boiler.setting.draw_drop]]', name: Chute de température = puisage}
-                  - {entity: '[[foxcat:boiler.setting.min_confidence]]', name: Confiance minimale fallback}
-                card_mod:
-                  style: |
-                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
-                    .card-header{font-size:15px!important;font-weight:700!important}
-              - type: entities
-                title: 5 · Onduleur / PRI
-                show_header_toggle: false
-                entities:
-                  - {entity: '[[foxcat:inverter.enabled]]', name: Régulation PRI}
-                  - {entity: '[[foxcat:inverter.setting.export_max]]', name: Injection maximale tolérée}
-                  - {entity: '[[foxcat:inverter.setting.import_target]]', name: Import cible}
-                  - {entity: '[[foxcat:inverter.setting.import_max]]', name: Import maximal avant libération PV}
-                  - {entity: '[[foxcat:inverter.setting.pv_min]]', name: Production PV minimale PRI}
-                card_mod:
-                  style: |
-                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
-                    .card-header{font-size:15px!important;font-weight:700!important}
-              - type: entities
-                title: 6 · Maintenance
-                show_header_toggle: false
-                entities:
-                  - {entity: '[[foxcat:diagnostic.dashboard_regenerate]]', name: Régénérer le dashboard}
-                  - {entity: '[[foxcat:diagnostic.button]]', name: Lancer diagnostic}
-                  - {entity: '[[foxcat:diagnostic.reset]]', name: Réinitialiser cycle EMS}
-                card_mod:
-                  style: |
-                    ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px solid rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0 10px 30px rgba(0,0,0,.35)!important;color:#e8f1fb}
-                    .card-header{font-size:15px!important;font-weight:700!important}
+                    - entity: >-
+                        number.foxcat_energy_tarification_seuil_prix_favorable_day_ahead
+                      name: Seuil favorable
+                    - entity: >-
+                        number.foxcat_energy_tarification_seuil_zone_pic_day_ahead
+                      name: Plafond acceptable
+                    - entity: >-
+                        switch.foxcat_energy_tarification_predictif_prix_dynamique
+                      name: Planification prix
+                    - entity: >-
+                        switch.foxcat_energy_tarification_optimisation_economique_des_charges_flexibles
+                      name: Arbitrage prévision solaire
+      - type: grid
+        column_span: 2
+        cards:
+          - type: markdown
+            content: >
+              ### 4 · Boiler · charge flexible
+
+              La sonde dans le **doigt de gant bas** est fiable pour la
+              sécurité.  Le capteur en **contact sur la tête de cuve** est
+              utilisé pour la  tendance et la détection de puisage.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: switch.foxcat_energy_boiler_boiler_gere_par_foxcat
+                name: Charge flexible Boiler
+              - entity: number.foxcat_energy_boiler_temperature_reprise_boiler
+                name: Température de reprise
+              - entity: number.foxcat_energy_boiler_temperature_confort_boiler
+                name: Cible confort réseau
+              - entity: number.foxcat_energy_boiler_temperature_boost_solaire
+                name: Stockage solaire / boost
+              - entity: number.foxcat_energy_boiler_securite_temperature_boiler
+                name: Sécurité absolue
+              - entity: number.foxcat_energy_boiler_correction_sonde_haute_boiler
+                name: Correction capteur tête cuve
+              - entity: >-
+                  number.foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse
+                name: Durée influence résistance
+              - entity: >-
+                  number.foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs
+                name: Chute de température = puisage
+              - entity: number.foxcat_energy_boiler_confiance_minimale_fallback_boiler
+                name: Confiance minimale fallback
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### 5 · Onduleur / PRI
+
+              Le PRI reste indépendant du comportement tarifaire. En **Zéro
+              injection**, il vise une réinjection quasi nulle ; en
+              **Compensation**, la production reste libérée.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: sensor.foxcat_energy_onduleur_ems_onduleur_etat
+                name: Régulation PRI
+              - entity: number.foxcat_energy_ems_injection_maximale_toleree
+                name: Injection maximale tolérée
+              - entity: number.foxcat_energy_ems_import_cible
+                name: Import cible
+              - entity: number.foxcat_energy_ems_import_maximal_avant_liberation_pv
+                name: Import maximal avant libération PV
+      - type: grid
+        cards:
+          - type: markdown
+            content: >
+              ### 6 · Maintenance
+
+              La régénération du dashboard utilise le registre FoxCat et crée
+              une sauvegarde du fichier existant avant remplacement.
+          - type: entities
+            show_header_toggle: false
+            entities:
+              - entity: button.foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat
+                name: Régénérer le dashboard
+              - entity: button.foxcat_energy_diagnostic_lancer_un_diagnostic_ems
+                name: Lancer diagnostic
+              - entity: button.foxcat_energy_ems_reinitialiser_le_cycle_ems
+                name: Réinitialiser cycle EMS
+              - entity: input_boolean.ems_head_menu
+              - entity: input_boolean.ems_head_lateral
+    theme: ios-dark-mode-blue-red
