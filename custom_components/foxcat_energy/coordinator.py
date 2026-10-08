@@ -171,7 +171,7 @@ from .dashboard import dashboard_status
 
 _LOGGER = logging.getLogger(__name__)
 
-from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, scoped_config
+from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, apply_configured_tariff, scoped_config
 
 
 class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -517,6 +517,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     if key in self.settings
                 }
             )
+            apply_configured_tariff(self.settings, self.config)
             self._entry_options_snapshot = self._entry_option_settings()
 
         self.settings["tariff_regime"] = {

@@ -24,6 +24,16 @@ from .const import (
     CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR,
     CONF_TARIFF_HC_PRICE_SENSOR,
     CONF_TARIFF_HP_PRICE_SENSOR,
+    DYNAMIC_STRUCT_IMPACT,
+    DYNAMIC_STRUCT_SIMPLE,
+    PRICE_SOURCE_DYNAMIC,
+    PRICE_SOURCE_VARIABLE,
+    TARIFF_BI,
+    TARIFF_DYNAMIC,
+    TARIFF_MONO,
+    TARIFF_STRUCTURE_IMPACT,
+    TARIFF_STRUCTURE_SIMPLE,
+    TARIFF_STRUCTURE_TOU,
 )
 
 CONF_TARIFF_FAMILY = "tariff_family"
@@ -67,6 +77,41 @@ def active_tariff(config: dict[str, Any]) -> str | None:
             return TARIFF_HPHC_MONO
         return TARIFF_HPHC_BI
     return None
+
+
+def apply_configured_tariff(settings: dict[str, Any], config: dict[str, Any]) -> None:
+    """Apply the tariff selected during setup to runtime tariff settings."""
+    tariff = active_tariff(config)
+    if tariff == TARIFF_DYNAMIQUE:
+        impact = config.get(CONF_TARIFF_STRUCTURE) in {
+            "Impact",
+            DYNAMIC_STRUCT_IMPACT,
+            TARIFF_STRUCTURE_IMPACT,
+        }
+        settings.update(
+            {
+                "price_source": PRICE_SOURCE_DYNAMIC,
+                "tariff_regime": TARIFF_DYNAMIC,
+                "tariff_structure": TARIFF_STRUCTURE_IMPACT if impact else TARIFF_STRUCTURE_SIMPLE,
+                "dynamic_structure": DYNAMIC_STRUCT_IMPACT if impact else DYNAMIC_STRUCT_SIMPLE,
+            }
+        )
+    elif tariff == TARIFF_HPHC_BI:
+        settings.update(
+            {
+                "price_source": PRICE_SOURCE_VARIABLE,
+                "tariff_regime": TARIFF_BI,
+                "tariff_structure": TARIFF_STRUCTURE_TOU,
+            }
+        )
+    elif tariff == TARIFF_HPHC_MONO:
+        settings.update(
+            {
+                "price_source": PRICE_SOURCE_VARIABLE,
+                "tariff_regime": TARIFF_MONO,
+                "tariff_structure": TARIFF_STRUCTURE_SIMPLE,
+            }
+        )
 
 
 def allowed_price_keys(config: dict[str, Any]) -> frozenset[str] | None:

@@ -143,7 +143,7 @@ def _grid_sign_selector() -> selector.SelectSelector:
 HPHC_MONO = "Mono-horaire"
 HPHC_BI = "Bi-horaire"
 HPHC_STRUCTURES = [HPHC_MONO, HPHC_BI]
-DYNAMIQUE_STRUCTURES = ["Simple", "Bi-horaire", "Dynamique"]
+DYNAMIQUE_STRUCTURES = ["Simple", "Impact"]
 
 
 def _structure_schema(options: list[str], default: str) -> vol.Schema:

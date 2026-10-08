@@ -19,6 +19,7 @@ def tariff_dimensions(settings):
         structure={
             'Simple':TARIFF_STRUCTURE_SIMPLE,
             'Bi-horaire':TARIFF_STRUCTURE_TOU,
+            'Impact':TARIFF_STRUCTURE_IMPACT,
             'Impact (Capacitaire)':TARIFF_STRUCTURE_IMPACT,
         }.get(settings.get('dynamic_structure'),structure)
     return TariffDimensions(source,structure,settings.get('network_policy',NETWORK_POLICY_COMPENSATION))
