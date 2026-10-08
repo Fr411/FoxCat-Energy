@@ -5,6 +5,7 @@ import types
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 
 COMPONENT_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
@@ -13,6 +14,13 @@ package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.economic_optimizer import PricePoint
+from foxcat_energy.engine.inverter_core import (
+    InverterCore,
+    NETWORK_BILLED_EXPORT,
+    NETWORK_COMPENSATION,
+    NETWORK_UNVALUED_EXPORT,
+    NETWORK_ZERO_INJECTION,
+)
 from foxcat_energy.engine.modes import evaluate_mode
 from foxcat_energy.engine.models import EnergySnapshot, SolarForecast
 from foxcat_energy.migration import migrate_settings_v171
@@ -132,6 +140,29 @@ class DynamicAnalysisTests(unittest.TestCase):
         )
 
         self.assertIn("Économie énergie", comfort.reason)
+
+    def test_network_policy_controls_inverter_export_behavior(self) -> None:
+        inverter = InverterCore()
+        snapshot = SimpleNamespace(pv_w=4000, export_w=1500, import_w=0)
+
+        compensation = inverter.decide(
+            snapshot, 100, {}, NETWORK_COMPENSATION
+        )
+        remunerated_export = inverter.decide(
+            snapshot, 100, {}, NETWORK_BILLED_EXPORT,
+            dynamic_export_value_eur_kwh=0.1,
+        )
+        unvalued_export = inverter.decide(
+            snapshot, 100, {}, NETWORK_UNVALUED_EXPORT,
+        )
+        zero_injection = inverter.decide(
+            snapshot, 100, {}, NETWORK_ZERO_INJECTION,
+        )
+
+        self.assertEqual(compensation.target_level, 100)
+        self.assertEqual(remunerated_export.target_level, 100)
+        self.assertLess(unvalued_export.target_level, 100)
+        self.assertLess(zero_injection.target_level, 100)
 
 
 if __name__ == "__main__":
