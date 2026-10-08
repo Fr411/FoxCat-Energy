@@ -7,15 +7,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DOMAIN,
-    DYNAMIC_STRUCTURES,
     MODE_MANUAL,
     MODES,
     NETWORK_POLICIES,
     NETWORK_POLICY_COMPENSATION,
-    PRICE_SOURCES,
+    TARIFF_BI,
+    TARIFF_DYNAMIC,
     TARIFF_REGIMES,
-    TARIFF_STRUCTURES,
 )
+from .tariff_model import tariff_dimensions
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .select_options import (
@@ -99,34 +99,56 @@ class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
         self.async_write_ha_state()
 
 
+PRICE_SOURCE_BIHORAIRE = "Bihoraire"
+PRICE_SOURCE_DYNAMIQUE = "Dynamique"
+PRICE_SOURCE_CHOICES = [PRICE_SOURCE_BIHORAIRE, PRICE_SOURCE_DYNAMIQUE]
+# Structures applicables aux contrats dynamiques : Simple suit le spot,
+# Impact suit les tarifs dynamiques Impact. Bi-horaire n'est pas utilisé pour l'instant.
+DYNAMIC_STRUCTURE_CHOICES = ["Simple", "Impact"]
+_STRUCTURE_TO_DYNAMIC = {"Simple": "Simple", "Impact": "Impact (Capacitaire)"}
+
+
 class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
-    _attr_options = PRICE_SOURCES
+    _attr_options = PRICE_SOURCE_CHOICES
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "source_prix", "Source du prix", "mdi:database-clock-outline", "pricing")
 
     @property
     def current_option(self) -> str:
-        return constrained_option(self.coordinator.settings, "price_source", PRICE_SOURCES)
+        return (
+            PRICE_SOURCE_DYNAMIQUE
+            if tariff_dimensions(self.coordinator.settings).dynamic
+            else PRICE_SOURCE_BIHORAIRE
+        )
 
     async def async_select_option(self, option: str) -> None:
-        if option in PRICE_SOURCES:
-            await self.coordinator.async_set_setting("price_source", option)
+        if option == PRICE_SOURCE_DYNAMIQUE:
+            await self.coordinator.async_set_setting("tariff_regime", TARIFF_DYNAMIC)
+        elif option == PRICE_SOURCE_BIHORAIRE:
+            await self.coordinator.async_set_setting("tariff_regime", TARIFF_BI)
+        self.async_write_ha_state()
 
 
 class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
-    _attr_options = TARIFF_STRUCTURES
+    """Structure tarifaire : uniquement pour les contrats dynamiques."""
+
+    _attr_options = DYNAMIC_STRUCTURE_CHOICES
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "structure_tarifaire", "Structure tarifaire", "mdi:timeline-clock-outline", "pricing")
 
     @property
     def current_option(self) -> str:
-        return constrained_option(self.coordinator.settings, "tariff_structure", TARIFF_STRUCTURES)
+        structure = tariff_dimensions(self.coordinator.settings).structure
+        return "Impact" if structure == "Impact" else "Simple"
 
     async def async_select_option(self, option: str) -> None:
-        if option in TARIFF_STRUCTURES:
-            await self.coordinator.async_set_setting("tariff_structure", option)
+        if option not in _STRUCTURE_TO_DYNAMIC:
+            return
+        await self.coordinator.async_set_setting("tariff_structure", option)
+        await self.coordinator.async_set_setting("dynamic_structure", _STRUCTURE_TO_DYNAMIC[option])
+        self.async_write_ha_state()
 
 
 class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
@@ -167,7 +189,7 @@ class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
             "Structure (Si Dynamique)",
             "mdi:chart-bell-curve-cumulative",
             "dynamic_structure",
-            DYNAMIC_STRUCTURES,
+            list(_STRUCTURE_TO_DYNAMIC.values()),
         )
 
 class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
