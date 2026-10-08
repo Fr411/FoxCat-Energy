@@ -14,7 +14,7 @@ package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.economic_optimizer import PricePoint
-from foxcat_energy.engine.inverter_core import (
+from foxcat_energy.inverter_core import (
     InverterCore,
     NETWORK_BILLED_EXPORT,
     NETWORK_COMPENSATION,
