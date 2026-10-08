@@ -1997,21 +1997,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         if key == "tariff_regime":
             self.reset_core(f"Régime tarifaire modifié vers {value} : nouvelle acquisition demandée.")
-            if str(self.settings.get("mode")) == MODE_DYNAMIC:
-                if str(value) == TARIFF_DYNAMIC:
-                    self.settings["pri_enabled"] = True
-                else:
-                    self.settings["pri_enabled"] = False
-                    if self._pri_task and not self._pri_task.done():
-                        self._pri_task.cancel()
-                    if bool(self.settings.get("regulation_active")):
-                        await self.async_release_pri_100("Prix dynamique incompatible avec le régime tarifaire : onduleur libéré à 100 %.")
-                        if self.snapshot().boiler_on:
-                            await self.async_command_boiler(
-                                BOILER_STOP,
-                                "Régime tarifaire quitté : arrêt de la charge financière dynamique en cours.",
-                                "PRIX_BLOQUE",
-                            )
 
         if key in {"predictive_pricing_enabled", "solar_forecast_arbitrage", "dynamic_favorable_position_pct", "dynamic_high_position_pct"}:
             # Réglages Day-Ahead dédiés au mode Dynamique : aucun effet sur HP/HC.
