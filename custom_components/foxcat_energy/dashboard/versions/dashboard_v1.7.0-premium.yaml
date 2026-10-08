@@ -734,22 +734,22 @@ views:
                         duration: 5min
                     series:
                       - entity: >-
-                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_production_photovoltaique]]
+                          sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
                         name: Solaire
                         type: area
                         color: '#ffb020'
                       - entity: >-
-                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison]]
+                          sensor.foxcat_energy_energie_puissance_de_consommation_maison
                         name: Maison
                         type: line
                         color: '#38bdf8'
                       - entity: >-
-                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau]]
+                          sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
                         name: Prélèvement
                         type: line
                         color: '#f87171'
                       - entity: >-
-                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_reinjectee_au_reseau]]
+                          sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
                         name: Réinjection
                         type: line
                         color: '#34d399'
@@ -1660,7 +1660,7 @@ views:
                                 return value.toFixed(3) + " €";
                               }
                     series:
-                      - entity: [[foxcat:legacy.sensor_foxcat_energy_tarification_prix_d_achat_actif]]
+                      - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
                         name: Prix d'achat
                         type: area
                         color: '#38bdf8'
@@ -2692,6 +2692,211 @@ views:
                         const v=m[p]||['—','Profil Impact actif','#94a3b8'];
                         return `<div class="p"><div class="k" style="font-weight:800;letter-spacing:.13em">TARIF DE DISTRIBUTION · IMPACT</div><div style="font-size:30px;font-weight:900;color:${v[2]};margin:10px 0">${p}</div><b>${v[0]}</b><div class="k" style="margin-top:5px">${v[1]}</div></div>`;
                       ]]]
+          - type: custom:button-card
+            show_name: false
+            show_icon: false
+            show_state: false
+            styles:
+              card:
+                - padding: 24px
+                - border-radius: 26px
+                - background: >-
+                    linear-gradient(145deg, rgba(8, 14, 22, 0.95), rgba(4, 9,
+                    14, 0.98))
+                - border: 1px solid rgba(167, 139, 250, 0.15)
+                - box-shadow: 0 25px 50px rgba(0,0,0,0.5)
+              grid:
+                - grid-template-areas: |
+                    "header"
+                    "kpis"
+                    "chart"
+                    "bilan"
+                - grid-template-columns: 1fr
+                - row-gap: 20px
+            custom_fields:
+              header: |
+                [[[
+                  const price = parseFloat(states['sensor.foxcat_energy_tarification_prix_d_achat_actif']?.state || 0).toFixed(3);
+                  return `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <div>
+                        <div style="font-size:24px; font-weight:950; letter-spacing:1px; color:#ffffff; display:flex; align-items:center; gap:10px;">
+                          <ha-icon icon="mdi:chart-timeline-variant-shimmer" style="color:#a78bfa; --mdc-icon-size:28px; filter:drop-shadow(0 0 10px rgba(167,139,250,0.6));"></ha-icon>
+                          CONTRAT DYNAMIQUE
+                        </div>
+                        <div style="opacity:0.6; font-size:10px; margin-top:5px; font-weight:800; letter-spacing:0.1em; color:white;">
+                          FOXCAT ENERGY · DAY-AHEAD PRICING
+                        </div>
+                      </div>
+                      <div style="text-align:right; background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.3); padding:10px 18px; border-radius:16px; box-shadow: 0 0 20px rgba(167,139,250,0.1);">
+                        <span style="font-size:9px; font-weight:900; color:#a78bfa; display:block; letter-spacing:0.05em;">PRIX ACTUEL</span>
+                        <strong style="font-size:24px; font-weight:950; color:#ffffff; line-height:1.2;">${price} <span style="font-size:12px; opacity:0.6;">€/kWh</span></strong>
+                      </div>
+                    </div>
+                  `;
+                ]]]
+              kpis: |
+                [[[
+                  const N = (id, fallback = 0) => { const v = parseFloat(states[id]?.state); return isFinite(v) ? v : fallback; };
+                  const S = (id, fallback = '—') => { const v = states[id]?.state; return (!v || ['unknown', 'unavailable'].includes(v)) ? fallback : v; };
+                  const T = (id) => { const s = states[id]?.state; return s && s !== 'unknown' ? s.slice(0, 5) : '—'; };
+
+                  const nextPrice = N('sensor.foxcat_energy_tarification_prix_d_achat_suivant');
+                  const pos = N('sensor.foxcat_energy_tarification_position_sur_la_courbe_dynamique');
+                  const low = T('sensor.foxcat_energy_tarification_day_ahead_prochain_creux');
+                  const high = T('sensor.foxcat_energy_tarification_day_ahead_prochain_pic');
+                  const isFavorable = states['binary_sensor.foxcat_energy_tarification_fenetre_prix_favorable_day_ahead']?.state === 'on';
+                  const trend = S('sensor.foxcat_energy_tarification_tendance_courbe_dynamique', 'Stable');
+
+                  let trendIcon = '→';
+                  let trendCol = '#94a3b8';
+                  if(trend.toLowerCase().includes('hausse')) { trendIcon = '↗'; trendCol = '#fb7185'; }
+                  else if(trend.toLowerCase().includes('baisse')) { trendIcon = '↘'; trendCol = '#35e59d'; }
+
+                  const favCol = isFavorable ? '#35e59d' : '#94a3b8';
+
+                  return `
+                    <style>
+                      * { box-sizing: border-box; }
+                      .da-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+                      .da-box { padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+                      .da-lbl { font-size: 8px; color: #64748b; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+                      .da-val { font-size: 20px; font-weight: 900; color: #ffffff; margin-top: 6px; }
+                      .da-sub { font-size: 9px; color: #475569; margin-top: 4px; font-weight: bold; }
+                      .da-split { display: flex; width: 100%; justify-content: space-around; align-items: center; }
+                      @media(max-width: 700px) { .da-grid { grid-template-columns: repeat(2, 1fr); } }
+                    </style>
+                    <div class="da-grid">
+                      
+                      <div class="da-box">
+                        <span class="da-lbl">HEURE SUIVANTE</span>
+                        <span class="da-val" style="color:#a78bfa;">${nextPrice.toFixed(3)} <span style="font-size:12px;opacity:0.6;">€</span></span>
+                        <span class="da-sub">H+1</span>
+                      </div>
+                      
+                      <div class="da-box">
+                        <span class="da-lbl">POSITION COURBE</span>
+                        <span class="da-val">${pos.toFixed(1)} <span style="font-size:12px;opacity:0.6;">%</span></span>
+                        <span class="da-sub">Sur le max journalier</span>
+                      </div>
+                      
+                      <div class="da-box">
+                        <span class="da-lbl">TENDANCE</span>
+                        <span class="da-val" style="color:${trendCol};">${trendIcon} ${trend}</span>
+                        <span class="da-sub">Luminus Dynamic</span>
+                      </div>
+                      
+                      <div class="da-box" style="border-color:${favCol}30; background:${favCol}10;">
+                        <span class="da-lbl" style="color:${favCol};">STATUT ACTUEL</span>
+                        <span class="da-val" style="color:${favCol}; font-size:16px;">${isFavorable ? 'FAVORABLE' : 'EN ATTENTE'}</span>
+                        <span class="da-sub" style="color:${favCol}; opacity:0.7;">Analyse continue</span>
+                      </div>
+                      
+                      <div class="da-box" style="grid-column: span 4; padding: 12px;">
+                         <div class="da-split">
+                            <div>
+                              <span class="da-lbl">PROCHAIN CREUX</span>
+                              <span class="da-val" style="color:#35e59d;">${low}</span>
+                            </div>
+                            <div style="width:1px; height:30px; background:rgba(255,255,255,0.1);"></div>
+                            <div>
+                              <span class="da-lbl">PROCHAIN PIC</span>
+                              <span class="da-val" style="color:#fb7185;">${high}</span>
+                            </div>
+                         </div>
+                      </div>
+                    </div>
+                  `;
+                ]]]
+              chart:
+                card:
+                  type: custom:apexcharts-card
+                  update_interval: 5min
+                  graph_span: 2d
+                  span:
+                    start: day
+                  now:
+                    show: true
+                    label: Maintenant
+                  header:
+                    show: false
+                  yaxis:
+                    - decimals: 3
+                      labels:
+                        formatter: |
+                          EVAL:function(value) {
+                            return value.toFixed(3) + " €";
+                          }
+                  apex_config:
+                    chart:
+                      height: 280
+                      toolbar:
+                        show: false
+                      background: transparent
+                    theme:
+                      mode: dark
+                    legend:
+                      show: true
+                      position: bottom
+                      labels:
+                        colors: '#9bb3cc'
+                    grid:
+                      borderColor: rgba(255,255,255,0.06)
+                      strokeDashArray: 3
+                    stroke:
+                      width: 2
+                      curve: smooth
+                    fill:
+                      type:
+                        - gradient
+                        - solid
+                        - solid
+                      gradient:
+                        shade: dark
+                        type: vertical
+                        shadeIntensity: 0.5
+                        opacityFrom: 0.3
+                        opacityTo: 0.05
+                        stops:
+                          - 0
+                          - 100
+                    xaxis:
+                      type: datetime
+                      labels:
+                        datetimeUTC: false
+                    tooltip:
+                      shared: true
+                      x:
+                        format: dd/MM HH:mm
+                  series:
+                    - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                      name: Achat
+                      type: area
+                      color: '#a78bfa'
+                      float_precision: 3
+                      show:
+                        in_header: false
+                        extremas: true
+                      data_generator: >
+                        const
+                        rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+
+                        return
+                        rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new
+                        Date(r.start).getTime(),Number(r.all_in)]);
+                    - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                      name: Tendance
+                      type: line
+                      color: '#38bdf8'
+                      float_precision: 3
+                      show:
+                        in_header: false
+                      data_generator: >
+                        const
+                        rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]
+                          .filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>({time:new Date(r.start).getTime(),price:Number(r.all_in)})).sort((a,b)=>a.time-b.time);
+                        return rows.map((r,i)=>{const
+                        w=rows.slice(Math.max(0,i-1),
     theme: ios-dark-mode-blue-red
   - title: Diagnostic
     path: diagnostic
@@ -2713,10 +2918,10 @@ views:
             custom_fields:
               content: |
                 [[[
-                  const mode=states['[[foxcat:ems.mode]]']?.state??'—', 
-                        c=states['[[foxcat:pricing.regime]]']?.state??'—', 
-                        d=states['[[foxcat:legacy.select_foxcat_energy_tarification_profil_distribution_belgique]]']?.state??'—', 
-                        p=states['[[foxcat:pricing.network_policy]]']?.state??'—';
+                  const mode=states['select.foxcat_energy_ems_mode_ems']?.state??'—', 
+                        c=states['select.foxcat_energy_tarification_regime_tarifaire']?.state??'—', 
+                        d=states['select.foxcat_energy_tarification_profil_distribution_belgique']?.state??'—', 
+                        p=states['select.foxcat_energy_tarification_politique_reseau']?.state??'—';
                   return `<div class="confighead"><span>FOXCAT ENERGY · DIAGNOSTIC</span><h2>EMS DIAGNOSTIC</h2><p>État complet des capteurs, exécutions et variables internes.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
                 ]]]
             styles:
@@ -2743,15 +2948,15 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:ems.mode]]
+              - entity: select.foxcat_energy_ems_mode_ems
                 name: Mode
-              - entity: [[foxcat:ems.phase]]
+              - entity: sensor.foxcat_energy_ems_phase_de_regulation
                 name: Phase actuelle
-              - entity: [[foxcat:ems.pending_action]]
+              - entity: sensor.foxcat_energy_ems_action_en_attente
                 name: Action en attente
-              - entity: [[foxcat:ems.ack]]
+              - entity: sensor.foxcat_energy_ems_validation_dexecution_ems
                 name: État de validation
-              - entity: [[foxcat:ems.regulation_active]]
+              - entity: switch.foxcat_energy_ems_regulation_foxcat_active
                 name: Autorisation de régulation
       - type: grid
         cards:
@@ -2764,13 +2969,13 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_derniere_decision_ems]]
+              - entity: sensor.foxcat_energy_ems_derniere_decision_ems
                 name: Justification EMS
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_origine_de_la_demande_chauffe_eau]]
+              - entity: sensor.foxcat_energy_boiler_origine_de_la_demande_chauffe_eau
                 name: Origine Boiler
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_demande_chauffe_eau]]
+              - entity: sensor.foxcat_energy_boiler_demande_chauffe_eau
                 name: Demande Boiler
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_derniere_action_ems]]
+              - entity: sensor.foxcat_energy_ems_derniere_action_ems
                 name: Ordre du CORE
       - type: grid
         cards:
@@ -2783,19 +2988,19 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.number_foxcat_energy_ems_tolerance_stabilite_t0_t1]]
+              - entity: number.foxcat_energy_ems_tolerance_stabilite_t0_t1
                 name: 1 · Mesure de référence T0
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_reseau_avant_action]]
+              - entity: sensor.foxcat_energy_ems_reseau_avant_action
                 name: 2 · Réseau avant action
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_reseau_attendu]]
+              - entity: sensor.foxcat_energy_ems_reseau_attendu
                 name: 3 · Réseau attendu
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_erreur_ack]]
+              - entity: sensor.foxcat_energy_ems_erreur_ack
                 name: 4 · Erreur constatée
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_variation_attendue]]
+              - entity: sensor.foxcat_energy_ems_variation_attendue
                 name: Variation prévue
-              - entity: [[foxcat:legacy.number_foxcat_energy_ems_tolerance_ack]]
+              - entity: number.foxcat_energy_ems_tolerance_ack
                 name: Tolérance validation
-              - entity: [[foxcat:legacy.number_foxcat_energy_ems_tolerance_stabilite_t0_t1]]
+              - entity: number.foxcat_energy_ems_tolerance_stabilite_t0_t1
                 name: Tolérance stabilité
       - type: grid
         cards:
@@ -2808,17 +3013,17 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_demande_chauffe_eau]]
+              - entity: sensor.foxcat_energy_boiler_demande_chauffe_eau
                 name: 1 · Demande stratégique
-              - entity: [[foxcat:ems.pending_action]]
+              - entity: sensor.foxcat_energy_ems_action_en_attente
                 name: 2 · Ordre du CORE
-              - entity: [[foxcat:legacy.switch_foxcat_energy_boiler_boiler_ecs_active]]
+              - entity: switch.foxcat_energy_boiler_boiler_ecs_active
                 name: 3 · Commande Climate (Boiler)
-              - entity: [[foxcat:legacy.switch_chauffe_eau]]
+              - entity: switch.chauffe_eau
                 name: 4 · Alimentation Boiler (Prise physique)
-              - entity: [[foxcat:legacy.binary_sensor_foxcat_energy_boiler_boiler_physique]]
+              - entity: binary_sensor.foxcat_energy_boiler_boiler_physique
                 name: 5 · État physique
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_puissance_chauffe_eau]]
+              - entity: sensor.foxcat_energy_boiler_puissance_chauffe_eau
                 name: 6 · Puissance mesurée
       - type: grid
         cards:
@@ -2830,13 +3035,13 @@ views:
             show_header_toggle: false
             entities:
               - entity: >-
-                  [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_production_photovoltaique]]
+                  sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
                 name: Production PV
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison]]
+              - entity: sensor.foxcat_energy_energie_puissance_de_consommation_maison
                 name: Consommation maison
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_reinjectee_au_reseau]]
+              - entity: sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
                 name: Réinjection réseau
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau]]
+              - entity: sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
                 name: Prélèvement réseau
       - type: grid
         cards:
@@ -2847,13 +3052,13 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:boiler.temperature_source]]
+              - entity: sensor.garage_boiler_sonde_temperature_temperature
                 name: Température basse (Eau froide)
-              - entity: [[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]
+              - entity: sensor.temperature_boiler_2sondes_moyenne
                 name: Température isolant
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_temperature_chauffe_eau]]
+              - entity: sensor.foxcat_energy_boiler_temperature_chauffe_eau
                 name: Température FoxCat
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_puissance_chauffe_eau]]
+              - entity: sensor.foxcat_energy_boiler_puissance_chauffe_eau
                 name: Puissance de chauffe
       - type: grid
         cards:
@@ -2864,17 +3069,17 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:machines.washer.switch]]
+              - entity: switch.lave_linge_prise_1
                 name: Lave-linge · cycle
-              - entity: [[foxcat:machines.dryer.switch]]
+              - entity: switch.seche_linge_prise_1
                 name: Sèche-linge · cycle
-              - entity: [[foxcat:machines.dishwasher.switch]]
+              - entity: switch.lave_vaisselle_prise_1
                 name: Lave-vaisselle · prise
-              - entity: [[foxcat:legacy.switch_foxcat_energy_machines_gestion_lave_linge]]
+              - entity: switch.foxcat_energy_machines_gestion_lave_linge
                 name: Gestion EMS lave-linge
-              - entity: [[foxcat:legacy.switch_foxcat_energy_machines_gestion_seche_linge]]
+              - entity: switch.foxcat_energy_machines_gestion_seche_linge
                 name: Gestion EMS sèche-linge
-              - entity: [[foxcat:legacy.switch_foxcat_energy_machines_gestion_lave_vaisselle]]
+              - entity: switch.foxcat_energy_machines_gestion_lave_vaisselle
                 name: Gestion EMS lave-vaisselle
     cards: []
     theme: ios-dark-mode-blue-red
@@ -2898,10 +3103,10 @@ views:
             custom_fields:
               content: |
                 [[[
-                  const mode=states['[[foxcat:ems.mode]]']?.state??'—', 
-                        c=states['[[foxcat:pricing.regime]]']?.state??'—', 
-                        d=states['[[foxcat:legacy.select_foxcat_energy_tarification_profil_distribution_belgique]]']?.state??'—', 
-                        p=states['[[foxcat:pricing.network_policy]]']?.state??'—';
+                  const mode=states['select.foxcat_energy_ems_mode_ems']?.state??'—', 
+                        c=states['select.foxcat_energy_tarification_regime_tarifaire']?.state??'—', 
+                        d=states['select.foxcat_energy_tarification_profil_distribution_belgique']?.state??'—', 
+                        p=states['select.foxcat_energy_tarification_politique_reseau']?.state??'—';
                   return `<div class="confighead"><span>FOXCAT ENERGY · 1.7.0</span><h2>EMS CONFIGURATOR</h2><p>Le comportement du moteur, le contrat d’énergie, la distribution et la politique réseau sont indépendants.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
                 ]]]
             styles:
@@ -2932,12 +3137,12 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:ems.mode]]
+              - entity: select.foxcat_energy_ems_mode_ems
                 name: Comportement EMS
-              - entity: [[foxcat:ems.regulation_active]]
+              - entity: switch.foxcat_energy_ems_regulation_foxcat_active
                 name: Régulation FoxCat
               - entity: >-
-                  [[foxcat:legacy.number_foxcat_energy_ems_assouplissement_economique_mode_confort]]
+                  number.foxcat_energy_ems_assouplissement_economique_mode_confort
                 name: Assouplissement Confort
       - type: grid
         cards:
@@ -2951,19 +3156,17 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:pricing.regime]]
+              - entity: select.foxcat_energy_tarification_regime_tarifaire
                 name: Contrat énergie
-              - entity: [[foxcat:legacy.select_foxcat_energy_tarification_profil_distribution_belgique]]
-                name: Distribution / comptage
-              - entity: [[foxcat:pricing.network_policy]]
+              - entity: select.foxcat_energy_tarification_politique_reseau
                 name: Politique réseau
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_tarification_periode_de_distribution]]
-                name: Période distribution
+              - entity: select.foxcat_energy_tarification_regime_tarifaire
+                name: Distribution / comptage
       - type: grid
         cards:
           - type: conditional
             conditions:
-              - entity: [[foxcat:pricing.regime]]
+              - entity: select.foxcat_energy_tarification_regime_tarifaire
                 state: Dynamique
             card:
               type: vertical-stack
@@ -2979,16 +3182,16 @@ views:
                   show_header_toggle: false
                   entities:
                     - entity: >-
-                        [[foxcat:legacy.number_foxcat_energy_tarification_seuil_prix_favorable_day_ahead]]
+                        number.foxcat_energy_tarification_seuil_prix_favorable_day_ahead
                       name: Seuil favorable
                     - entity: >-
-                        [[foxcat:legacy.number_foxcat_energy_tarification_seuil_zone_pic_day_ahead]]
+                        number.foxcat_energy_tarification_seuil_zone_pic_day_ahead
                       name: Plafond acceptable
                     - entity: >-
-                        [[foxcat:legacy.switch_foxcat_energy_tarification_predictif_prix_dynamique]]
+                        switch.foxcat_energy_tarification_predictif_prix_dynamique
                       name: Planification prix
                     - entity: >-
-                        [[foxcat:legacy.switch_foxcat_energy_tarification_optimisation_economique_des_charges_flexibles]]
+                        switch.foxcat_energy_tarification_optimisation_economique_des_charges_flexibles
                       name: Arbitrage prévision solaire
       - type: grid
         column_span: 2
@@ -3003,25 +3206,25 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.switch_foxcat_energy_boiler_boiler_gere_par_foxcat]]
+              - entity: switch.foxcat_energy_boiler_boiler_gere_par_foxcat
                 name: Charge flexible Boiler
-              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_temperature_reprise_boiler]]
+              - entity: number.foxcat_energy_boiler_temperature_reprise_boiler
                 name: Température de reprise
-              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_temperature_confort_boiler]]
+              - entity: number.foxcat_energy_boiler_temperature_confort_boiler
                 name: Cible confort réseau
-              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_temperature_boost_solaire]]
+              - entity: number.foxcat_energy_boiler_temperature_boost_solaire
                 name: Stockage solaire / boost
-              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_securite_temperature_boiler]]
+              - entity: number.foxcat_energy_boiler_securite_temperature_boiler
                 name: Sécurité absolue
-              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_correction_sonde_haute_boiler]]
+              - entity: number.foxcat_energy_boiler_correction_sonde_haute_boiler
                 name: Correction capteur tête cuve
               - entity: >-
-                  [[foxcat:legacy.number_foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse]]
+                  number.foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse
                 name: Durée influence résistance
               - entity: >-
-                  [[foxcat:legacy.number_foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs]]
+                  number.foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs
                 name: Chute de température = puisage
-              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_confiance_minimale_fallback_boiler]]
+              - entity: number.foxcat_energy_boiler_confiance_minimale_fallback_boiler
                 name: Confiance minimale fallback
       - type: grid
         cards:
@@ -3035,13 +3238,13 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.sensor_foxcat_energy_onduleur_ems_onduleur_etat]]
+              - entity: sensor.foxcat_energy_onduleur_ems_onduleur_etat
                 name: Régulation PRI
-              - entity: [[foxcat:legacy.number_foxcat_energy_ems_injection_maximale_toleree]]
+              - entity: number.foxcat_energy_ems_injection_maximale_toleree
                 name: Injection maximale tolérée
-              - entity: [[foxcat:legacy.number_foxcat_energy_ems_import_cible]]
+              - entity: number.foxcat_energy_ems_import_cible
                 name: Import cible
-              - entity: [[foxcat:legacy.number_foxcat_energy_ems_import_maximal_avant_liberation_pv]]
+              - entity: number.foxcat_energy_ems_import_maximal_avant_liberation_pv
                 name: Import maximal avant libération PV
       - type: grid
         cards:
@@ -3054,12 +3257,12 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.button_foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat]]
+              - entity: button.foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat
                 name: Régénérer le dashboard
-              - entity: [[foxcat:legacy.button_foxcat_energy_diagnostic_lancer_un_diagnostic_ems]]
+              - entity: button.foxcat_energy_diagnostic_lancer_un_diagnostic_ems
                 name: Lancer diagnostic
-              - entity: [[foxcat:legacy.button_foxcat_energy_ems_reinitialiser_le_cycle_ems]]
+              - entity: button.foxcat_energy_ems_reinitialiser_le_cycle_ems
                 name: Réinitialiser cycle EMS
-              - entity: [[foxcat:legacy.input_boolean_ems_head_menu]]
-              - entity: [[foxcat:legacy.input_boolean_ems_head_lateral]]
+              - entity: input_boolean.ems_head_menu
+              - entity: input_boolean.ems_head_lateral
     theme: ios-dark-mode-blue-red
