@@ -734,22 +734,22 @@ views:
                         duration: 5min
                     series:
                       - entity: >-
-                          sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
+                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_production_photovoltaique]]
                         name: Solaire
                         type: area
                         color: '#ffb020'
                       - entity: >-
-                          sensor.foxcat_energy_energie_puissance_de_consommation_maison
+                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison]]
                         name: Maison
                         type: line
                         color: '#38bdf8'
                       - entity: >-
-                          sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
+                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau]]
                         name: Prélèvement
                         type: line
                         color: '#f87171'
                       - entity: >-
-                          sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
+                          [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_reinjectee_au_reseau]]
                         name: Réinjection
                         type: line
                         color: '#34d399'
@@ -1660,7 +1660,7 @@ views:
                                 return value.toFixed(3) + " €";
                               }
                     series:
-                      - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                      - entity: [[foxcat:legacy.sensor_foxcat_energy_tarification_prix_d_achat_actif]]
                         name: Prix d'achat
                         type: area
                         color: '#38bdf8'
@@ -2713,10 +2713,10 @@ views:
             custom_fields:
               content: |
                 [[[
-                  const mode=states['select.foxcat_energy_ems_mode_ems']?.state??'—', 
-                        c=states['select.foxcat_energy_tarification_regime_tarifaire']?.state??'—', 
-                        d=states['select.foxcat_energy_tarification_profil_distribution_belgique']?.state??'—', 
-                        p=states['select.foxcat_energy_tarification_politique_reseau']?.state??'—';
+                  const mode=states['[[foxcat:ems.mode]]']?.state??'—', 
+                        c=states['[[foxcat:pricing.regime]]']?.state??'—', 
+                        d=states['[[foxcat:legacy.select_foxcat_energy_tarification_profil_distribution_belgique]]']?.state??'—', 
+                        p=states['[[foxcat:pricing.network_policy]]']?.state??'—';
                   return `<div class="confighead"><span>FOXCAT ENERGY · DIAGNOSTIC</span><h2>EMS DIAGNOSTIC</h2><p>État complet des capteurs, exécutions et variables internes.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
                 ]]]
             styles:
@@ -2743,15 +2743,15 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: select.foxcat_energy_ems_mode_ems
+              - entity: [[foxcat:ems.mode]]
                 name: Mode
-              - entity: sensor.foxcat_energy_ems_phase_de_regulation
+              - entity: [[foxcat:ems.phase]]
                 name: Phase actuelle
-              - entity: sensor.foxcat_energy_ems_action_en_attente
+              - entity: [[foxcat:ems.pending_action]]
                 name: Action en attente
-              - entity: sensor.foxcat_energy_ems_validation_dexecution_ems
+              - entity: [[foxcat:ems.ack]]
                 name: État de validation
-              - entity: switch.foxcat_energy_ems_regulation_foxcat_active
+              - entity: [[foxcat:ems.regulation_active]]
                 name: Autorisation de régulation
       - type: grid
         cards:
@@ -2764,13 +2764,13 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: sensor.foxcat_energy_ems_derniere_decision_ems
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_derniere_decision_ems]]
                 name: Justification EMS
-              - entity: sensor.foxcat_energy_boiler_origine_de_la_demande_chauffe_eau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_origine_de_la_demande_chauffe_eau]]
                 name: Origine Boiler
-              - entity: sensor.foxcat_energy_boiler_demande_chauffe_eau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_demande_chauffe_eau]]
                 name: Demande Boiler
-              - entity: sensor.foxcat_energy_ems_derniere_action_ems
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_derniere_action_ems]]
                 name: Ordre du CORE
       - type: grid
         cards:
@@ -2783,19 +2783,19 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: number.foxcat_energy_ems_tolerance_stabilite_t0_t1
+              - entity: [[foxcat:legacy.number_foxcat_energy_ems_tolerance_stabilite_t0_t1]]
                 name: 1 · Mesure de référence T0
-              - entity: sensor.foxcat_energy_ems_reseau_avant_action
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_reseau_avant_action]]
                 name: 2 · Réseau avant action
-              - entity: sensor.foxcat_energy_ems_reseau_attendu
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_reseau_attendu]]
                 name: 3 · Réseau attendu
-              - entity: sensor.foxcat_energy_ems_erreur_ack
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_erreur_ack]]
                 name: 4 · Erreur constatée
-              - entity: sensor.foxcat_energy_ems_variation_attendue
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_ems_variation_attendue]]
                 name: Variation prévue
-              - entity: number.foxcat_energy_ems_tolerance_ack
+              - entity: [[foxcat:legacy.number_foxcat_energy_ems_tolerance_ack]]
                 name: Tolérance validation
-              - entity: number.foxcat_energy_ems_tolerance_stabilite_t0_t1
+              - entity: [[foxcat:legacy.number_foxcat_energy_ems_tolerance_stabilite_t0_t1]]
                 name: Tolérance stabilité
       - type: grid
         cards:
@@ -2808,17 +2808,17 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: sensor.foxcat_energy_boiler_demande_chauffe_eau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_demande_chauffe_eau]]
                 name: 1 · Demande stratégique
-              - entity: sensor.foxcat_energy_ems_action_en_attente
+              - entity: [[foxcat:ems.pending_action]]
                 name: 2 · Ordre du CORE
-              - entity: switch.foxcat_energy_boiler_boiler_ecs_active
+              - entity: [[foxcat:legacy.switch_foxcat_energy_boiler_boiler_ecs_active]]
                 name: 3 · Commande Climate (Boiler)
-              - entity: switch.chauffe_eau
+              - entity: [[foxcat:legacy.switch_chauffe_eau]]
                 name: 4 · Alimentation Boiler (Prise physique)
-              - entity: binary_sensor.foxcat_energy_boiler_boiler_physique
+              - entity: [[foxcat:legacy.binary_sensor_foxcat_energy_boiler_boiler_physique]]
                 name: 5 · État physique
-              - entity: sensor.foxcat_energy_boiler_puissance_chauffe_eau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_puissance_chauffe_eau]]
                 name: 6 · Puissance mesurée
       - type: grid
         cards:
@@ -2830,13 +2830,13 @@ views:
             show_header_toggle: false
             entities:
               - entity: >-
-                  sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
+                  [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_production_photovoltaique]]
                 name: Production PV
-              - entity: sensor.foxcat_energy_energie_puissance_de_consommation_maison
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison]]
                 name: Consommation maison
-              - entity: sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_reinjectee_au_reseau]]
                 name: Réinjection réseau
-              - entity: sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau]]
                 name: Prélèvement réseau
       - type: grid
         cards:
@@ -2847,13 +2847,13 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: sensor.garage_boiler_sonde_temperature_temperature
+              - entity: [[foxcat:boiler.temperature_source]]
                 name: Température basse (Eau froide)
-              - entity: sensor.temperature_boiler_2sondes_moyenne
+              - entity: [[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]
                 name: Température isolant
-              - entity: sensor.foxcat_energy_boiler_temperature_chauffe_eau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_temperature_chauffe_eau]]
                 name: Température FoxCat
-              - entity: sensor.foxcat_energy_boiler_puissance_chauffe_eau
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_boiler_puissance_chauffe_eau]]
                 name: Puissance de chauffe
       - type: grid
         cards:
@@ -2864,17 +2864,17 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: switch.lave_linge_prise_1
+              - entity: [[foxcat:machines.washer.switch]]
                 name: Lave-linge · cycle
-              - entity: switch.seche_linge_prise_1
+              - entity: [[foxcat:machines.dryer.switch]]
                 name: Sèche-linge · cycle
-              - entity: switch.lave_vaisselle_prise_1
+              - entity: [[foxcat:machines.dishwasher.switch]]
                 name: Lave-vaisselle · prise
-              - entity: switch.foxcat_energy_machines_gestion_lave_linge
+              - entity: [[foxcat:legacy.switch_foxcat_energy_machines_gestion_lave_linge]]
                 name: Gestion EMS lave-linge
-              - entity: switch.foxcat_energy_machines_gestion_seche_linge
+              - entity: [[foxcat:legacy.switch_foxcat_energy_machines_gestion_seche_linge]]
                 name: Gestion EMS sèche-linge
-              - entity: switch.foxcat_energy_machines_gestion_lave_vaisselle
+              - entity: [[foxcat:legacy.switch_foxcat_energy_machines_gestion_lave_vaisselle]]
                 name: Gestion EMS lave-vaisselle
     cards: []
     theme: ios-dark-mode-blue-red
@@ -2898,10 +2898,10 @@ views:
             custom_fields:
               content: |
                 [[[
-                  const mode=states['select.foxcat_energy_ems_mode_ems']?.state??'—', 
-                        c=states['select.foxcat_energy_tarification_regime_tarifaire']?.state??'—', 
-                        d=states['select.foxcat_energy_tarification_profil_distribution_belgique']?.state??'—', 
-                        p=states['select.foxcat_energy_tarification_politique_reseau']?.state??'—';
+                  const mode=states['[[foxcat:ems.mode]]']?.state??'—', 
+                        c=states['[[foxcat:pricing.regime]]']?.state??'—', 
+                        d=states['[[foxcat:legacy.select_foxcat_energy_tarification_profil_distribution_belgique]]']?.state??'—', 
+                        p=states['[[foxcat:pricing.network_policy]]']?.state??'—';
                   return `<div class="confighead"><span>FOXCAT ENERGY · 1.7.0</span><h2>EMS CONFIGURATOR</h2><p>Le comportement du moteur, le contrat d’énergie, la distribution et la politique réseau sont indépendants.</p><div><b>${mode}</b><b>${c}</b><b>${d}</b><b>${p}</b></div></div>`;
                 ]]]
             styles:
@@ -2932,12 +2932,12 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: select.foxcat_energy_ems_mode_ems
+              - entity: [[foxcat:ems.mode]]
                 name: Comportement EMS
-              - entity: switch.foxcat_energy_ems_regulation_foxcat_active
+              - entity: [[foxcat:ems.regulation_active]]
                 name: Régulation FoxCat
               - entity: >-
-                  number.foxcat_energy_ems_assouplissement_economique_mode_confort
+                  [[foxcat:legacy.number_foxcat_energy_ems_assouplissement_economique_mode_confort]]
                 name: Assouplissement Confort
       - type: grid
         cards:
@@ -2951,19 +2951,19 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: select.foxcat_energy_tarification_regime_tarifaire
+              - entity: [[foxcat:pricing.regime]]
                 name: Contrat énergie
-              - entity: select.foxcat_energy_tarification_profil_distribution_belgique
+              - entity: [[foxcat:legacy.select_foxcat_energy_tarification_profil_distribution_belgique]]
                 name: Distribution / comptage
-              - entity: select.foxcat_energy_tarification_politique_reseau
+              - entity: [[foxcat:pricing.network_policy]]
                 name: Politique réseau
-              - entity: sensor.foxcat_energy_tarification_periode_de_distribution
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_tarification_periode_de_distribution]]
                 name: Période distribution
       - type: grid
         cards:
           - type: conditional
             conditions:
-              - entity: select.foxcat_energy_tarification_regime_tarifaire
+              - entity: [[foxcat:pricing.regime]]
                 state: Dynamique
             card:
               type: vertical-stack
@@ -2979,16 +2979,16 @@ views:
                   show_header_toggle: false
                   entities:
                     - entity: >-
-                        number.foxcat_energy_tarification_seuil_prix_favorable_day_ahead
+                        [[foxcat:legacy.number_foxcat_energy_tarification_seuil_prix_favorable_day_ahead]]
                       name: Seuil favorable
                     - entity: >-
-                        number.foxcat_energy_tarification_seuil_zone_pic_day_ahead
+                        [[foxcat:legacy.number_foxcat_energy_tarification_seuil_zone_pic_day_ahead]]
                       name: Plafond acceptable
                     - entity: >-
-                        switch.foxcat_energy_tarification_predictif_prix_dynamique
+                        [[foxcat:legacy.switch_foxcat_energy_tarification_predictif_prix_dynamique]]
                       name: Planification prix
                     - entity: >-
-                        switch.foxcat_energy_tarification_optimisation_economique_des_charges_flexibles
+                        [[foxcat:legacy.switch_foxcat_energy_tarification_optimisation_economique_des_charges_flexibles]]
                       name: Arbitrage prévision solaire
       - type: grid
         column_span: 2
@@ -3003,25 +3003,25 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: switch.foxcat_energy_boiler_boiler_gere_par_foxcat
+              - entity: [[foxcat:legacy.switch_foxcat_energy_boiler_boiler_gere_par_foxcat]]
                 name: Charge flexible Boiler
-              - entity: number.foxcat_energy_boiler_temperature_reprise_boiler
+              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_temperature_reprise_boiler]]
                 name: Température de reprise
-              - entity: number.foxcat_energy_boiler_temperature_confort_boiler
+              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_temperature_confort_boiler]]
                 name: Cible confort réseau
-              - entity: number.foxcat_energy_boiler_temperature_boost_solaire
+              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_temperature_boost_solaire]]
                 name: Stockage solaire / boost
-              - entity: number.foxcat_energy_boiler_securite_temperature_boiler
+              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_securite_temperature_boiler]]
                 name: Sécurité absolue
-              - entity: number.foxcat_energy_boiler_correction_sonde_haute_boiler
+              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_correction_sonde_haute_boiler]]
                 name: Correction capteur tête cuve
               - entity: >-
-                  number.foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse
+                  [[foxcat:legacy.number_foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse]]
                 name: Durée influence résistance
               - entity: >-
-                  number.foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs
+                  [[foxcat:legacy.number_foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs]]
                 name: Chute de température = puisage
-              - entity: number.foxcat_energy_boiler_confiance_minimale_fallback_boiler
+              - entity: [[foxcat:legacy.number_foxcat_energy_boiler_confiance_minimale_fallback_boiler]]
                 name: Confiance minimale fallback
       - type: grid
         cards:
@@ -3035,13 +3035,13 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: sensor.foxcat_energy_onduleur_ems_onduleur_etat
+              - entity: [[foxcat:legacy.sensor_foxcat_energy_onduleur_ems_onduleur_etat]]
                 name: Régulation PRI
-              - entity: number.foxcat_energy_ems_injection_maximale_toleree
+              - entity: [[foxcat:legacy.number_foxcat_energy_ems_injection_maximale_toleree]]
                 name: Injection maximale tolérée
-              - entity: number.foxcat_energy_ems_import_cible
+              - entity: [[foxcat:legacy.number_foxcat_energy_ems_import_cible]]
                 name: Import cible
-              - entity: number.foxcat_energy_ems_import_maximal_avant_liberation_pv
+              - entity: [[foxcat:legacy.number_foxcat_energy_ems_import_maximal_avant_liberation_pv]]
                 name: Import maximal avant libération PV
       - type: grid
         cards:
@@ -3054,12 +3054,12 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: button.foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat
+              - entity: [[foxcat:legacy.button_foxcat_energy_diagnostic_regenerer_le_dashboard_foxcat]]
                 name: Régénérer le dashboard
-              - entity: button.foxcat_energy_diagnostic_lancer_un_diagnostic_ems
+              - entity: [[foxcat:legacy.button_foxcat_energy_diagnostic_lancer_un_diagnostic_ems]]
                 name: Lancer diagnostic
-              - entity: button.foxcat_energy_ems_reinitialiser_le_cycle_ems
+              - entity: [[foxcat:legacy.button_foxcat_energy_ems_reinitialiser_le_cycle_ems]]
                 name: Réinitialiser cycle EMS
-              - entity: input_boolean.ems_head_menu
-              - entity: input_boolean.ems_head_lateral
+              - entity: [[foxcat:legacy.input_boolean_ems_head_menu]]
+              - entity: [[foxcat:legacy.input_boolean_ems_head_lateral]]
     theme: ios-dark-mode-blue-red

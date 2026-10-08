@@ -171,6 +171,8 @@ from .dashboard import dashboard_status
 
 _LOGGER = logging.getLogger(__name__)
 
+from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, scoped_config
+
 
 class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Central sovereign EMS coordinator."""
@@ -179,6 +181,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
         self.config = dict(entry.data)
         self.config.update(entry.options)
+        self.config = scoped_config(self.config)
         self._entry_options_snapshot: dict[str, Any] = {}
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         self.machines: list[MachineDefinition] = machine_definitions(self.config)
@@ -1321,7 +1324,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def prices(self) -> dict[str, Any]:
         now=dt_util.now(); dims=tariff_dimensions(self.settings); regime=compatibility_tariff_regime(self.settings)
-        cur=self._optional_float_state(self.config.get(CONF_PRICE_CURRENT)); nxt=self._optional_float_state(self.config.get(CONF_PRICE_NEXT)); inj=self._optional_float_state(self.config.get(CONF_PRICE_INJECTION))
+        cur=self._optional_float_state(self.config.get(CONF_PRICE_CURRENT) or self.config.get(CONF_TARIFF_MONO_PRICE_SENSOR)); nxt=self._optional_float_state(self.config.get(CONF_PRICE_NEXT)); inj=self._optional_float_state(self.config.get(CONF_PRICE_INJECTION))
         hp=self._optional_float_state(self.config.get(CONF_TARIFF_HP_PRICE_SENSOR)); hc=self._optional_float_state(self.config.get(CONF_TARIFF_HC_PRICE_SENSOR))
         hp=float(self.settings.get(CONF_TARIFF_HP_PRICE,.35)) if dims.price_source==PRICE_SOURCE_CONTRACT else hp
         hc=float(self.settings.get(CONF_TARIFF_HC_PRICE,.25)) if dims.price_source==PRICE_SOURCE_CONTRACT else hc

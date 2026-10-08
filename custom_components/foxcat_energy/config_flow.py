@@ -94,6 +94,7 @@ from .const import (
     OFFICIAL_MENU_STEPS,
 )
 from .machines import records_for_options
+from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
 
 
 
@@ -136,6 +137,24 @@ def _grid_sign_selector() -> selector.SelectSelector:
             ],
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
+    )
+
+
+HPHC_MONO = "Mono-horaire"
+HPHC_BI = "Bi-horaire"
+HPHC_STRUCTURES = [HPHC_MONO, HPHC_BI]
+DYNAMIQUE_STRUCTURES = ["Simple", "Bi-horaire", "Dynamique"]
+
+
+def _structure_schema(options: list[str], default: str) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required("tariff_structure", default=default): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options, mode=selector.SelectSelectorMode.LIST
+                )
+            )
+        }
     )
 
 
@@ -387,12 +406,63 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
+        """Root menu: choose the contract family."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
+        return self.async_show_menu(step_id="user", menu_options=["hphc", "dynamique"])
+
+    async def async_step_hphc(self, user_input: dict[str, Any] | None = None):
+        """Branch A: HP/HC family, choose Mono-horaire or Bi-horaire."""
+        if user_input is not None:
+            self._data["tariff_family"] = "hphc"
+            self._data["tariff_structure"] = user_input["tariff_structure"]
+            if user_input["tariff_structure"] == HPHC_MONO:
+                return await self.async_step_hphc_mono()
+            return await self.async_step_hphc_bi()
+        return self.async_show_form(
+            step_id="hphc", data_schema=_structure_schema(HPHC_STRUCTURES, HPHC_MONO)
+        )
+
+    async def async_step_hphc_mono(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data.update(_normalise_input(user_input))
+            return await self.async_step_core()
+        return self.async_show_form(
+            step_id="hphc_mono",
+            data_schema=vol.Schema({vol.Required(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor"), _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor")}),
+        )
+
+    async def async_step_hphc_bi(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data.update(_normalise_input(user_input))
+            return await self.async_step_core()
+        return self.async_show_form(
+            step_id="hphc_bi",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_TARIFF_HP_PRICE_SENSOR): _entity("sensor"),
+                    vol.Required(CONF_TARIFF_HC_PRICE_SENSOR): _entity("sensor"),
+                    _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor"),
+                }
+            ),
+        )
+
+    async def async_step_dynamique(self, user_input: dict[str, Any] | None = None):
+        """Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique."""
+        if user_input is not None:
+            self._data["tariff_family"] = "dynamique"
+            self._data["tariff_structure"] = user_input["tariff_structure"]
+            return await self.async_step_core()
+        return self.async_show_form(
+            step_id="dynamique",
+            data_schema=_structure_schema(DYNAMIQUE_STRUCTURES, DYNAMIQUE_STRUCTURES[0]),
+        )
+
+    async def async_step_core(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
             return await self.async_step_boiler()
-        return self.async_show_form(step_id="user", data_schema=_core_schema())
+        return self.async_show_form(step_id="core", data_schema=_core_schema())
 
     async def async_step_boiler(self, user_input=None):
         if user_input is not None:
@@ -409,20 +479,16 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_machines(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
-            return await self.async_step_pricing()
+            if self._data.get("tariff_family") == "dynamique":
+                return await self.async_step_pricing()
+            return await self.async_step_ia()
         return self.async_show_form(step_id="machines", data_schema=_machines_schema())
 
     async def async_step_pricing(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
-            return await self.async_step_hphc()
-        return self.async_show_form(step_id="pricing", data_schema=_pricing_schema())
-
-    async def async_step_hphc(self, user_input=None):
-        if user_input is not None:
-            self._data.update(_normalise_input(user_input))
             return await self.async_step_ia()
-        return self.async_show_form(step_id="hphc", data_schema=_hphc_schema())
+        return self.async_show_form(step_id="pricing", data_schema=_pricing_schema())
 
     async def async_step_ia(self, user_input=None):
         if user_input is not None:
@@ -504,6 +570,11 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
                 pending[CONF_METRONOME_FALLBACK_SENSOR] = ""
             return await getattr(self, f"async_step_{return_step}")()
         schema = _SCHEMA_BUILDERS[step_id]()
+        if step_id == "hphc" and active_tariff(self._effective()) == TARIFF_HPHC_MONO:
+            hp_hc = (CONF_TARIFF_HP_PRICE_SENSOR, CONF_TARIFF_HC_PRICE_SENSOR)
+            fields: dict[Any, Any] = {vol.Optional(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor")}
+            fields.update({k: v for k, v in schema.schema.items() if k.schema not in hp_hc})
+            schema = vol.Schema(fields)
         return self.async_show_form(
             step_id=step_id,
             data_schema=_schema_with_current(schema, self._effective()),
@@ -620,10 +691,14 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         return await self._info_section("machine_learning_info", user_input, return_step="machine_learning")
 
     async def async_step_pricing(self, user_input=None):
-        return self.async_show_menu(
-            step_id="pricing",
-            menu_options=["pricing_dynamic", "hphc", "init"],
-        )
+        tariff = active_tariff(self._effective())
+        if tariff == TARIFF_DYNAMIQUE:
+            options = ["pricing_dynamic", "init"]
+        elif tariff in (TARIFF_HPHC_MONO, TARIFF_HPHC_BI):
+            options = ["hphc", "init"]
+        else:
+            options = ["pricing_dynamic", "hphc", "init"]
+        return self.async_show_menu(step_id="pricing", menu_options=options)
 
     async def async_step_pricing_dynamic(self, user_input=None):
         return await self._section("pricing_dynamic", user_input, return_step="pricing")

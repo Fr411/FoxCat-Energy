@@ -7,6 +7,14 @@
     },
     "step": {
       "user": {
+        "title": "FoxCat Energy – Contrat",
+        "description": "Choisissez la famille de votre contrat.",
+        "menu_options": {
+          "hphc": "Tarif HP/HC",
+          "dynamique": "Tarif Dynamique"
+        }
+      },
+      "core": {
         "title": "FoxCat Energy – 1/7 • Sources énergétiques",
         "description": "Sélectionnez les deux mesures physiques souveraines de FoxCat. La puissance réseau signée cadence l’EMS; la production photovoltaïque complète chaque snapshot énergétique.",
         "data": {
@@ -22,6 +30,35 @@
           "grid_sign_convention": "Permet d’adapter FoxCat au signe utilisé par votre compteur ou votre intégration.",
           "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison.",
           "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale."
+        }
+      },
+      "hphc": {
+        "title": "Tarif HP/HC",
+        "description": "Choisissez la structure du tarif.",
+        "data": {
+          "tariff_structure": "Structure"
+        }
+      },
+      "hphc_mono": {
+        "title": "HP/HC – Mono-horaire",
+        "description": "Sélectionnez l’entité source du tarif global.",
+        "data": {
+          "tariff_mono_price_sensor": "Source tarif global"
+        }
+      },
+      "hphc_bi": {
+        "title": "HP/HC – Bi-horaire",
+        "description": "Sélectionnez les entités sources des tarifs.",
+        "data": {
+          "tariff_hp_price_sensor": "Source Tarif HP",
+          "tariff_hc_price_sensor": "Source Tarif HC"
+        }
+      },
+      "dynamique": {
+        "title": "Tarif Dynamique",
+        "description": "Choisissez la structure du tarif.",
+        "data": {
+          "tariff_structure": "Structure"
         }
       },
       "boiler": {
@@ -125,20 +162,6 @@
           "forecast_peak_today": "Heure du pic aujourd'hui",
           "forecast_tomorrow": "Prévision demain",
           "forecast_peak_tomorrow": "Heure du pic demain"
-        }
-      },
-      "hphc": {
-        "title": "FoxCat Energy – 6/7 • Tarifs HP/HC",
-        "description": "Tarifs ComfyFlex réservés au régime HP/HC, prix de réinjection et plages horaires utilisés par le comparateur économique.",
-        "data": {
-          "tariff_hp_price_sensor": "Capteur prix heures pleines (HP)",
-          "tariff_hc_price_sensor": "Capteur prix heures creuses (HC)",
-          "tariff_fixed_injection_price_sensor": "Capteur prix fixe de réinjection",
-          "tariff_fixed_injection_eur_kwh": "Prix fixe de réinjection de secours",
-          "tariff_hp_start_1": "Début HP 1",
-          "tariff_hp_end_1": "Fin HP 1",
-          "tariff_hp_start_2": "Début HP 2",
-          "tariff_hp_end_2": "Fin HP 2"
         }
       },
       "ia": {
@@ -477,10 +500,18 @@
     },
     "entity": {
       "select": {
-        "mode_ems": {"name": "Mode EMS"},
-        "regime_tarifaire": {"name": "Régime tarifaire"},
-        "politique_reseau": {"name": "Politique réseau"},
-        "dashboard_version": {"name": "Version du dashboard"}
+        "mode_ems": {
+          "name": "Mode EMS"
+        },
+        "regime_tarifaire": {
+          "name": "Régime tarifaire"
+        },
+        "politique_reseau": {
+          "name": "Politique réseau"
+        },
+        "dashboard_version": {
+          "name": "Version du dashboard"
+        }
       }
     }
   }
