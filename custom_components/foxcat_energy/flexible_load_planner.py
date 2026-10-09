@@ -36,7 +36,24 @@ def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points
  for m in sorted(machines,key=lambda x:-int(getattr(x,'priority',50))):
   if not settings.get(m.setting_key,m.automatic_default): result['machines'][m.machine_id]={'name':m.name,'decision':USER_CONTROL,'allow_start_now':False,'reason':'Gestion automatique désactivée'}; continue
   if cycles.get(m.machine_id,{}).get('protected'):
-   end=datetime.fromisoformat(cycles[m.machine_id]['expected_end_at']) if cycles[m.machine_id].get('expected_end_at') else now+timedelta(hours=float(m.cycle_duration_minutes)/60); result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
+   raw_end=cycles[m.machine_id].get('expected_end_at')
+   # MachineCycleManager peut fournir un datetime natif, alors que certaines
+   # anciennes données/restaurations contiennent une chaîne ISO 8601.
+   if isinstance(raw_end, datetime):
+    end=raw_end
+   elif isinstance(raw_end, str) and raw_end.strip():
+    try:
+     end=datetime.fromisoformat(raw_end.strip())
+    except ValueError:
+     end=now+timedelta(hours=float(m.cycle_duration_minutes)/60)
+   else:
+    end=now+timedelta(hours=float(m.cycle_duration_minutes)/60)
+   # Éviter une comparaison mélangeant datetime avec et sans fuseau horaire.
+   if end.tzinfo is None and now.tzinfo is not None:
+    end=end.replace(tzinfo=now.tzinfo)
+   elif end.tzinfo is not None and now.tzinfo is None:
+    end=end.replace(tzinfo=None)
+   result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
   dur,power=_profile(m,learning); av=_available(m,now); dl=min(_deadline(m,now),now+timedelta(hours=maxwait)); candidates=[]
   starts=[p.at for p in ps if av<=p.at<=dl-timedelta(hours=dur) and machine_allowed(m,p.at)]
   if av<=dl-timedelta(hours=dur) and machine_allowed(m,av): starts.insert(0,av)
