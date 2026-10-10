@@ -2485,351 +2485,391 @@ views:
                       - >-
                         [[foxcat:legacy.sensor_lave_vaisselle_energy_daily_cost]]
     theme: ios-dark-mode-blue-red
-  - type: panel
-    title: Marché & Réseau
+  - title: Marché & Réseau
     path: marche
-    icon: mdi:chart-timeline-variant-shimmer
+    icon: mdi:trending-up
     subview: true
+    type: panel
     cards:
       - type: vertical-stack
         cards:
-          - type: custom:button-card
-            template: fc_navbar
-          - type: custom:button-card
-            template: fc_head
-            variables:
-              title: Économie
-              subtitle: Contrat · Distribution · Prix
-              icon: mdi:chart-timeline-variant-shimmer
-              color: '#22d3ee'
-          - type: grid
-            columns: 3
-            square: false
-            cards:
-              - type: conditional
-                conditions:
-                  - entity: '[[foxcat:pricing.regime]]'
-                    state: Dynamique
-                card:
-                  type: custom:button-card
-                  template: fc_panel
-                  custom_fields:
-                    c: |
-                      [[[
-                        const f=(id,d=3)=>{const v=Number(states[id]?.state);return Number.isFinite(v)?v.toFixed(d).replace('.',','):'—'};
-                        const a=states['[[foxcat:pricing.day_ahead.plan]]']?.attributes||{};
-                        const remain=a.temps_restant_creux||'—',end=a.fin_creux_actuel||'—';
-                        return `<div class="p"><div class="k" style="font-weight:800;letter-spacing:.14em">CONTRAT DYNAMIQUE · DAY-AHEAD</div>
-                          <div style="font-size:34px;font-weight:900;color:#67ddff;margin:12px 0">${f('[[foxcat:pricing.current]]')} <small style="font-size:12px;opacity:.6">€/kWh</small></div>
-                          <div class="g2" style="grid-template-columns:repeat(4,1fr)"><div class="stat"><span>H+1</span><b>${f('[[foxcat:pricing.next]]')}</b></div><div class="stat"><span>POSITION</span><b>${f('[[foxcat:pricing.dynamic_curve_position]]',1)} %</b></div><div class="stat"><span>FAVORABLE</span><b>${a.seuil_favorable_pct??'—'} %</b></div><div class="stat"><span>PLAFOND</span><b>${a.seuil_pic_pct??'—'} %</b></div></div>
-                          <div style="margin-top:10px;padding:12px;border-radius:14px;background:linear-gradient(90deg,rgba(0,207,255,.09),rgba(255,178,56,.05))"><div class="k" style="font-size:9px">CREUX ACTUEL &lt; SEUIL FAVORABLE</div><b style="font-size:15px">${remain==='—'?'Aucun creux actif':remain+' restantes'}</b>${end==='—'?'':`<div class="k" style="font-size:10px">Fin estimée : ${end}</div>`}</div></div>`;
-                      ]]]
-              - type: custom:button-card
-                template: fc_panel
-                custom_fields:
-                  c: |
-                    [[[
-                      const N=(i,d=0)=>{const v=parseFloat(states[i]?.state);return isFinite(v)?v:d};
-                      const e=v=>v.toFixed(2).replace('.',',')+' €';
-                      const k=v=>Math.max(v,0).toFixed(2).replace('.',',')+' kWh';
-                      const gross=Math.max(N('[[foxcat:pricing.cost_today]]'),0),revenue=Math.max(N('[[foxcat:pricing.export_revenue_today]]'),0),net=N('[[foxcat:pricing.net_today]]',gross-revenue);
-                      const gain=N('[[foxcat:pricing.solar_gain_today]]');
-                      return `<div class="p"><div class="t"><span><ha-icon class="gr" icon="mdi:cash-sync"></ha-icon>Coût journalier</span><small>depuis 00:00</small></div>
-                        <div style="text-align:center;margin-bottom:8px"><div class="k">COÛT NET DU JOUR</div><div class="v gr" style="font-size:34px">${e(net)}</div></div>
-                        <div class="g2">
-                          <div class="stat"><span>COÛT BRUT RÉSEAU</span><b class="r">${e(gross)}</b><span>${k(N('[[foxcat:energy.today.import]]'))} prélevés</span></div>
-                          <div class="stat"><span>REVENU RÉINJECTION</span><b class="gr">${e(revenue)}</b><span>${k(N('[[foxcat:energy.today.export]]'))} réinjectés</span></div>
-                          <div class="stat"><span>AVANTAGE PV</span><b class="o">${e(gain)}</b><span>${k(N('[[foxcat:energy.today.self_consumed]]'))} autoconsommés</span></div>
-                          <div class="stat"><span>COÛT SANS PV</span><b class="b">${e(gross+gain)}</b><span>${k(N('[[foxcat:energy.today.house]]'))} maison</span></div>
-                        </div></div>`;
-                    ]]]
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Configuration active
-                  icon: mdi:cog-outline
-                  rows:
-                    - - Contrat énergie
-                      - '[[foxcat:pricing.regime]]'
-                    - - Distribution / comptage
-                      - '[[foxcat:pricing.distribution_profile]]'
-                    - - Période distribution
-                      - '[[foxcat:pricing.distribution_period]]'
-                    - - Politique réseau
-                      - '[[foxcat:pricing.network_policy]]'
-                    - - Prix achat actif
-                      - '[[foxcat:pricing.active_buy]]'
-                    - - Décision économique
-                      - '[[foxcat:pricing.economic_decision]]'
           - type: conditional
             conditions:
-              - entity: '[[foxcat:pricing.regime]]'
+              - condition: state
+                entity: select.foxcat_energy_tarification_regime_tarifaire
                 state: Dynamique
             card:
-              type: custom:apexcharts-card
-              update_interval: 1min
-              graph_span: 2d
-              span:
-                start: day
-              now:
-                show: true
-                label: Maintenant
-              header:
-                show: true
-                title: Courbe Luminus Dynamic
-                show_states: false
-              yaxis:
-                - decimals: 3
-              apex_config:
-                chart:
-                  height: 320
-                  background: transparent
-                  toolbar:
-                    show: true
-                  zoom:
-                    enabled: true
-                legend:
-                  show: true
-                  position: bottom
-                  labels:
-                    colors: '#9bb3cc'
-                grid:
-                  borderColor: rgba(255,255,255,.06)
-                stroke:
-                  curve: smooth
-                xaxis:
-                  type: datetime
-                  labels:
-                    datetimeUTC: false
-              series:
-                - entity: '[[foxcat:pricing.source.current]]'
-                  name: Achat
-                  type: area
-                  unit: €/kWh
-                  stroke_width: 3
-                  opacity: 0.16
-                  color: '#38bdf8'
-                  data_generator: >
-                    const
-                    rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-
-                    return
-                    rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new
-                    Date(r.start).getTime(),Number(r.all_in)]);
-                - entity: '[[foxcat:pricing.source.injection]]'
-                  name: Injection
-                  type: line
-                  unit: €/kWh
-                  stroke_width: 2
-                  color: '#34d399'
-                  data_generator: >
-                    const
-                    rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-
-                    return
-                    rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new
-                    Date(r.start).getTime(),Number(r.injection)]);
-              card_mod:
-                style: >
-                  ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
-                  solid
-                  rgba(90,150,220,.18)!important;border-radius:18px!important;box-shadow:0
-                  10px 30px rgba(0,0,0,.35)!important}
-          - type: grid
-            columns: 3
-            square: false
-            cards:
-              - type: conditional
-                conditions:
-                  - entity: '[[foxcat:pricing.regime]]'
-                    state: Bi-horaire HP/HC
-                card:
-                  type: custom:button-card
-                  template: fc_list
-                  variables:
-                    title: Contrat bihoraire
-                    icon: mdi:clock-outline
-                    rows:
-                      - - Période actuelle
-                        - '[[foxcat:pricing.period]]'
-                      - - Prix heures pleines
-                        - '[[foxcat:pricing.source.hp]]'
-                      - - Prix heures creuses
-                        - '[[foxcat:pricing.source.hc]]'
-                      - - Prix actif
-                        - '[[foxcat:pricing.current]]'
-                      - - Injection tarifée
-                        - '[[foxcat:pricing.injection]]'
-              - type: conditional
-                conditions:
-                  - entity: '[[foxcat:pricing.regime]]'
-                    state: Fixe / Monohoraire
-                card:
-                  type: custom:button-card
-                  template: fc_list
-                  variables:
-                    title: Contrat fixe / monohoraire
-                    icon: mdi:cash
-                    rows:
-                      - - Prix actif
-                        - '[[foxcat:pricing.current]]'
-                      - - Prix injection
-                        - '[[foxcat:pricing.injection]]'
-                      - - Politique réseau
-                        - '[[foxcat:pricing.network_policy]]'
-              - type: conditional
-                conditions:
-                  - entity: '[[foxcat:pricing.distribution_profile]]'
-                    state: Wallonie · Impact
-                card:
-                  type: custom:button-card
-                  template: fc_panel
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  show_name: false
+                  show_icon: false
+                  show_state: false
+                  triggers_update: all
+                  styles:
+                    card:
+                      - padding: 24px
+                      - border-radius: 24px
+                      - background: linear-gradient(145deg,#141a23,#0a0e14)
+                      - border: 1px solid rgba(167,139,250,.25)
+                    grid:
+                      - grid-template-areas: '"content"'
                   custom_fields:
-                    c: |
+                    content: |
                       [[[
-                        const p=states['[[foxcat:pricing.distribution_period]]']?.state??'—';
-                        const m={ECO:['01–07 · 11–17','Déplacer les charges ici','#34d399'],MEDIUM:['07–11 · 22–01','Zone intermédiaire','#facc15'],PIC:['17–22','Éviter les nouvelles grosses charges','#f87171']};
-                        const v=m[p]||['—','Profil Impact actif','#94a3b8'];
-                        return `<div class="p"><div class="k" style="font-weight:800;letter-spacing:.13em">TARIF DE DISTRIBUTION · IMPACT</div><div style="font-size:30px;font-weight:900;color:${v[2]};margin:10px 0">${p}</div><b>${v[0]}</b><div class="k" style="margin-top:5px">${v[1]}</div></div>`;
+                        const getState = (id, fallback = '—') => {
+                          const value = states[id]?.state;
+                          return value && !['unknown','unavailable'].includes(value) ? value : fallback;
+                        };
+                        const getNumber = id => {
+                          const value = getState(id, '');
+                          if (value === '') return null;
+                          const number = Number(value);
+                          return Number.isFinite(number) ? number : null;
+                        };
+                        const format = (value, digits = 3) =>
+                          value === null ? '—' : value.toFixed(digits).replace('.', ',');
+                          
+                        const price = getNumber('sensor.foxcat_energy_tarification_prix_d_achat_actif');
+                        const next = getNumber('sensor.foxcat_energy_tarification_prix_d_achat_suivant');
+                        const position = getNumber('sensor.foxcat_energy_tarification_position_sur_la_courbe_dynamique');
+                        const trend = getState('sensor.foxcat_energy_tarification_tendance_courbe_dynamique', 'Stable');
+                        const favorable = getState('binary_sensor.foxcat_energy_tarification_fenetre_prix_favorable_day_ahead', 'off') === 'on';
+                        const trendLower = trend.toLowerCase();
+                        const trendColor = trendLower.includes('hausse') ? '#fb7185' : trendLower.includes('baisse') ? '#35e59d' : '#94a3b8';
+                        const trendIcon = trendLower.includes('hausse') ? '↗' : trendLower.includes('baisse') ? '↘' : '→';
+                        const statusColor = favorable ? '#35e59d' : '#94a3b8';
+
+                        return `
+                          <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+                            <div>
+                              <div style="font-size:clamp(20px,3vw,28px);font-weight:950;color:white">
+                                <ha-icon icon="mdi:chart-timeline-variant-shimmer" style="color:#a78bfa;--mdc-icon-size:30px;vertical-align:middle"></ha-icon>
+                                TARIFICATION DYNAMIQUE
+                              </div>
+                              <div style="font-size:10px;color:#94a3b8;font-weight:800;letter-spacing:1.5px;margin-top:8px">
+                                FOXCAT ENERGY · MARCHÉ DAY-AHEAD
+                              </div>
+                            </div>
+                            <div style="padding:12px 18px;border:1px solid #a78bfa55;border-radius:16px;background:#a78bfa12">
+                              <div style="font-size:10px;color:#a78bfa;font-weight:900">PRIX D'ACHAT ACTUEL</div>
+                              <div style="font-size:27px;font-weight:950;color:white;margin-top:4px">
+                                ${format(price)} <span style="font-size:12px;color:#94a3b8">€/kWh</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+                            <div style="padding:18px 10px;text-align:center;border:1px solid #ffffff10;border-radius:16px;background:#ffffff04">
+                              <div style="font-size:9px;color:#94a3b8;font-weight:900">PRIX SUIVANT</div>
+                              <div style="font-size:22px;color:#a78bfa;font-weight:900;margin-top:10px">${format(next)} €</div>
+                              <div style="font-size:10px;color:#64748b;margin-top:6px">Créneau suivant</div>
+                            </div>
+                            <div style="padding:18px 10px;text-align:center;border:1px solid #ffffff10;border-radius:16px;background:#ffffff04">
+                              <div style="font-size:9px;color:#94a3b8;font-weight:900">POSITION COURBE</div>
+                              <div style="font-size:22px;color:white;font-weight:900;margin-top:10px">${format(position,1)}${position === null ? '' : ' %'}</div>
+                              <div style="font-size:10px;color:#64748b;margin-top:6px">Position calculée</div>
+                            </div>
+                            <div style="padding:18px 10px;text-align:center;border:1px solid #ffffff10;border-radius:16px;background:#ffffff04">
+                              <div style="font-size:9px;color:#94a3b8;font-weight:900">TENDANCE</div>
+                              <div style="font-size:19px;color:${trendColor};font-weight:900;margin-top:10px">${trendIcon}${trend}</div>
+                              <div style="font-size:10px;color:#64748b;margin-top:6px">Évolution du prix</div>
+                            </div>
+                            <div style="padding:18px 10px;text-align:center;border:1px solid ${statusColor}55;border-radius:16px;background:#ffffff04">
+                              <div style="font-size:9px;color:${statusColor};font-weight:900">FENÊTRE TARIFAIRE</div>
+                              <div style="font-size:17px;color:${statusColor};font-weight:900;margin-top:10px">${favorable ? 'FAVORABLE' : 'EN ATTENTE'}</div>
+                              <div style="font-size:10px;color:#64748b;margin-top:6px">État FoxCat</div>
+                            </div>
+                          </div>
+                          <style>
+                            @media(max-width:650px) { .unused { display:none; } }
+                          </style>
+                        `;
                       ]]]
-          - type: custom:button-card
-            show_name: false
-            show_icon: false
-            show_state: false
-            styles:
-              card:
-                - padding: 24px
-                - border-radius: 26px
-                - background: >-
-                    linear-gradient(145deg, rgba(8, 14, 22, 0.95), rgba(4, 9,
-                    14, 0.98))
-                - border: 1px solid rgba(167, 139, 250, 0.15)
-                - box-shadow: 0 25px 50px rgba(0,0,0,0.5)
-              grid:
-                - grid-template-areas: |
-                    "header"
-                    "kpis"
-                    "chart"
-                    "bilan"
-                - grid-template-columns: 1fr
-                - row-gap: 20px
-            custom_fields:
-              header: |
-                [[[
-                  const price = parseFloat(states['sensor.foxcat_energy_tarification_prix_d_achat_actif']?.state || 0).toFixed(3);
-                  return `
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                      <div>
-                        <div style="font-size:24px; font-weight:950; letter-spacing:1px; color:#ffffff; display:flex; align-items:center; gap:10px;">
-                          <ha-icon icon="mdi:chart-timeline-variant-shimmer" style="color:#a78bfa; --mdc-icon-size:28px; filter:drop-shadow(0 0 10px rgba(167,139,250,0.6));"></ha-icon>
-                          CONTRAT DYNAMIQUE
-                        </div>
-                        <div style="opacity:0.6; font-size:10px; margin-top:5px; font-weight:800; letter-spacing:0.1em; color:white;">
-                          FOXCAT ENERGY · DAY-AHEAD PRICING
-                        </div>
-                      </div>
-                      <div style="text-align:right; background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.3); padding:10px 18px; border-radius:16px; box-shadow: 0 0 20px rgba(167,139,250,0.1);">
-                        <span style="font-size:9px; font-weight:900; color:#a78bfa; display:block; letter-spacing:0.05em;">PRIX ACTUEL</span>
-                        <strong style="font-size:24px; font-weight:950; color:#ffffff; line-height:1.2;">${price} <span style="font-size:12px; opacity:0.6;">€/kWh</span></strong>
-                      </div>
-                    </div>
-                  `;
-                ]]]
-              kpis: |
-                [[[
-                  const N = (id, fallback = 0) => { const v = parseFloat(states[id]?.state); return isFinite(v) ? v : fallback; };
-                  const S = (id, fallback = '—') => { const v = states[id]?.state; return (!v || ['unknown', 'unavailable'].includes(v)) ? fallback : v; };
-                  const T = (id) => { const s = states[id]?.state; return s && s !== 'unknown' ? s.slice(0, 5) : '—'; };
-
-                  const nextPrice = N('sensor.foxcat_energy_tarification_prix_d_achat_suivant');
-                  const pos = N('sensor.foxcat_energy_tarification_position_sur_la_courbe_dynamique');
-                  const low = T('sensor.foxcat_energy_tarification_day_ahead_prochain_creux');
-                  const high = T('sensor.foxcat_energy_tarification_day_ahead_prochain_pic');
-                  const isFavorable = states['binary_sensor.foxcat_energy_tarification_fenetre_prix_favorable_day_ahead']?.state === 'on';
-                  const trend = S('sensor.foxcat_energy_tarification_tendance_courbe_dynamique', 'Stable');
-
-                  let trendIcon = '→';
-                  let trendCol = '#94a3b8';
-                  if(trend.toLowerCase().includes('hausse')) { trendIcon = '↗'; trendCol = '#fb7185'; }
-                  else if(trend.toLowerCase().includes('baisse')) { trendIcon = '↘'; trendCol = '#35e59d'; }
-
-                  const favCol = isFavorable ? '#35e59d' : '#94a3b8';
-
-                  return `
-                    <style>
-                      * { box-sizing: border-box; }
-                      .da-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-                      .da-box { padding: 16px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-                      .da-lbl { font-size: 8px; color: #64748b; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
-                      .da-val { font-size: 20px; font-weight: 900; color: #ffffff; margin-top: 6px; }
-                      .da-sub { font-size: 9px; color: #475569; margin-top: 4px; font-weight: bold; }
-                      .da-split { display: flex; width: 100%; justify-content: space-around; align-items: center; }
-                      @media(max-width: 700px) { .da-grid { grid-template-columns: repeat(2, 1fr); } }
-                    </style>
-                    <div class="da-grid">
-                      
-                      <div class="da-box">
-                        <span class="da-lbl">HEURE SUIVANTE</span>
-                        <span class="da-val" style="color:#a78bfa;">${nextPrice.toFixed(3)} <span style="font-size:12px;opacity:0.6;">€</span></span>
-                        <span class="da-sub">H+1</span>
-                      </div>
-                      
-                      <div class="da-box">
-                        <span class="da-lbl">POSITION COURBE</span>
-                        <span class="da-val">${pos.toFixed(1)} <span style="font-size:12px;opacity:0.6;">%</span></span>
-                        <span class="da-sub">Sur le max journalier</span>
-                      </div>
-                      
-                      <div class="da-box">
-                        <span class="da-lbl">TENDANCE</span>
-                        <span class="da-val" style="color:${trendCol};">${trendIcon} ${trend}</span>
-                        <span class="da-sub">Luminus Dynamic</span>
-                      </div>
-                      
-                      <div class="da-box" style="border-color:${favCol}30; background:${favCol}10;">
-                        <span class="da-lbl" style="color:${favCol};">STATUT ACTUEL</span>
-                        <span class="da-val" style="color:${favCol}; font-size:16px;">${isFavorable ? 'FAVORABLE' : 'EN ATTENTE'}</span>
-                        <span class="da-sub" style="color:${favCol}; opacity:0.7;">Analyse continue</span>
-                      </div>
-                      
-                      <div class="da-box" style="grid-column: span 4; padding: 12px;">
-                         <div class="da-split">
-                            <div>
-                              <span class="da-lbl">PROCHAIN CREUX</span>
-                              <span class="da-val" style="color:#35e59d;">${low}</span>
-                            </div>
-                            <div style="width:1px; height:30px; background:rgba(255,255,255,0.1);"></div>
-                            <div>
-                              <span class="da-lbl">PROCHAIN PIC</span>
-                              <span class="da-val" style="color:#fb7185;">${high}</span>
-                            </div>
-                         </div>
-                      </div>
-                    </div>
-                  `;
-                ]]]
-              chart:
-                card:
-                  type: custom:apexcharts-card
-                  update_interval: 5min
-                  graph_span: 2d
+                - type: custom:apexcharts-card
+                  graph_span: 48h
                   span:
                     start: day
+                  update_interval: 5min
                   now:
                     show: true
                     label: Maintenant
                   header:
-                    show: false
-                  yaxis:
-                    - decimals: 3
-                      labels:
-                        formatter: |
-                          EVAL:function(value) {
-                            return value.toFixed(3) + " €";
-                          }
+                    show: true
+                    title: Marché de l'électricité — Day-Ahead
+                    show_states: false
                   apex_config:
                     chart:
-                      height: 280
+                      height: 350
+                      toolbar:
+                        show: false
+                      background: transparent
+                      dropShadow:
+                        enabled: true
+                        top: 4
+                        left: 0
+                        blur: 4
+                        opacity: 0.15
+                    theme:
+                      mode: dark
+                    legend:
+                      show: true
+                      position: bottom
+                    grid:
+                      borderColor: rgba(255,255,255,0.05)
+                      strokeDashArray: 4
+                    stroke:
+                      width:
+                        - 0
+                        - 4
+                      curve:
+                        - stepline
+                        - smooth
+                    fill:
+                      type:
+                        - solid
+                        - gradient
+                      gradient:
+                        type: vertical
+                        shadeIntensity: 1
+                        inverseColors: false
+                        opacityFrom: 0.55
+                        opacityTo: 0
+                        stops:
+                          - 0
+                          - 100
+                    markers:
+                      size: 0
+                    xaxis:
+                      type: datetime
+                      labels:
+                        datetimeUTC: false
+                    yaxis:
+                      decimalsInFloat: 3
+                      labels:
+                        formatter: >
+                          EVAL:function(value) { return value == null ? '' :
+                          value.toFixed(3) + ' €/kWh'; }
+                    tooltip:
+                      shared: true
+                      x:
+                        format: dd/MM HH:mm
+                      'true':
+                        formatter: |
+                          EVAL:function(value, opts) {
+                            if (opts.seriesIndex === 0) {
+                              return value > 0 ? "Période active" : "Inactif";
+                            }
+                            return value == null ? '' : value.toFixed(3) + ' €/kWh';
+                          }
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: linear-gradient(145deg,#141a23,#0a0e14);
+                        border: 1px solid rgba(167,139,250,.20);
+                        border-radius: 24px;
+                        padding: 12px;
+                        box-shadow: 0 0 40px -10px rgba(167,139,250, 0.15);
+                      }
+                  series:
+                    - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
+                      name: Créneau Optimal
+                      type: area
+                      color: '#35e59d'
+                      stroke_width: 0
+                      opacity: 0.15
+                      show:
+                        extremas: false
+                      data_generator: >
+                        if (!entity || !entity.attributes ||
+                        !entity.attributes.today) return []; const rows =
+                        [...(entity.attributes.today || []),
+                        ...(entity.attributes.tomorrow || [])]; const valid =
+                        rows.filter(r => r.start != null &&
+                        Number.isFinite(Number(r.all_in))).map(r => ({t: new
+                        Date(r.start).getTime(), p: Number(r.all_in)}));
+                        if(valid.length === 0) return []; const maxP =
+                        Math.max(...valid.map(v => v.p)); const now = new
+                        Date(); now.setMinutes(0,0,0); const future =
+                        valid.filter(r => r.t >= now.getTime());
+                        if(future.length === 0) return []; let bestTime =
+                        future[0].t; let minP = future[0].p; for(let r of
+                        future) { if(r.p < minP) { minP = r.p; bestTime = r.t; }
+                        } return valid.map(r => [r.t, r.t === bestTime ? maxP :
+                        0]);
+                    - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
+                      name: Prix Achat Dynamic
+                      type: area
+                      color: '#a78bfa'
+                      stroke_width: 4
+                      opacity: 1
+                      float_precision: 3
+                      show:
+                        extremas: true
+                      data_generator: >
+                        if (!entity || !entity.attributes ||
+                        !entity.attributes.today) return [];
+
+                        const rows = [
+                          ...(entity.attributes.today || []),
+                          ...(entity.attributes.tomorrow || [])
+                        ];
+
+                        return rows
+                          .filter(r => r.start != null && r.all_in != null && Number.isFinite(Number(r.all_in)))
+                          .map(r => [new Date(r.start).getTime(), Number(r.all_in)])
+                          .filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]))
+                          .sort((a,b) => a[0] - b[0]);
+                - type: custom:button-card
+                  show_name: false
+                  show_icon: false
+                  show_state: false
+                  triggers_update: all
+                  styles:
+                    card:
+                      - padding: 22px
+                      - border-radius: 22px
+                      - background: linear-gradient(145deg,#141a23,#0a0e14)
+                      - border: 1px solid rgba(167,139,250,.15)
+                    grid:
+                      - grid-template-areas: '"content"'
+                  custom_fields:
+                    content: |
+                      [[[
+                        const read = id => {
+                          const s = states[id]?.state;
+                          if (!s || ['unknown','unavailable'].includes(s)) return null;
+                          const n = Number(s);
+                          return Number.isFinite(n) ? n : null;
+                        };
+                        const fmt = (v, suffix) => v === null ? '—' : v.toFixed(2).replace('.', ',') + suffix;
+                        const time = id => {
+                          const s = states[id]?.state;
+                          return s && !['unknown','unavailable'].includes(s) ? (s.includes(':') ? s.slice(0,5) : s) : '—';
+                        };
+
+                        const imp = read('sensor.foxcat_energy_energie_dynamic_prelevement_reseau_aujourdhui');
+                        const exp = read('sensor.foxcat_energy_energie_dynamic_reinjection_aujourdhui');
+                        const cost = read('sensor.foxcat_energy_tarification_dynamic_cout_net_aujourdhui');
+
+                        const wash = time('sensor.foxcat_energy_machines_day_ahead_lave_linge');
+                        const dry = time('sensor.foxcat_energy_machines_day_ahead_seche_linge');
+                        const dish = time('sensor.foxcat_energy_machines_day_ahead_lave_vaisselle');
+
+                        return `
+                          <style>
+                            .plan-chip { padding: 6px 12px; border-radius: 10px; background: rgba(255,255,255,0.05); color: #cbd5e1; font-size: 12px; font-weight: 800; text-transform: capitalize; }
+                          </style>
+                          <div style="font-size:16px;font-weight:900;color:white;margin-bottom:18px">BILAN ET PLANIFICATION DYNAMIQUE</div>
+                          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+                            <div style="padding:18px;border:1px solid #ffffff12;border-radius:16px">
+                              <div style="font-size:12px;color:#38bdf8;font-weight:900;margin-bottom:12px">BILAN JOURNALIER</div>
+                              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:#94a3b8;font-size:12px">Prélèvement <b style="color:#fb7185">${fmt(imp,' kWh')}</b></div>
+                              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:#94a3b8;font-size:12px">Réinjection <b style="color:#35e59d">${fmt(exp,' kWh')}</b></div>
+                              <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 0;border-top:1px solid #ffffff12;color:white;font-size:12px">Coût net <b style="color:#38bdf8;font-size:20px">${fmt(cost,' €')}</b></div>
+                            </div>
+                            <div style="padding:18px;border:1px solid #ffffff12;border-radius:16px">
+                              <div style="font-size:12px;color:#a78bfa;font-weight:900;margin-bottom:12px">CRÉNEAUX MACHINES</div>
+                              <div style="display:flex;justify-content:space-between;align-items:left;padding:10px 0;color:#94a3b8;font-size:12px">Lave-linge <span class="plan-chip">${wash}</span></div>
+                              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:#94a3b8;font-size:12px">Sèche-linge <span class="plan-chip">${dry}</span></div>
+                              <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;color:#94a3b8;font-size:12px">Lave-vaisselle <span class="plan-chip">${dish}</span></div>
+                            </div>
+                          </div>
+                        `;
+                      ]]]
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: select.foxcat_energy_tarification_regime_tarifaire
+                state: Bi-horaire (HP/HC)
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:button-card
+                  show_name: false
+                  show_icon: false
+                  show_state: false
+                  triggers_update: all
+                  styles:
+                    card:
+                      - padding: 24px
+                      - border-radius: 24px
+                      - background: linear-gradient(145deg,#141a23,#0a0e14)
+                      - border: 1px solid rgba(25,216,255,.22)
+                    grid:
+                      - grid-template-areas: '"content"'
+                  custom_fields:
+                    content: |
+                      [[[
+                        const get = id => {
+                          const s = states[id]?.state;
+                          if (!s || ['unknown','unavailable'].includes(s)) return null;
+                          const n = Number(s);
+                          return Number.isFinite(n) ? n : null;
+                        };
+                        const fmt = n => n === null ? '—' : n.toFixed(3).replace('.',',');
+                        const hp = get('sensor.foxcat_energy_tarification_prix_heures_pleines_hp');
+                        const hc = get('sensor.foxcat_energy_tarification_prix_heures_creuses_hc');
+                        const current = get('sensor.foxcat_energy_tarification_prix_d_achat_actif');
+                        const period = states['sensor.foxcat_energy_tarification_periode_tarifaire']?.state || '—';
+                        const isHP = period.toUpperCase() === 'HP';
+                        const isHC = period.toUpperCase() === 'HC';
+
+                        return `
+                          <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px">
+                            <div>
+                              <div style="font-size:clamp(20px,3vw,28px);font-weight:950;color:white">
+                                <ha-icon icon="mdi:clock-time-four-outline" style="color:#19d8ff;--mdc-icon-size:30px;vertical-align:middle"></ha-icon>
+                                TARIFICATION BI-HORAIRE
+                              </div>
+                              <div style="font-size:10px;color:#94a3b8;font-weight:800;letter-spacing:1.5px;margin-top:8px">
+                                FOXCAT ENERGY · HEURES PLEINES / HEURES CREUSES
+                              </div>
+                            </div>
+                            <div style="padding:12px 18px;border:1px solid ${isHP ? '#ff922b' : isHC ? '#19d8ff' : '#64748b'}55;border-radius:16px;background:#ffffff05">
+                              <div style="font-size:10px;color:#94a3b8;font-weight:900">PÉRIODE ACTUELLE</div>
+                              <div style="font-size:27px;font-weight:950;color:${isHP ? '#ff922b' : isHC ? '#19d8ff' : 'white'};margin-top:4px">${period}</div>
+                            </div>
+                          </div>
+                          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+                            <div style="padding:20px 10px;text-align:center;border:1px solid ${isHP ? '#ff922b' : '#ffffff12'};border-radius:16px;background:${isHP ? '#ff922b12' : '#ffffff04'}">
+                              <div style="font-size:10px;color:#ff922b;font-weight:900">HEURES PLEINES</div>
+                              <div style="font-size:25px;color:white;font-weight:950;margin-top:10px">${fmt(hp)} €</div>
+                              <div style="font-size:10px;color:#94a3b8;margin-top:6px">${isHP ? 'TARIF ACTIF' : 'Tarif HP'}</div>
+                            </div>
+                            <div style="padding:20px 10px;text-align:center;border:1px solid ${isHC ? '#19d8ff' : '#ffffff12'};border-radius:16px;background:${isHC ? '#19d8ff12' : '#ffffff04'}">
+                              <div style="font-size:10px;color:#19d8ff;font-weight:900">HEURES CREUSES</div>
+                              <div style="font-size:25px;color:white;font-weight:950;margin-top:10px">${fmt(hc)} €</div>
+                              <div style="font-size:10px;color:#94a3b8;margin-top:6px">${isHC ? 'TARIF ACTIF' : 'Tarif HC'}</div>
+                            </div>
+                            <div style="padding:20px 10px;text-align:center;border:1px solid #ffffff12;border-radius:16px;background:#ffffff04">
+                              <div style="font-size:10px;color:#a78bfa;font-weight:900">PRIX ACTUEL</div>
+                              <div style="font-size:25px;color:white;font-weight:950;margin-top:10px">${fmt(current)} €</div>
+                              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Capteur FoxCat</div>
+                            </div>
+                          </div>
+                          <div style="margin-top:18px;padding:14px 16px;border-radius:14px;background:#ffffff04;color:#94a3b8;font-size:12px;line-height:1.7">
+                            <b style="color:#f8fafc">Horaires configurés</b><br>
+                            HC : 22 h–07 h et 11 h–17 h<br>
+                            HP : 07 h–11 h et 17 h–22 h<br>
+                            Tous les jours, selon le calendrier tarifaire configuré.
+                          </div>
+                        `;
+                      ]]]
+                - type: custom:apexcharts-card
+                  graph_span: 48h
+                  span:
+                    start: day
+                  update_interval: 5min
+                  now:
+                    show: true
+                    label: Maintenant
+                  header:
+                    show: true
+                    title: Profil tarifaire HP / HC
+                    show_states: false
+                  apex_config:
+                    chart:
+                      height: 350
                       toolbar:
                         show: false
                       background: transparent
@@ -2838,66 +2878,128 @@ views:
                     legend:
                       show: true
                       position: bottom
-                      labels:
-                        colors: '#9bb3cc'
                     grid:
-                      borderColor: rgba(255,255,255,0.06)
+                      borderColor: rgba(255,255,255,0.08)
                       strokeDashArray: 3
                     stroke:
-                      width: 2
-                      curve: smooth
-                    fill:
-                      type:
-                        - gradient
-                        - solid
-                        - solid
-                      gradient:
-                        shade: dark
-                        type: vertical
-                        shadeIntensity: 0.5
-                        opacityFrom: 0.3
-                        opacityTo: 0.05
-                        stops:
-                          - 0
-                          - 100
+                      width: 3
+                      curve: stepline
+                    markers:
+                      size: 0
                     xaxis:
                       type: datetime
                       labels:
                         datetimeUTC: false
+                    yaxis:
+                      decimalsInFloat: 3
+                      labels:
+                        formatter: >
+                          EVAL:function(value) { return value == null ? '' :
+                          value.toFixed(3) + ' €/kWh'; }
                     tooltip:
                       shared: true
                       x:
                         format: dd/MM HH:mm
+                  card_mod:
+                    style: |
+                      ha-card {
+                        background: linear-gradient(145deg,#141a23,#0a0e14);
+                        border: 1px solid rgba(25,216,255,.20);
+                        border-radius: 24px;
+                        padding: 12px;
+                      }
                   series:
-                    - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
-                      name: Achat
-                      type: area
-                      color: '#a78bfa'
-                      float_precision: 3
-                      show:
-                        in_header: false
-                        extremas: true
-                      data_generator: >
-                        const
-                        rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-
-                        return
-                        rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new
-                        Date(r.start).getTime(),Number(r.all_in)]);
-                    - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
-                      name: Tendance
+                    - entity: sensor.foxcat_energy_tarification_prix_heures_pleines_hp
+                      name: Tarif HP
                       type: line
-                      color: '#38bdf8'
+                      color: '#ff922b'
                       float_precision: 3
-                      show:
-                        in_header: false
                       data_generator: >
-                        const
-                        rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]
-                          .filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>({time:new Date(r.start).getTime(),price:Number(r.all_in)})).sort((a,b)=>a.time-b.time);
-                        return rows.map((r,i)=>{const
-                        w=rows.slice(Math.max(0,i-1),
-    theme: ios-dark-mode-blue-red
+                        const hpState =
+                        hass.states['sensor.foxcat_energy_tarification_prix_heures_pleines_hp']?.state;
+                        const hcState =
+                        hass.states['sensor.foxcat_energy_tarification_prix_heures_creuses_hc']?.state;
+                        if (!hpState || !hcState ||
+                        !Number.isFinite(Number(hpState)) ||
+                        !Number.isFinite(Number(hcState))) return []; const hp =
+                        Number(hpState); const start = new Date();
+                        start.setHours(0,0,0,0); const data = []; for (let i =
+                        0; i <= 96; i++) {
+                          const d = new Date(start.getTime() + i * 30 * 60000);
+                          const h = d.getHours();
+                          const isHC = h >= 22 || h < 7 || (h >= 11 && h < 17);
+                          data.push([d.getTime(), isHC ? null : hp]);
+                        } return data;
+                    - entity: sensor.foxcat_energy_tarification_prix_heures_creuses_hc
+                      name: Tarif HC
+                      type: line
+                      color: '#19d8ff'
+                      float_precision: 3
+                      data_generator: >
+                        const hpState =
+                        hass.states['sensor.foxcat_energy_tarification_prix_heures_pleines_hp']?.state;
+                        const hcState =
+                        hass.states['sensor.foxcat_energy_tarification_prix_heures_creuses_hc']?.state;
+                        if (!hpState || !hcState ||
+                        !Number.isFinite(Number(hpState)) ||
+                        !Number.isFinite(Number(hcState))) return []; const hc =
+                        Number(hcState); const start = new Date();
+                        start.setHours(0,0,0,0); const data = []; for (let i =
+                        0; i <= 96; i++) {
+                          const d = new Date(start.getTime() + i * 30 * 60000);
+                          const h = d.getHours();
+                          const isHC = h >= 22 || h < 7 || (h >= 11 && h < 17);
+                          data.push([d.getTime(), isHC ? hc : null]);
+                        } return data;
+                - type: custom:button-card
+                  show_name: false
+                  show_icon: false
+                  show_state: false
+                  triggers_update: all
+                  styles:
+                    card:
+                      - padding: 22px
+                      - border-radius: 22px
+                      - background: linear-gradient(145deg,#141a23,#0a0e14)
+                      - border: 1px solid rgba(25,216,255,.15)
+                      - filter: grayscale(1)
+                      - opacity: 0.4
+                    grid:
+                      - grid-template-areas: '"content"'
+                  custom_fields:
+                    content: |
+                      [[[
+                        const read = id => {
+                          const s = states[id]?.state;
+                          if (!s || ['unknown','unavailable'].includes(s)) return null;
+                          const n = Number(s);
+                          return Number.isFinite(n) ? n : null;
+                        };
+                        const fmt = (v, suffix) => v === null ? '—' : v.toFixed(2).replace('.', ',') + suffix;
+                        
+                        const imp = read('sensor.foxcat_energy_energie_dynamic_prelevement_reseau_aujourdhui');
+                        const exp = read('sensor.foxcat_energy_energie_dynamic_reinjection_aujourdhui');
+                        const cost = read('sensor.foxcat_energy_tarification_dynamic_cout_net_aujourdhui');
+
+                        return `
+                          <div style="font-size:16px;font-weight:900;color:white;margin-bottom:18px">BILAN ET PLANIFICATION BI-HORAIRE</div>
+                          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px">
+                            <div style="padding:18px;border:1px solid #ffffff12;border-radius:16px">
+                              <div style="font-size:12px;color:#38bdf8;font-weight:900;margin-bottom:12px">BILAN JOURNALIER</div>
+                              <div style="display:flex;justify-content:space-between;padding:10px 0;color:#94a3b8;font-size:12px">Prélèvement <b style="color:#fb7185">${fmt(imp,' kWh')}</b></div>
+                              <div style="display:flex;justify-content:space-between;padding:10px 0;color:#94a3b8;font-size:12px">Réinjection <b style="color:#35e59d">${fmt(exp,' kWh')}</b></div>
+                              <div style="display:flex;justify-content:space-between;padding:14px 0 0;border-top:1px solid #ffffff12;color:white;font-size:12px">Coût net <b style="color:#38bdf8;font-size:20px">${fmt(cost,' €')}</b></div>
+                            </div>
+                            <div style="padding:18px;border:1px solid #ffffff12;border-radius:16px">
+                              <div style="font-size:12px;color:#a78bfa;font-weight:900;margin-bottom:12px">CRÉNEAUX MACHINES</div>
+                              <div style="display:flex;justify-content:space-between;padding:10px 0;color:#94a3b8;font-size:12px">Lave-linge <b style="color:white">Désactivé</b></div>
+                              <div style="display:flex;justify-content:space-between;padding:10px 0;color:#94a3b8;font-size:12px">Sèche-linge <b style="color:white">Désactivé</b></div>
+                              <div style="display:flex;justify-content:space-between;padding:10px 0;color:#94a3b8;font-size:12px">Lave-vaisselle <b style="color:white">Désactivé</b></div>
+                            </div>
+                          </div>
+                        `;
+                      ]]]
+    theme: ios-dark-mode-blue-red-alternative
   - title: Diagnostic
     path: diagnostic
     icon: mdi:stethoscope
@@ -3162,6 +3264,7 @@ views:
                 name: Politique réseau
               - entity: select.foxcat_energy_tarification_regime_tarifaire
                 name: Distribution / comptage
+              - entity: select.foxcat_energy_tarification_source_du_prix
       - type: grid
         cards:
           - type: conditional
