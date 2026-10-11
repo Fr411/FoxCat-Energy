@@ -733,23 +733,19 @@ views:
                         func: avg
                         duration: 5min
                     series:
-                      - entity: >-
-                          sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
+                      - entity: sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
                         name: Solaire
                         type: area
                         color: '#ffb020'
-                      - entity: >-
-                          sensor.foxcat_energy_energie_puissance_de_consommation_maison
+                      - entity: sensor.foxcat_energy_energie_puissance_de_consommation_maison
                         name: Maison
                         type: line
                         color: '#38bdf8'
-                      - entity: >-
-                          sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
+                      - entity: sensor.foxcat_energy_energie_puissance_prelevee_au_reseau
                         name: Prélèvement
                         type: line
                         color: '#f87171'
-                      - entity: >-
-                          sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
+                      - entity: sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau
                         name: Réinjection
                         type: line
                         color: '#34d399'
@@ -1886,24 +1882,6 @@ views:
                         rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0
                         0 18px 18px!important;box-shadow:none!important}
               - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: FoxCat · EMS
-                  icon: mdi:cat
-                  rows:
-                    - - Mode EMS
-                      - '[[foxcat:ems.mode]]'
-                    - - Régulation active
-                      - '[[foxcat:ems.regulation_active]]'
-                    - - Demande Boiler
-                      - '[[foxcat:boiler.demand]]'
-                    - - Origine Boiler
-                      - '[[foxcat:boiler.origin]]'
-                    - - Exécution Boiler
-                      - '[[foxcat:boiler.execution_status]]'
-                    - - Statut du prix
-                      - '[[foxcat:pricing.status]]'
-              - type: custom:button-card
                 template: fc_panel
                 custom_fields:
                   c: |
@@ -1921,6 +1899,3967 @@ views:
                         <div style="padding:14px;border-radius:14px;background:${c}14;border:1px solid ${c}55;font-size:14px;line-height:1.5">${t}</div>
                         <div class="quote">« Le bon kWh est celui qu'on n'achète pas. »</div></div>`;
                     ]]]
+              - type: custom:button-card
+                show_name: false
+                show_icon: false
+                show_state: false
+                triggers_update: all
+                styles:
+                  card:
+                    - padding: 0
+                    - border-radius: 26px
+                    - overflow: hidden
+                    - background: >-
+                        linear-gradient(145deg, rgba(7,11,20,0.98),
+                        rgba(12,22,38,0.98))
+                    - border: 1px solid rgba(255,255,255,0.08)
+                    - box-shadow: 0 16px 38px rgba(0,0,0,0.35)
+                  grid:
+                    - grid-template-areas: '"content"'
+                    - grid-template-columns: 1fr
+                  custom_fields:
+                    content:
+                      - width: 100%
+                custom_fields:
+                  content: |
+                    [[[
+                      /* ==========================================================
+                         FOXCAT ENERGY V1.5.0
+                         CONSOMMATION APPAREILS — COMPTABILITÉ NATIVE FOXCAT
+
+                         Priorité : entités natives FoxCat Energy V1.5.0
+                         Fallback : anciens capteurs uniquement si nécessaire.
+                         Une carte n'est affichée que si sa gestion FoxCat est active.
+                         ========================================================== */
+
+
+                      /* ==========================================================
+                         OUTILS
+                         ========================================================== */
+
+                      const norm = (value) =>
+                        String(value ?? '')
+                          .normalize('NFD')
+                          .replace(/[\u0300-\u036f]/g, '')
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]+/g, ' ')
+                          .trim();
+
+
+                      const validState = (id) => {
+
+                        const s =
+                          id
+                            ? states[id]
+                            : null;
+
+                        return (
+                          !!s &&
+                          ![
+                            'unknown',
+                            'unavailable',
+                            'none',
+                            ''
+                          ].includes(
+                            String(s.state)
+                          )
+                        );
+                      };
+
+
+                      const stateOf = (
+                        id,
+                        fallback = '—'
+                      ) =>
+                        validState(id)
+                          ? states[id].state
+                          : fallback;
+
+
+                      const numberOf = (
+                        id,
+                        fallback = 0
+                      ) => {
+
+                        if (!validState(id)) {
+                          return fallback;
+                        }
+
+                        const v =
+                          Number.parseFloat(
+                            states[id].state
+                          );
+
+                        return Number.isFinite(v)
+                          ? v
+                          : fallback;
+                      };
+
+
+                      const isOn = (id) =>
+                        !!id &&
+                        states[id]?.state === 'on';
+
+
+                      const clamp = (
+                        v,
+                        min,
+                        max
+                      ) =>
+                        Math.min(
+                          Math.max(
+                            Number(v) || 0,
+                            min
+                          ),
+                          max
+                        );
+
+
+                      const fmtEnergy = (v) =>
+                        `${Math.max(
+                          0,
+                          Number(v) || 0
+                        ).toFixed(2)} kWh`;
+
+
+                      const fmtEuro = (v) =>
+                        `${Number(
+                          v || 0
+                        ).toFixed(2)} €`;
+
+
+                      const fmtPrice = (v) =>
+                        Number.isFinite(
+                          Number(v)
+                        )
+                          ? `${Number(v).toFixed(4)} €/kWh`
+                          : '—';
+
+
+                      const fmtPower = (v) => {
+
+                        const x =
+                          Math.max(
+                            0,
+                            Number(v) || 0
+                          );
+
+                        return x >= 1000
+                          ? `${(x / 1000).toFixed(2)} kW`
+                          : `${Math.round(x)} W`;
+                      };
+
+
+                      /* ==========================================================
+                         REGISTRE CENTRAL DES ENTITÉS
+                         FOXCAT ENERGY V1.5.0
+
+                         ============================================
+                         C'EST ICI QU'IL FAUT MODIFIER LES ENTITÉS
+                         ============================================
+
+                         Une valeur vide :
+                           ''
+
+                         signifie :
+                           → recherche automatique de l'entité FoxCat
+
+                         Une valeur renseignée :
+                           '[[foxcat:legacy.sensor_xxx]]'
+
+                         signifie :
+                           → cette entité est prioritaire
+
+                         Les anciennes entités restent en secours.
+                         ========================================================== */
+
+                      const ENTITIES = {
+
+
+                        /* ========================================================
+                           FOXCAT GLOBAL
+                           ======================================================== */
+
+                        foxcat: {
+
+                          /* Mode EMS */
+                          mode_ems:
+                            '',
+
+                          /* Régime tarifaire sélectionné */
+                          regime_tarifaire:
+                            '',
+
+                          /* Régime tarifaire réellement actif */
+                          regime_tarifaire_actif:
+                            '',
+
+                          /* HP / HC / dynamique */
+                          periode_tarifaire:
+                            '',
+
+                          /* Prix réellement utilisé par FoxCat */
+                          prix_achat_actif:
+                            '',
+
+                          /* AVANTAGEUX / NORMAL / ÉLEVÉ */
+                          statut_prix:
+                            '',
+
+                          /* Fenêtre autorisation machines */
+                          fenetre_machines:
+                            '',
+
+                          /* Machine protégée active */
+                          machine_protegee_active:
+                            '',
+
+                          /* Délestage haute consommation */
+                          delestage_haute_consommation_actif:
+                            '',
+
+                          /* État du délestage */
+                          statut_delestage_haute_consommation:
+                            '',
+
+                          /* Comptabilité globale maison */
+                          consommation_maison_aujourdhui:
+                            '',
+
+                          cout_net_maison_aujourdhui:
+                            ''
+
+                        },
+
+
+                        /* ========================================================
+                           ENTITÉS EXTÉRIEURES DE SECOURS
+                           ======================================================== */
+
+                        external: {
+
+                          prix_luminus_fallback:
+                            '[[foxcat:pricing.active_buy]]'
+
+                        },
+
+
+                        /* ========================================================
+                           BOILER ECS
+                           ======================================================== */
+
+                        boiler: {
+
+                          /* -------- NATIF FOXCAT -------- */
+
+                          gestion:
+                            '',
+
+                          energie_jour:
+                            '',
+
+                          part_solaire_jour:
+                            '',
+
+                          part_reseau_jour:
+                            '',
+
+                          cout_jour:
+                            '',
+
+                          consommation_hp_jour:
+                            '',
+
+                          consommation_hc_jour:
+                            '',
+
+                          tarif_actuel:
+                            '',
+
+                          puissance:
+                            '',
+
+                          cycle:
+                            '',
+
+
+                          /* -------- LEGACY / SECOURS -------- */
+
+                          legacy_gestion:
+                            '[[foxcat:legacy.input_boolean_ems_boiler]]',
+
+                          legacy_puissance:
+                            '[[foxcat:boiler.power_source]]',
+
+                          legacy_cycle:
+                            '[[foxcat:boiler.binary_source]]',
+
+                          legacy_cycle_2:
+                            '[[foxcat:legacy.binary_sensor_boiler_physique]]',
+
+                          legacy_energie:
+                            '[[foxcat:legacy.sensor_boiler_energy_daily]]',
+
+                          legacy_cout:
+                            '[[foxcat:legacy.sensor_boiler_energy_daily_cost]]',
+
+                          legacy_hc:
+                            '[[foxcat:legacy.sensor_boiler_puissance_hc_energy]]',
+
+                          legacy_hp:
+                            '[[foxcat:legacy.sensor_boiler_puissance_hp_energy]]'
+
+                        },
+
+
+                        /* ========================================================
+                           LAVE-LINGE
+                           ======================================================== */
+
+                        lave_linge: {
+
+                          /* -------- NATIF FOXCAT -------- */
+
+                          gestion:
+                            '',
+
+                          energie_jour:
+                            '',
+
+                          part_solaire_jour:
+                            '',
+
+                          part_reseau_jour:
+                            '',
+
+                          cout_jour:
+                            '',
+
+                          consommation_hp_jour:
+                            '',
+
+                          consommation_hc_jour:
+                            '',
+
+                          tarif_actuel:
+                            '',
+
+                          puissance:
+                            '',
+
+                          cycle:
+                            '',
+
+
+                          /* -------- LEGACY / SECOURS -------- */
+
+                          legacy_gestion:
+                            '[[foxcat:legacy.input_boolean_ems_lave_linge]]',
+
+                          legacy_puissance:
+                            '[[foxcat:legacy.sensor_lave_linge_puissance]]',
+
+                          legacy_puissance_2:
+                            '[[foxcat:legacy.sensor_lave_linge_power]]',
+
+                          legacy_cycle:
+                            '[[foxcat:machines.washer.cycle]]',
+
+                          legacy_cycle_2:
+                            '[[foxcat:legacy.binary_sensor_lave_linge_en_cours]]',
+
+                          legacy_energie:
+                            '[[foxcat:legacy.sensor_lave_linge_energy_daily]]',
+
+                          legacy_energie_2:
+                            '[[foxcat:legacy.sensor_lave_linge_energie_journaliere]]',
+
+                          legacy_cout:
+                            '[[foxcat:legacy.sensor_lave_linge_energy_daily_cost]]',
+
+                          legacy_cout_2:
+                            '[[foxcat:legacy.sensor_lave_linge_cout_journalier]]',
+
+                          legacy_hc:
+                            '[[foxcat:legacy.sensor_lave_linge_puissance_hc_energy]]',
+
+                          legacy_hc_2:
+                            '[[foxcat:legacy.sensor_lave_linge_hc_energy]]',
+
+                          legacy_hp:
+                            '[[foxcat:legacy.sensor_lave_linge_puissance_hp_energy]]',
+
+                          legacy_hp_2:
+                            '[[foxcat:legacy.sensor_lave_linge_hp_energy]]'
+
+                        },
+
+
+                        /* ========================================================
+                           SÈCHE-LINGE
+                           ======================================================== */
+
+                        seche_linge: {
+
+                          /* -------- NATIF FOXCAT -------- */
+
+                          gestion:
+                            '',
+
+                          energie_jour:
+                            '',
+
+                          part_solaire_jour:
+                            '',
+
+                          part_reseau_jour:
+                            '',
+
+                          cout_jour:
+                            '',
+
+                          consommation_hp_jour:
+                            '',
+
+                          consommation_hc_jour:
+                            '',
+
+                          tarif_actuel:
+                            '',
+
+                          puissance:
+                            '',
+
+                          cycle:
+                            '',
+
+
+                          /* -------- LEGACY / SECOURS -------- */
+
+                          legacy_gestion:
+                            '[[foxcat:legacy.input_boolean_ems_seche_linge]]',
+
+                          legacy_puissance:
+                            '[[foxcat:legacy.sensor_seche_linge_puissance]]',
+
+                          legacy_puissance_2:
+                            '[[foxcat:legacy.sensor_seche_linge_power]]',
+
+                          legacy_cycle:
+                            '[[foxcat:machines.dryer.cycle]]',
+
+                          legacy_cycle_2:
+                            '[[foxcat:legacy.binary_sensor_seche_linge_en_cours]]',
+
+                          legacy_energie:
+                            '[[foxcat:legacy.sensor_seche_linge_energy_daily]]',
+
+                          legacy_energie_2:
+                            '[[foxcat:legacy.sensor_seche_linge_energie_journaliere]]',
+
+                          legacy_cout:
+                            '[[foxcat:legacy.sensor_seche_linge_energy_daily_cost]]',
+
+                          legacy_cout_2:
+                            '[[foxcat:legacy.sensor_seche_linge_cout_journalier]]',
+
+                          legacy_hc:
+                            '[[foxcat:legacy.sensor_seche_linge_puissance_hc_energy]]',
+
+                          legacy_hc_2:
+                            '[[foxcat:legacy.sensor_seche_linge_hc_energy]]',
+
+                          legacy_hp:
+                            '[[foxcat:legacy.sensor_seche_linge_puissance_hp_energy]]',
+
+                          legacy_hp_2:
+                            '[[foxcat:legacy.sensor_seche_linge_hp_energy]]'
+
+                        },
+
+
+                        /* ========================================================
+                           LAVE-VAISSELLE
+                           ======================================================== */
+
+                        lave_vaisselle: {
+
+                          /* -------- NATIF FOXCAT -------- */
+
+                          gestion:
+                            '',
+
+                          energie_jour:
+                            '',
+
+                          part_solaire_jour:
+                            '',
+
+                          part_reseau_jour:
+                            '',
+
+                          cout_jour:
+                            '',
+
+                          consommation_hp_jour:
+                            '',
+
+                          consommation_hc_jour:
+                            '',
+
+                          tarif_actuel:
+                            '',
+
+                          puissance:
+                            '',
+
+                          cycle:
+                            '',
+
+
+                          /* -------- LEGACY / SECOURS -------- */
+
+                          legacy_gestion:
+                            '[[foxcat:legacy.input_boolean_ems_lave_vaisselle]]',
+
+                          legacy_puissance:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_puissance]]',
+
+                          legacy_puissance_2:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_power]]',
+
+                          legacy_cycle:
+                            '[[foxcat:machines.dishwasher.cycle]]',
+
+                          legacy_cycle_2:
+                            '[[foxcat:legacy.binary_sensor_lave_vaisselle_en_cours]]',
+
+                          legacy_energie:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily]]',
+
+                          legacy_energie_2:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_energie_journaliere]]',
+
+                          legacy_cout:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily_cost]]',
+
+                          legacy_cout_2:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_cout_journalier]]',
+
+                          legacy_hc:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_puissance_hc_energy]]',
+
+                          legacy_hc_2:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_hc_energy]]',
+
+                          legacy_hp:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_puissance_hp_energy]]',
+
+                          legacy_hp_2:
+                            '[[foxcat:legacy.sensor_lave_vaisselle_hp_energy]]'
+
+                        }
+
+                      };
+
+
+                      /* ==========================================================
+                         OUTILS DU REGISTRE
+                         ========================================================== */
+
+                      const entityList = (
+                        ...values
+                      ) =>
+                        values
+                          .flat(Infinity)
+                          .filter(
+                            (id) =>
+                              typeof id === 'string'
+                              &&
+                              id.trim() !== ''
+                          );
+
+
+                      const firstExisting = (
+                        ...values
+                      ) =>
+                        entityList(
+                          ...values
+                        )
+                          .find(
+                            (id) =>
+                              !!states[id]
+                          )
+                        ||
+                        null;
+
+
+                      /* ==========================================================
+                         RECHERCHE AUTOMATIQUE
+                         ========================================================== */
+
+                      const entityText = (id) => {
+
+                        const s =
+                          states[id];
+
+                        return norm(
+                          `${id} ${s?.attributes?.friendly_name || ''}`
+                        );
+                      };
+
+
+                      const findEntity = (
+                        domain,
+                        requiredWords = [],
+                        candidates = [],
+                        rejectedWords = []
+                      ) => {
+
+                        for (
+                          const id
+                          of candidates
+                        ) {
+
+                          if (
+                            states[id]
+                          ) {
+                            return id;
+                          }
+                        }
+
+
+                        const wanted =
+                          requiredWords
+                            .map(norm)
+                            .filter(Boolean);
+
+
+                        const rejected =
+                          rejectedWords
+                            .map(norm)
+                            .filter(Boolean);
+
+
+                        return (
+                          Object.keys(states)
+
+                            .filter(
+                              (id) =>
+                                id.startsWith(
+                                  `${domain}.`
+                                )
+                            )
+
+                            .find(
+                              (id) => {
+
+                                const text =
+                                  entityText(id);
+
+
+                                return (
+                                  wanted.every(
+                                    (w) =>
+                                      text.includes(w)
+                                  )
+                                  &&
+                                  !rejected.some(
+                                    (w) =>
+                                      text.includes(w)
+                                  )
+                                );
+                              }
+                            )
+                          ||
+                          null
+                        );
+                      };
+
+
+                      const findFox = (
+                        domain,
+                        requiredWords = [],
+                        candidates = [],
+                        rejectedWords = []
+                      ) => {
+
+                        /*
+                         * 1 — Registre prioritaire.
+                         */
+
+                        for (
+                          const id
+                          of candidates
+                        ) {
+
+                          if (
+                            states[id]
+                          ) {
+                            return id;
+                          }
+                        }
+
+
+                        /*
+                         * 2 — Recherche automatique FoxCat.
+                         */
+
+                        const wanted =
+                          requiredWords
+                            .map(norm)
+                            .filter(Boolean);
+
+
+                        const rejected =
+                          rejectedWords
+                            .map(norm)
+                            .filter(Boolean);
+
+
+                        return (
+                          Object.keys(states)
+
+                            .filter(
+                              (id) =>
+                                id.startsWith(
+                                  `${domain}.`
+                                )
+                            )
+
+                            .find(
+                              (id) => {
+
+                                const text =
+                                  entityText(id);
+
+
+                                const fox =
+                                  text.includes(
+                                    'foxcat energy'
+                                  )
+                                  ||
+                                  norm(id).includes(
+                                    'foxcat energy'
+                                  );
+
+
+                                return (
+                                  fox
+                                  &&
+                                  wanted.every(
+                                    (w) =>
+                                      text.includes(w)
+                                  )
+                                  &&
+                                  !rejected.some(
+                                    (w) =>
+                                      text.includes(w)
+                                  )
+                                );
+                              }
+                            )
+                          ||
+                          null
+                        );
+                      };
+
+
+                      const findPowerSensor = (
+                        deviceWords = [],
+                        candidates = []
+                      ) => {
+
+                        /*
+                         * Registre / anciennes entités prioritaires.
+                         */
+
+                        for (
+                          const id
+                          of candidates
+                        ) {
+
+                          if (
+                            states[id]
+                          ) {
+                            return id;
+                          }
+                        }
+
+
+                        const wanted =
+                          deviceWords
+                            .map(norm)
+                            .filter(Boolean);
+
+
+                        return (
+                          Object.keys(states)
+
+                            .filter(
+                              (id) =>
+                                id.startsWith(
+                                  'sensor.'
+                                )
+                            )
+
+                            .find(
+                              (id) => {
+
+                                const s =
+                                  states[id];
+
+
+                                const text =
+                                  entityText(id);
+
+
+                                const unit =
+                                  s?.attributes?.unit_of_measurement
+                                  ||
+                                  '';
+
+
+                                const cls =
+                                  s?.attributes?.device_class
+                                  ||
+                                  '';
+
+
+                                return (
+                                  wanted.some(
+                                    (w) =>
+                                      text.includes(w)
+                                  )
+                                  &&
+                                  (
+                                    cls === 'power'
+                                    ||
+                                    unit === 'W'
+                                    ||
+                                    unit === 'kW'
+                                  )
+                                );
+                              }
+                            )
+                          ||
+                          null
+                        );
+                      };
+
+
+                      /* ==========================================================
+                         GESTION FOXCAT
+                         ========================================================== */
+
+                      const management = (
+                        words,
+                        legacy = null,
+                        preferred = null
+                      ) => {
+
+                        /*
+                         * 1 — Entité renseignée dans le registre.
+                         * 2 — Détection automatique FoxCat.
+                         */
+
+                        const native =
+                          findFox(
+                            'switch',
+                            words,
+                            entityList(
+                              preferred
+                            )
+                          );
+
+
+                        if (
+                          native
+                        ) {
+
+                          return {
+
+                            entity:
+                              native,
+
+                            enabled:
+                              isOn(native),
+
+                            native:
+                              true
+                          };
+                        }
+
+
+                        /*
+                         * Secours legacy.
+                         */
+
+                        const legacyEntity =
+                          firstExisting(
+                            legacy
+                          );
+
+
+                        if (
+                          legacyEntity
+                        ) {
+
+                          return {
+
+                            entity:
+                              legacyEntity,
+
+                            enabled:
+                              isOn(
+                                legacyEntity
+                              ),
+
+                            native:
+                              false
+                          };
+                        }
+
+
+                        return {
+
+                          entity:
+                            null,
+
+                          enabled:
+                            false,
+
+                          native:
+                            false
+                        };
+                      };
+
+
+                      /* ==========================================================
+                         CONTEXTE FOXCAT
+                         ========================================================== */
+
+                      const modeEntity =
+                        findFox(
+                          'select',
+                          [
+                            'mode',
+                            'ems'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.mode_ems
+                          )
+                        );
+
+
+                      const tariffEntity =
+                        findFox(
+                          'select',
+                          [
+                            'regime',
+                            'tarifaire'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.regime_tarifaire
+                          )
+                        );
+
+
+                      const tariffActiveEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'regime',
+                            'tarifaire',
+                            'actif'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.regime_tarifaire_actif
+                          )
+                        );
+
+
+                      const periodEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'periode',
+                            'tarifaire'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.periode_tarifaire
+                          )
+                        );
+
+
+                      const activePriceEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'prix',
+                            'achat',
+                            'actif'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.prix_achat_actif
+                          )
+                        );
+
+
+                      const priceStatusEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'statut',
+                            'prix'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.statut_prix
+                          )
+                        );
+
+
+                      const machineWindowEntity =
+                        findFox(
+                          'binary_sensor',
+                          [
+                            'fenetre',
+                            'machines'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.fenetre_machines
+                          )
+                        );
+
+
+                      const protectedMachineEntity =
+                        findFox(
+                          'binary_sensor',
+                          [
+                            'machine',
+                            'protegee',
+                            'active'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.machine_protegee_active
+                          )
+                        );
+
+
+                      const highLoadEntity =
+                        findFox(
+                          'binary_sensor',
+                          [
+                            'delestage',
+                            'haute',
+                            'consommation',
+                            'actif'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.delestage_haute_consommation_actif
+                          )
+                        );
+
+
+                      const loadSheddingStatusEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'statut',
+                            'delestage',
+                            'haute',
+                            'consommation'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.statut_delestage_haute_consommation
+                          )
+                        );
+
+
+                      const mode =
+                        stateOf(
+                          modeEntity,
+                          '—'
+                        );
+
+
+                      const tariff =
+                        stateOf(
+                          tariffEntity,
+                          stateOf(
+                            tariffActiveEntity,
+                            '—'
+                          )
+                        );
+
+
+                      const tariffPeriod =
+                        stateOf(
+                          periodEntity,
+                          '—'
+                        );
+
+
+                      const activePrice =
+                        numberOf(
+                          activePriceEntity,
+                          numberOf(
+                            ENTITIES.external.prix_luminus_fallback,
+                            0
+                          )
+                        );
+
+
+                      const priceStatus =
+                        stateOf(
+                          priceStatusEntity,
+                          '—'
+                        );
+
+
+                      const machineWindow =
+                        isOn(
+                          machineWindowEntity
+                        );
+
+
+                      const protectedMachine =
+                        isOn(
+                          protectedMachineEntity
+                        );
+
+
+                      const highLoad =
+                        isOn(
+                          highLoadEntity
+                        );
+
+
+                      const loadSheddingStatus =
+                        stateOf(
+                          loadSheddingStatusEntity,
+                          highLoad
+                            ? 'ACTIF'
+                            : 'NORMAL'
+                        );
+
+
+                      /* ==========================================================
+                         BILAN MAISON FOXCAT
+                         ========================================================== */
+
+                      const houseAccountingEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'maison',
+                            'consommation',
+                            'aujourd'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.consommation_maison_aujourdhui
+                          )
+                        );
+
+
+                      const houseCostEntity =
+                        findFox(
+                          'sensor',
+                          [
+                            'maison',
+                            'cout',
+                            'net',
+                            'aujourd'
+                          ],
+                          entityList(
+                            ENTITIES.foxcat.cout_net_maison_aujourdhui
+                          )
+                        );
+
+
+                      const totalHouseEnergy =
+                        numberOf(
+                          houseAccountingEntity,
+                          0
+                        );
+
+
+                      const totalHouseCost =
+                        numberOf(
+                          houseCostEntity,
+                          0
+                        );
+
+
+                      /* ==========================================================
+                         CONFIGURATION DES APPAREILS
+                         ========================================================== */
+
+                      const devices = [
+
+
+                        /* ========================================================
+                           BOILER
+                           ======================================================== */
+
+                        {
+
+                          id:
+                            'boiler',
+
+                          registry:
+                            ENTITIES.boiler,
+
+                          nativeNames: [
+                            'chauffe eau',
+                            'boiler'
+                          ],
+
+                          name:
+                            'Boiler ECS',
+
+                          nativeLabel:
+                            'Chauffe-eau',
+
+                          icon:
+                            'mdi:water-boiler',
+
+                          color:
+                            '#ff922b',
+
+
+                          management:
+                            management(
+                              [
+                                'boiler',
+                                'gere',
+                                'foxcat'
+                              ],
+                              ENTITIES.boiler.legacy_gestion,
+                              ENTITIES.boiler.gestion
+                            ),
+
+
+                          powerCandidates:
+                            entityList(
+                              ENTITIES.boiler.puissance,
+                              ENTITIES.boiler.legacy_puissance
+                            ),
+
+
+                          cycleCandidates:
+                            entityList(
+                              ENTITIES.boiler.cycle,
+                              ENTITIES.boiler.legacy_cycle_2,
+                              ENTITIES.boiler.legacy_cycle
+                            ),
+
+
+                          legacy: {
+
+                            energy:
+                              entityList(
+                                ENTITIES.boiler.legacy_energie
+                              ),
+
+                            cost:
+                              entityList(
+                                ENTITIES.boiler.legacy_cout
+                              ),
+
+                            hc:
+                              entityList(
+                                ENTITIES.boiler.legacy_hc
+                              ),
+
+                            hp:
+                              entityList(
+                                ENTITIES.boiler.legacy_hp
+                              )
+                          }
+
+                        },
+
+
+                        /* ========================================================
+                           LAVE-LINGE
+                           ======================================================== */
+
+                        {
+
+                          id:
+                            'washer',
+
+                          registry:
+                            ENTITIES.lave_linge,
+
+                          nativeNames: [
+                            'lave linge',
+                            'washer'
+                          ],
+
+                          name:
+                            'Lave-linge',
+
+                          nativeLabel:
+                            'Lave-linge',
+
+                          icon:
+                            'mdi:washing-machine',
+
+                          color:
+                            '#19d8ff',
+
+
+                          management:
+                            management(
+                              [
+                                'gestion',
+                                'lave linge'
+                              ],
+                              ENTITIES.lave_linge.legacy_gestion,
+                              ENTITIES.lave_linge.gestion
+                            ),
+
+
+                          powerCandidates:
+                            entityList(
+                              ENTITIES.lave_linge.puissance,
+                              ENTITIES.lave_linge.legacy_puissance,
+                              ENTITIES.lave_linge.legacy_puissance_2
+                            ),
+
+
+                          cycleCandidates:
+                            entityList(
+                              ENTITIES.lave_linge.cycle,
+                              ENTITIES.lave_linge.legacy_cycle,
+                              ENTITIES.lave_linge.legacy_cycle_2
+                            ),
+
+
+                          legacy: {
+
+                            energy:
+                              entityList(
+                                ENTITIES.lave_linge.legacy_energie,
+                                ENTITIES.lave_linge.legacy_energie_2
+                              ),
+
+                            cost:
+                              entityList(
+                                ENTITIES.lave_linge.legacy_cout,
+                                ENTITIES.lave_linge.legacy_cout_2
+                              ),
+
+                            hc:
+                              entityList(
+                                ENTITIES.lave_linge.legacy_hc,
+                                ENTITIES.lave_linge.legacy_hc_2
+                              ),
+
+                            hp:
+                              entityList(
+                                ENTITIES.lave_linge.legacy_hp,
+                                ENTITIES.lave_linge.legacy_hp_2
+                              )
+                          }
+
+                        },
+
+
+                        /* ========================================================
+                           SÈCHE-LINGE
+                           ======================================================== */
+
+                        {
+
+                          id:
+                            'dryer',
+
+                          registry:
+                            ENTITIES.seche_linge,
+
+                          nativeNames: [
+                            'seche linge',
+                            'dryer'
+                          ],
+
+                          name:
+                            'Sèche-linge',
+
+                          nativeLabel:
+                            'Sèche-linge',
+
+                          icon:
+                            'mdi:tumble-dryer',
+
+                          color:
+                            '#a78bfa',
+
+
+                          management:
+                            management(
+                              [
+                                'gestion',
+                                'seche linge'
+                              ],
+                              ENTITIES.seche_linge.legacy_gestion,
+                              ENTITIES.seche_linge.gestion
+                            ),
+
+
+                          powerCandidates:
+                            entityList(
+                              ENTITIES.seche_linge.puissance,
+                              ENTITIES.seche_linge.legacy_puissance,
+                              ENTITIES.seche_linge.legacy_puissance_2
+                            ),
+
+
+                          cycleCandidates:
+                            entityList(
+                              ENTITIES.seche_linge.cycle,
+                              ENTITIES.seche_linge.legacy_cycle,
+                              ENTITIES.seche_linge.legacy_cycle_2
+                            ),
+
+
+                          legacy: {
+
+                            energy:
+                              entityList(
+                                ENTITIES.seche_linge.legacy_energie,
+                                ENTITIES.seche_linge.legacy_energie_2
+                              ),
+
+                            cost:
+                              entityList(
+                                ENTITIES.seche_linge.legacy_cout,
+                                ENTITIES.seche_linge.legacy_cout_2
+                              ),
+
+                            hc:
+                              entityList(
+                                ENTITIES.seche_linge.legacy_hc,
+                                ENTITIES.seche_linge.legacy_hc_2
+                              ),
+
+                            hp:
+                              entityList(
+                                ENTITIES.seche_linge.legacy_hp,
+                                ENTITIES.seche_linge.legacy_hp_2
+                              )
+                          }
+
+                        },
+
+
+                        /* ========================================================
+                           LAVE-VAISSELLE
+                           ======================================================== */
+
+                        {
+
+                          id:
+                            'dishwasher',
+
+                          registry:
+                            ENTITIES.lave_vaisselle,
+
+                          nativeNames: [
+                            'lave vaisselle',
+                            'dishwasher'
+                          ],
+
+                          name:
+                            'Lave-vaisselle',
+
+                          nativeLabel:
+                            'Lave-vaisselle',
+
+                          icon:
+                            'mdi:dishwasher',
+
+                          color:
+                            '#35e59d',
+
+
+                          management:
+                            management(
+                              [
+                                'gestion',
+                                'lave vaisselle'
+                              ],
+                              ENTITIES.lave_vaisselle.legacy_gestion,
+                              ENTITIES.lave_vaisselle.gestion
+                            ),
+
+
+                          powerCandidates:
+                            entityList(
+                              ENTITIES.lave_vaisselle.puissance,
+                              ENTITIES.lave_vaisselle.legacy_puissance,
+                              ENTITIES.lave_vaisselle.legacy_puissance_2
+                            ),
+
+
+                          cycleCandidates:
+                            entityList(
+                              ENTITIES.lave_vaisselle.cycle,
+                              ENTITIES.lave_vaisselle.legacy_cycle,
+                              ENTITIES.lave_vaisselle.legacy_cycle_2
+                            ),
+
+
+                          legacy: {
+
+                            energy:
+                              entityList(
+                                ENTITIES.lave_vaisselle.legacy_energie,
+                                ENTITIES.lave_vaisselle.legacy_energie_2
+                              ),
+
+                            cost:
+                              entityList(
+                                ENTITIES.lave_vaisselle.legacy_cout,
+                                ENTITIES.lave_vaisselle.legacy_cout_2
+                              ),
+
+                            hc:
+                              entityList(
+                                ENTITIES.lave_vaisselle.legacy_hc,
+                                ENTITIES.lave_vaisselle.legacy_hc_2
+                              ),
+
+                            hp:
+                              entityList(
+                                ENTITIES.lave_vaisselle.legacy_hp,
+                                ENTITIES.lave_vaisselle.legacy_hp_2
+                              )
+                          }
+
+                        }
+
+                      ];
+
+
+                      /* ==========================================================
+                         CAPTEURS NATIFS FOXCAT PAR APPAREIL
+                         ========================================================== */
+
+                      const nativeApplianceSensor = (
+                        device,
+                        metricWords,
+                        rejected = []
+                      ) => {
+
+                        for (
+                          const deviceWord
+                          of device.nativeNames
+                        ) {
+
+                          const id =
+                            findFox(
+                              'sensor',
+                              [
+                                deviceWord,
+                                ...metricWords
+                              ],
+                              [],
+                              rejected
+                            );
+
+
+                          if (
+                            id
+                          ) {
+                            return id;
+                          }
+                        }
+
+
+                        return null;
+                      };
+
+
+                      const legacyCandidate = (
+                        ids = []
+                      ) =>
+                        ids.find(
+                          (id) =>
+                            states[id]
+                        )
+                        ||
+                        null;
+
+
+                      /* ==========================================================
+                         CONSTRUCTION DES DONNÉES
+                         ========================================================== */
+
+                      const activeDevices =
+                        devices
+
+                          /* ======================================================
+                             AFFICHAGE UNIQUEMENT SI GÉRÉ PAR FOXCAT
+                             ====================================================== */
+
+                          .filter(
+                            (device) =>
+                              device.management.enabled
+                          )
+
+
+                          .map(
+                            (device) => {
+
+
+                              /* ==================================================
+                                 ÉNERGIE JOUR
+                                 ================================================== */
+
+                              const energyEntity =
+                                firstExisting(
+                                  device.registry.energie_jour
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'energie',
+                                    'aujourd'
+                                  ]
+                                )
+                                ||
+                                legacyCandidate(
+                                  device.legacy.energy
+                                );
+
+
+                              /* ==================================================
+                                 PART SOLAIRE
+                                 ================================================== */
+
+                              const solarEntity =
+                                firstExisting(
+                                  device.registry.part_solaire_jour
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'part',
+                                    'solaire',
+                                    'aujourd'
+                                  ]
+                                );
+
+
+                              /* ==================================================
+                                 PART RÉSEAU
+                                 ================================================== */
+
+                              const gridEntity =
+                                firstExisting(
+                                  device.registry.part_reseau_jour
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'part',
+                                    'reseau',
+                                    'aujourd'
+                                  ]
+                                );
+
+
+                              /* ==================================================
+                                 COÛT JOUR
+                                 ================================================== */
+
+                              const costEntity =
+                                firstExisting(
+                                  device.registry.cout_jour
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'cout',
+                                    'aujourd'
+                                  ]
+                                )
+                                ||
+                                legacyCandidate(
+                                  device.legacy.cost
+                                );
+
+
+                              /* ==================================================
+                                 HP
+                                 ================================================== */
+
+                              const hpEntity =
+                                firstExisting(
+                                  device.registry.consommation_hp_jour
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'consommation',
+                                    'hp',
+                                    'aujourd'
+                                  ]
+                                )
+                                ||
+                                legacyCandidate(
+                                  device.legacy.hp
+                                );
+
+
+                              /* ==================================================
+                                 HC
+                                 ================================================== */
+
+                              const hcEntity =
+                                firstExisting(
+                                  device.registry.consommation_hc_jour
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'consommation',
+                                    'hc',
+                                    'aujourd'
+                                  ]
+                                )
+                                ||
+                                legacyCandidate(
+                                  device.legacy.hc
+                                );
+
+
+                              /* ==================================================
+                                 TARIF ACTUEL APPAREIL
+                                 ================================================== */
+
+                              const tariffNowEntity =
+                                firstExisting(
+                                  device.registry.tarif_actuel
+                                )
+                                ||
+                                nativeApplianceSensor(
+                                  device,
+                                  [
+                                    'tarif',
+                                    'actuel'
+                                  ]
+                                );
+
+
+                              /* ==================================================
+                                 PUISSANCE
+                                 ================================================== */
+
+                              let powerEntity =
+                                null;
+
+
+                              if (
+                                device.id === 'boiler'
+                              ) {
+
+                                powerEntity =
+                                  findFox(
+                                    'sensor',
+                                    [
+                                      'puissance',
+                                      'chauffe',
+                                      'eau'
+                                    ],
+                                    entityList(
+                                      device.registry.puissance
+                                    )
+                                  )
+                                  ||
+                                  findPowerSensor(
+                                    device.nativeNames,
+                                    device.powerCandidates
+                                  );
+                              }
+
+                              else {
+
+                                powerEntity =
+                                  findPowerSensor(
+                                    device.nativeNames,
+                                    device.powerCandidates
+                                  );
+                              }
+
+
+                              /* ==================================================
+                                 CYCLE
+                                 ================================================== */
+
+                              let cycleEntity =
+                                null;
+
+
+                              if (
+                                device.id === 'boiler'
+                              ) {
+
+                                cycleEntity =
+                                  findFox(
+                                    'binary_sensor',
+                                    [
+                                      'boiler',
+                                      'physique'
+                                    ],
+                                    entityList(
+                                      device.registry.cycle
+                                    )
+                                  )
+                                  ||
+                                  device.cycleCandidates.find(
+                                    (id) =>
+                                      states[id]
+                                  )
+                                  ||
+                                  null;
+                              }
+
+                              else {
+
+                                cycleEntity =
+                                  device.cycleCandidates.find(
+                                    (id) =>
+                                      states[id]
+                                  )
+                                  ||
+                                  null;
+                              }
+
+
+                              /* ==================================================
+                                 VALEURS
+                                 ================================================== */
+
+                              const energy =
+                                Math.max(
+                                  numberOf(
+                                    energyEntity,
+                                    0
+                                  ),
+                                  0
+                                );
+
+
+                              const solar =
+                                Math.max(
+                                  numberOf(
+                                    solarEntity,
+                                    0
+                                  ),
+                                  0
+                                );
+
+
+                              const grid =
+                                Math.max(
+                                  numberOf(
+                                    gridEntity,
+                                    Math.max(
+                                      energy - solar,
+                                      0
+                                    )
+                                  ),
+                                  0
+                                );
+
+
+                              const hp =
+                                Math.max(
+                                  numberOf(
+                                    hpEntity,
+                                    0
+                                  ),
+                                  0
+                                );
+
+
+                              const hc =
+                                Math.max(
+                                  numberOf(
+                                    hcEntity,
+                                    0
+                                  ),
+                                  0
+                                );
+
+
+                              /*
+                               * Si FoxCat possède un vrai coût :
+                               * → on l'utilise.
+                               *
+                               * Sinon :
+                               * → secours énergie × prix actif.
+                               */
+
+                              const cost =
+                                Math.max(
+                                  numberOf(
+                                    costEntity,
+                                    energy *
+                                    Math.max(
+                                      activePrice,
+                                      0
+                                    )
+                                  ),
+                                  0
+                                );
+
+
+                              const power =
+                                Math.max(
+                                  numberOf(
+                                    powerEntity,
+                                    0
+                                  ),
+                                  0
+                                );
+
+
+                              const tariffNow =
+                                stateOf(
+                                  tariffNowEntity,
+                                  tariffPeriod
+                                );
+
+
+                              const running =
+                                (
+                                  cycleEntity
+                                  &&
+                                  isOn(
+                                    cycleEntity
+                                  )
+                                )
+                                ||
+                                power > 20;
+
+
+                              const tariffTotal =
+                                hp +
+                                hc;
+
+
+                              const partHC =
+                                tariffTotal > 0
+                                  ? clamp(
+                                      (
+                                        hc /
+                                        tariffTotal
+                                      ) * 100,
+                                      0,
+                                      100
+                                    )
+                                  : 0;
+
+
+                              const partHP =
+                                tariffTotal > 0
+                                  ? clamp(
+                                      (
+                                        hp /
+                                        tariffTotal
+                                      ) * 100,
+                                      0,
+                                      100
+                                    )
+                                  : 0;
+
+
+                              const solarShare =
+                                energy > 0
+                                  ? clamp(
+                                      (
+                                        solar /
+                                        energy
+                                      ) * 100,
+                                      0,
+                                      100
+                                    )
+                                  : 0;
+
+
+                              const gridShare =
+                                energy > 0
+                                  ? clamp(
+                                      (
+                                        grid /
+                                        energy
+                                      ) * 100,
+                                      0,
+                                      100
+                                    )
+                                  : 0;
+
+
+                              const avgPrice =
+                                energy > 0
+                                  ? cost / energy
+                                  : 0;
+
+
+                              /*
+                               * Détermine si la comptabilité utilisée
+                               * est native FoxCat.
+                               */
+
+                              const nativeAccounting =
+                                !!(
+                                  firstExisting(
+                                    device.registry.energie_jour,
+                                    device.registry.part_solaire_jour,
+                                    device.registry.part_reseau_jour,
+                                    device.registry.cout_jour,
+                                    device.registry.consommation_hp_jour,
+                                    device.registry.consommation_hc_jour,
+                                    device.registry.tarif_actuel
+                                  )
+                                  ||
+                                  solarEntity
+                                  ||
+                                  gridEntity
+                                  ||
+                                  (
+                                    costEntity
+                                    &&
+                                    norm(
+                                      costEntity
+                                    ).includes(
+                                      'foxcat energy'
+                                    )
+                                  )
+                                );
+
+
+                              return {
+
+                                ...device,
+
+                                energyEntity,
+                                solarEntity,
+                                gridEntity,
+                                costEntity,
+                                hpEntity,
+                                hcEntity,
+                                tariffNowEntity,
+
+                                powerEntity,
+                                cycleEntity,
+
+                                energy,
+                                solar,
+                                grid,
+                                hp,
+                                hc,
+                                cost,
+                                power,
+                                tariffNow,
+
+                                running,
+                                partHC,
+                                partHP,
+                                solarShare,
+                                gridShare,
+                                avgPrice,
+                                nativeAccounting
+
+                              };
+                            }
+                          );
+
+
+                      /* ==========================================================
+                         TOTAUX
+                         ========================================================== */
+
+                      const activeEnergy =
+                        activeDevices.reduce(
+                          (
+                            sum,
+                            d
+                          ) =>
+                            sum +
+                            d.energy,
+                          0
+                        );
+
+
+                      const activeSolar =
+                        activeDevices.reduce(
+                          (
+                            sum,
+                            d
+                          ) =>
+                            sum +
+                            d.solar,
+                          0
+                        );
+
+
+                      const activeGrid =
+                        activeDevices.reduce(
+                          (
+                            sum,
+                            d
+                          ) =>
+                            sum +
+                            d.grid,
+                          0
+                        );
+
+
+                      const activeCost =
+                        activeDevices.reduce(
+                          (
+                            sum,
+                            d
+                          ) =>
+                            sum +
+                            d.cost,
+                          0
+                        );
+
+
+                      const runningCount =
+                        activeDevices.filter(
+                          (d) =>
+                            d.running
+                        ).length;
+
+
+                      /* ==========================================================
+                         COULEUR PRIX
+                         ========================================================== */
+
+                      const priceColor =
+                        (() => {
+
+                          const p =
+                            norm(
+                              priceStatus
+                            );
+
+
+                          if (
+                            p.includes(
+                              'avantage'
+                            )
+                            ||
+                            p.includes(
+                              'bas'
+                            )
+                            ||
+                            p.includes(
+                              'negatif'
+                            )
+                          ) {
+
+                            return '#35e59d';
+                          }
+
+
+                          if (
+                            p.includes(
+                              'eleve'
+                            )
+                            ||
+                            p.includes(
+                              'cher'
+                            )
+                          ) {
+
+                            return '#fb7185';
+                          }
+
+
+                          return '#facc15';
+
+                        })();
+
+
+                      /* ==========================================================
+                         CARTES APPAREILS
+                         ========================================================== */
+
+                      const cardHtml =
+                        activeDevices
+
+                          .map(
+                            (d) => {
+
+                              const stateColor =
+                                d.running
+                                  ? '#35e59d'
+                                  : '#64748b';
+
+
+                              const tariffColor =
+                                norm(
+                                  d.tariffNow
+                                ).includes(
+                                  'hp'
+                                )
+                                  ? '#ff922b'
+                                  : '#19d8ff';
+
+
+                              const hasSplit =
+                                d.hpEntity
+                                ||
+                                d.hcEntity
+                                ||
+                                (
+                                  d.hp +
+                                  d.hc
+                                ) > 0;
+
+
+                              return `
+
+                                <div
+                                  class="device-card"
+                                  style="
+                                    --device:${d.color};
+                                  "
+                                >
+
+
+                                  <!-- HEADER APPAREIL -->
+
+                                  <div class="device-header">
+
+
+                                    <div class="device-name-block">
+
+
+                                      <div class="device-icon">
+
+                                        <ha-icon
+                                          icon="${d.icon}">
+                                        </ha-icon>
+
+                                      </div>
+
+
+                                      <div>
+
+                                        <div class="device-name">
+                                          ${d.name}
+                                        </div>
+
+
+                                        <div class="native-line">
+
+                                          <span class="native-dot"></span>
+
+                                          ${
+                                            d.management.native
+                                              ? 'GESTION FOXCAT'
+                                              : 'GESTION LEGACY'
+                                          }
+
+                                          ·
+
+                                          ${
+                                            d.nativeAccounting
+                                              ? 'COMPTABILITÉ FOXCAT'
+                                              : 'FALLBACK'
+                                          }
+
+                                        </div>
+
+                                      </div>
+
+
+                                    </div>
+
+
+
+                                    <div
+                                      class="running"
+                                      style="
+                                        color:${stateColor};
+                                      "
+                                    >
+
+                                      ${
+                                        d.running
+                                          ? '● EN COURS'
+                                          : '○ EN ATTENTE'
+                                      }
+
+                                    </div>
+
+
+                                  </div>
+
+
+
+                                  <!-- ÉNERGIE / COÛT -->
+
+                                  <div class="main-values">
+
+
+                                    <div>
+
+                                      <div class="small-label">
+                                        ÉNERGIE AUJOURD'HUI
+                                      </div>
+
+                                      <div class="energy-value">
+                                        ${fmtEnergy(d.energy)}
+                                      </div>
+
+                                    </div>
+
+
+
+                                    <div class="cost-block">
+
+                                      <div class="small-label">
+                                        COÛT FOXCAT
+                                      </div>
+
+                                      <div class="cost-value">
+                                        ${fmtEuro(d.cost)}
+                                      </div>
+
+                                      <div class="cost-source">
+
+                                        ${
+                                          d.nativeAccounting
+                                            ? 'COMPTABILISÉ V1.5.0'
+                                            : 'SECOURS / ESTIMÉ'
+                                        }
+
+                                      </div>
+
+                                    </div>
+
+
+                                  </div>
+
+
+
+                                  <!-- PUISSANCE -->
+
+                                  <div class="power-line">
+
+                                    <span>
+                                      Puissance actuelle
+                                    </span>
+
+                                    <strong>
+                                      ${fmtPower(d.power)}
+                                    </strong>
+
+                                  </div>
+
+
+
+                                  <!-- PART SOLAIRE / RÉSEAU -->
+
+                                  <div class="source-grid">
+
+
+                                    <div>
+
+                                      <span class="solar-label">
+                                        PART SOLAIRE
+                                      </span>
+
+                                      <strong>
+                                        ${fmtEnergy(d.solar)}
+                                      </strong>
+
+                                      <small>
+                                        ${d.solarShare.toFixed(0)} %
+                                      </small>
+
+                                    </div>
+
+
+
+                                    <div>
+
+                                      <span class="grid-label">
+                                        PART RÉSEAU
+                                      </span>
+
+                                      <strong>
+                                        ${fmtEnergy(d.grid)}
+                                      </strong>
+
+                                      <small>
+                                        ${d.gridShare.toFixed(0)} %
+                                      </small>
+
+                                    </div>
+
+
+                                  </div>
+
+
+
+                                  <div class="source-bar">
+
+                                    <div
+                                      class="solar-fill"
+                                      style="
+                                        width:${d.solarShare}%;
+                                      "
+                                    ></div>
+
+                                    <div
+                                      class="grid-fill"
+                                      style="
+                                        width:${d.gridShare}%;
+                                      "
+                                    ></div>
+
+                                  </div>
+
+
+
+                                  <!-- HP / HC -->
+
+                                  ${
+                                    hasSplit
+                                      ? `
+
+                                        <div class="tariff-title">
+                                          RÉPARTITION HP / HC
+                                        </div>
+
+
+                                        <div class="tariff-values">
+
+
+                                          <div>
+
+                                            <span class="hc-label">
+                                              HEURES CREUSES
+                                            </span>
+
+                                            <strong>
+                                              ${fmtEnergy(d.hc)}
+                                            </strong>
+
+                                            <small>
+                                              ${d.partHC.toFixed(1)} %
+                                            </small>
+
+                                          </div>
+
+
+
+                                          <div>
+
+                                            <span class="hp-label">
+                                              HEURES PLEINES
+                                            </span>
+
+                                            <strong>
+                                              ${fmtEnergy(d.hp)}
+                                            </strong>
+
+                                            <small>
+                                              ${d.partHP.toFixed(1)} %
+                                            </small>
+
+                                          </div>
+
+
+                                        </div>
+
+
+
+                                        <div class="split-bar">
+
+                                          <div
+                                            class="hc-fill"
+                                            style="
+                                              width:${d.partHC}%;
+                                            "
+                                          ></div>
+
+                                          <div
+                                            class="hp-fill"
+                                            style="
+                                              width:${d.partHP}%;
+                                            "
+                                          ></div>
+
+                                        </div>
+
+                                      `
+                                      : `
+
+                                        <div class="tariff-unavailable">
+                                          Aucune répartition HP / HC enregistrée aujourd'hui
+                                        </div>
+
+                                      `
+                                  }
+
+
+
+                                  <!-- FOOTER APPAREIL -->
+
+                                  <div class="device-footer">
+
+
+                                    <div>
+
+                                      <span>
+                                        TARIF APPAREIL
+                                      </span>
+
+                                      <strong
+                                        style="
+                                          color:${tariffColor};
+                                        "
+                                      >
+                                        ${d.tariffNow}
+                                      </strong>
+
+                                    </div>
+
+
+
+                                    <div>
+
+                                      <span>
+                                        PRIX MOYEN
+                                      </span>
+
+                                      <strong>
+
+                                        ${
+                                          d.energy > 0
+                                            ? `${d.avgPrice.toFixed(3)} €/kWh`
+                                            : '—'
+                                        }
+
+                                      </strong>
+
+                                    </div>
+
+
+                                  </div>
+
+
+                                </div>
+
+                              `;
+                            }
+                          )
+
+                          .join('');
+
+
+                      /* ==========================================================
+                         AUCUN APPAREIL
+                         ========================================================== */
+
+                      const emptyHtml = `
+
+                        <div class="empty">
+
+                          <ha-icon
+                            icon="mdi:power-plug-off-outline">
+                          </ha-icon>
+
+                          <div>
+
+                            <strong>
+                              Aucun appareil géré par FoxCat
+                            </strong>
+
+                            <span>
+                              Active la gestion d'un appareil dans FoxCat EMS
+                              pour afficher sa comptabilité énergétique.
+                            </span>
+
+                          </div>
+
+                        </div>
+
+                      `;
+
+
+                      /* ==========================================================
+                         RENDU
+                         ========================================================== */
+
+                      return `
+
+                        <style>
+
+                          * {
+                            box-sizing:border-box;
+                          }
+
+
+                          .wrap {
+
+                            padding:22px;
+
+                            color:#f8fafc;
+
+                            font-family:
+                              -apple-system,
+                              BlinkMacSystemFont,
+                              "Segoe UI",
+                              Roboto,
+                              sans-serif;
+                          }
+
+
+                          /* =====================================================
+                             HEADER
+                             ===================================================== */
+
+                          .header {
+
+                            display:flex;
+
+                            align-items:flex-start;
+
+                            justify-content:space-between;
+
+                            gap:15px;
+
+                            margin-bottom:15px;
+                          }
+
+
+                          .brand {
+
+                            display:flex;
+
+                            align-items:center;
+
+                            gap:12px;
+                          }
+
+
+                          .logo {
+
+                            width:46px;
+
+                            height:46px;
+
+                            flex:none;
+
+                            display:flex;
+
+                            align-items:center;
+
+                            justify-content:center;
+
+                            border-radius:14px;
+
+                            color:#19d8ff;
+
+                            background:
+                              linear-gradient(
+                                135deg,
+                                rgba(255,146,43,.10),
+                                rgba(25,216,255,.10)
+                              );
+
+                            border:
+                              1px solid rgba(255,255,255,.08);
+                          }
+
+
+                          .logo ha-icon {
+                            --mdc-icon-size:25px;
+                          }
+
+
+                          .brand-name {
+
+                            color:#19d8ff;
+
+                            font-size:9px;
+
+                            font-weight:900;
+
+                            letter-spacing:2px;
+                          }
+
+
+                          .title {
+
+                            margin-top:4px;
+
+                            font-size:23px;
+
+                            font-weight:900;
+                          }
+
+
+                          .subtitle {
+
+                            margin-top:3px;
+
+                            color:#64748b;
+
+                            font-size:8px;
+                          }
+
+
+                          .count {
+
+                            padding:8px 10px;
+
+                            border-radius:13px;
+
+                            color:#35e59d;
+
+                            background:
+                              rgba(53,229,157,.06);
+
+                            border:
+                              1px solid rgba(53,229,157,.14);
+
+                            font-size:8px;
+
+                            font-weight:900;
+
+                            white-space:nowrap;
+                          }
+
+
+                          /* =====================================================
+                             CONTEXTE
+                             ===================================================== */
+
+                          .context {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              repeat(
+                                4,
+                                minmax(0,1fr)
+                              );
+
+                            gap:8px;
+
+                            margin-bottom:10px;
+                          }
+
+
+                          .context-box {
+
+                            min-width:0;
+
+                            padding:11px 12px;
+
+                            border-radius:14px;
+
+                            background:
+                              rgba(255,255,255,.02);
+
+                            border:
+                              1px solid rgba(255,255,255,.045);
+                          }
+
+
+                          .context-box span {
+
+                            display:block;
+
+                            color:#526174;
+
+                            font-size:6px;
+
+                            font-weight:900;
+
+                            letter-spacing:.08em;
+                          }
+
+
+                          .context-box strong {
+
+                            display:block;
+
+                            margin-top:4px;
+
+                            color:#dbe5f1;
+
+                            font-size:9px;
+
+                            white-space:nowrap;
+
+                            overflow:hidden;
+
+                            text-overflow:ellipsis;
+                          }
+
+
+                          /* =====================================================
+                             RÉSUMÉ
+                             ===================================================== */
+
+                          .summary {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              repeat(
+                                4,
+                                minmax(0,1fr)
+                              );
+
+                            gap:8px;
+
+                            margin-bottom:13px;
+                          }
+
+
+                          .summary-box {
+
+                            padding:13px 14px;
+
+                            border-radius:16px;
+
+                            background:
+                              rgba(255,255,255,.024);
+
+                            border:
+                              1px solid rgba(255,255,255,.05);
+                          }
+
+
+                          .small-label {
+
+                            color:#718096;
+
+                            font-size:7px;
+
+                            font-weight:900;
+
+                            letter-spacing:.10em;
+                          }
+
+
+                          .summary-value {
+
+                            margin-top:5px;
+
+                            font-size:20px;
+
+                            font-weight:900;
+                          }
+
+
+                          .summary-box.cost .summary-value {
+                            color:#35e59d;
+                          }
+
+
+                          .summary-box.solar .summary-value {
+                            color:#ff922b;
+                          }
+
+
+                          .summary-box.grid .summary-value {
+                            color:#fb7185;
+                          }
+
+
+                          /* =====================================================
+                             BANDEAU ÉTAT
+                             ===================================================== */
+
+                          .status-strip {
+
+                            display:flex;
+
+                            justify-content:space-between;
+
+                            align-items:center;
+
+                            gap:10px;
+
+                            margin-bottom:13px;
+
+                            padding:10px 12px;
+
+                            border-radius:14px;
+
+                            background:
+                              rgba(25,216,255,.025);
+
+                            border:
+                              1px solid rgba(25,216,255,.07);
+
+                            font-size:7px;
+
+                            color:#64748b;
+                          }
+
+
+                          .status-strip strong {
+
+                            color:#cbd5e1;
+
+                            font-size:8px;
+                          }
+
+
+                          /* =====================================================
+                             GRILLE APPAREILS
+                             ===================================================== */
+
+                          .device-grid {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              repeat(
+                                auto-fit,
+                                minmax(
+                                  255px,
+                                  1fr
+                                )
+                              );
+
+                            gap:11px;
+                          }
+
+
+                          .device-card {
+
+                            min-width:0;
+
+                            padding:16px;
+
+                            border-radius:19px;
+
+                            background:
+                              linear-gradient(
+                                145deg,
+                                rgba(255,255,255,.032),
+                                rgba(255,255,255,.014)
+                              );
+
+                            border:
+                              1px solid rgba(255,255,255,.06);
+
+                            box-shadow:
+                              inset 0 1px 0 rgba(255,255,255,.025);
+                          }
+
+
+                          .device-card::before {
+
+                            content:"";
+
+                            display:block;
+
+                            height:2px;
+
+                            margin:
+                              -16px
+                              -16px
+                              14px;
+
+                            background:
+                              linear-gradient(
+                                90deg,
+                                var(--device),
+                                transparent 80%
+                              );
+
+                            opacity:.8;
+                          }
+
+
+                          /* =====================================================
+                             HEADER APPAREIL
+                             ===================================================== */
+
+                          .device-header {
+
+                            display:flex;
+
+                            align-items:flex-start;
+
+                            justify-content:space-between;
+
+                            gap:10px;
+                          }
+
+
+                          .device-name-block {
+
+                            display:flex;
+
+                            align-items:center;
+
+                            gap:10px;
+
+                            min-width:0;
+                          }
+
+
+                          .device-icon {
+
+                            width:38px;
+
+                            height:38px;
+
+                            flex:none;
+
+                            display:flex;
+
+                            align-items:center;
+
+                            justify-content:center;
+
+                            border-radius:12px;
+
+                            color:
+                              var(--device);
+
+                            background:
+                              rgba(255,255,255,.035);
+
+                            border:
+                              1px solid rgba(255,255,255,.055);
+                          }
+
+
+                          .device-icon ha-icon {
+                            --mdc-icon-size:21px;
+                          }
+
+
+                          .device-name {
+
+                            color:#f8fafc;
+
+                            font-size:13px;
+
+                            font-weight:900;
+                          }
+
+
+                          .native-line {
+
+                            display:flex;
+
+                            align-items:center;
+
+                            gap:4px;
+
+                            margin-top:4px;
+
+                            color:#64748b;
+
+                            font-size:5.5px;
+
+                            font-weight:900;
+
+                            letter-spacing:.05em;
+                          }
+
+
+                          .native-dot {
+
+                            width:5px;
+
+                            height:5px;
+
+                            border-radius:50%;
+
+                            background:#35e59d;
+
+                            box-shadow:
+                              0 0 6px rgba(53,229,157,.7);
+                          }
+
+
+                          .running {
+
+                            flex:none;
+
+                            font-size:7px;
+
+                            font-weight:900;
+
+                            white-space:nowrap;
+                          }
+
+
+                          /* =====================================================
+                             ÉNERGIE / COÛT
+                             ===================================================== */
+
+                          .main-values {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              1fr 1fr;
+
+                            gap:10px;
+
+                            margin-top:15px;
+                          }
+
+
+                          .energy-value {
+
+                            margin-top:5px;
+
+                            color:
+                              var(--device);
+
+                            font-size:22px;
+
+                            font-weight:900;
+                          }
+
+
+                          .cost-block {
+                            text-align:right;
+                          }
+
+
+                          .cost-value {
+
+                            margin-top:5px;
+
+                            color:#35e59d;
+
+                            font-size:22px;
+
+                            font-weight:900;
+                          }
+
+
+                          .cost-source {
+
+                            margin-top:3px;
+
+                            color:#526174;
+
+                            font-size:5.5px;
+
+                            font-weight:800;
+
+                            letter-spacing:.06em;
+                          }
+
+
+                          /* =====================================================
+                             PUISSANCE
+                             ===================================================== */
+
+                          .power-line {
+
+                            display:flex;
+
+                            align-items:center;
+
+                            justify-content:space-between;
+
+                            gap:10px;
+
+                            margin-top:12px;
+
+                            padding-top:10px;
+
+                            border-top:
+                              1px solid rgba(255,255,255,.045);
+
+                            color:#64748b;
+
+                            font-size:8px;
+                          }
+
+
+                          .power-line strong {
+
+                            color:#e2e8f0;
+
+                            font-size:9px;
+                          }
+
+
+                          /* =====================================================
+                             PART SOLAIRE / RÉSEAU
+                             ===================================================== */
+
+                          .source-grid {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              1fr 1fr;
+
+                            gap:10px;
+
+                            margin-top:13px;
+                          }
+
+
+                          .source-grid > div {
+
+                            display:flex;
+
+                            flex-direction:column;
+                          }
+
+
+                          .source-grid span {
+
+                            font-size:7px;
+
+                            font-weight:900;
+                          }
+
+
+                          .source-grid strong {
+
+                            margin-top:4px;
+
+                            color:#f1f5f9;
+
+                            font-size:12px;
+                          }
+
+
+                          .source-grid small {
+
+                            margin-top:2px;
+
+                            color:#64748b;
+
+                            font-size:7px;
+                          }
+
+
+                          .solar-label {
+                            color:#ff922b;
+                          }
+
+
+                          .grid-label {
+                            color:#fb7185;
+                          }
+
+
+                          .source-bar,
+                          .split-bar {
+
+                            display:flex;
+
+                            width:100%;
+
+                            height:6px;
+
+                            margin-top:9px;
+
+                            overflow:hidden;
+
+                            border-radius:10px;
+
+                            background:
+                              rgba(255,255,255,.05);
+                          }
+
+
+                          .solar-fill {
+
+                            height:100%;
+
+                            background:#ff922b;
+                          }
+
+
+                          .grid-fill {
+
+                            height:100%;
+
+                            background:#fb7185;
+                          }
+
+
+                          /* =====================================================
+                             HP / HC
+                             ===================================================== */
+
+                          .tariff-title {
+
+                            margin-top:13px;
+
+                            color:#526174;
+
+                            font-size:6px;
+
+                            font-weight:900;
+
+                            letter-spacing:.12em;
+                          }
+
+
+                          .tariff-values {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              1fr 1fr;
+
+                            gap:10px;
+
+                            margin-top:8px;
+                          }
+
+
+                          .tariff-values > div {
+
+                            display:flex;
+
+                            flex-direction:column;
+                          }
+
+
+                          .tariff-values span {
+
+                            font-size:7px;
+
+                            font-weight:900;
+                          }
+
+
+                          .tariff-values strong {
+
+                            margin-top:4px;
+
+                            color:#f1f5f9;
+
+                            font-size:12px;
+                          }
+
+
+                          .tariff-values small {
+
+                            margin-top:2px;
+
+                            color:#64748b;
+
+                            font-size:7px;
+                          }
+
+
+                          .hc-label {
+                            color:#19d8ff;
+                          }
+
+
+                          .hp-label {
+                            color:#ff922b;
+                          }
+
+
+                          .hc-fill {
+
+                            height:100%;
+
+                            background:#19d8ff;
+                          }
+
+
+                          .hp-fill {
+
+                            height:100%;
+
+                            background:#ff922b;
+                          }
+
+
+                          .tariff-unavailable {
+
+                            margin-top:13px;
+
+                            padding:9px;
+
+                            border-radius:10px;
+
+                            color:#526174;
+
+                            background:
+                              rgba(255,255,255,.018);
+
+                            font-size:7px;
+
+                            text-align:center;
+                          }
+
+
+                          /* =====================================================
+                             FOOTER APPAREIL
+                             ===================================================== */
+
+                          .device-footer {
+
+                            display:grid;
+
+                            grid-template-columns:
+                              1fr 1fr;
+
+                            gap:10px;
+
+                            margin-top:11px;
+
+                            padding-top:9px;
+
+                            border-top:
+                              1px solid rgba(255,255,255,.04);
+                          }
+
+
+                          .device-footer > div:last-child {
+                            text-align:right;
+                          }
+
+
+                          .device-footer span {
+
+                            display:block;
+
+                            color:#526174;
+
+                            font-size:6px;
+
+                            font-weight:900;
+                          }
+
+
+                          .device-footer strong {
+
+                            display:block;
+
+                            margin-top:3px;
+
+                            color:#94a3b8;
+
+                            font-size:8px;
+                          }
+
+
+                          /* =====================================================
+                             AUCUN APPAREIL
+                             ===================================================== */
+
+                          .empty {
+
+                            display:flex;
+
+                            align-items:center;
+
+                            gap:12px;
+
+                            padding:16px;
+
+                            border-radius:17px;
+
+                            color:#64748b;
+
+                            background:
+                              rgba(255,255,255,.02);
+
+                            border:
+                              1px solid rgba(255,255,255,.05);
+                          }
+
+
+                          .empty ha-icon {
+
+                            flex:none;
+
+                            --mdc-icon-size:25px;
+
+                            color:#475569;
+                          }
+
+
+                          .empty strong {
+
+                            display:block;
+
+                            color:#94a3b8;
+
+                            font-size:10px;
+                          }
+
+
+                          .empty span {
+
+                            display:block;
+
+                            margin-top:3px;
+
+                            font-size:8px;
+
+                            line-height:1.4;
+                          }
+
+
+                          /* =====================================================
+                             RESPONSIVE
+                             ===================================================== */
+
+                          @media(max-width:850px) {
+
+                            .context,
+                            .summary {
+
+                              grid-template-columns:
+                                repeat(
+                                  2,
+                                  minmax(0,1fr)
+                                );
+                            }
+
+                          }
+
+
+                          @media(max-width:600px) {
+
+                            .wrap {
+                              padding:16px;
+                            }
+
+
+                            .header {
+
+                              align-items:flex-start;
+
+                              flex-direction:column;
+                            }
+
+
+                            .device-grid {
+
+                              grid-template-columns:
+                                1fr;
+                            }
+
+
+                            .title {
+                              font-size:20px;
+                            }
+
+
+                            .energy-value,
+                            .cost-value {
+                              font-size:20px;
+                            }
+
+
+                            .status-strip {
+
+                              align-items:flex-start;
+
+                              flex-direction:column;
+                            }
+
+                          }
+
+                        </style>
+
+
+
+                        <div class="wrap">
+
+
+                          <!-- ====================================================
+                               HEADER
+                               ==================================================== -->
+
+                          <div class="header">
+
+
+                            <div class="brand">
+
+
+                              <div class="logo">
+
+                                <ha-icon
+                                  icon="mdi:home-lightning-bolt-outline">
+                                </ha-icon>
+
+                              </div>
+
+
+                              <div>
+
+                                <div class="brand-name">
+                                  HOMEFOXCAT ENERGY
+                                </div>
+
+                                <div class="title">
+                                  Consommation appareils
+                                </div>
+
+                                <div class="subtitle">
+                                  Comptabilité native FoxCat Energy V1.5.0
+                                </div>
+
+                              </div>
+
+
+                            </div>
+
+
+
+                            <div class="count">
+
+                              ${activeDevices.length}
+
+                              APPAREIL${
+                                activeDevices.length > 1
+                                  ? 'S'
+                                  : ''
+                              }
+
+                              GÉRÉ${
+                                activeDevices.length > 1
+                                  ? 'S'
+                                  : ''
+                              }
+
+                            </div>
+
+
+                          </div>
+
+
+
+                          <!-- ====================================================
+                               CONTEXTE EMS
+                               ==================================================== -->
+
+                          <div class="context">
+
+
+                            <div class="context-box">
+
+                              <span>
+                                MODE EMS
+                              </span>
+
+                              <strong>
+                                ${mode}
+                              </strong>
+
+                            </div>
+
+
+
+                            <div class="context-box">
+
+                              <span>
+                                RÉGIME TARIFAIRE
+                              </span>
+
+                              <strong>
+                                ${tariff}
+                              </strong>
+
+                            </div>
+
+
+
+                            <div class="context-box">
+
+                              <span>
+                                PÉRIODE ACTUELLE
+                              </span>
+
+                              <strong>
+                                ${tariffPeriod}
+                              </strong>
+
+                            </div>
+
+
+
+                            <div class="context-box">
+
+                              <span>
+                                PRIX D'ACHAT ACTIF
+                              </span>
+
+                              <strong>
+                                ${fmtPrice(activePrice)}
+                              </strong>
+
+                            </div>
+
+
+                          </div>
+
+
+
+                          ${
+                            activeDevices.length > 0
+                              ? `
+
+
+                                <!-- ==============================================
+                                     RÉSUMÉ APPAREILS
+                                     ============================================== -->
+
+                                <div class="summary">
+
+
+                                  <div class="summary-box">
+
+                                    <div class="small-label">
+                                      ÉNERGIE APPAREILS
+                                    </div>
+
+                                    <div class="summary-value">
+                                      ${fmtEnergy(activeEnergy)}
+                                    </div>
+
+                                  </div>
+
+
+
+                                  <div class="summary-box cost">
+
+                                    <div class="small-label">
+                                      COÛT APPAREILS
+                                    </div>
+
+                                    <div class="summary-value">
+                                      ${fmtEuro(activeCost)}
+                                    </div>
+
+                                  </div>
+
+
+
+                                  <div class="summary-box solar">
+
+                                    <div class="small-label">
+                                      PART SOLAIRE
+                                    </div>
+
+                                    <div class="summary-value">
+                                      ${fmtEnergy(activeSolar)}
+                                    </div>
+
+                                  </div>
+
+
+
+                                  <div class="summary-box grid">
+
+                                    <div class="small-label">
+                                      PART RÉSEAU
+                                    </div>
+
+                                    <div class="summary-value">
+                                      ${fmtEnergy(activeGrid)}
+                                    </div>
+
+                                  </div>
+
+
+                                </div>
+
+
+
+                                <!-- ==============================================
+                                     ÉTAT EMS
+                                     ============================================== -->
+
+                                <div class="status-strip">
+
+
+                                  <span>
+
+                                    Fenêtre machines :
+
+                                    <strong>
+                                      ${
+                                        machineWindow
+                                          ? 'OUVERTE'
+                                          : 'FERMÉE'
+                                      }
+                                    </strong>
+
+                                    ·
+
+                                    Machine protégée :
+
+                                    <strong>
+                                      ${
+                                        protectedMachine
+                                          ? 'OUI'
+                                          : 'NON'
+                                      }
+                                    </strong>
+
+                                    ·
+
+                                    En fonctionnement :
+
+                                    <strong>
+                                      ${runningCount}
+                                    </strong>
+
+                                  </span>
+
+
+
+                                  <span>
+
+                                    Prix :
+
+                                    <strong
+                                      style="
+                                        color:${priceColor};
+                                      "
+                                    >
+                                      ${priceStatus}
+                                    </strong>
+
+                                    ·
+
+                                    Délestage :
+
+                                    <strong
+                                      style="
+                                        color:${
+                                          highLoad
+                                            ? '#fb7185'
+                                            : '#35e59d'
+                                        };
+                                      "
+                                    >
+                                      ${loadSheddingStatus}
+                                    </strong>
+
+                                  </span>
+
+
+                                </div>
+
+
+
+                                <!-- ==============================================
+                                     APPAREILS
+                                     ============================================== -->
+
+                                <div class="device-grid">
+
+                                  ${cardHtml}
+
+                                </div>
+
+
+                              `
+                              :
+                              emptyHtml
+                          }
+
+
+
+                          <!-- ====================================================
+                               BILAN GLOBAL FOXCAT
+                               ==================================================== -->
+
+                          ${
+                            (
+                              totalHouseEnergy > 0
+                              ||
+                              totalHouseCost !== 0
+                            )
+                              ? `
+
+                                <div
+                                  class="status-strip"
+                                  style="
+                                    margin-top:13px;
+                                    margin-bottom:0;
+                                  "
+                                >
+
+                                  <span>
+
+                                    Bilan maison FoxCat :
+
+                                    <strong>
+                                      ${fmtEnergy(totalHouseEnergy)}
+                                    </strong>
+
+                                  </span>
+
+
+                                  <span>
+
+                                    Coût net maison :
+
+                                    <strong
+                                      style="
+                                        color:#35e59d;
+                                      "
+                                    >
+                                      ${fmtEuro(totalHouseCost)}
+                                    </strong>
+
+                                  </span>
+
+
+                                </div>
+
+                              `
+                              :
+                              ''
+                          }
+
+
+                        </div>
+
+                      `;
+                    ]]]
+                tap_action:
+                  action: none
+                hold_action:
+                  action: none
+                double_tap_action:
+                  action: none
     theme: ios-dark-mode-blue-red
   - type: panel
     title: Onduleur
@@ -2319,8 +6258,7 @@ views:
                         yaxis_id: temp
                         stroke_width: 3
                         color: '#fb923c'
-                      - entity: >-
-                          [[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]
+                      - entity: '[[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]'
                         name: Moyenne ballon
                         yaxis_id: temp
                         stroke_width: 2
@@ -2398,92 +6336,85 @@ views:
             cards:
               - type: custom:button-card
                 template: fc_device
-                entity: '[[foxcat:legacy.switch_boiler_prise_1]]'
+                entity: switch.boiler_prise_1
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  service_data:
+                    entity_id: button.foxcat_energy_fonctions_utilisateur_demarrage_utilisateur_boiler
                 variables:
                   name: Boiler ECS
                   sub: Chauffe-eau
                   emoji: ♨️
                   col: '#fb923c'
-                  cy: '[[foxcat:boiler.binary_source]]'
-                  pw: '[[foxcat:boiler.power_source]]'
-                  sw: '[[foxcat:legacy.switch_boiler_prise_1]]'
+                  cy: binary_sensor.boiler_source
+                  pw: sensor.boiler_power_source
+                  sw: switch.boiler_prise_1
               - type: custom:button-card
                 template: fc_device
-                entity: '[[foxcat:machines.washer.switch]]'
+                entity: switch.lave_linge
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  service_data:
+                    entity_id: button.foxcat_energy_fonctions_utilisateur_demarrage_utilisateur_lave_linge
                 variables:
                   name: Lave-linge
                   emoji: 🧺
                   col: '#60a5fa'
-                  cy: '[[foxcat:machines.washer.cycle]]'
-                  pw: '[[foxcat:legacy.sensor_lave_linge_puissance]]'
-                  sw: '[[foxcat:machines.washer.switch]]'
+                  cy: sensor.lave_linge_cycle
+                  pw: sensor.lave_linge_puissance
+                  sw: switch.lave_linge
               - type: custom:button-card
                 template: fc_device
-                entity: '[[foxcat:machines.dryer.switch]]'
+                entity: switch.seche_linge
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  service_data:
+                    entity_id: button.foxcat_energy_fonctions_utilisateur_demarrage_utilisateur_seche_linge
                 variables:
                   name: Sèche-linge
                   emoji: 🌀
                   col: '#c4b5fd'
-                  cy: '[[foxcat:machines.dryer.cycle]]'
-                  pw: '[[foxcat:legacy.sensor_seche_linge_puissance]]'
-                  sw: '[[foxcat:machines.dryer.switch]]'
+                  cy: sensor.seche_linge_cycle
+                  pw: sensor.seche_linge_puissance
+                  sw: switch.seche_linge
               - type: custom:button-card
                 template: fc_device
-                entity: '[[foxcat:machines.dishwasher.switch]]'
+                entity: switch.lave_vaisselle
+                tap_action:
+                  action: call-service
+                  service: button.press
+                  service_data:
+                    entity_id: button.foxcat_energy_fonctions_utilisateur_demarrage_utilisateur_lave_vaisselle
                 variables:
                   name: Lave-vaisselle
                   emoji: 🍽️
                   col: '#34d399'
-                  cy: '[[foxcat:machines.dishwasher.cycle]]'
-                  pw: '[[foxcat:legacy.sensor_lave_vaisselle_puissance]]'
-                  sw: '[[foxcat:machines.dishwasher.switch]]'
-          - type: grid
-            columns: 2
-            square: false
-            cards:
-              - type: custom:button-card
-                template: fc_panel
-                custom_fields:
-                  c: |
-                    [[[
-                      const units=[
-                        ['Salon','🛋️','[[foxcat:legacy.climate_salon_2]]'],
-                        ['Chambre parentale','🛏️','[[foxcat:legacy.climate_chambre_parentale]]'],
-                        ['Chambre Nathéo','🧸','[[foxcat:legacy.climate_chambre_natheo_2]]'],
-                        ['Salle de bain','🚿','[[foxcat:legacy.climate_salle_de_bain_2]]'],
-                        ['Chauffage sol','♨️','[[foxcat:legacy.climate_chauffage_sol_2]]'],
-                        ['Insert à pellet','🍳','[[foxcat:legacy.climate_poele_a_pellet]]']];
-                      const mode=states['[[foxcat:legacy.select_central_mode]]']?.state||'—';
-                      const act={heating:['CHAUFFE','#fb923c'],cooling:['RAFRAÎCHIT','#60a5fa'],drying:['DÉSHUMIDIFIE','#38bdf8'],fan:['VENTILATION','#c4b5fd'],fan_only:['VENTILATION','#c4b5fd']};
-                      const cells=units.map(u=>{const s=states[u[2]];if(!s)return '';
-                        const a=s.state==='off'?['ARRÊT','#64748b']:act[s.attributes.hvac_action]||['EN VEILLE','#94a3b8'];
-                        const cur=parseFloat(s.attributes.current_temperature),tg=parseFloat(s.attributes.temperature);
-                        return `<div class="stat" style="padding:14px 8px;border:1px solid ${a[1]}33"><div style="font-size:24px">${u[1]}</div><b style="font-size:14px">${u[0]}</b><span style="color:${a[1]};font-weight:800;margin-top:4px">● ${a[0]}</span><b style="font-size:26px;margin-top:6px">${isNaN(cur)?'--':cur.toFixed(1)}°</b><span>Consigne ${isNaN(tg)?'--':tg.toFixed(1)}°</span></div>`}).join('');
-                      return `<div class="p"><div class="t"><span><ha-icon icon="mdi:thermometer"></ha-icon>Chauffage & climatisation</span><span class="chip" style="color:#c4b5fd;background:rgba(196,181,253,.12)">Mode ${mode}</span></div><div class="g3">${cells}</div></div>`;
-                    ]]]
-              - type: custom:button-card
-                template: fc_list
-                variables:
-                  title: Consommation du jour
-                  icon: mdi:chart-bar
-                  rows:
-                    - - Boiler · énergie
-                      - '[[foxcat:legacy.sensor_boiler_energy_daily]]'
-                    - - Boiler · coût
-                      - '[[foxcat:legacy.sensor_boiler_energy_daily_cost]]'
-                    - - Lave-linge · énergie
-                      - '[[foxcat:legacy.sensor_lave_linge_energy_daily]]'
-                    - - Lave-linge · coût
-                      - '[[foxcat:legacy.sensor_lave_linge_energy_daily_cost]]'
-                    - - Sèche-linge · énergie
-                      - '[[foxcat:legacy.sensor_seche_linge_energy_daily]]'
-                    - - Sèche-linge · coût
-                      - '[[foxcat:legacy.sensor_seche_linge_energy_daily_cost]]'
-                    - - Lave-vaisselle · énergie
-                      - '[[foxcat:legacy.sensor_lave_vaisselle_energy_daily]]'
-                    - - Lave-vaisselle · coût
-                      - >-
-                        [[foxcat:legacy.sensor_lave_vaisselle_energy_daily_cost]]
+                  cy: sensor.lave_vaisselle_cycle
+                  pw: sensor.lave_vaisselle_puissance
+                  sw: switch.lave_vaisselle
+          - type: custom:button-card
+            template: fc_panel
+            custom_fields:
+              c: |
+                [[[
+                  const units=[
+                    ['Salon','🛋️','[[foxcat:legacy.climate_salon_2]]'],
+                    ['Chambre parentale','🛏️','[[foxcat:legacy.climate_chambre_parentale]]'],
+                    ['Chambre Nathéo','🧸','[[foxcat:legacy.climate_chambre_natheo_2]]'],
+                    ['Salle de bain','🚿','[[foxcat:legacy.climate_salle_de_bain_2]]'],
+                    ['Chauffage sol','♨️','[[foxcat:legacy.climate_chauffage_sol_2]]'],
+                    ['Insert à pellet','🍳','[[foxcat:legacy.climate_poele_a_pellet]]']];
+                  const mode=states['[[foxcat:legacy.select_central_mode]]']?.state||'—';
+                  const act={heating:['CHAUFFE','#fb923c'],cooling:['RAFRAÎCHIT','#60a5fa'],drying:['DÉSHUMIDIFIE','#38bdf8'],fan:['VENTILATION','#c4b5fd'],fan_only:['VENTILATION','#c4b5fd']};
+                  const cells=units.map(u=>{const s=states[u[2]];if(!s)return '';
+                    const a=s.state==='off'?['ARRÊT','#64748b']:act[s.attributes.hvac_action]||['EN VEILLE','#94a3b8'];
+                    const cur=parseFloat(s.attributes.current_temperature),tg=parseFloat(s.attributes.temperature);
+                    return `<div class="stat" style="padding:14px 8px;border:1px solid ${a[1]}33"><div style="font-size:24px">${u[1]}</div><b style="font-size:14px">${u[0]}</b><span style="color:${a[1]};font-weight:800;margin-top:4px">● ${a[0]}</span><b style="font-size:26px;margin-top:6px">${isNaN(cur)?'--':cur.toFixed(1)}°</b><span>Consigne ${isNaN(tg)?'--':tg.toFixed(1)}°</span></div>`}).join('');
+                  return `<div class="p"><div class="t"><span><ha-icon icon="mdi:thermometer"></ha-icon>Chauffage & climatisation</span><span class="chip" style="color:#c4b5fd;background:rgba(196,181,253,.12)">Mode ${mode}</span></div><div class="g3">${cells}</div></div>`;
+                ]]]
     theme: ios-dark-mode-blue-red
   - title: Marché & Réseau
     path: marche
@@ -2493,6 +6424,8 @@ views:
     cards:
       - type: vertical-stack
         cards:
+          - type: custom:button-card
+            template: fc_navbar
           - type: conditional
             conditions:
               - condition: state
@@ -2856,101 +6789,64 @@ views:
                         `;
                       ]]]
                 - type: custom:apexcharts-card
-                  graph_span: 48h
+                  graph_span: 24h
                   span:
                     start: day
                   update_interval: 5min
-                  now:
-                    show: true
-                    label: Maintenant
                   header:
-                    show: true
-                    title: Profil tarifaire HP / HC
-                    show_states: false
+                    show: false
                   apex_config:
                     chart:
-                      height: 350
+                      height: 160
+                      background: transparent
                       toolbar:
                         show: false
-                      background: transparent
                     theme:
                       mode: dark
                     legend:
-                      show: true
-                      position: bottom
+                      show: false
                     grid:
-                      borderColor: rgba(255,255,255,0.08)
+                      borderColor: rgba(255,255,255,.08)
                       strokeDashArray: 3
                     stroke:
-                      width: 3
+                      width: 2
                       curve: stepline
-                    markers:
-                      size: 0
+                    fill:
+                      type: gradient
+                      gradient:
+                        shade: dark
+                        type: vertical
+                        shadeIntensity: 0.5
+                        opacityFrom: 0.4
+                        opacityTo: 0.05
+                        stops:
+                          - 0
+                          - 100
                     xaxis:
-                      type: datetime
                       labels:
                         datetimeUTC: false
+                      tooltip:
+                        enabled: false
                     yaxis:
-                      decimalsInFloat: 3
-                      labels:
-                        formatter: >
-                          EVAL:function(value) { return value == null ? '' :
-                          value.toFixed(3) + ' €/kWh'; }
-                    tooltip:
-                      shared: true
-                      x:
-                        format: dd/MM HH:mm
-                  card_mod:
-                    style: |
-                      ha-card {
-                        background: linear-gradient(145deg,#141a23,#0a0e14);
-                        border: 1px solid rgba(25,216,255,.20);
-                        border-radius: 24px;
-                        padding: 12px;
-                      }
+                      - decimals: 3
+                        labels:
+                          formatter: |
+                            EVAL:function(value) {
+                              return value.toFixed(3) + " €";
+                            }
                   series:
-                    - entity: sensor.foxcat_energy_tarification_prix_heures_pleines_hp
-                      name: Tarif HP
-                      type: line
-                      color: '#ff922b'
+                    - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                      name: Prix d'achat
+                      type: area
+                      color: '#38bdf8'
+                      extend_to: now
                       float_precision: 3
-                      data_generator: >
-                        const hpState =
-                        hass.states['sensor.foxcat_energy_tarification_prix_heures_pleines_hp']?.state;
-                        const hcState =
-                        hass.states['sensor.foxcat_energy_tarification_prix_heures_creuses_hc']?.state;
-                        if (!hpState || !hcState ||
-                        !Number.isFinite(Number(hpState)) ||
-                        !Number.isFinite(Number(hcState))) return []; const hp =
-                        Number(hpState); const start = new Date();
-                        start.setHours(0,0,0,0); const data = []; for (let i =
-                        0; i <= 96; i++) {
-                          const d = new Date(start.getTime() + i * 30 * 60000);
-                          const h = d.getHours();
-                          const isHC = h >= 22 || h < 7 || (h >= 11 && h < 17);
-                          data.push([d.getTime(), isHC ? null : hp]);
-                        } return data;
-                    - entity: sensor.foxcat_energy_tarification_prix_heures_creuses_hc
-                      name: Tarif HC
-                      type: line
-                      color: '#19d8ff'
-                      float_precision: 3
-                      data_generator: >
-                        const hpState =
-                        hass.states['sensor.foxcat_energy_tarification_prix_heures_pleines_hp']?.state;
-                        const hcState =
-                        hass.states['sensor.foxcat_energy_tarification_prix_heures_creuses_hc']?.state;
-                        if (!hpState || !hcState ||
-                        !Number.isFinite(Number(hpState)) ||
-                        !Number.isFinite(Number(hcState))) return []; const hc =
-                        Number(hcState); const start = new Date();
-                        start.setHours(0,0,0,0); const data = []; for (let i =
-                        0; i <= 96; i++) {
-                          const d = new Date(start.getTime() + i * 30 * 60000);
-                          const h = d.getHours();
-                          const isHC = h >= 22 || h < 7 || (h >= 11 && h < 17);
-                          data.push([d.getTime(), isHC ? hc : null]);
-                        } return data;
+                  card_mod:
+                    style: >
+                      ha-card{background:linear-gradient(160deg,#0d1a2c,#08111e)!important;border:1px
+                      solid
+                      rgba(90,150,220,.18)!important;border-top:none!important;border-radius:0
+                      0 18px 18px!important;box-shadow:none!important}
                 - type: custom:button-card
                   show_name: false
                   show_icon: false
@@ -2999,7 +6895,7 @@ views:
                           </div>
                         `;
                       ]]]
-    theme: ios-dark-mode-blue-red-alternative
+    theme: ios-dark-mode-blue-red
   - title: Diagnostic
     path: diagnostic
     icon: mdi:stethoscope
@@ -3136,8 +7032,7 @@ views:
           - type: entities
             show_header_toggle: false
             entities:
-              - entity: >-
-                  sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
+              - entity: sensor.foxcat_energy_energie_puissance_de_production_photovoltaique
                 name: Production PV
               - entity: sensor.foxcat_energy_energie_puissance_de_consommation_maison
                 name: Consommation maison
@@ -3185,6 +7080,9 @@ views:
                 name: Gestion EMS lave-vaisselle
     cards: []
     theme: ios-dark-mode-blue-red
+    badges:
+      - type: custom:button-card
+        template: fc_navbar
   - title: Technique
     path: technique
     icon: mdi:tune-vertical-variant
@@ -3243,8 +7141,7 @@ views:
                 name: Comportement EMS
               - entity: switch.foxcat_energy_ems_regulation_foxcat_active
                 name: Régulation FoxCat
-              - entity: >-
-                  number.foxcat_energy_ems_assouplissement_economique_mode_confort
+              - entity: number.foxcat_energy_ems_assouplissement_economique_mode_confort
                 name: Assouplissement Confort
       - type: grid
         cards:
@@ -3284,17 +7181,13 @@ views:
                 - type: entities
                   show_header_toggle: false
                   entities:
-                    - entity: >-
-                        number.foxcat_energy_tarification_seuil_prix_favorable_day_ahead
+                    - entity: number.foxcat_energy_tarification_seuil_prix_favorable_day_ahead
                       name: Seuil favorable
-                    - entity: >-
-                        number.foxcat_energy_tarification_seuil_zone_pic_day_ahead
+                    - entity: number.foxcat_energy_tarification_seuil_zone_pic_day_ahead
                       name: Plafond acceptable
-                    - entity: >-
-                        switch.foxcat_energy_tarification_predictif_prix_dynamique
+                    - entity: switch.foxcat_energy_tarification_predictif_prix_dynamique
                       name: Planification prix
-                    - entity: >-
-                        switch.foxcat_energy_tarification_optimisation_economique_des_charges_flexibles
+                    - entity: switch.foxcat_energy_tarification_optimisation_economique_des_charges_flexibles
                       name: Arbitrage prévision solaire
       - type: grid
         column_span: 2
@@ -3321,11 +7214,9 @@ views:
                 name: Sécurité absolue
               - entity: number.foxcat_energy_boiler_correction_sonde_haute_boiler
                 name: Correction capteur tête cuve
-              - entity: >-
-                  number.foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse
+              - entity: number.foxcat_energy_boiler_duree_influence_resistance_sur_sonde_basse
                 name: Durée influence résistance
-              - entity: >-
-                  number.foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs
+              - entity: number.foxcat_energy_boiler_chute_rapide_detectant_un_puisage_ecs
                 name: Chute de température = puisage
               - entity: number.foxcat_energy_boiler_confiance_minimale_fallback_boiler
                 name: Confiance minimale fallback
@@ -3369,3 +7260,12 @@ views:
               - entity: input_boolean.ems_head_menu
               - entity: input_boolean.ems_head_lateral
     theme: ios-dark-mode-blue-red
+    badges:
+      - type: custom:button-card
+        template: fc_navbar
+background:
+  opacity: 60
+  alignment: center
+  size: cover
+  repeat: repeat
+  attachment: fixed
