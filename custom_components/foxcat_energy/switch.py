@@ -12,6 +12,7 @@ from .devices import DeviceDefinition, device_definitions
 from .machines import MachineDefinition
 
 
+# FONCTION : _device_for — Device for
 def _device_for(key: str) -> str:
     if key.startswith("boiler") or key == "agressivite_ecs":
         return "boiler"
@@ -26,6 +27,7 @@ def _device_for(key: str) -> str:
     return "ems"
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities = [FoxCatSettingSwitch(coordinator, key, name, icon) for key, (name, icon) in SWITCH_DEFINITIONS.items()]
@@ -45,6 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class FoxCatSettingSwitch(FoxCatEntity, SwitchEntity):
+    # MÉTHODE : FoxCatSettingSwitch.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, key: str, name: str, icon: str) -> None:
         super().__init__(coordinator, key, name, icon, _device_for(key))
         if key == "predictive_pricing_enabled":
@@ -52,34 +55,42 @@ class FoxCatSettingSwitch(FoxCatEntity, SwitchEntity):
         elif key == "solar_forecast_arbitrage":
             self._attr_suggested_object_id = "foxcat_solar_forecast_arbitrage"
 
+    # MÉTHODE : FoxCatSettingSwitch.is_on — Is on
     @property
     def is_on(self) -> bool:
         return bool(self.coordinator.settings.get(self._key, False))
 
+    # MÉTHODE : FoxCatSettingSwitch.async_turn_on — traitement asynchrone : turn on
     async def async_turn_on(self, **kwargs) -> None:
         await self.coordinator.async_set_setting(self._key, True)
 
+    # MÉTHODE : FoxCatSettingSwitch.async_turn_off — traitement asynchrone : turn off
     async def async_turn_off(self, **kwargs) -> None:
         await self.coordinator.async_set_setting(self._key, False)
 
 
 class FoxCatMachineManagementSwitch(FoxCatEntity, SwitchEntity):
+    # MÉTHODE : FoxCatMachineManagementSwitch.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, machine: MachineDefinition) -> None:
         self.machine = machine
         super().__init__(coordinator, f"machine_{machine.machine_id}_gestion", f"Gestion {machine.name}", "mdi:power-socket-eu", "machines")
 
+    # MÉTHODE : FoxCatMachineManagementSwitch.is_on — Is on
     @property
     def is_on(self) -> bool:
         return bool(self.coordinator.settings.get(self.machine.setting_key, self.machine.automatic_default))
 
+    # MÉTHODE : FoxCatMachineManagementSwitch.async_turn_on — traitement asynchrone : turn on
     async def async_turn_on(self, **kwargs) -> None:
         await self.coordinator.async_set_machine_enabled(self.machine.machine_id, True)
 
+    # MÉTHODE : FoxCatMachineManagementSwitch.async_turn_off — traitement asynchrone : turn off
     async def async_turn_off(self, **kwargs) -> None:
         await self.coordinator.async_set_machine_enabled(self.machine.machine_id, False)
 
 
 class FoxCatDeviceSwitch(FoxCatEntity, SwitchEntity):
+    # MÉTHODE : FoxCatDeviceSwitch.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, definition: DeviceDefinition) -> None:
         self.definition = definition
         device = {
@@ -96,12 +107,15 @@ class FoxCatDeviceSwitch(FoxCatEntity, SwitchEntity):
             device,
         )
 
+    # MÉTHODE : FoxCatDeviceSwitch.is_on — Is on
     @property
     def is_on(self) -> bool:
         return bool(self.coordinator.settings.get(self.definition.enabled_setting, True))
 
+    # MÉTHODE : FoxCatDeviceSwitch.async_turn_on — traitement asynchrone : turn on
     async def async_turn_on(self, **kwargs) -> None:
         await self.coordinator.async_set_device_enabled(self.definition.device_id, True)
 
+    # MÉTHODE : FoxCatDeviceSwitch.async_turn_off — traitement asynchrone : turn off
     async def async_turn_off(self, **kwargs) -> None:
         await self.coordinator.async_set_device_enabled(self.definition.device_id, False)

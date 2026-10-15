@@ -39,6 +39,7 @@ class EnergyBus:
     distinct des ACK physiques RRCR/onduleur/réseau.
     """
 
+    # MÉTHODE : EnergyBus.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self.last_ems_intent: EnergyIntent | None = None
         self._messages: list[EnergyIntent] = []
@@ -58,6 +59,7 @@ class EnergyBus:
         self._frame_history: list[dict[str, Any]] = []
         self.last_transport_event = "Energy Bus : initialisation."
 
+    # MÉTHODE : EnergyBus.publish_message — Publie un télégramme inter-corps avec ACK obligatoire.
     def publish_message(
         self,
         *,
@@ -93,6 +95,7 @@ class EnergyBus:
         )
         return message.message_id
 
+    # MÉTHODE : EnergyBus.publish_ems_intent — Publish ems intent
     def publish_ems_intent(
         self,
         *,
@@ -113,6 +116,7 @@ class EnergyBus:
             now=now, frame_id=frame_id, **metadata,
         )
 
+    # MÉTHODE : EnergyBus.reset_daily_counters — Réinitialise les identifiants visibles du bus à chaque nouvelle journée
     def reset_daily_counters(self, now: datetime) -> dict[str, int]:
         """Réinitialise les identifiants visibles du bus à chaque nouvelle journée.
 
@@ -144,6 +148,7 @@ class EnergyBus:
         )
         return {"previous_day_message_count": previous_count}
 
+    # MÉTHODE : EnergyBus.pending_for — Pending for
     def pending_for(self, target: str) -> EnergyIntent | None:
         target = str(target).upper()
         for message in reversed(self._messages):
@@ -151,6 +156,7 @@ class EnergyBus:
                 return message
         return None
 
+    # MÉTHODE : EnergyBus.acknowledge_pending — Acknowledge pending
     def acknowledge_pending(
         self,
         *,
@@ -174,6 +180,7 @@ class EnergyBus:
         )
         return message.message_id
 
+    # MÉTHODE : EnergyBus.mark_processed — Mark processed
     def mark_processed(self, message_id: int, *, by: str, now: datetime, reason: str) -> bool:
         message = self._find(message_id)
         if message is None:
@@ -188,6 +195,7 @@ class EnergyBus:
         self.last_transport_event = f"Energy Bus : {by} -> {message.source} : ACK TRAITÉ #{message_id} : {reason}"
         return True
 
+    # MÉTHODE : EnergyBus.mark_nok — Mark nok
     def mark_nok(
         self,
         message_id: int,
@@ -207,6 +215,7 @@ class EnergyBus:
         self.last_transport_event = f"Energy Bus : {by} -> {message.source} : NOK #{message_id} : {reason}"
         return True
 
+    # MÉTHODE : EnergyBus.reject_pending — Reject pending
     def reject_pending(
         self,
         *,
@@ -227,6 +236,7 @@ class EnergyBus:
         )
         return message.message_id
 
+    # MÉTHODE : EnergyBus.expire_pending — Expire pending
     def expire_pending(self, *, now: datetime, timeout_s: float) -> list[int]:
         expired: list[int] = []
         timeout = max(float(timeout_s), 1.0)
@@ -242,6 +252,7 @@ class EnergyBus:
                 )
         return expired
 
+    # MÉTHODE : EnergyBus.expire_frames — Ferme explicitement toute trame restée PENDING anormalement longtemps.
     def expire_frames(self, *, now: datetime, timeout_s: float = 10.0) -> list[tuple[int, str]]:
         """Ferme explicitement toute trame restée PENDING anormalement longtemps."""
         expired: list[tuple[int, str]] = []
@@ -268,15 +279,18 @@ class EnergyBus:
             )
         return expired
 
+    # MÉTHODE : EnergyBus._find — Find
     def _find(self, message_id: int) -> EnergyIntent | None:
         for message in reversed(self._messages):
             if message.message_id == int(message_id):
                 return message
         return None
 
+    # MÉTHODE : EnergyBus.publish_inverter_state — Publish inverter state
     def publish_inverter_state(self, **state: Any) -> None:
         self.inverter_state.update(state)
 
+    # MÉTHODE : EnergyBus.on_grid_frame — Ouvre une trame unique qui sera consommée par les deux corps.
     def on_grid_frame(self, frame_id: int, now: datetime, **data: Any) -> None:
         """Ouvre une trame unique qui sera consommée par les deux corps."""
         self.last_grid_frame_id = int(frame_id)
@@ -294,6 +308,7 @@ class EnergyBus:
         if len(self._frame_history) > 20:
             self._frame_history = self._frame_history[-20:]
 
+    # MÉTHODE : EnergyBus.mark_frame_core — Marque le traitement d'une trame par EMS ou Onduleur Core.
     def mark_frame_core(self, frame_id: int, core: str, status: str, *, now: datetime, reason: str = "") -> None:
         """Marque le traitement d'une trame par EMS ou Onduleur Core."""
         core_key = "ems" if str(core).upper() == "EMS" else "inverter"
@@ -308,6 +323,7 @@ class EnergyBus:
                 item[f"{core_key}_reason"] = reason
                 break
 
+    # MÉTHODE : EnergyBus._message_view — Message view
     @staticmethod
     def _message_view(intent: EnergyIntent | None) -> dict[str, Any] | None:
         if intent is None:
@@ -328,6 +344,7 @@ class EnergyBus:
             "processed_at": intent.processed_at,
         }
 
+    # MÉTHODE : EnergyBus.view — View
     def view(self) -> dict[str, Any]:
         intent = self.last_ems_intent
         pending = next((m for m in reversed(self._messages) if m.status == BUS_WAIT_ACK), None)

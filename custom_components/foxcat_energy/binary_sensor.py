@@ -10,6 +10,7 @@ from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     c: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
@@ -29,11 +30,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class FoxCatBinary(FoxCatEntity, BinarySensorEntity):
+    # MÉTHODE : FoxCatBinary.__init__ — méthode spéciale __init__
     def __init__(self, coordinator, key, name, icon, device, getter, device_class=None):
         super().__init__(coordinator, key, name, icon, device)
         self._getter = getter
         self._attr_device_class = device_class
 
+    # MÉTHODE : FoxCatBinary.is_on — Is on
     @property
     def is_on(self) -> bool:
         try:

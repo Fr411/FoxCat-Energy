@@ -37,6 +37,7 @@ _TIME_NAMES = {
 }
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -50,11 +51,13 @@ async def async_setup_entry(
 
 
 class FoxCatSettingTime(FoxCatEntity, TimeEntity):
+    # MÉTHODE : FoxCatSettingTime.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, key: str) -> None:
         self._setting_key = key
         name = _TIME_NAMES.get(key, key.replace("_", " ").capitalize())
         super().__init__(coordinator, f"heure_{key}", name, "mdi:clock-outline", "pricing" if key.startswith(("tariff_", "impact_")) else "machines")
 
+    # MÉTHODE : FoxCatSettingTime.native_value — Native value
     @property
     def native_value(self) -> time | None:
         try:
@@ -62,5 +65,6 @@ class FoxCatSettingTime(FoxCatEntity, TimeEntity):
         except (KeyError, TypeError, ValueError):
             return None
 
+    # MÉTHODE : FoxCatSettingTime.async_set_value — traitement asynchrone : set value
     async def async_set_value(self, value: time) -> None:
         await self.coordinator.async_set_setting(self._setting_key, value.isoformat())

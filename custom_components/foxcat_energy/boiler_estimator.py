@@ -27,12 +27,14 @@ class BoilerThermalEstimator:
     Aucune des deux n'est traitée comme vérité absolue pour le fallback.
     """
 
+    # MÉTHODE : BoilerThermalEstimator.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self._last_at: datetime | None = None
         self._last_top: float | None = None
         self._last_bottom: float | None = None
         self._last_heating_at: datetime | None = None
 
+    # MÉTHODE : BoilerThermalEstimator.update — Update
     def update(
         self, *, now: datetime, bottom_c: float, top_c: float | None, boiler_on: bool, settings: dict[str, Any]
     ) -> BoilerThermalEstimate:

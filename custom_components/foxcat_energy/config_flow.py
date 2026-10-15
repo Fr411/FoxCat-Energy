@@ -98,6 +98,7 @@ from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_
 
 
 
+# FONCTION : _entity — Entity
 def _entity(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector:
     cfg: dict[str, Any] = {"domain": domain}
     if device_class:
@@ -105,14 +106,17 @@ def _entity(domain: str | list[str], device_class: str | None = None) -> selecto
     return selector.EntitySelector(selector.EntitySelectorConfig(**cfg))
 
 
+# FONCTION : _required — Required
 def _required(key: str, default: str) -> vol.Required:
     return vol.Required(key, default=default)
 
 
+# FONCTION : _optional — Optional
 def _optional(key: str, default: str | None = None) -> vol.Optional:
     return vol.Optional(key, default=default) if default is not None else vol.Optional(key)
 
 
+# FONCTION : _normalise_value — Return values that ConfigEntry storage can serialise reliably.
 def _normalise_value(value: Any) -> Any:
     """Return values that ConfigEntry storage can serialise reliably."""
     if isinstance(value, time):
@@ -120,6 +124,7 @@ def _normalise_value(value: Any) -> Any:
     return value
 
 
+# FONCTION : _normalise_input — Normalise input
 def _normalise_input(user_input: dict[str, Any]) -> dict[str, Any]:
     return {key: _normalise_value(value) for key, value in user_input.items()}
 
@@ -128,6 +133,7 @@ def _normalise_input(user_input: dict[str, Any]) -> dict[str, Any]:
 # to register the ConfigFlow handler.  Building all selectors at import time made
 # a single selector/API incompatibility capable of preventing the handler from
 # being registered, which surfaced in the UI as "Invalid handler specified".
+# FONCTION : _grid_sign_selector — Grid sign selector
 def _grid_sign_selector() -> selector.SelectSelector:
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
@@ -146,6 +152,7 @@ HPHC_STRUCTURES = [HPHC_MONO, HPHC_BI]
 DYNAMIQUE_STRUCTURES = ["Simple", "Impact"]
 
 
+# FONCTION : _structure_schema — Structure schema
 def _structure_schema(options: list[str], default: str) -> vol.Schema:
     return vol.Schema(
         {
@@ -158,6 +165,7 @@ def _structure_schema(options: list[str], default: str) -> vol.Schema:
     )
 
 
+# FONCTION : _core_schema — FoxCat 1.6 sources: only grid signed power + PV are mandatory.
 def _core_schema() -> vol.Schema:
     """FoxCat 1.6 sources: only grid signed power + PV are mandatory."""
     return vol.Schema(
@@ -171,6 +179,7 @@ def _core_schema() -> vol.Schema:
     )
 
 
+# FONCTION : _metronome_schema — Metronome schema
 def _metronome_schema() -> vol.Schema:
     return vol.Schema(
         {
@@ -179,6 +188,7 @@ def _metronome_schema() -> vol.Schema:
     )
 
 
+# FONCTION : _boiler_schema — Boiler schema
 def _boiler_schema() -> vol.Schema:
     return vol.Schema(
         {
@@ -209,6 +219,7 @@ def _boiler_schema() -> vol.Schema:
     )
 
 
+# FONCTION : _pri_schema — Pri schema
 def _pri_schema() -> vol.Schema:
     return vol.Schema(
         {
@@ -221,6 +232,7 @@ def _pri_schema() -> vol.Schema:
     )
 
 
+# FONCTION : _machines_schema — Machines schema
 def _machines_schema() -> vol.Schema:
     return vol.Schema(
         {
@@ -247,8 +259,10 @@ def _machines_schema() -> vol.Schema:
 
 
 
+# FONCTION : _machine_record_schema — Machine record schema
 def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
     current = current or {}
+    # FONCTION : opt_entity — Opt entity
     def opt_entity(key: str, domains: str | list[str]):
         value = str(current.get(key, "") or "")
         marker = vol.Optional(key, description={"suggested_value": value}) if value else vol.Optional(key)
@@ -280,10 +294,12 @@ def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
     })
 
 
+# FONCTION : _machine_choice_schema — Machine choice schema
 def _machine_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
     choices = {str(item.get("id")): str(item.get("name") or item.get("id")) for item in records if item.get("id")}
     return vol.Schema({vol.Required("machine_id"): vol.In(choices)})
 
+# FONCTION : _dynamic_export_sign_selector — Dynamic export sign selector
 def _dynamic_export_sign_selector() -> selector.SelectSelector:
     return selector.SelectSelector(
         selector.SelectSelectorConfig(
@@ -296,6 +312,7 @@ def _dynamic_export_sign_selector() -> selector.SelectSelector:
     )
 
 
+# FONCTION : _pricing_schema — Pricing schema
 def _pricing_schema() -> vol.Schema:
     return vol.Schema(
         {
@@ -319,6 +336,7 @@ def _pricing_schema() -> vol.Schema:
     )
 
 
+# FONCTION : _price_number — Price number
 def _price_number(default: float, minimum: float = 0.0, maximum: float = 2.0) -> selector.NumberSelector:
     return selector.NumberSelector(
         selector.NumberSelectorConfig(
@@ -331,6 +349,7 @@ def _price_number(default: float, minimum: float = 0.0, maximum: float = 2.0) ->
     )
 
 
+# FONCTION : _hphc_schema — Fixed / dual-rate tariff values configured by the installer/user.
 def _hphc_schema() -> vol.Schema:
     """Fixed / dual-rate tariff values configured by the installer/user."""
     return vol.Schema(
@@ -347,6 +366,7 @@ def _hphc_schema() -> vol.Schema:
     )
 
 
+# FONCTION : _solar_schema — Solar schema
 def _solar_schema() -> vol.Schema:
     return vol.Schema(
         {
@@ -381,6 +401,7 @@ _SCHEMA_BUILDERS = {
 }
 
 
+# FONCTION : _schema_with_current — Schema with current
 def _schema_with_current(schema: vol.Schema, current: dict[str, Any]) -> vol.Schema:
     fields: dict[Any, Any] = {}
     for marker, validator in schema.schema.items():
@@ -402,15 +423,18 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_user — Root menu: choose the contract family.
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         """Root menu: choose the contract family."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
         return self.async_show_menu(step_id="user", menu_options=["hphc", "dynamique"])
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc — Branch A: HP/HC family, choose Mono-horaire or Bi-horaire.
     async def async_step_hphc(self, user_input: dict[str, Any] | None = None):
         """Branch A: HP/HC family, choose Mono-horaire or Bi-horaire."""
         if user_input is not None:
@@ -423,6 +447,7 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="hphc", data_schema=_structure_schema(HPHC_STRUCTURES, HPHC_MONO)
         )
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_mono — traitement asynchrone : step hphc mono
     async def async_step_hphc_mono(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
@@ -432,6 +457,7 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor"), _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor")}),
         )
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_bi — traitement asynchrone : step hphc bi
     async def async_step_hphc_bi(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
@@ -447,6 +473,7 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
         )
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_dynamique — Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique.
     async def async_step_dynamique(self, user_input: dict[str, Any] | None = None):
         """Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique."""
         if user_input is not None:
@@ -458,24 +485,28 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=_structure_schema(DYNAMIQUE_STRUCTURES, DYNAMIQUE_STRUCTURES[0]),
         )
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_core — traitement asynchrone : step core
     async def async_step_core(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
             return await self.async_step_boiler()
         return self.async_show_form(step_id="core", data_schema=_core_schema())
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_boiler — traitement asynchrone : step boiler
     async def async_step_boiler(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
             return await self.async_step_pri()
         return self.async_show_form(step_id="boiler", data_schema=_boiler_schema())
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_pri — traitement asynchrone : step pri
     async def async_step_pri(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
             return await self.async_step_machines()
         return self.async_show_form(step_id="pri", data_schema=_pri_schema())
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_machines — traitement asynchrone : step machines
     async def async_step_machines(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
@@ -484,12 +515,14 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_ia()
         return self.async_show_form(step_id="machines", data_schema=_machines_schema())
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_pricing — traitement asynchrone : step pricing
     async def async_step_pricing(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
             return await self.async_step_ia()
         return self.async_show_form(step_id="pricing", data_schema=_pricing_schema())
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_ia — traitement asynchrone : step ia
     async def async_step_ia(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
@@ -499,10 +532,12 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(title=title, data=self._data)
         return self.async_show_form(step_id="ia", data_schema=_solar_schema())
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_solar — Compatibilité avec l'ancien nom de l'étape EMS 2 solaire.
     async def async_step_solar(self, user_input=None):
         """Compatibilité avec l'ancien nom de l'étape EMS 2 solaire."""
         return await self.async_step_ia(user_input)
 
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_get_options_flow — Return the transactional options flow
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry):
@@ -522,16 +557,19 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     is complete instead of destroying an active flow.
     """
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         super().__init__()
         self._pending_options: dict[str, Any] | None = None
         self._selected_machine_id: str | None = None
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow._ensure_pending — Ensure pending
     def _ensure_pending(self) -> dict[str, Any]:
         if self._pending_options is None:
             self._pending_options = dict(self.config_entry.options)
         return self._pending_options
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow._effective — Effective
     def _effective(self) -> dict[str, Any]:
         data = dict(self.config_entry.data)
         data.update(self._ensure_pending())
@@ -553,6 +591,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
                     data[key] = coordinator.settings[key]
         return data
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_init — traitement asynchrone : step init
     async def async_step_init(self, user_input=None):
         self._ensure_pending()
         return self.async_show_menu(
@@ -560,6 +599,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
             menu_options=list(OFFICIAL_MENU_STEPS),
         )
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow._section — Section
     async def _section(self, step_id: str, user_input, return_step: str = "init"):
         if user_input is not None:
             normalised = _normalise_input(user_input)
@@ -580,64 +620,81 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
             data_schema=_schema_with_current(schema, self._effective()),
         )
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_sources — traitement asynchrone : step sources
     async def async_step_sources(self, user_input=None):
         return await self._section("core", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow._info_section — Info section
     async def _info_section(self, step_id: str, user_input=None, return_step: str = "init"):
         if user_input is not None:
             return await getattr(self, f"async_step_{return_step}")()
         return self.async_show_form(step_id=step_id, data_schema=vol.Schema({}))
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_energy — traitement asynchrone : step energy
     async def async_step_energy(self, user_input=None):
         return await self._info_section("energy", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_inverter — traitement asynchrone : step inverter
     async def async_step_inverter(self, user_input=None):
         return await self._section("pri", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_ems — traitement asynchrone : step ems
     async def async_step_ems(self, user_input=None):
         return self.async_show_menu(
             step_id="ems",
             menu_options=["ems_core", "ia", "init"],
         )
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_ems_core — traitement asynchrone : step ems core
     async def async_step_ems_core(self, user_input=None):
         return await self._info_section("ems_core", user_input, return_step="ems")
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_ia — traitement asynchrone : step ia
     async def async_step_ia(self, user_input=None):
         return await self._section("ia", user_input, return_step="ems")
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_energy_bus — traitement asynchrone : step energy bus
     async def async_step_energy_bus(self, user_input=None):
         return await self._info_section("energy_bus", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_metronome — traitement asynchrone : step metronome
     async def async_step_metronome(self, user_input=None):
         return await self._section("metronome", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_diagnostic — traitement asynchrone : step diagnostic
     async def async_step_diagnostic(self, user_input=None):
         return await self._info_section("diagnostic", user_input)
 
     # Compatibility with the pre-1.6 route name.
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_core — traitement asynchrone : step core
     async def async_step_core(self, user_input=None):
         return await self._section("core", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_boiler — traitement asynchrone : step boiler
     async def async_step_boiler(self, user_input=None):
         return await self._section("boiler", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pri — traitement asynchrone : step pri
     async def async_step_pri(self, user_input=None):
         return await self._section("pri", user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow._machine_records — Machine records
     def _machine_records(self) -> list[dict[str, Any]]:
         effective = self._effective()
         return records_for_options(effective)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow._store_machine_records — Store machine records
     def _store_machine_records(self, records: list[dict[str, Any]]) -> None:
         self._ensure_pending()[CONF_MACHINES_V13] = records
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machines — traitement asynchrone : step machines
     async def async_step_machines(self, user_input=None):
         return self.async_show_menu(
             step_id="machines",
             menu_options=["machine_add", "machine_edit", "machine_remove", "machine_learning", "init"],
         )
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_add — traitement asynchrone : step machine add
     async def async_step_machine_add(self, user_input=None):
         if user_input is None:
             return self.async_show_form(step_id="machine_add", data_schema=_machine_record_schema())
@@ -648,6 +705,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         self._store_machine_records(records)
         return await self.async_step_machines()
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_edit — traitement asynchrone : step machine edit
     async def async_step_machine_edit(self, user_input=None):
         records = self._machine_records()
         if not records:
@@ -657,6 +715,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         self._selected_machine_id = str(user_input["machine_id"])
         return await self.async_step_machine_edit_form()
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_edit_form — traitement asynchrone : step machine edit form
     async def async_step_machine_edit_form(self, user_input=None):
         records = self._machine_records()
         current = next((item for item in records if str(item.get("id")) == self._selected_machine_id), None)
@@ -671,6 +730,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         self._selected_machine_id = None
         return await self.async_step_machines()
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_remove — traitement asynchrone : step machine remove
     async def async_step_machine_remove(self, user_input=None):
         records = self._machine_records()
         if not records:
@@ -681,15 +741,18 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         self._store_machine_records([item for item in records if str(item.get("id")) != machine_id])
         return await self.async_step_machines()
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_learning — traitement asynchrone : step machine learning
     async def async_step_machine_learning(self, user_input=None):
         return self.async_show_menu(
             step_id="machine_learning",
             menu_options=["machine_learning_info", "machines"],
         )
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_learning_info — traitement asynchrone : step machine learning info
     async def async_step_machine_learning_info(self, user_input=None):
         return await self._info_section("machine_learning_info", user_input, return_step="machine_learning")
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing — traitement asynchrone : step pricing
     async def async_step_pricing(self, user_input=None):
         tariff = active_tariff(self._effective())
         if tariff == TARIFF_DYNAMIQUE:
@@ -700,15 +763,19 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
             options = ["pricing_dynamic", "hphc", "init"]
         return self.async_show_menu(step_id="pricing", menu_options=options)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_dynamic — traitement asynchrone : step pricing dynamic
     async def async_step_pricing_dynamic(self, user_input=None):
         return await self._section("pricing_dynamic", user_input, return_step="pricing")
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_hphc — traitement asynchrone : step hphc
     async def async_step_hphc(self, user_input=None):
         return await self._section("hphc", user_input, return_step="pricing")
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_solar — Compatibilité options avec l'ancien nom EMS 2 solaire.
     async def async_step_solar(self, user_input=None):
         """Compatibilité options avec l'ancien nom EMS 2 solaire."""
         return await self.async_step_ia(user_input)
 
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_finish — traitement asynchrone : step finish
     async def async_step_finish(self, user_input=None):
         return self.async_create_entry(title="", data=self._ensure_pending())

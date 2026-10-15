@@ -79,14 +79,17 @@ class RegistryBinding:
 BINDINGS: dict[str, RegistryBinding] = {}
 
 
+# FONCTION : _native — Native
 def _native(role: str, section: str, key: str, fallback: str | None = None) -> None:
     BINDINGS[role] = RegistryBinding(role, section, "native", key, fallback)
 
 
+# FONCTION : _config — Config
 def _config(role: str, section: str, key: str, fallback: str | None = None) -> None:
     BINDINGS[role] = RegistryBinding(role, section, "config", key, fallback)
 
 
+# FONCTION : _literal — Literal
 def _literal(role: str, section: str, entity_id: str) -> None:
     BINDINGS[role] = RegistryBinding(role, section, "literal", None, entity_id)
 
@@ -528,12 +531,14 @@ _literal('legacy.switch_foxcat_energy_tarification_predictif_prix_dynamique', 'T
 _TOKEN_RE = re.compile(r"\[\[foxcat:([a-zA-Z0-9_.-]+)\]\]")
 
 
+# FONCTION : literal_role_for — Return a deterministic semantic fallback role for a legacy dashboard entity.
 def literal_role_for(entity_id: str) -> str:
     """Return a deterministic semantic fallback role for a legacy dashboard entity."""
     safe = re.sub(r"[^a-z0-9]+", "_", entity_id.lower()).strip("_")
     return f"legacy.{safe}"
 
 
+# FONCTION : register_legacy_literal — Register legacy literal
 def register_legacy_literal(entity_id: str, section: str = "Diagnostic") -> str:
     role = literal_role_for(entity_id)
     if role not in BINDINGS:
@@ -541,6 +546,7 @@ def register_legacy_literal(entity_id: str, section: str = "Diagnostic") -> str:
     return role
 
 
+# FONCTION : _native_entities_by_key — Native entities by key
 def _native_entities_by_key(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, str]:
     registry = er.async_get(hass)
     result: dict[str, str] = {}
@@ -552,6 +558,7 @@ def _native_entities_by_key(hass: HomeAssistant, entry: ConfigEntry) -> dict[str
     return result
 
 
+# FONCTION : resolve_registry — Resolve all FoxCat roles to the current HA entity_ids
 def resolve_registry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -619,9 +626,11 @@ def resolve_registry(
     return resolved
 
 
+# FONCTION : render_dashboard_template — Render dashboard template
 def render_dashboard_template(template: str, registry: dict[str, str]) -> tuple[str, list[str]]:
     unresolved: set[str] = set()
 
+    # FONCTION : repl — Repl
     def repl(match: re.Match[str]) -> str:
         role = match.group(1)
         entity_id = registry.get(role)
@@ -635,6 +644,7 @@ def render_dashboard_template(template: str, registry: dict[str, str]) -> tuple[
     return _TOKEN_RE.sub(repl, template), sorted(unresolved)
 
 
+# FONCTION : registry_diagnostics — Registry diagnostics
 def registry_diagnostics(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]) -> dict[str, Any]:
     resolved = resolve_registry(hass, entry, config)
     sections: dict[str, dict[str, str]] = {section: {} for section in OFFICIAL_SECTION_ORDER}

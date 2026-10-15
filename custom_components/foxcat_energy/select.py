@@ -26,6 +26,7 @@ from .select_options import (
 )
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
@@ -43,6 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class FoxCatDescribedSelect:
+    # MÉTHODE : FoxCatDescribedSelect.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self) -> dict[str, dict[str, str]]:
         return {
@@ -60,13 +62,16 @@ class FoxCatModeSelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
     }
     option_icons = {"Éco": "mdi:leaf", "Confort": "mdi:sofa", "Manuel": "mdi:hand"}
 
+    # MÉTHODE : FoxCatModeSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "mode_ems", "Mode EMS", "mdi:home-lightning-bolt", "ems")
 
+    # MÉTHODE : FoxCatModeSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         return mode_option(self.coordinator.settings)
 
+    # MÉTHODE : FoxCatModeSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if option not in MODES:
             return
@@ -74,6 +79,7 @@ class FoxCatModeSelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):
 
 
 class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
+    # MÉTHODE : FoxCatBaseSelect.__init__ — méthode spéciale __init__
     def __init__(
         self,
         coordinator: FoxCatEnergyCoordinator,
@@ -87,11 +93,13 @@ class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
         self._setting_key = setting_key
         self._attr_options = options
 
+    # MÉTHODE : FoxCatBaseSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         value = self.coordinator.settings.get(self._setting_key)
         return str(value) if value in self._attr_options else None
 
+    # MÉTHODE : FoxCatBaseSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if option not in self._attr_options:
             return
@@ -111,9 +119,11 @@ _STRUCTURE_TO_DYNAMIC = {"Simple": "Simple", "Impact": "Impact (Capacitaire)"}
 class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
     _attr_options = PRICE_SOURCE_CHOICES
 
+    # MÉTHODE : FoxCatPriceSourceSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "source_prix", "Source du prix", "mdi:database-clock-outline", "pricing")
 
+    # MÉTHODE : FoxCatPriceSourceSelect.current_option — Current option
     @property
     def current_option(self) -> str:
         return (
@@ -122,6 +132,7 @@ class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
             else PRICE_SOURCE_BIHORAIRE
         )
 
+    # MÉTHODE : FoxCatPriceSourceSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if option == PRICE_SOURCE_DYNAMIQUE:
             await self.coordinator.async_set_setting("tariff_regime", TARIFF_DYNAMIC)
@@ -135,14 +146,17 @@ class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
 
     _attr_options = DYNAMIC_STRUCTURE_CHOICES
 
+    # MÉTHODE : FoxCatTariffStructureSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "structure_tarifaire", "Structure tarifaire", "mdi:timeline-clock-outline", "pricing")
 
+    # MÉTHODE : FoxCatTariffStructureSelect.current_option — Current option
     @property
     def current_option(self) -> str:
         structure = tariff_dimensions(self.coordinator.settings).structure
         return "Impact" if structure == "Impact" else "Simple"
 
+    # MÉTHODE : FoxCatTariffStructureSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if option not in _STRUCTURE_TO_DYNAMIC:
             return
@@ -163,6 +177,7 @@ class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
         "Dynamique": "mdi:chart-timeline-variant",
     }
 
+    # MÉTHODE : FoxCatTariffRegimeSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -173,15 +188,18 @@ class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
             TARIFF_REGIMES,
         )
 
+    # MÉTHODE : FoxCatTariffRegimeSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         return tariff_regime_option(self.coordinator.settings)
 
+    # MÉTHODE : FoxCatTariffRegimeSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         await super().async_select_option(option)
 
 
 class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
+    # MÉTHODE : FoxCatDynamicStructureSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -207,13 +225,16 @@ class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntit
         "Zéro injection": "mdi:transmission-tower-off",
     }
 
+    # MÉTHODE : FoxCatNetworkPolicySelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "politique_reseau", "Politique réseau", "mdi:transmission-tower", "pricing")
 
+    # MÉTHODE : FoxCatNetworkPolicySelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         return network_policy_option(self.coordinator.settings)
 
+    # MÉTHODE : FoxCatNetworkPolicySelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if option not in NETWORK_POLICIES:
             return
@@ -221,6 +242,7 @@ class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntit
 
 
 class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
+    # MÉTHODE : FoxCatDashboardVersionSelect.options — Options
     @property
     def options(self) -> list[str]:
         from .dashboard import dashboard_select_options, dashboard_version_label
@@ -230,9 +252,11 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
             for option in dashboard_select_options(self.coordinator.hass)
         ]
 
+    # MÉTHODE : FoxCatDashboardVersionSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "dashboard_version", "Version du dashboard", "mdi:view-dashboard", "diagnostic")
 
+    # MÉTHODE : FoxCatDashboardVersionSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         from .dashboard import dashboard_status, dashboard_version_label
@@ -241,6 +265,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
         active = dashboard_version_label(active) if active else active
         return active if active in self.options else (self.options[0] if self.options else None)
 
+    # MÉTHODE : FoxCatDashboardVersionSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if option not in self.options:
             return
@@ -275,14 +300,17 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
 class FoxCatPriManualLevelSelect(FoxCatEntity, SelectEntity):
     _attr_options = [f"{level} %" for level in range(0, 101, 10)]
 
+    # MÉTHODE : FoxCatPriManualLevelSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "pri_niveau_manuel", "Niveau réduction puissance onduleur manuel", "mdi:tune-vertical", "pri")
 
+    # MÉTHODE : FoxCatPriManualLevelSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         level = self.coordinator._rrcr_level()
         return f"{level} %" if level in range(0, 101, 10) else None
 
+    # MÉTHODE : FoxCatPriManualLevelSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         if str(self.coordinator.settings.get("mode")) != MODE_MANUAL:
             await self.coordinator.async_set_pri_manual_level(-1)

@@ -15,6 +15,7 @@ from .entity import FoxCatEntity
 from .registry import registry_diagnostics
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     c: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[SensorEntity] = [
@@ -251,28 +252,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 
 class FoxCatPriceAnalyzerSensor(FoxCatEntity, SensorEntity):
+    # MÉTHODE : FoxCatPriceAnalyzerSensor.__init__ — méthode spéciale __init__
     def __init__(self,c): super().__init__(c,"price_analyzer_v2","Price Analyzer V2","mdi:chart-bell-curve-cumulative","pricing")
+    # MÉTHODE : FoxCatPriceAnalyzerSensor.native_value — Native value
     @property
     def native_value(self): return (self.coordinator.data.get("economic",{}).get("price_analyzer",{}) or {}).get("mode","INACTIF")
+    # MÉTHODE : FoxCatPriceAnalyzerSensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self): return dict(self.coordinator.data.get("economic",{}).get("price_analyzer",{}) or {})
 class FoxCatPlannerSensor(FoxCatEntity, SensorEntity):
+    # MÉTHODE : FoxCatPlannerSensor.__init__ — méthode spéciale __init__
     def __init__(self,c): super().__init__(c,"planificateur_charges_flexibles","Planificateur charges flexibles","mdi:timeline-clock-outline","machines")
+    # MÉTHODE : FoxCatPlannerSensor.native_value — Native value
     @property
     def native_value(self):
         p=self.coordinator.data.get("economic",{}).get("planner",{}) or {}; return "INACTIF" if not p.get("active") else f"{p.get('behavior','Éco')} • {p.get('mode','REACTIVE')}"
+    # MÉTHODE : FoxCatPlannerSensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self): return dict(self.coordinator.data.get("economic",{}).get("planner",{}) or {})
 
 class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
     """Synthèse du planificateur Day-Ahead, strictement Dynamique."""
 
+    # MÉTHODE : FoxCatDayAheadSensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "day_ahead_plan", "Planificateur Day-Ahead", "mdi:chart-timeline-variant-shimmer", "pricing")
 
+    # MÉTHODE : FoxCatDayAheadSensor._plan — Plan
     def _plan(self) -> dict[str, Any]:
         return self.coordinator.data.get("economic", {}).get("day_ahead", {}) or {}
 
+    # MÉTHODE : FoxCatDayAheadSensor.native_value — Native value
     @property
     def native_value(self) -> str:
         plan = self._plan()
@@ -282,6 +292,7 @@ class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
             return "PRIX FAVORABLE"
         return "PLANIFICATION ACTIVE"
 
+    # MÉTHODE : FoxCatDayAheadSensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         plan = self._plan()
@@ -306,14 +317,17 @@ class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
 class FoxCatMachineDayAheadSensor(FoxCatEntity, SensorEntity):
     """Fenêtre optimale d'une machine, calculée dans ses plages utilisateur."""
 
+    # MÉTHODE : FoxCatMachineDayAheadSensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, machine_id: str, name: str) -> None:
         safe = machine_id.replace(" ", "_").lower()
         super().__init__(coordinator, f"day_ahead_{safe}_plan", f"Day-Ahead • {name}", "mdi:calendar-clock", "machines")
         self._machine_id = machine_id
 
+    # MÉTHODE : FoxCatMachineDayAheadSensor._plan — Plan
     def _plan(self) -> dict[str, Any]:
         return (self.coordinator.data.get("economic", {}).get("day_ahead", {}).get("machines", {}) or {}).get(self._machine_id, {}) or {}
 
+    # MÉTHODE : FoxCatMachineDayAheadSensor.native_value — Native value
     @property
     def native_value(self) -> str:
         root = self.coordinator.data.get("economic", {}).get("day_ahead", {}) or {}
@@ -327,6 +341,7 @@ class FoxCatMachineDayAheadSensor(FoxCatEntity, SensorEntity):
         start = plan.get("best_start")
         return f"PLANIFIÉ {start}" if start else "ATTENTE"
 
+    # MÉTHODE : FoxCatMachineDayAheadSensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return dict(self._plan())
@@ -339,6 +354,7 @@ class FoxCatEconomicDecisionSensor(FoxCatEntity, SensorEntity):
     raisonnement tarifaire et les recommandations par machine.
     """
 
+    # MÉTHODE : FoxCatEconomicDecisionSensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -348,11 +364,13 @@ class FoxCatEconomicDecisionSensor(FoxCatEntity, SensorEntity):
             "pricing",
         )
 
+    # MÉTHODE : FoxCatEconomicDecisionSensor.native_value — Native value
     @property
     def native_value(self) -> str:
         decision = (self.coordinator.data or {}).get("economic", {}).get("decision", {})
         return str(decision.get("label") or decision.get("code") or "Indisponible")
 
+    # MÉTHODE : FoxCatEconomicDecisionSensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         economic = (self.coordinator.data or {}).get("economic", {})
@@ -397,17 +415,21 @@ class FoxCatEconomicDecisionSensor(FoxCatEntity, SensorEntity):
 class FoxCatRegistrySensor(FoxCatEntity, SensorEntity):
     """Expose the central dashboard/entity registry as a diagnostic entity."""
 
+    # MÉTHODE : FoxCatRegistrySensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "registre_entites", "Registre des entités FoxCat", "mdi:database-search", "diagnostic")
 
+    # MÉTHODE : FoxCatRegistrySensor._snapshot — Snapshot
     def _snapshot(self) -> dict[str, Any]:
         return registry_diagnostics(self.hass, self.coordinator.entry, self.coordinator.config)
 
+    # MÉTHODE : FoxCatRegistrySensor.native_value — Native value
     @property
     def native_value(self) -> str:
         data = self._snapshot()
         return f"{data['resolved_count']}/{data['binding_count']} résolues"
 
+    # MÉTHODE : FoxCatRegistrySensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         data = self._snapshot()
@@ -419,15 +441,18 @@ class FoxCatRegistrySensor(FoxCatEntity, SensorEntity):
         }
 
 
+# FONCTION : _iso — Iso
 def _iso(value: Any) -> str:
     return value.isoformat() if hasattr(value, "isoformat") else "Jamais"
 
 
 class FoxCatValueSensor(FoxCatEntity, SensorEntity):
+    # MÉTHODE : FoxCatValueSensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any]):
         super().__init__(coordinator, key, name, icon, device)
         self._getter = getter
 
+    # MÉTHODE : FoxCatValueSensor.native_value — Native value
     @property
     def native_value(self) -> Any:
         try:
@@ -442,6 +467,7 @@ class FoxCatValueSensor(FoxCatEntity, SensorEntity):
 class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
+    # MÉTHODE : FoxCatNumericSensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], unit: str | None = None, device_class=None, state_class=None, device_name: str | None = None, device_identifier: str | None = None, suggested_object_id: str | None = None):
         super().__init__(coordinator, key, name, icon, device)
         if suggested_object_id:
@@ -456,6 +482,7 @@ class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
         elif unit in {PERCENTAGE, "€/kWh", "€"} or unit is None:
             self._attr_state_class = None
 
+    # MÉTHODE : FoxCatNumericSensor.native_value — Native value
     @property
     def native_value(self) -> float | int | None:
         try:
@@ -468,6 +495,7 @@ class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
         except (TypeError, ValueError, KeyError, AttributeError):
             return None
 
+    # MÉTHODE : FoxCatNumericSensor.device_info — Device info
     @property
     def device_info(self):
         if self._foxcat_device_identifier:

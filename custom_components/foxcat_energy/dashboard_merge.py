@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 
 
+# FONCTION : _edits — Edits
 def _edits(base: list[str], changed: list[str]) -> list[tuple[int, int, list[str]]]:
     matcher = difflib.SequenceMatcher(a=base, b=changed, autojunk=False)
     return [
@@ -12,6 +13,7 @@ def _edits(base: list[str], changed: list[str]) -> list[tuple[int, int, list[str
     ]
 
 
+# FONCTION : _overlap — Overlap
 def _overlap(
     first: tuple[int, int, list[str]], second: tuple[int, int, list[str]]
 ) -> bool:
@@ -26,6 +28,7 @@ def _overlap(
     return max(first_start, second_start) < min(first_end, second_end)
 
 
+# FONCTION : merge_dashboard_text — Apply non-conflicting user line edits from a dashboard onto a newer template.
 def merge_dashboard_text(base_text: str, user_text: str, latest_text: str) -> str:
     """Apply non-conflicting user line edits from a dashboard onto a newer template."""
     base = base_text.splitlines(keepends=True)

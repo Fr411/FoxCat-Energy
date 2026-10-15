@@ -6,12 +6,14 @@ from ..models import EnergySnapshot
 from ..tariff import is_offpeak, minute_of_day
 
 
+# FONCTION : coverage — Coverage
 def coverage(grid_net_w: float, boiler_power_w: float) -> float:
     if boiler_power_w <= 0:
         return 0.0
     return max(grid_net_w, 0.0) / boiler_power_w * 100.0
 
 
+# FONCTION : thermal_deadline — Prudent last-safe-start model kept from the validated FoxCat baseline.
 def thermal_deadline(snapshot: EnergySnapshot, settings: dict[str, object], now: datetime) -> bool:
     """Prudent last-safe-start model kept from the validated FoxCat baseline."""
     normal = float(settings["boiler_temp_normal_c"])
@@ -32,6 +34,7 @@ def thermal_deadline(snapshot: EnergySnapshot, settings: dict[str, object], now:
     return snapshot.boiler_temp_c < normal and available <= need_minutes
 
 
+# FONCTION : ecs_last_departure — Ecs last departure
 def ecs_last_departure(snapshot: EnergySnapshot, settings: dict[str, object], now: datetime) -> bool:
     m = minute_of_day(now)
     if 0 <= m < 420:

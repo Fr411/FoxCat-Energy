@@ -10,6 +10,7 @@ from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 
 
+# FONCTION : _device_for — Device for
 def _device_for(key: str) -> str:
     if key.startswith("metronome"):
         return "metronome"
@@ -24,6 +25,7 @@ def _device_for(key: str) -> str:
     return "ems"
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coordinator: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([FoxCatSettingNumber(coordinator, key, *definition) for key, definition in NUMBER_DEFINITIONS.items()])
@@ -32,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 class FoxCatSettingNumber(FoxCatEntity, NumberEntity):
     _attr_mode = NumberMode.BOX
 
+    # MÉTHODE : FoxCatSettingNumber.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, key: str, name: str, minimum: float, maximum: float, step: float, unit: str | None, icon: str) -> None:
         super().__init__(coordinator, key, name, icon, _device_for(key))
         self._attr_native_min_value = minimum
@@ -41,9 +44,11 @@ class FoxCatSettingNumber(FoxCatEntity, NumberEntity):
         if key == "dynamic_favorable_position_pct":
             self._attr_suggested_object_id = "foxcat_seuil_prix_dynamique"
 
+    # MÉTHODE : FoxCatSettingNumber.native_value — Native value
     @property
     def native_value(self) -> float:
         return float(self.coordinator.settings.get(self._key, 0.0))
 
+    # MÉTHODE : FoxCatSettingNumber.async_set_native_value — traitement asynchrone : set native value
     async def async_set_native_value(self, value: float) -> None:
         await self.coordinator.async_set_setting(self._key, float(value))

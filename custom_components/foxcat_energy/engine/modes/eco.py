@@ -8,6 +8,7 @@ from ..tariff import is_offpeak, is_peak
 from .common import coverage
 
 
+# FONCTION : evaluate_eco — Mode Économie énergie hybride boiler + PRI
 def evaluate_eco(
     snapshot: EnergySnapshot,
     t0: EnergySnapshot,

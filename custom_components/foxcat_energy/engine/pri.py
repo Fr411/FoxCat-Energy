@@ -6,10 +6,13 @@ INVERTER_POWER_W=4000.0
 LEVEL_STEP_PCT=10
 LEVEL_STEP_W=400.0
 
+# FONCTION : clamp — Clamp
 def clamp(v,lo,hi): return max(lo,min(hi,v))
+# FONCTION : score — Score
 def score(import_w,export_w,weight_import,weight_export):
     return max(import_w,0.0)*weight_import+max(export_w,0.0)*weight_export
 
+# FONCTION : house_target_level — Diagnostic seulement; ne commande pas la réduction puissance onduleur.
 def house_target_level(house_w,step_w,weight_import=1.0,weight_export=1.0):
     """Diagnostic seulement; ne commande pas la réduction puissance onduleur."""
     if step_w<=0:return 100,0.0,0.0
@@ -17,15 +20,18 @@ def house_target_level(house_w,step_w,weight_import=1.0,weight_export=1.0):
     t=0 if h<=0 else int(clamp(math.ceil(h/step_w)*10,0,100))
     return t,0.0,0.0
 
+# FONCTION : inverter_limit_w — Inverter limit w
 def inverter_limit_w(level_pct:int)->float:
     return INVERTER_POWER_W*clamp(float(level_pct),0.0,100.0)/100.0
 
+# FONCTION : _pv_hits_ceiling — Pv hits ceiling
 def _pv_hits_ceiling(pv_w,current_level,margin_w,ratio_threshold):
     limit_w=inverter_limit_w(current_level)
     if limit_w<=0:return False,limit_w,0.0
     ratio=max(float(pv_w),0.0)/limit_w
     return (pv_w>=max(limit_w-margin_w,0.0) or ratio>=ratio_threshold),limit_w,ratio
 
+# FONCTION : decide_zero — Réduction puissance onduleur: réinjection maître + contrôle PV/plafond.
 def decide_zero(snapshot:EnergySnapshot,current_level:int,settings:dict[str,object])->PriDecision:
     """Réduction puissance onduleur: réinjection maître + contrôle PV/plafond."""
     export_limit=max(float(settings.get("pri_export_acceptable_w",150.0)),0.0)
@@ -63,6 +69,7 @@ def decide_zero(snapshot:EnergySnapshot,current_level:int,settings:dict[str,obje
         f"Zone neutre : réinjection={snapshot.export_w:.0f} W, prélèvement={snapshot.import_w:.0f} W, maintien {current_level}%.",
         0.0,0.0,diag)
 
+# FONCTION : decide_dynamic — PRI dynamique basé sur la valeur SIGNÉE de l'export
 def decide_dynamic(snapshot:EnergySnapshot,current_level:int,settings:dict[str,object],injection_price:float|None,boiler_absorbing:bool)->PriDecision:
     """PRI dynamique basé sur la valeur SIGNÉE de l'export.
 

@@ -4,5 +4,6 @@ from ...const import BOILER_NONE, MODE_MANUAL
 from ..models import BoilerIntent, EnergySnapshot
 
 
+# FONCTION : evaluate_manual — Evaluate manual
 def evaluate_manual(snapshot: EnergySnapshot, settings: dict[str, object]) -> BoilerIntent:
     return BoilerIntent(BOILER_NONE, "Mode Manuel : aucune stratégie automatique, sécurités thermiques actives.", MODE_MANUAL)

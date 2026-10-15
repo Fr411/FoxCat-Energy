@@ -28,10 +28,12 @@ RATE_ZERO = {
 }
 
 
+# FONCTION : _rate_bucket — Rate bucket
 def _rate_bucket() -> dict[str, float]:
     return dict(RATE_ZERO)
 
 
+# FONCTION : _tariff_bucket — Tariff bucket
 def _tariff_bucket() -> dict[str, Any]:
     return {
         "dynamic": _rate_bucket(),
@@ -40,6 +42,7 @@ def _tariff_bucket() -> dict[str, Any]:
     }
 
 
+# FONCTION : _bucket — Bucket
 def _bucket() -> dict[str, Any]:
     return {**ZERO, "appliances": {}, "tariff": _tariff_bucket()}
 
@@ -52,6 +55,7 @@ class EnergyAccounting:
     revenu d'export n'est jamais converti en kWh.
     """
 
+    # MÉTHODE : EnergyAccounting.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self.day_key = ""
         self.month_key = ""
@@ -64,6 +68,7 @@ class EnergyAccounting:
         self.last_save_ts: datetime | None = None
         self.breakdown_since: str | None = None
 
+    # MÉTHODE : EnergyAccounting._migrate_rate — Migrate rate
     @staticmethod
     def _migrate_rate(raw: Any) -> dict[str, float]:
         result = _rate_bucket()
@@ -75,6 +80,7 @@ class EnergyAccounting:
                     result[key] = 0.0
         return result
 
+    # MÉTHODE : EnergyAccounting._migrate_bucket — Migrate bucket
     @classmethod
     def _migrate_bucket(cls, raw: Any) -> dict[str, Any]:
         result = _bucket()
@@ -109,6 +115,7 @@ class EnergyAccounting:
         }
         return result
 
+    # MÉTHODE : EnergyAccounting.restore — Restore
     def restore(self, raw: Any) -> None:
         if not isinstance(raw, dict):
             return
@@ -120,6 +127,7 @@ class EnergyAccounting:
             setattr(self, name, self._migrate_bucket(raw.get(name)))
         self.last_valid_ts = None  # Ne jamais intégrer le downtime HA.
 
+    # MÉTHODE : EnergyAccounting.dump — Dump
     def dump(self) -> dict[str, Any]:
         return {
             "schema": 2,
@@ -133,6 +141,7 @@ class EnergyAccounting:
             "lifetime": self.lifetime,
         }
 
+    # MÉTHODE : EnergyAccounting._rollover — Rollover
     def _rollover(self, now: datetime) -> None:
         d, m, y = now.strftime("%Y-%m-%d"), now.strftime("%Y-%m"), now.strftime("%Y")
         if self.day_key and self.day_key != d:
@@ -143,14 +152,17 @@ class EnergyAccounting:
             self.year = _bucket()
         self.day_key, self.month_key, self.year_key = d, m, y
 
+    # MÉTHODE : EnergyAccounting._add — Add
     @staticmethod
     def _add(bucket: dict[str, Any], key: str, value: float) -> None:
         bucket[key] = float(bucket.get(key, 0.0)) + max(float(value), 0.0)
 
+    # MÉTHODE : EnergyAccounting._add_signed — Add signed
     @staticmethod
     def _add_signed(bucket: dict[str, Any], key: str, value: float) -> None:
         bucket[key] = float(bucket.get(key, 0.0)) + float(value)
 
+    # MÉTHODE : EnergyAccounting._tariff_target — Tariff target
     @staticmethod
     def _tariff_target(bucket: dict[str, Any], regime: str, period: str) -> dict[str, Any]:
         tariff = bucket.setdefault("tariff", _tariff_bucket())
@@ -161,6 +173,7 @@ class EnergyAccounting:
             return hphc.setdefault("HP" if period == "HP" else "HC", _rate_bucket())
         return tariff.setdefault("other", _rate_bucket())
 
+    # MÉTHODE : EnergyAccounting._add_tariff — Add tariff
     @classmethod
     def _add_tariff(
         cls,
@@ -181,6 +194,7 @@ class EnergyAccounting:
         cls._add(target, "export_revenue_eur", export_revenue)
         cls._add(target, "export_cost_eur", export_cost)
 
+    # MÉTHODE : EnergyAccounting._add_appliance — Add appliance
     @staticmethod
     def _add_appliance(
         bucket: dict[str, Any],
@@ -222,6 +236,7 @@ class EnergyAccounting:
             key = "other_kwh"
         a[key] = float(a.get(key, 0.0)) + max(energy, 0.0)
 
+    # MÉTHODE : EnergyAccounting.process — Intègre une vraie trame valide et sa valeur tarifaire au même instant.
     def process(self, snapshot: Any, prices: dict[str, Any], appliances: list[dict[str, Any]]) -> bool:
         """Intègre une vraie trame valide et sa valeur tarifaire au même instant."""
         now = snapshot.timestamp
@@ -303,6 +318,7 @@ class EnergyAccounting:
             return True
         return False
 
+    # MÉTHODE : EnergyAccounting._view_rate — View rate
     @staticmethod
     def _view_rate(rate: dict[str, Any]) -> dict[str, Any]:
         imp = float(rate.get("import_kwh", 0.0) or 0.0)
@@ -321,6 +337,7 @@ class EnergyAccounting:
             "net_export_value_eur": revenue - export_cost,
         }
 
+    # MÉTHODE : EnergyAccounting._view — View
     @classmethod
     def _view(cls, bucket: dict[str, Any]) -> dict[str, Any]:
         pv = float(bucket.get("pv_kwh", 0.0) or 0.0)
@@ -356,6 +373,7 @@ class EnergyAccounting:
             "solar_gain_eur": avoided + revenue - export_cost,
         }
 
+    # MÉTHODE : EnergyAccounting.view — View
     def view(self) -> dict[str, Any]:
         return {
             "schema": 2,

@@ -63,6 +63,7 @@ class EconomicDecision:
     boiler_comfort_priority: bool = False
     dynamic_fallback: bool = False
 
+    # MÉTHODE : EconomicDecision.as_dict — As dict
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
         for key in ("best_future_at", "boiler_reserved_start", "boiler_reserved_end"):
@@ -84,6 +85,7 @@ _SERIES_KEYS = (
 )
 
 
+# FONCTION : _float — Float
 def _float(value: Any) -> float | None:
     try:
         if value is None or isinstance(value, bool):
@@ -93,6 +95,7 @@ def _float(value: Any) -> float | None:
         return None
 
 
+# FONCTION : _parse_datetime — Parse datetime
 def _parse_datetime(value: Any, now: datetime) -> datetime | None:
     if isinstance(value, datetime):
         dt = value
@@ -128,6 +131,7 @@ def _parse_datetime(value: Any, now: datetime) -> datetime | None:
     return dt
 
 
+# FONCTION : extract_price_points — Extract a future price series from common Home Assistant attributes
 def extract_price_points(
     raw: Any,
     now: datetime,
@@ -149,6 +153,7 @@ def extract_price_points(
     preferred = tuple(preferred_price_keys or ())
     price_keys = tuple(dict.fromkeys((*preferred, *_PRICE_KEYS)))
 
+    # FONCTION : add — Add
     def add(at: datetime | None, price: float | None) -> None:
         if at is None or price is None:
             return
@@ -157,6 +162,7 @@ def extract_price_points(
             return
         found.append(PricePoint(at=at, price=price, source=source))
 
+    # FONCTION : walk — Walk
     def walk(value: Any, base_at: datetime | None = None) -> None:
         if isinstance(value, dict):
             price = next((_float(value.get(key)) for key in price_keys if key in value and _float(value.get(key)) is not None), None)
@@ -197,6 +203,7 @@ def extract_price_points(
     return sorted(unique.values(), key=lambda p: p.at)
 
 
+# FONCTION : build_hphc_points — Build hphc points
 def build_hphc_points(
     now: datetime,
     settings: dict[str, Any],
@@ -223,6 +230,7 @@ def build_hphc_points(
     ]
 
 
+# FONCTION : merge_price_points — Merge price points
 def merge_price_points(*series: Iterable[PricePoint]) -> list[PricePoint]:
     merged: dict[datetime, PricePoint] = {}
     for points in series:
@@ -231,6 +239,7 @@ def merge_price_points(*series: Iterable[PricePoint]) -> list[PricePoint]:
     return sorted(merged.values(), key=lambda p: p.at)
 
 
+# FONCTION : _price_at — Price at
 def _price_at(points: list[PricePoint], at: datetime) -> float | None:
     if not points:
         return None
@@ -245,6 +254,7 @@ def _price_at(points: list[PricePoint], at: datetime) -> float | None:
     return points[0].price
 
 
+# FONCTION : average_price — Average price
 def average_price(points: list[PricePoint], start: datetime, duration_hours: float, *, sample_minutes: int = 15) -> float | None:
     if not points:
         return None
@@ -258,6 +268,7 @@ def average_price(points: list[PricePoint], start: datetime, duration_hours: flo
     return sum(samples) / len(samples) if samples else None
 
 
+# FONCTION : best_start_window — Best start window
 def best_start_window(
     points: list[PricePoint],
     now: datetime,
@@ -282,6 +293,7 @@ def best_start_window(
 
 
 
+# FONCTION : _dynamic_day_ahead_points — Return unique hourly Day-Ahead points for the next dynamic horizon only.
 def _dynamic_day_ahead_points(
     points: list[PricePoint], now: datetime, *, horizon_hours: int = DYNAMIC_ARBITRAGE_HORIZON_HOURS
 ) -> list[PricePoint]:
@@ -296,6 +308,7 @@ def _dynamic_day_ahead_points(
     return [hourly[key] for key in sorted(hourly)]
 
 
+# FONCTION : _best_consecutive_dynamic_window — Find the cheapest *consecutive* hourly Day-Ahead block
 def _best_consecutive_dynamic_window(
     points: list[PricePoint], now: datetime, duration_hours: float
 ) -> tuple[datetime | None, datetime | None, float | None]:
@@ -329,6 +342,7 @@ def _best_consecutive_dynamic_window(
     return best_start, best_end, best_avg
 
 
+# FONCTION : _legacy_dynamic_decision — Exact V1.6.156-style dynamic fallback used when prediction is disabled/unavailable.
 def _legacy_dynamic_decision(
     *,
     now: datetime,
@@ -396,6 +410,7 @@ def _legacy_dynamic_decision(
     )
 
 
+# FONCTION : _evaluate_dynamic_market — Arbitrage Luminus Day-Ahead, strictement réservé au régime DYNAMIQUE.
 def _evaluate_dynamic_market(
     *,
     now: datetime,
@@ -620,6 +635,7 @@ def _evaluate_dynamic_market(
         **common,
     )
 
+# FONCTION : evaluate_market — Evaluate market
 def evaluate_market(
     *,
     now: datetime,
@@ -723,6 +739,7 @@ def evaluate_market(
     )
 
 
+# FONCTION : recommend_flexible_load — Compare a machine start now with future starts without interrupting active cycles.
 def recommend_flexible_load(
     *,
     now: datetime,

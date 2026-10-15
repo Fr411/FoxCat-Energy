@@ -128,6 +128,7 @@ INVERTER_BRANDS = list(INVERTER_CATALOG)
 METER_BRANDS = list(METER_CATALOG)
 
 
+# FONCTION : models_for_inverter — Models for inverter
 def models_for_inverter(brand: str | None) -> list[str]:
     models = list(INVERTER_CATALOG.get(str(brand or ""), []))
     if OTHER not in models:
@@ -135,6 +136,7 @@ def models_for_inverter(brand: str | None) -> list[str]:
     return models
 
 
+# FONCTION : models_for_meter — Models for meter
 def models_for_meter(brand: str | None) -> list[str]:
     models = list(METER_CATALOG.get(str(brand or ""), []))
     if OTHER not in models:

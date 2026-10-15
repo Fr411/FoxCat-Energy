@@ -4,10 +4,12 @@ from datetime import datetime, time
 from typing import Any
 
 
+# FONCTION : minute_of_day — Minute of day
 def minute_of_day(now: datetime) -> float:
     return now.hour * 60 + now.minute + now.second / 60
 
 
+# FONCTION : _time_minutes — Time minutes
 def _time_minutes(value: Any, default: str) -> int:
     if isinstance(value, time):
         return value.hour * 60 + value.minute
@@ -20,6 +22,7 @@ def _time_minutes(value: Any, default: str) -> int:
         return int(h) * 60 + int(m)
 
 
+# FONCTION : _within — Within
 def _within(now_minute: float, start_minute: int, stop_minute: int) -> bool:
     if start_minute == stop_minute:
         return False
@@ -28,6 +31,7 @@ def _within(now_minute: float, start_minute: int, stop_minute: int) -> bool:
     return now_minute >= start_minute or now_minute < stop_minute
 
 
+# FONCTION : is_peak — Is peak
 def is_peak(now: datetime, settings: dict[str, object] | None = None) -> bool:
     settings = settings or {}
     m = minute_of_day(now)
@@ -38,10 +42,12 @@ def is_peak(now: datetime, settings: dict[str, object] | None = None) -> bool:
     return _within(m, s1, e1) or _within(m, s2, e2)
 
 
+# FONCTION : is_offpeak — Is offpeak
 def is_offpeak(now: datetime, settings: dict[str, object] | None = None) -> bool:
     return not is_peak(now, settings)
 
 
+# FONCTION : is_offpeak_day — Return the daytime off-peak window between the two HP ranges
 def is_offpeak_day(now: datetime, settings: dict[str, object] | None = None) -> bool:
     """Return the daytime off-peak window between the two HP ranges.
 
@@ -55,6 +61,7 @@ def is_offpeak_day(now: datetime, settings: dict[str, object] | None = None) -> 
     return _within(m, e1, s2)
 
 
+# FONCTION : is_offpeak_night — Is offpeak night
 def is_offpeak_night(now: datetime, settings: dict[str, object] | None = None) -> bool:
     settings = settings or {}
     m = minute_of_day(now)
@@ -63,10 +70,12 @@ def is_offpeak_night(now: datetime, settings: dict[str, object] | None = None) -
     return _within(m, e2, s1)
 
 
+# FONCTION : tariff_period — Tariff period
 def tariff_period(now: datetime, settings: dict[str, object] | None = None) -> str:
     return "HP" if is_peak(now, settings) else "HC"
 
 
+# FONCTION : tariff_boundaries — Tariff boundaries
 def tariff_boundaries(settings: dict[str, object] | None = None) -> set[tuple[int, int]]:
     settings = settings or {}
     values = (
@@ -82,6 +91,7 @@ def tariff_boundaries(settings: dict[str, object] | None = None) -> set[tuple[in
     return result
 
 
+# FONCTION : price_status — Price status
 def price_status(current: float | None, pmin: float | None, pmax: float | None, avg: float | None) -> str:
     if current is None:
         return "INDISPONIBLE"

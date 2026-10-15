@@ -15,6 +15,7 @@ from .dashboard import (
 from .entity import FoxCatEntity
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -144,6 +145,7 @@ async def async_setup_entry(
 
 
 class FoxCatActionButton(FoxCatEntity, ButtonEntity):
+    # MÉTHODE : FoxCatActionButton.__init__ — méthode spéciale __init__
     def __init__(
         self,
         coordinator: FoxCatEnergyCoordinator,
@@ -164,6 +166,7 @@ class FoxCatActionButton(FoxCatEntity, ButtonEntity):
         self._action = action
         self._machine_id = machine_id
 
+    # MÉTHODE : FoxCatActionButton.async_press — traitement asynchrone : press
     async def async_press(self) -> None:
         if self._action == "solar":
             await self.coordinator.async_analyze_solar(

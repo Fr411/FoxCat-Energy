@@ -7,6 +7,7 @@ from pathlib import Path
 _VERSION_PATTERN = re.compile(r"^dashboard_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)\.yaml$")
 
 
+# FONCTION : available_dashboard_versions — Available dashboard versions
 def available_dashboard_versions(directory: Path) -> list[str]:
     versions = []
     for path in directory.glob("dashboard_v*.yaml"):
@@ -24,6 +25,7 @@ def available_dashboard_versions(directory: Path) -> list[str]:
     )
 
 
+# FONCTION : dashboard_version_label — Dashboard version label
 def dashboard_version_label(version: str, directory: Path) -> str:
     manifest = directory / f"manifest_v{version}.json"
     try:
@@ -34,6 +36,7 @@ def dashboard_version_label(version: str, directory: Path) -> str:
     return label if isinstance(label, str) and label else version
 
 
+# FONCTION : dashboard_version_for_label — Dashboard version for label
 def dashboard_version_for_label(label: str, directory: Path) -> str:
     for version in available_dashboard_versions(directory):
         if dashboard_version_label(version, directory) == label:
@@ -41,6 +44,7 @@ def dashboard_version_for_label(label: str, directory: Path) -> str:
     return label
 
 
+# FONCTION : recommended_dashboard_version — Recommended dashboard version
 def recommended_dashboard_version(directory: Path) -> str | None:
     versions = available_dashboard_versions(directory)
     for version in versions:

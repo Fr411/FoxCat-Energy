@@ -30,6 +30,7 @@ class DeviceDefinition:
     configuration: dict[str, Any]
 
 
+# FONCTION : _validate_device — Validate device
 def _validate_device(raw: Any, source: str) -> DeviceDefinition:
     if not isinstance(raw, dict):
         raise ValueError(f"{source}: la clé device doit contenir un objet YAML.")
@@ -62,6 +63,7 @@ def _validate_device(raw: Any, source: str) -> DeviceDefinition:
     )
 
 
+# FONCTION : load_device_templates — Load device templates
 def load_device_templates() -> tuple[DeviceDefinition, ...]:
     definitions = []
     for filename in _TEMPLATE_FILES:
@@ -77,10 +79,12 @@ def load_device_templates() -> tuple[DeviceDefinition, ...]:
     return tuple(definitions)
 
 
+# FONCTION : device_definitions — Device definitions
 def device_definitions() -> tuple[DeviceDefinition, ...]:
     return load_device_templates()
 
 
+# FONCTION : apply_device_toggle — Apply device toggle
 def apply_device_toggle(settings: dict[str, Any], device_id: str, enabled: bool) -> str | None:
     definition = next(
         (item for item in device_definitions() if item.device_id == device_id),

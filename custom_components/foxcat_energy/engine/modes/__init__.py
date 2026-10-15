@@ -11,6 +11,7 @@ from .manual import evaluate_manual
 from .zero_injection import evaluate_zero_injection
 
 
+# FONCTION : evaluate_mode — Evaluate mode
 def evaluate_mode(
     mode: str,
     snapshot: EnergySnapshot,

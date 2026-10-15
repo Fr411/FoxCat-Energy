@@ -61,10 +61,12 @@ class MachineDefinition:
     deadline: str = ""
     max_delay_hours: float = 24.0
 
+    # MÉTHODE : MachineDefinition.setting_key — Setting key
     @property
     def setting_key(self) -> str:
         return self.legacy_setting_key or f"machine_{self.machine_id}_enabled"
 
+    # MÉTHODE : MachineDefinition.as_dict — As dict
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.machine_id,
@@ -90,10 +92,12 @@ class MachineDefinition:
         }
 
 
+# FONCTION : _str — Str
 def _str(value: Any, default: str = "") -> str:
     return str(value if value not in (None, "") else default)
 
 
+# FONCTION : machine_from_dict — Machine from dict
 def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
     machine_id = _str(raw.get("id")).strip()
     name = _str(raw.get("name")).strip()
@@ -130,6 +134,7 @@ def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
     )
 
 
+# FONCTION : legacy_machine_definitions — Legacy machine definitions
 def legacy_machine_definitions(config: dict[str, Any]) -> list[MachineDefinition]:
     specs = [
         (
@@ -167,6 +172,7 @@ def legacy_machine_definitions(config: dict[str, Any]) -> list[MachineDefinition
     return result
 
 
+# FONCTION : machine_definitions — Machine definitions
 def machine_definitions(config: dict[str, Any]) -> list[MachineDefinition]:
     raw = config.get(CONF_MACHINES_V13)
     if isinstance(raw, list):
@@ -176,6 +182,7 @@ def machine_definitions(config: dict[str, Any]) -> list[MachineDefinition]:
     return legacy_machine_definitions(config)
 
 
+# FONCTION : records_for_options — Records for options
 def records_for_options(config: dict[str, Any]) -> list[dict[str, Any]]:
     raw = config.get(CONF_MACHINES_V13)
     if isinstance(raw, list):
@@ -183,6 +190,7 @@ def records_for_options(config: dict[str, Any]) -> list[dict[str, Any]]:
     return [m.as_dict() for m in legacy_machine_definitions(config)]
 
 
+# FONCTION : time_minutes — Time minutes
 def time_minutes(value: Any, default: str) -> int:
     raw = _str(value, default)
     try:
@@ -193,6 +201,7 @@ def time_minutes(value: Any, default: str) -> int:
         return int(h) * 60 + int(m)
 
 
+# FONCTION : within_time_window — Within time window
 def within_time_window(now_minute: int, start_minute: int, stop_minute: int) -> bool:
     if start_minute == stop_minute:
         return False
@@ -201,6 +210,7 @@ def within_time_window(now_minute: int, start_minute: int, stop_minute: int) -> 
     return now_minute >= start_minute or now_minute < stop_minute
 
 
+# FONCTION : machine_allowed — Machine allowed
 def machine_allowed(machine: MachineDefinition, now: datetime) -> bool:
     minute = now.hour * 60 + now.minute
     return (
@@ -209,6 +219,7 @@ def machine_allowed(machine: MachineDefinition, now: datetime) -> bool:
     )
 
 
+# FONCTION : schedule_boundaries — Schedule boundaries
 def schedule_boundaries(machines: list[MachineDefinition]) -> set[tuple[int, int]]:
     result: set[tuple[int, int]] = set()
     for machine in machines:

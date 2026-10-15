@@ -21,18 +21,23 @@ class MachineCycleState:
     timeout_at: datetime | None = None
     last_power_w: float = 0.0
     origin: str = "NONE"
+    # MÉTHODE : MachineCycleState.protected — Protected
     @property
     def protected(self)->bool:
         return self.state in {PROTECTED_CYCLE,END_CONFIRMATION}
 
 class MachineCycleManager:
     """Cycle logique persistant : une pause à 0 W ne termine jamais un cycle prématurément."""
+    # MÉTHODE : MachineCycleManager.__init__ — méthode spéciale __init__
     def __init__(self)->None:
         self._states: dict[str,MachineCycleState]={}
+    # MÉTHODE : MachineCycleManager.state_for — State for
     def state_for(self,machine_id:str)->MachineCycleState:
         return self._states.setdefault(machine_id,MachineCycleState(machine_id))
+    # MÉTHODE : MachineCycleManager.is_protected — Is protected
     def is_protected(self,machine_id:str)->bool:
         return self.state_for(machine_id).protected
+    # MÉTHODE : MachineCycleManager.update — Update
     def update(self,machine_id:str,power_w:float,now:datetime,*,start_w:float,start_confirm_s:float,duration_minutes:float,margin_minutes:float,end_w:float,end_confirm_minutes:float,external_cycle_on:bool=False)->MachineCycleState:
         st=self.state_for(machine_id); power=max(float(power_w),0.0); st.last_power_w=power
         if external_cycle_on and not st.protected:
@@ -62,23 +67,28 @@ class MachineCycleManager:
                 if now-st.low_since>=timedelta(minutes=end_confirm_minutes): self._finish(st)
             else: st.low_since=None
         return st
+    # MÉTHODE : MachineCycleManager.force_start — Démarre immédiatement un cycle protégé demandé par l'utilisateur.
     def force_start(self, machine_id: str, now: datetime, *, duration_minutes: float, margin_minutes: float, origin: str = "USER_BUTTON") -> MachineCycleState:
         """Démarre immédiatement un cycle protégé demandé par l'utilisateur."""
         st = self.state_for(machine_id)
         self._start(st, now, duration_minutes, margin_minutes, origin)
         return st
 
+    # MÉTHODE : MachineCycleManager.force_finish — Termine explicitement un cycle à la demande de l'utilisateur.
     def force_finish(self, machine_id: str) -> MachineCycleState:
         """Termine explicitement un cycle à la demande de l'utilisateur."""
         st = self.state_for(machine_id)
         self._finish(st)
         return st
 
+    # MÉTHODE : MachineCycleManager.snapshot — Snapshot
     def snapshot(self,now:datetime)->dict[str,dict[str,Any]]:
         return {mid:{"state":st.state,"protected":st.protected,"origin":st.origin,"power_w":st.last_power_w,"started_at":st.started_at,"expected_end_at":st.expected_end_at,"timeout_at":st.timeout_at,"remaining_s":max((st.expected_end_at-now).total_seconds(),0) if st.expected_end_at and st.protected else None} for mid,st in self._states.items()}
+    # MÉTHODE : MachineCycleManager._start — Start
     @staticmethod
     def _start(st,started,duration,margin,origin):
         st.state=PROTECTED_CYCLE; st.started_at=started; st.candidate_at=None; st.low_since=None; st.origin=origin; st.expected_end_at=started+timedelta(minutes=max(duration,1)); st.timeout_at=st.expected_end_at+timedelta(minutes=max(margin,1))
+    # MÉTHODE : MachineCycleManager._finish — Finish
     @staticmethod
     def _finish(st):
         st.state=FINISHED; st.started_at=None; st.candidate_at=None; st.low_since=None; st.expected_end_at=None; st.timeout_at=None; st.origin="NONE"

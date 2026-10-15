@@ -31,12 +31,14 @@ from .migration import compatibility_tariff_regime
 _PROFILE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
+# FONCTION : profile_path — Profile path
 def profile_path(directory: Path, name: str) -> Path:
     if not _PROFILE_NAME.fullmatch(name):
         raise ValueError("Nom de profil invalide : utiliser 1 à 64 lettres, chiffres, _ ou -.")
     return directory / f"{name}.json"
 
 
+# FONCTION : validate_profile_settings — Validate profile settings
 def validate_profile_settings(
     values: Any,
     allowed_keys: Iterable[str] | None = None,
@@ -104,6 +106,7 @@ def validate_profile_settings(
     return validated
 
 
+# FONCTION : write_settings_profile — Write settings profile
 def write_settings_profile(
     directory: Path,
     name: str,
@@ -122,6 +125,7 @@ def write_settings_profile(
     return path
 
 
+# FONCTION : read_settings_profile — Read settings profile
 def read_settings_profile(
     directory: Path,
     name: str,

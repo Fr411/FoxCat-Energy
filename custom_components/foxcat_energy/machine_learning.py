@@ -19,10 +19,12 @@ class MachineLearningRecorder:
     MAX_INTEGRATION_GAP_S = 120.0
     PERIODIC_SAVE_S = 300.0
 
+    # MÉTHODE : MachineLearningRecorder.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self._machines: dict[str, dict[str, Any]] = {}
         self._last_save_at: datetime | None = None
 
+    # MÉTHODE : MachineLearningRecorder.restore — Restaure uniquement l'historique terminé
     def restore(self, raw: Any) -> None:
         """Restaure uniquement l'historique terminé.
 
@@ -50,6 +52,7 @@ class MachineLearningRecorder:
                 "last_observation": None,
             }
 
+    # MÉTHODE : MachineLearningRecorder.dump — Dump
     def dump(self) -> dict[str, Any]:
         machines: dict[str, Any] = {}
         for machine_id, rec in self._machines.items():
@@ -60,6 +63,7 @@ class MachineLearningRecorder:
             }
         return {"machines": machines}
 
+    # MÉTHODE : MachineLearningRecorder.observe — Enregistre une observation et retourne True si une sauvegarde est souhaitée.
     def observe(
         self,
         *,
@@ -157,6 +161,7 @@ class MachineLearningRecorder:
         rec["last_observation"] = now.isoformat()
         return self._save_due(now)
 
+    # MÉTHODE : MachineLearningRecorder._save_due — Save due
     def _save_due(self, now: datetime) -> bool:
         if self._last_save_at is None:
             self._last_save_at = now
@@ -166,6 +171,7 @@ class MachineLearningRecorder:
             return True
         return False
 
+    # MÉTHODE : MachineLearningRecorder._new_cycle — New cycle
     @staticmethod
     def _new_cycle(
         *,
@@ -202,6 +208,7 @@ class MachineLearningRecorder:
             "_source": source,
         }
 
+    # MÉTHODE : MachineLearningRecorder._integrate — Integrate
     def _integrate(self, cycle: dict[str, Any], now: datetime, power_w: float) -> None:
         last_at = cycle.get("_last_at")
         last_power = float(cycle.get("_last_power_w", power_w) or 0.0)
@@ -213,6 +220,7 @@ class MachineLearningRecorder:
         cycle["_last_power_w"] = power_w
         cycle["max_power_w"] = max(float(cycle.get("max_power_w", 0.0)), power_w)
 
+    # MÉTHODE : MachineLearningRecorder._append_point — Append point
     def _append_point(
         self,
         cycle: dict[str, Any],
@@ -275,6 +283,7 @@ class MachineLearningRecorder:
         if len(cycle["points"]) > self.MAX_POINTS_PER_CYCLE:
             cycle["points"] = self._compact_points(cycle["points"])
 
+    # MÉTHODE : MachineLearningRecorder._compact_points — Compact points
     @staticmethod
     def _compact_points(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if len(points) <= 2:
@@ -283,6 +292,7 @@ class MachineLearningRecorder:
         compact = [points[0], *points[1:-1:2], points[-1]]
         return compact
 
+    # MÉTHODE : MachineLearningRecorder._finish_cycle — Finish cycle
     def _finish_cycle(self, rec: dict[str, Any], now: datetime, context: dict[str, Any]) -> None:
         cycle = rec.get("current")
         if not isinstance(cycle, dict):
@@ -309,6 +319,7 @@ class MachineLearningRecorder:
         rec["candidate_at"] = None
         rec["low_since"] = None
 
+    # MÉTHODE : MachineLearningRecorder.view — View
     def view(self) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for machine_id, rec in self._machines.items():
@@ -340,6 +351,7 @@ class MachineLearningRecorder:
             }
         return result
 
+    # MÉTHODE : MachineLearningRecorder._num — Num
     @staticmethod
     def _num(value: Any, digits: int = 1) -> float | None:
         if not isinstance(value, (int, float)):

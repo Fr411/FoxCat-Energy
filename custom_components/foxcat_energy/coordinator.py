@@ -178,6 +178,7 @@ from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, apply_configured_tarif
 class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Central sovereign EMS coordinator."""
 
+    # MÉTHODE : FoxCatEnergyCoordinator.__init__ — méthode spéciale __init__
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.entry = entry
         self.config = dict(entry.data)
@@ -346,11 +347,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=30),
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.installation_name — Installation name
     @property
     def installation_name(self) -> str:
         return str(self.config.get(CONF_INSTALLATION_NAME) or self.entry.title or "FoxCat Energy")
 
 
+    # MÉTHODE : FoxCatEnergyCoordinator._financial_status_view — Retourne un état financier court et stable pour l'utilisateur
     def _financial_status_view(self, data: dict[str, Any]) -> dict[str, str]:
         """Retourne un état financier court et stable pour l'utilisateur.
 
@@ -376,6 +379,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         status, detail = mapping.get(code, ("INFORMATION", str(decision.get("label") or code)))
         return {"status": status, "detail": detail, "code": code}
 
+    # MÉTHODE : FoxCatEnergyCoordinator._status_notification_signature — Empreinte des seules informations utiles à la notification persistante.
     def _status_notification_signature(self, data: dict[str, Any]) -> tuple[Any, ...]:
         """Empreinte des seules informations utiles à la notification persistante."""
         summary = data.get("status_summary", {})
@@ -393,6 +397,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             round(float(accounting.get("net_grid_cost_eur") or 0.0), 2),
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_refresh_persistent_status_notification — Crée ou remplace le résumé EMS persistant sans générer de doublons.
     async def async_refresh_persistent_status_notification(
         self, data: dict[str, Any] | None = None, *, force: bool = False
     ) -> None:
@@ -422,6 +427,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         export_value = prices.get("export_value")
         net_cost = float(accounting.get("net_grid_cost_eur") or 0.0)
 
+        # MÉTHODE : FoxCatEnergyCoordinator.euro_kwh — Euro kwh
         def euro_kwh(value: Any) -> str:
             try:
                 return f"{float(value):.3f} €/kWh"
@@ -445,6 +451,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             notification_id=notification_id,
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_updated_data — Met à jour les entités puis synchronise le résumé persistant.
     @callback
     def async_set_updated_data(self, data: dict[str, Any]) -> None:
         """Met à jour les entités puis synchronise le résumé persistant."""
@@ -474,6 +481,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.async_refresh_persistent_status_notification(data)
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_initialize — traitement asynchrone : initialize
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
         self._migration_notes = []
@@ -555,6 +563,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_release_pri_100("Démarrage Home Assistant : fail-safe onduleur 100 %.")
             await self.async_reconcile_machines()
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_shutdown — traitement asynchrone : shutdown
     async def async_shutdown(self) -> None:
         for unsub in self._unsubs:
             try:
@@ -574,6 +583,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._status_notification_task.cancel()
         await self._async_save()
 
+    # MÉTHODE : FoxCatEnergyCoordinator._migrate_legacy_defaults — Migrate legacy defaults
     def _migrate_legacy_defaults(self) -> None:
         for key, entity_id in LEGACY_SETTING_MAP.items():
             state = self.hass.states.get(entity_id)
@@ -590,6 +600,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if mode:
             self.settings["mode"] = MODE_ALIASES.get(mode.state, mode.state)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._entry_option_settings — Entry option settings
     def _entry_option_settings(self) -> dict[str, Any]:
         return {
             key: value
@@ -597,6 +608,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if key in self.settings
         }
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_save — Initialisation save
     async def _async_save(self) -> None:
         await self._store.async_save(
             {
@@ -618,6 +630,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._register_listeners — Register listeners
     def _register_listeners(self) -> None:
         # FoxCat 1.5.5 : métronome réseau interne.
         #
@@ -778,11 +791,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ):
             self._unsubs.append(async_track_time_change(self.hass, lambda now, lbl=label: self.hass.async_create_task(self.async_analyze_solar(lbl)), hour=hour, minute=minute, second=0))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_house_event — Compatibilité interne : une variation maison ne cadence plus le CORE.
     @callback
     def _on_house_event(self, event: Event) -> None:
         """Compatibilité interne : une variation maison ne cadence plus le CORE."""
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._state_report_at — Retourne le dernier instant de publication réel connu d'une entité.
     @staticmethod
     def _state_report_at(state: Any) -> datetime | None:
         """Retourne le dernier instant de publication réel connu d'une entité."""
@@ -794,6 +809,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         updated = getattr(state, "last_updated", None)
         return updated if isinstance(updated, datetime) else None
 
+    # MÉTHODE : FoxCatEnergyCoordinator._metronome_entity_fresh — Metronome entity fresh
     def _metronome_entity_fresh(self, entity_id: str | None, now: datetime, timeout_s: float) -> bool:
         if not entity_id:
             return False
@@ -805,11 +821,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return False
         return (now - reported_at).total_seconds() <= timeout_s
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_daily_counter_reset — Déclenche le reset journalier des compteurs visibles à minuit.
     @callback
     def _on_daily_counter_reset(self, now: datetime) -> None:
         """Déclenche le reset journalier des compteurs visibles à minuit."""
         self.hass.async_create_task(self._async_daily_counter_reset(now))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_daily_counter_reset — Réinitialise les séquences journalières sans casser les ACK internes.
     async def _async_daily_counter_reset(self, now: datetime) -> None:
         """Réinitialise les séquences journalières sans casser les ACK internes."""
         local_now = dt_util.as_local(now)
@@ -847,6 +865,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data())
         await self._async_save()
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_metronome_report — Capture un heartbeat du capteur principal ou de secours.
     @callback
     def _on_metronome_report(self, event: Event) -> None:
         """Capture un heartbeat du capteur principal ou de secours."""
@@ -859,10 +878,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._async_metronome_report(entity_id, reported_at, "event")
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_metronome_watchdog — On metronome watchdog
     @callback
     def _on_metronome_watchdog(self, now: datetime) -> None:
         self.hass.async_create_task(self._async_metronome_watchdog(now))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_metronome_watchdog — Surveille la fraîcheur, détecte les republications et gère le fallback.
     async def _async_metronome_watchdog(self, now: datetime) -> None:
         """Surveille la fraîcheur, détecte les republications et gère le fallback."""
         local_today = dt_util.as_local(now).date().isoformat()
@@ -924,6 +945,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.pri_state["guard_reason"] = "metronome_perdu"
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_metronome_report — Traite chaque publication physique comme une trame réseau souveraine
     async def _async_metronome_report(self, entity_id: str, reported_at: datetime, origin: str) -> None:
         """Traite chaque publication physique comme une trame réseau souveraine.
 
@@ -974,6 +996,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # une seule photographie puis lance les deux moteurs indépendamment.
         await self._async_metronome_pulse(entity_id, f"{source}_{origin}", now)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_metronome_pulse — Transforme une publication réseau en UNE trame partagée par les deux corps.
     async def _async_metronome_pulse(self, entity_id: str, source: str, pulse_at: datetime) -> None:
         """Transforme une publication réseau en UNE trame partagée par les deux corps."""
         async with self._frame_dispatch_lock:
@@ -1029,6 +1052,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._run_dispatched_core — Garantit qu'une exception de moteur ne laisse jamais une trame PENDING.
     async def _run_dispatched_core(self, core: str, frame_id: int, task: Any) -> None:
         """Garantit qu'une exception de moteur ne laisse jamais une trame PENDING."""
         try:
@@ -1049,6 +1073,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.pri_state["last_reason"] = f"Onduleur Core : erreur trame {frame_id} : {err}"
             self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_grid_event — On grid event
     @callback
     def _on_grid_event(self, event: Event) -> None:
         entity_id = str(event.data.get("entity_id", ""))
@@ -1070,10 +1095,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             self.hass.async_create_task(self.async_handle_grid_change())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_safety_event — On safety event
     @callback
     def _on_safety_event(self, event: Event) -> None:
         self.hass.async_create_task(self.async_handle_safety_change())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_machine_telemetry_event — Collecte passive : aucun appel de décision ni commande physique.
     @callback
     def _on_machine_telemetry_event(self, event: Event) -> None:
         """Collecte passive : aucun appel de décision ni commande physique."""
@@ -1082,16 +1109,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._record_machine_learning(snapshot=snapshot, now=now, source="TELEMETRY_EVENT")
         self.async_set_updated_data(self._build_data(snapshot))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_pv_event — On pv event
     @callback
     def _on_pv_event(self, event: Event) -> None:
         self.hass.async_create_task(self.async_handle_pv_change())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_price_event — On price event
     @callback
     def _on_price_event(self, event: Event) -> None:
         if self._capture_economic_price_backup():
             self.hass.async_create_task(self._async_save())
         self.hass.async_create_task(self.async_handle_price_change())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_economic_price_event — Rafraîchit le Day-Ahead; en Dynamique, réévalue les nouveaux départs machines.
     @callback
     def _on_economic_price_event(self, event: Event) -> None:
         """Rafraîchit le Day-Ahead; en Dynamique, réévalue les nouveaux départs machines."""
@@ -1105,15 +1135,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ):
             self.hass.async_create_task(self.async_reconcile_machines())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_tariff_boundary — On tariff boundary
     @callback
     def _on_tariff_boundary(self, now: datetime) -> None:
         self.reset_core("Transition tarifaire : nouvelle acquisition demandée.")
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._on_machine_schedule — On machine schedule
     @callback
     def _on_machine_schedule(self, now: datetime) -> None:
         self.hass.async_create_task(self.async_reconcile_machines())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_update_data — Initialisation update data
     async def _async_update_data(self) -> dict[str, Any]:
         await self._watchdog()
         await self._check_end_solar()
@@ -1121,6 +1154,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._evaluate_high_load(self.snapshot())
         return self._build_data()
 
+    # MÉTHODE : FoxCatEnergyCoordinator._float_state — Float state
     def _float_state(self, entity_id: str | None, default: float = 0.0) -> float:
         if not entity_id:
             return default
@@ -1132,6 +1166,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (TypeError, ValueError):
             return default
 
+    # MÉTHODE : FoxCatEnergyCoordinator._optional_float_state — Optional float state
     def _optional_float_state(self, entity_id: str | None) -> float | None:
         if not entity_id:
             return None
@@ -1143,13 +1178,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (TypeError, ValueError):
             return None
 
+    # MÉTHODE : FoxCatEnergyCoordinator._is_on — Is on
     def _is_on(self, entity_id: str | None) -> bool:
         state = self.hass.states.get(entity_id) if entity_id else None
         return bool(state and state.state == STATE_ON)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._numeric_valid — Numeric valid
     def _numeric_valid(self, entity_id: str | None) -> bool:
         return self._optional_float_state(entity_id) is not None
 
+    # MÉTHODE : FoxCatEnergyCoordinator.snapshot — Build the sovereign FoxCat energy snapshot
     def snapshot(self) -> EnergySnapshot:
         """Build the sovereign FoxCat energy snapshot.
 
@@ -1265,6 +1303,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             },
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._boiler_thermal_view — Modèle thermique physique du Boiler, destiné à l'arbitrage DYNAMIQUE
     def _boiler_thermal_view(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
         """Modèle thermique physique du Boiler, destiné à l'arbitrage DYNAMIQUE.
 
@@ -1308,6 +1347,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "thermal_capacity_comfort_kwh": round(capacity_comfort_kwh, 5),
         }
 
+    # MÉTHODE : FoxCatEnergyCoordinator._boiler_on_seconds — Return trusted physical ON duration for the boiler
     def _boiler_on_seconds(self) -> float:
         """Return trusted physical ON duration for the boiler.
 
@@ -1324,6 +1364,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return 0.0
         return 999999.0
 
+    # MÉTHODE : FoxCatEnergyCoordinator.prices — Prices
     def prices(self) -> dict[str, Any]:
         now=dt_util.now(); dims=tariff_dimensions(self.settings); regime=compatibility_tariff_regime(self.settings)
         cur=self._optional_float_state(self.config.get(CONF_PRICE_CURRENT) or self.config.get(CONF_TARIFF_MONO_PRICE_SENSOR)); nxt=self._optional_float_state(self.config.get(CONF_PRICE_NEXT)); inj=self._optional_float_state(self.config.get(CONF_PRICE_INJECTION))
@@ -1341,6 +1382,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else: export_value=inj if dims.dynamic else float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0))
         return {'current':cur,'next':nxt,'injection':inj,'hp_price':hp,'hc_price':hc,'fixed_injection_price':float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0)),'min_today':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TODAY)),'max_today':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TODAY)),'avg_today':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TODAY)),'min_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW)),'max_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW)),'avg_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),'price_source':dims.price_source,'tariff_structure':dims.structure,'network_policy':dims.network_policy,'regime':regime,'period':period,'active_buy':active,'next_buy':next_buy,'active_buy_label':label,'next_buy_label':nlabel,'export_value':export_value,'dynamic_compatible':dims.dynamic,'negative_purchase':bool(active is not None and active<0)}
 
+    # MÉTHODE : FoxCatEnergyCoordinator._economic_import_points — Economic import points
     def _economic_import_points(
         self, prices: dict[str, Any], now: datetime
     ) -> list[PricePoint]:
@@ -1404,6 +1446,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             manual.append(PricePoint(slot + timedelta(hours=1), float(nxt), "DYNAMIC_NEXT"))
         return merge_price_points(series, manual)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._economic_series_from_entity — Extract a provider price curve without treating missing data as prices.
     def _economic_series_from_entity(
         self,
         entity_id: str | None,
@@ -1452,6 +1495,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return apply_final_price_components(points, self.settings)
         return points
 
+    # MÉTHODE : FoxCatEnergyCoordinator._economic_backup_kind — Economic backup kind
     def _economic_backup_kind(self, entity_id: str | None, source: str) -> str | None:
         if source == "DYNAMIC_IMPORT":
             return "import"
@@ -1467,6 +1511,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return "export"
         return None
 
+    # MÉTHODE : FoxCatEnergyCoordinator._price_backup_points — Price backup points
     def _price_backup_points(
         self, kind: str, now: datetime, horizon_hours: int, source: str
     ) -> list[PricePoint]:
@@ -1487,6 +1532,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 points.append(PricePoint(at, value, f"{source}_BACKUP"))
         return merge_price_points(points)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._capture_economic_price_backup — Capture economic price backup
     def _capture_economic_price_backup(self) -> bool:
         if self.settings.get("price_source") != PRICE_SOURCE_INTEGRATION:
             return False
@@ -1557,6 +1603,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     updated = True
         return updated
 
+    # MÉTHODE : FoxCatEnergyCoordinator._economic_export_points — Retourne la VALEUR économique de l'export, positive = recette.
     def _economic_export_points(
         self, prices: dict[str, Any], now: datetime
     ) -> list[PricePoint]:
@@ -1626,6 +1673,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         return merge_price_points(normalised)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._economic_view — Construit la décision économique hors Energy Bus
     def _economic_view(
         self,
         snapshot: EnergySnapshot | None = None,
@@ -1742,6 +1790,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
 
 
+    # MÉTHODE : FoxCatEnergyCoordinator._apply_dynamic_boiler_arbitrage — Applique l'arbitrage Day-Ahead au Boiler, uniquement en mode DYNAMIQUE
     def _apply_dynamic_boiler_arbitrage(
         self, snapshot: EnergySnapshot, intent: BoilerIntent, economic_view: dict[str, Any]
     ) -> BoilerIntent:
@@ -1911,6 +1960,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         return intent
 
+    # MÉTHODE : FoxCatEnergyCoordinator._set_core_phase — Set core phase
     def _set_core_phase(self, phase: str, reason: str = "") -> None:
         valid = {PHASE_ACQUISITION, PHASE_DECISION, PHASE_WAIT_ACK}
         previous = str(self.core_state.get("phase", PHASE_ACQUISITION))
@@ -1926,6 +1976,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if reason:
             self.core_state["last_reason"] = reason
 
+    # MÉTHODE : FoxCatEnergyCoordinator.reset_core — Reset core
     def reset_core(self, reason: str) -> None:
         self._set_core_phase(PHASE_ACQUISITION, reason)
         self.core_state.update(
@@ -1937,6 +1988,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_setting — traitement asynchrone : set setting
     async def async_set_setting(self, key: str, value: Any) -> None:
         if key == "mode":
             await self.async_set_mode(str(value))
@@ -2031,6 +2083,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_apply_settings_profile — traitement asynchrone : apply settings profile
     async def async_apply_settings_profile(self, values: dict[str, Any]) -> None:
         was_regulating = bool(self.settings.get("regulation_active"))
         was_pri_enabled = bool(self.settings.get("pri_enabled"))
@@ -2066,6 +2119,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._async_save()
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_mode — traitement asynchrone : set mode
     async def async_set_mode(self, mode: str) -> None:
         canonical=MODE_ALIASES.get(mode,mode)
         if canonical not in MODES: canonical=MODE_ECO
@@ -2077,6 +2131,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.settings.get("regulation_active"): await self.async_reconcile_machines()
         await self._async_save(); self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_pri_manual_level — Force un niveau RRCR uniquement lorsque le mode Manuel est actif.
     async def async_set_pri_manual_level(self, level: int) -> None:
         """Force un niveau RRCR uniquement lorsque le mode Manuel est actif."""
         if str(self.settings.get("mode")) != MODE_MANUAL:
@@ -2107,6 +2162,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.pri_state["last_reason"] = f"Échec commande manuelle PRI {level} % : code lu {code}, attendu {expected}."
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_handle_inverter_grid_frame — Onduleur Core : une décision immédiate pour chaque publication réseau
     async def async_handle_inverter_grid_frame(
         self,
         source_entity: str = "",
@@ -2213,6 +2269,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.async_set_updated_data(self._build_data(snapshot))
 
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_handle_house_frame — EMS Core : traite la même trame/snapshot que le corps Onduleur
     async def async_handle_house_frame(
         self,
         *,
@@ -2349,10 +2406,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self.async_set_updated_data(self._build_data(snapshot))
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_handle_grid_change — Télémétrie secondaire; la publication réseau souveraine déclenche les deux corps.
     async def async_handle_grid_change(self) -> None:
         """Télémétrie secondaire; la publication réseau souveraine déclenche les deux corps."""
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._core_process_frame — Core process frame
     async def _core_process_frame(self, snapshot: EnergySnapshot) -> None:
         if not snapshot.valid:
             self.reset_core("Mesures énergétiques invalides : aucune décision autorisée.")
@@ -2522,6 +2581,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return
         await self.async_command_boiler(intent.action, intent.reason, intent.origin)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._validate_core_ack — Validate core ack
     def _validate_core_ack(self, snapshot: EnergySnapshot) -> None:
         reference = float(self.core_state.get("action_reference_grid", 0.0))
         expected = float(self.core_state.get("grid_expected", reference))
@@ -2544,6 +2604,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             f"attendu={expected:.0f} W, réel={snapshot.grid_net_w:.0f} W, erreur={error:.0f} W."
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_ems_service_call — Appel Home Assistant borné : EMS Core ne peut jamais rester bloqué indéfiniment.
     async def _async_ems_service_call(
         self, domain: str, service: str, data: dict[str, Any], *, timeout: float = 3.0
     ) -> bool:
@@ -2563,6 +2624,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.core_state["execution_failure_reason"] = f"{domain}.{service}: {err}"
             return False
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_command_boiler — traitement asynchrone : command boiler
     async def async_command_boiler(self, action: str, reason: str, origin: str) -> None:
         if not bool(self.settings.get("regulation_active")) and origin not in {"UTILISATEUR", "SECURITE"}:
             return
@@ -2636,6 +2698,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._execute_boiler_command(action, pending, climate)
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._execute_boiler_command — Worker physique Boiler indépendant du cadenceur EMS.
     async def _execute_boiler_command(self, action: str, pending: str, climate: str) -> None:
         """Worker physique Boiler indépendant du cadenceur EMS."""
         try:
@@ -2673,6 +2736,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.core_state["execution_status"] = "CANCELLED"
             raise
 
+    # MÉTHODE : FoxCatEnergyCoordinator._verify_boiler_execution — Verify boiler execution
     async def _verify_boiler_execution(self, command: str) -> None:
         try:
             for attempt in range(4):
@@ -2717,6 +2781,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.core_state["execution_status"] = "FAILED"
             self.core_state["execution_failure_reason"] = str(err)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._execution_blocked — Execution blocked
     def _execution_blocked(self, command: str, snap: EnergySnapshot) -> bool:
         command_on = not (command.startswith("BOILER_OFF") or command == "ECS_MODULE_OFF")
         if not command_on:
@@ -2737,6 +2802,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return True
         return False
 
+    # MÉTHODE : FoxCatEnergyCoordinator._retry_boiler_command — Retry boiler command
     async def _retry_boiler_command(self, command: str) -> None:
         if (
             not bool(self.settings.get("regulation_active"))
@@ -2761,6 +2827,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "heat"}
                     )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_handle_safety_change — traitement asynchrone : handle safety change
     async def async_handle_safety_change(self) -> None:
         snap = self.snapshot()
         # Sécurité thermique toujours souveraine, y compris régulation désactivée
@@ -2786,6 +2853,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data(snap))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._time_minutes — Time minutes
     @staticmethod
     def _time_minutes(value: Any, default: str) -> int:
         raw = str(value or default)
@@ -2796,6 +2864,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             h, m = default.split(":")[:2]
             return int(h) * 60 + int(m)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._within_time_window — Within time window
     @staticmethod
     def _within_time_window(now_minute: int, start_minute: int, stop_minute: int) -> bool:
         if start_minute == stop_minute:
@@ -2804,13 +2873,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return start_minute <= now_minute < stop_minute
         return now_minute >= start_minute or now_minute < stop_minute
 
+    # MÉTHODE : FoxCatEnergyCoordinator._machine_allowed — Machine allowed
     def _machine_allowed(self, machine_id: str, now: datetime) -> bool:
         machine = next((item for item in self.machines if item.machine_id == machine_id), None)
         return machine_allowed(machine, now) if machine else False
 
+    # MÉTHODE : FoxCatEnergyCoordinator._machine_schedule_boundaries — Machine schedule boundaries
     def _machine_schedule_boundaries(self) -> set[tuple[int, int]]:
         return schedule_boundaries(self.machines)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._tariff_start_favorable — Décide si une NOUVELLE charge flexible peut démarrer
     def _tariff_start_favorable(self, machine: MachineDefinition | None = None, economic_view: dict[str, Any] | None = None) -> bool:
         """Décide si une NOUVELLE charge flexible peut démarrer.
 
@@ -2846,10 +2918,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return bool(rec.get("allow_start", False))
         return bool(view.get("decision", {}).get("flexible_start", False))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._schedule_learning_save — Schedule learning save
     def _schedule_learning_save(self) -> None:
         if self._learning_save_task is None or self._learning_save_task.done():
             self._learning_save_task = self.hass.async_create_task(self._async_save())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._record_machine_learning — Observe les machines sans modifier leur machine à états.
     def _record_machine_learning(
         self, *, snapshot: EnergySnapshot, now: datetime, source: str
     ) -> None:
@@ -2888,6 +2962,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if save_requested:
             self._schedule_learning_save()
 
+    # MÉTHODE : FoxCatEnergyCoordinator._machine_bus_context — Contexte machine transporté dans la trame, sans effet décisionnel.
     def _machine_bus_context(self, now: datetime) -> list[dict[str, Any]]:
         """Contexte machine transporté dans la trame, sans effet décisionnel."""
         cycles = self.machine_cycle_manager.snapshot(now)
@@ -2911,6 +2986,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             })
         return result
 
+    # MÉTHODE : FoxCatEnergyCoordinator._refresh_machine_cycles — Refresh machine cycles
     def _refresh_machine_cycles(self) -> None:
         now = dt_util.now()
         for machine in self.machines:
@@ -2927,6 +3003,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 external_cycle_on=external,
             )
 
+    # MÉTHODE : FoxCatEnergyCoordinator.machine_states — Machine states
     def machine_states(self, economic_view: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         self._refresh_machine_cycles()
         now = dt_util.now()
@@ -2956,6 +3033,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             })
         return result
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_machine_enabled — traitement asynchrone : set machine enabled
     async def async_set_machine_enabled(self, machine_id: str, enabled: bool) -> None:
         machine = next((item for item in self.machines if item.machine_id == machine_id), None)
         if machine is None:
@@ -2965,6 +3043,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_device_enabled — traitement asynchrone : set device enabled
     async def async_set_device_enabled(self, device_id: str, enabled: bool) -> None:
         from .devices import apply_device_toggle
 
@@ -2994,6 +3073,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._async_save()
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._async_user_switch_call — Commande utilisateur bornée, sans polluer l'état d'exécution Boiler.
     async def _async_user_switch_call(self, entity_id: str, turn_on: bool) -> bool:
         """Commande utilisateur bornée, sans polluer l'état d'exécution Boiler."""
         try:
@@ -3009,6 +3089,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER.warning("FoxCat user switch command failed for %s: %s", entity_id, err)
             return False
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_user_start_machine — Démarrage utilisateur : priorité au cycle protégé, sans attendre l'EMS.
     async def async_user_start_machine(self, machine_id: str) -> bool:
         """Démarrage utilisateur : priorité au cycle protégé, sans attendre l'EMS."""
         machine = next((item for item in self.machines if item.machine_id == machine_id), None)
@@ -3041,6 +3122,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data())
         return ok
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_user_stop_machine — Arrêt utilisateur explicite : termine la protection puis coupe la prise.
     async def async_user_stop_machine(self, machine_id: str) -> bool:
         """Arrêt utilisateur explicite : termine la protection puis coupe la prise."""
         machine = next((item for item in self.machines if item.machine_id == machine_id), None)
@@ -3061,6 +3143,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data())
         return ok
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_user_boiler_override — Commande utilisateur Boiler : FORCE_ON, FORCE_OFF ou AUTO.
     async def async_user_boiler_override(self, state: str) -> bool:
         """Commande utilisateur Boiler : FORCE_ON, FORCE_OFF ou AUTO."""
         state = str(state).upper()
@@ -3103,6 +3186,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.async_set_updated_data(self._build_data())
         return ok
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_reconcile_machines — traitement asynchrone : reconcile machines
     async def async_reconcile_machines(self) -> None:
         if not bool(self.settings.get("regulation_active")):
             return
@@ -3138,6 +3222,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except Exception as err:  # pragma: no cover
                 _LOGGER.warning("FoxCat machine socket command failed for %s (%s): %s", machine.name, socket, err)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._evaluate_high_load — Délestage synchronisé sur chaque publication réseau
     async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
         """Délestage synchronisé sur chaque publication réseau.
 
@@ -3175,6 +3260,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.reset_core("Fin délestage : 5 trames basses confirmées.")
                 await self.async_reconcile_machines()
 
+    # MÉTHODE : FoxCatEnergyCoordinator._activate_high_load_shed — Activate high load shed
     async def _activate_high_load_shed(self, snapshot: EnergySnapshot, trigger_w: float) -> None:
         self.load_shed_state.update({
             "active": True,
@@ -3208,6 +3294,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         await self.async_reconcile_machines()
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_handle_price_change — traitement asynchrone : handle price change
     async def async_handle_price_change(self) -> None:
         snap = self.snapshot()
         if (
@@ -3228,10 +3315,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data(snap))
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_handle_pv_change — traitement asynchrone : handle pv change
     async def async_handle_pv_change(self) -> None:
         await self._check_end_solar()
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._check_end_solar — Check end solar
     async def _check_end_solar(self) -> None:
         if not bool(self.settings.get("regulation_active")):
             self._pv_below_since = None
@@ -3264,6 +3353,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         else:
             self._pv_below_since = None
 
+    # MÉTHODE : FoxCatEnergyCoordinator._watchdog — Watchdog
     async def _watchdog(self) -> None:
         now = dt_util.now()
         valid_phases = {PHASE_ACQUISITION, PHASE_DECISION, PHASE_WAIT_ACK}
@@ -3290,22 +3380,26 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.core_state.get("phase") != PHASE_ACQUISITION:
                 self.reset_core(f"Watchdog : aucune nouvelle trame depuis {age:.0f} s, machine d'états réinitialisée.")
 
+    # MÉTHODE : FoxCatEnergyCoordinator._pri_settle_ok — Pri settle ok
     def _pri_settle_ok(self) -> bool:
         if self._last_boiler_command_at is None:
             return True
         age = (dt_util.now() - self._last_boiler_command_at).total_seconds()
         return age >= float(self.settings.get("pri_boiler_settle_s", 30.0))
 
+    # MÉTHODE : FoxCatEnergyCoordinator._dynamic_tariff_ok — Dynamic tariff ok
     def _dynamic_tariff_ok(self) -> bool:
         return not (
             str(self.settings.get("mode")) == MODE_DYNAMIC
             and str(self.settings.get("tariff_regime")) != TARIFF_DYNAMIC
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._maybe_start_pri — Compatibilité 1.3.x : aucune horloge PRI indépendante en 1.3.200.
     def _maybe_start_pri(self, snapshot: EnergySnapshot) -> None:
         """Compatibilité 1.3.x : aucune horloge PRI indépendante en 1.3.200."""
         return
 
+    # MÉTHODE : FoxCatEnergyCoordinator._pri_guard — Garde minimale de la réduction puissance onduleur.
     def _pri_guard(self) -> bool:
         """Garde minimale de la réduction puissance onduleur."""
         if not bool(self.settings.get("regulation_active")):
@@ -3321,6 +3415,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return True
 
 
+    # MÉTHODE : FoxCatEnergyCoordinator._rrcr_code — Rrcr code
     def _rrcr_code(self) -> str:
         bits = []
         for key in (CONF_PRI_L4, CONF_PRI_L3, CONF_PRI_L2, CONF_PRI_L1):
@@ -3331,9 +3426,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             bits.append("1" if state.state == "on" else "0")
         return "".join(bits)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._rrcr_level — Rrcr level
     def _rrcr_level(self) -> int:
         return RRCR_CODE_TO_LEVEL.get(self._rrcr_code(), -1)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._apply_rrcr_level — Envoie une commande RRCR sans jamais bloquer Onduleur Core.
     async def _apply_rrcr_level(self, level: int) -> bool:
         """Envoie une commande RRCR sans jamais bloquer Onduleur Core."""
         code = RRCR_LEVEL_TO_CODE.get(int(level))
@@ -3359,6 +3456,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     return False
         return True
 
+    # MÉTHODE : FoxCatEnergyCoordinator._wait_rrcr_code — Wait rrcr code
     async def _wait_rrcr_code(self, code: str, timeout: float = 5.0) -> bool:
         end = asyncio.get_running_loop().time() + timeout
         while asyncio.get_running_loop().time() < end:
@@ -3367,6 +3465,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await asyncio.sleep(0.25)
         return self._rrcr_code() == code
 
+    # MÉTHODE : FoxCatEnergyCoordinator._queue_pri_target — Mémorise uniquement la dernière consigne physique demandée
     def _queue_pri_target(
         self,
         level: int,
@@ -3395,6 +3494,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._pri_actuator_task is None or self._pri_actuator_task.done():
             self._pri_actuator_task = self.hass.async_create_task(self._pri_actuator_loop())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._pri_actuator_loop — Applique la dernière consigne RRCR avec timeout et sans bloquer les trames.
     async def _pri_actuator_loop(self) -> None:
         """Applique la dernière consigne RRCR avec timeout et sans bloquer les trames."""
         try:
@@ -3459,6 +3559,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.pri_state["actuator_status"] = "FAILED"
             self.pri_state["actuator_last_error"] = str(err)
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_release_pri_100 — traitement asynchrone : release pri 100
     async def async_release_pri_100(self, reason: str) -> None:
         entities = [self.config.get(CONF_PRI_L1), self.config.get(CONF_PRI_L2), self.config.get(CONF_PRI_L3), self.config.get(CONF_PRI_L4)]
         if not all(entities):
@@ -3475,6 +3576,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.pri_state["ack_rrcr"] = "FAILED"
             self.pri_state["last_reason"] = f"Échec fail-safe 100 % : {err}"
 
+    # MÉTHODE : FoxCatEnergyCoordinator._classify_pri_grid — Classe le résultat réseau PRI sans lever d'exception
     def _classify_pri_grid(self, snapshot: EnergySnapshot) -> str:
         """Classe le résultat réseau PRI sans lever d'exception.
 
@@ -3492,6 +3594,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return "NOK_PRELEVEMENT"
         return "OK"
 
+    # MÉTHODE : FoxCatEnergyCoordinator._update_pri_pv_comparator — Update pri pv comparator
     def _update_pri_pv_comparator(self, snapshot: EnergySnapshot, level: int) -> None:
         max_w=float(self.settings.get("pri_step_w",400.0))*10.0
         limit=max_w*max(level,0)/100.0
@@ -3512,6 +3615,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.pri_state.update({"solar_state":state,"solar_potential_min_w":potential,
                                "pv_limit_w":limit,"pv_limit_error_w":err})
 
+    # MÉTHODE : FoxCatEnergyCoordinator._validate_pending_pri_on_frame — Validate pending pri on frame
     async def _validate_pending_pri_on_frame(self, snapshot: EnergySnapshot, *, frame_serial: int | None = None) -> None:
         if not snapshot.valid:
             return
@@ -3535,6 +3639,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.pri_state["pending_frame_serial"]=None
         self.pri_state["pending_pv_before"]=None
 
+    # MÉTHODE : FoxCatEnergyCoordinator._run_pri_frame — Onduleur Core 1.6.150 : décision immédiate, action RRCR asynchrone.
     async def _run_pri_frame(
         self, snapshot: EnergySnapshot, *, frame_id: int | None = None, frame_serial: int | None = None
     ) -> str:
@@ -3642,6 +3747,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return "PROCESSED"
 
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_reset_cycle — traitement asynchrone : reset cycle
     async def async_reset_cycle(self) -> None:
         self.reset_core("Cycle EMS réinitialisé manuellement.")
         if self._pri_task and not self._pri_task.done():
@@ -3649,6 +3755,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.pri_state.update({"ack_rrcr": "IDLE", "ack_inverter": "IDLE", "ack_grid": "IDLE", "last_reason": "Cycle PRI réinitialisé."})
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_diagnostic — traitement asynchrone : diagnostic
     async def async_diagnostic(self) -> None:
         snap = self.snapshot()
         missing = []
@@ -3673,6 +3780,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.core_state["last_reason"] = "Diagnostic FoxCat : " + " | ".join(parts)
         self.async_set_updated_data(self._build_data(snap))
 
+    # MÉTHODE : FoxCatEnergyCoordinator.async_analyze_solar — traitement asynchrone : analyze solar
     async def async_analyze_solar(self, analysis_type: str = "RÉÉVALUATION MANUELLE") -> None:
         if not bool(self.settings.get("solar_advisor_enabled")):
             return
@@ -3720,6 +3828,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._async_save()
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._deterministic_solar_fallback — Deterministic solar fallback
     def _deterministic_solar_fallback(self, analysis_type: str) -> None:
         values = [
             self._optional_float_state(self.config.get(CONF_FORECAST_NOW)),
@@ -3756,8 +3865,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw=f"{'OUI' if available else 'NON'} | {peak}---:-- | {confidence:.0f}% | {potential} | NOUVELLE",
         )
 
+    # MÉTHODE : FoxCatEnergyCoordinator._solar_prompt — Solar prompt
     def _solar_prompt(self, analysis_type: str) -> str:
         snap = self.snapshot()
+        # MÉTHODE : FoxCatEnergyCoordinator.st — St
         def st(key: str) -> str:
             eid = self.config.get(key)
             state = self.hass.states.get(eid) if eid else None
@@ -3783,9 +3894,11 @@ Pic demain: {st(CONF_FORECAST_PEAK_TOMORROW)}
 
 Cherche une fenêtre solaire exploitable avant la prochaine échéance énergétique pertinente. Une faible production actuelle n'annule pas une fenêtre future. Ne confonds pas production PV et surplus disponible. Si plusieurs fenêtres existent, choisis une seule fenêtre, stable et durable. À 15:00, privilégie la garantie thermique avant 17:00. Fournis uniquement les champs structurés demandés. Justification: maximum 12 mots."""
 
+    # MÉTHODE : FoxCatEnergyCoordinator._legacy_conflict — Legacy conflict
     def _legacy_conflict(self) -> bool:
         return any(self._is_on(eid) for eid in KNOWN_LEGACY_AUTOMATIONS)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._build_data — Build data
     def _build_data(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
         snap = snapshot or self.snapshot()
         rrcr_code = self._rrcr_code() if all(self.config.get(k) for k in (CONF_PRI_L1, CONF_PRI_L2, CONF_PRI_L3, CONF_PRI_L4)) else "----"

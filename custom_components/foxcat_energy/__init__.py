@@ -20,10 +20,12 @@ _PROFILE_SCHEMA = vol.Schema(
 )
 
 
+# FONCTION : _profile_directory — Profile directory
 def _profile_directory(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DOMAIN, "profiles"))
 
 
+# FONCTION : _profile_setting_keys — Profile setting keys
 def _profile_setting_keys(coordinator: FoxCatEnergyCoordinator) -> set[str]:
     return (
         set(DEFAULT_SETTINGS)
@@ -34,6 +36,7 @@ def _profile_setting_keys(coordinator: FoxCatEnergyCoordinator) -> set[str]:
     )
 
 
+# FONCTION : _coordinator — Coordinator
 def _coordinator(hass: HomeAssistant) -> FoxCatEnergyCoordinator:
     coordinators = hass.data.get(DOMAIN, {})
     if not coordinators:
@@ -41,7 +44,9 @@ def _coordinator(hass: HomeAssistant) -> FoxCatEnergyCoordinator:
     return next(iter(coordinators.values()))
 
 
+# FONCTION : _async_register_profile_services — Initialisation register profile services
 def _async_register_profile_services(hass: HomeAssistant) -> None:
+    # FONCTION ASYNCHRONE : save_profile — Save profile
     async def save_profile(call: ServiceCall) -> None:
         coordinator = _coordinator(hass)
         allowed = _profile_setting_keys(coordinator)
@@ -57,6 +62,7 @@ def _async_register_profile_services(hass: HomeAssistant) -> None:
         except ValueError as err:
             raise HomeAssistantError(str(err)) from err
 
+    # FONCTION ASYNCHRONE : load_profile — Load profile
     async def load_profile(call: ServiceCall) -> None:
         coordinator = _coordinator(hass)
         try:
@@ -70,6 +76,7 @@ def _async_register_profile_services(hass: HomeAssistant) -> None:
         except ValueError as err:
             raise HomeAssistantError(str(err)) from err
 
+    # FONCTION ASYNCHRONE : reset_settings — Reset settings
     async def reset_settings(call: ServiceCall) -> None:
         coordinator = _coordinator(hass)
         defaults = dict(DEFAULT_SETTINGS)
@@ -88,12 +95,14 @@ def _async_register_profile_services(hass: HomeAssistant) -> None:
             hass.services.async_register(DOMAIN, service, handler, schema=_PROFILE_SCHEMA)
 
 
+# FONCTION : _async_remove_profile_services — Initialisation remove profile services
 def _async_remove_profile_services(hass: HomeAssistant) -> None:
     for service in ("save_settings_profile", "load_settings_profile", "reset_settings"):
         if hass.services.has_service(DOMAIN, service):
             hass.services.async_remove(DOMAIN, service)
 
 
+# FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
@@ -126,6 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+# FONCTION ASYNCHRONE : async_unload_entry — traitement asynchrone : unload entry
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(
         entry,
@@ -143,5 +153,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+# FONCTION ASYNCHRONE : _async_reload_entry — Initialisation reload entry
 async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)

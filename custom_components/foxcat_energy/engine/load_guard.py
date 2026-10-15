@@ -3,6 +3,7 @@ from __future__ import annotations
 from .models import EnergySnapshot
 
 
+# FONCTION : boiler_surplus_before_load_w — Return the network surplus available before the boiler load
 def boiler_surplus_before_load_w(snapshot: EnergySnapshot) -> float:
     """Return the network surplus available before the boiler load.
 
@@ -17,6 +18,7 @@ def boiler_surplus_before_load_w(snapshot: EnergySnapshot) -> float:
     return max(available, 0.0)
 
 
+# FONCTION : protected_cycle_boiler_allowed — Allow boiler during a protected appliance cycle only on real surplus
 def protected_cycle_boiler_allowed(
     snapshot: EnergySnapshot,
     settings: dict[str, object],
@@ -35,6 +37,7 @@ def protected_cycle_boiler_allowed(
     return boiler_surplus_before_load_w(snapshot) >= required
 
 
+# FONCTION : protected_cycle_boiler_allowed_stable — Two-frame guard used before starting/maintaining the boiler
 def protected_cycle_boiler_allowed_stable(
     snapshot: EnergySnapshot,
     t0: EnergySnapshot,

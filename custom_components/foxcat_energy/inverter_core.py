@@ -40,6 +40,7 @@ class InverterCore:
     (0, 10, ..., 100 %) et commande directement le meilleur compromis réseau.
     """
 
+    # MÉTHODE : InverterCore._score_grid — Score réseau : plus petit = meilleur
     @staticmethod
     def _score_grid(
         import_w: float,
@@ -68,6 +69,7 @@ class InverterCore:
             base += (export_w - export_max_w) * weight_export * 4.0
         return base
 
+    # MÉTHODE : InverterCore._nearest_level_for_power — Nearest level for power
     @staticmethod
     def _nearest_level_for_power(power_w: float, inverter_w: float) -> int:
         if inverter_w <= 0:
@@ -76,6 +78,7 @@ class InverterCore:
         # RRCR FoxCat expose uniquement les paliers de 10 %.
         return max(0, min(100, int(round(raw / 10.0) * 10)))
 
+    # MÉTHODE : InverterCore.decide — Decide
     def decide(
         self,
         snapshot: Any,

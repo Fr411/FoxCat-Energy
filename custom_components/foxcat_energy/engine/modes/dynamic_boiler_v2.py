@@ -15,6 +15,7 @@ from ..load_guard import boiler_surplus_before_load_w
 from ..models import BoilerIntent, EnergySnapshot
 
 
+# FONCTION : evaluate_dynamic_boiler_v2 — Arbitrage boiler réservé à la source Day-Ahead, hors comportement Manuel
 def evaluate_dynamic_boiler_v2(
     snapshot: EnergySnapshot,
     base_intent: BoilerIntent,

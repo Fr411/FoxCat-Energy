@@ -13,10 +13,12 @@ IN_FAVORABLE_WINDOW = "IN_FAVORABLE_WINDOW"
 AFTER_FAVORABLE_WINDOW = "AFTER_FAVORABLE_WINDOW"
 
 
+# FONCTION : _unique — Unique
 def _unique(points: Iterable[PricePoint]) -> list[PricePoint]:
     return sorted({point.at: point for point in points}.values(), key=lambda point: point.at)
 
 
+# FONCTION : _granularity — Granularity
 def _granularity(points: list[PricePoint]) -> int:
     minutes = [
         (right.at - left.at).total_seconds() / 60
@@ -26,12 +28,14 @@ def _granularity(points: list[PricePoint]) -> int:
     return max(1, int(round(median(minutes)))) if minutes else 60
 
 
+# FONCTION : _position — Position
 def _position(value: float, minimum: float, maximum: float) -> float:
     if maximum <= minimum:
         return 50.0
     return max(0.0, min(100.0, (value - minimum) / (maximum - minimum) * 100.0))
 
 
+# FONCTION : _stats — Stats
 def _stats(points: list[PricePoint]) -> dict[str, Any]:
     prices = [point.price for point in points]
     return {
@@ -43,6 +47,7 @@ def _stats(points: list[PricePoint]) -> dict[str, Any]:
     }
 
 
+# FONCTION : _point_hours — Use provider timestamps, with the observed granularity for the last slot.
 def _point_hours(points: list[PricePoint], index: int, granularity: int) -> float:
     """Use provider timestamps, with the observed granularity for the last slot."""
     if index + 1 < len(points):
@@ -52,6 +57,7 @@ def _point_hours(points: list[PricePoint], index: int, granularity: int) -> floa
     return granularity / 60
 
 
+# FONCTION : _window — Window
 def _window(start: datetime, end: datetime) -> dict[str, Any]:
     return {
         "start": start.isoformat(),
@@ -60,6 +66,7 @@ def _window(start: datetime, end: datetime) -> dict[str, Any]:
     }
 
 
+# FONCTION : analyze_price_curve — Summarize known dynamic prices without fabricating missing future values.
 def analyze_price_curve(
     *,
     now: datetime,

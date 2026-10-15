@@ -7,6 +7,7 @@ from ..models import BoilerIntent, EnergySnapshot, SolarForecast
 from .common import coverage, thermal_deadline
 
 
+# FONCTION : evaluate_dynamic — Mode financier dynamique
 def evaluate_dynamic(
     snapshot: EnergySnapshot,
     t0: EnergySnapshot,

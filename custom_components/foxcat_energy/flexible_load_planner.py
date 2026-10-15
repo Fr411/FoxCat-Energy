@@ -6,18 +6,22 @@ from .machines import MachineDefinition,machine_allowed
 START_NOW='START_NOW'; WAIT='WAIT'; CONTINUE='CONTINUE'; STOP_WHEN_SAFE='STOP_WHEN_SAFE'; USER_CONTROL='USER_CONTROL'; SAFETY_OVERRIDE='SAFETY_OVERRIDE'
 @dataclass(slots=True)
 class Reservation: load_id:str; start:datetime; end:datetime; power_w:float
+# FONCTION : _price — Price
 def _price(ps,at):
  for p in reversed(ps):
   if p.at<=at:return float(p.price)
  return float(ps[0].price) if ps else None
+# FONCTION : _step — Step
 def _step(ps):
  d=[int((b.at-a.at).total_seconds()/60) for a,b in zip(ps,ps[1:]) if b.at>a.at]; return max(5,min(d)) if d else 60
+# FONCTION : _available — Available
 def _available(m,now):
  raw=str(getattr(m,'available_from','') or '')
  if not raw:return now
  try:
   h,mi=raw.split(':')[:2]; x=now.replace(hour=int(h),minute=int(mi),second=0,microsecond=0); return x if x>now else now
  except Exception:return now
+# FONCTION : _deadline — Deadline
 def _deadline(m,now):
  raw=str(getattr(m,'deadline','') or '')
  if raw:
@@ -25,9 +29,12 @@ def _deadline(m,now):
    h,mi=raw.split(':')[:2]; x=now.replace(hour=int(h),minute=int(mi),second=0,microsecond=0); return x if x>now else x+timedelta(1)
   except Exception:pass
  return now+timedelta(hours=max(float(getattr(m,'max_delay_hours',24)),1))
+# FONCTION : _profile — Profile
 def _profile(m,learning):
  x=learning.get(m.machine_id,{}) if isinstance(learning,dict) else {}; dur=float(x.get('average_duration_s_10',0) or 0)/3600 or float(m.cycle_duration_minutes)/60; dur=max(.25,dur); power=float(x.get('average_energy_wh_10',0) or 0)/dur if x.get('average_energy_wh_10') else float(getattr(m,'nominal_power_w',2000)); return dur,power
+# FONCTION : _conflict — Conflict
 def _conflict(a,b,p,res,maxp): return sum(r.power_w for r in res if a<r.end and b>r.start)+p>maxp
+# FONCTION : build_flexible_load_plan — Build flexible load plan
 def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points,machines,learning,cycles,price_analysis,solar_forecast,boiler_thermal=None,boiler_user_override='AUTO'):
  ps=sorted(import_points,key=lambda x:x.at); step=_step(ps); dyn=bool(price_analysis.get('active')); result={'active':dyn,'ready':bool(ps),'loads':{},'machines':{},'timeline':[],'behavior':settings.get('mode'),'mode':price_analysis.get('mode','REACTIVE')}
  if not dyn:return result|{'reason':'Planner V1.7.1 réservé à Dynamique Day-Ahead'}
@@ -36,24 +43,7 @@ def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points
  for m in sorted(machines,key=lambda x:-int(getattr(x,'priority',50))):
   if not settings.get(m.setting_key,m.automatic_default): result['machines'][m.machine_id]={'name':m.name,'decision':USER_CONTROL,'allow_start_now':False,'reason':'Gestion automatique désactivée'}; continue
   if cycles.get(m.machine_id,{}).get('protected'):
-   raw_end=cycles[m.machine_id].get('expected_end_at')
-   # MachineCycleManager peut fournir un datetime natif, alors que certaines
-   # anciennes données/restaurations contiennent une chaîne ISO 8601.
-   if isinstance(raw_end, datetime):
-    end=raw_end
-   elif isinstance(raw_end, str) and raw_end.strip():
-    try:
-     end=datetime.fromisoformat(raw_end.strip())
-    except ValueError:
-     end=now+timedelta(hours=float(m.cycle_duration_minutes)/60)
-   else:
-    end=now+timedelta(hours=float(m.cycle_duration_minutes)/60)
-   # Éviter une comparaison mélangeant datetime avec et sans fuseau horaire.
-   if end.tzinfo is None and now.tzinfo is not None:
-    end=end.replace(tzinfo=now.tzinfo)
-   elif end.tzinfo is not None and now.tzinfo is None:
-    end=end.replace(tzinfo=None)
-   result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
+   end=datetime.fromisoformat(cycles[m.machine_id]['expected_end_at']) if cycles[m.machine_id].get('expected_end_at') else now+timedelta(hours=float(m.cycle_duration_minutes)/60); result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
   dur,power=_profile(m,learning); av=_available(m,now); dl=min(_deadline(m,now),now+timedelta(hours=maxwait)); candidates=[]
   starts=[p.at for p in ps if av<=p.at<=dl-timedelta(hours=dur) and machine_allowed(m,p.at)]
   if av<=dl-timedelta(hours=dur) and machine_allowed(m,av): starts.insert(0,av)
@@ -70,6 +60,7 @@ def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points
   else:dec,allow,reason=WAIT,False,f'WAIT : report {max((best[1]-now).total_seconds()/3600,0):.2f} h, économie {saving:.3f} €'
   en=best[1]+timedelta(hours=dur); reservations.append(Reservation(m.machine_id,best[1],en,power)); result['machines'][m.machine_id]={'name':m.name,'decision':dec,'allow_start_now':allow,'reason':reason,'planned_start':best[1].isoformat(),'planned_end':en.isoformat(),'estimated_cost_eur':round(best[2],4),'start_now_cost_eur':round(nowc[2],4) if nowc else None,'expected_saving_eur':round(max(saving,0),4),'energy_kwh':power/1000*dur,'estimated_grid_kwh':power/1000*dur,'estimated_solar_kwh':0}
  result['boiler']=_boiler(now,snapshot,settings,ps,price_analysis,boiler_thermal or {},boiler_user_override,step,maxp); result['loads']={**result['machines'],'boiler':result['boiler']}; result['timeline']=[{'load_id':k,'start':v.get('planned_start'),'end':v.get('planned_end'),'decision':v.get('decision')} for k,v in result['loads'].items() if v.get('planned_start')]; return result
+# FONCTION : _boiler — Boiler
 def _boiler(now,snap,settings,ps,analysis,thermal,override,step,maxp):
  temp=thermal.get('measured_temp_c'); safety=float(settings.get('boiler_temp_safety_c',68)); need=float(settings.get('boiler_necessity_temp_c',38)); required=float(thermal.get('heating_duration_h',0) or 0); power=float(thermal.get('element_power_w',1800) or 1800)
  if isinstance(temp,(int,float)) and temp>=safety:return {'name':'Boiler','decision':SAFETY_OVERRIDE,'allow_start_now':False,'reason':'Sécurité thermique 68 °C prioritaire','status':'Bloqué par sécurité'}

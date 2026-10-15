@@ -26,30 +26,37 @@ DASHBOARD_FILENAME = "dashboard.yaml"
 CUSTOM_DASHBOARD_OPTION = "Personnalisé"
 
 
+# FONCTION : _dir — Dir
 def _dir() -> Path:
     return Path(__file__).parent / "dashboard" / "versions"
 
 
+# FONCTION : _target — Target
 def _target(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DASHBOARD_FOLDER, DASHBOARD_FILENAME))
 
 
+# FONCTION : _state — State
 def _state(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_state.json"))
 
 
+# FONCTION : _user_dashboard — User dashboard
 def _user_dashboard(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_user.yaml"))
 
 
+# FONCTION : _user_dashboard_base — User dashboard base
 def _user_dashboard_base(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_user_base.yaml"))
 
 
+# FONCTION : _user_dashboard_state — User dashboard state
 def _user_dashboard_state(hass: HomeAssistant) -> Path:
     return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_user_state.json"))
 
 
+# FONCTION : _read — Read
 def _read(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -58,6 +65,7 @@ def _read(path: Path) -> dict[str, Any]:
         return {}
 
 
+# FONCTION : _write — Write
 def _write(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -65,6 +73,7 @@ def _write(path: Path, value: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+# FONCTION : _write_text — Write text
 def _write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -72,22 +81,27 @@ def _write_text(path: Path, content: str) -> None:
     temporary.replace(path)
 
 
+# FONCTION : available_dashboard_versions — Available dashboard versions
 def available_dashboard_versions() -> list[str]:
     return _scan_dashboard_versions(_dir())
 
 
+# FONCTION : recommended_dashboard_version — Recommended dashboard version
 def recommended_dashboard_version() -> str | None:
     return _scan_recommended_version(_dir())
 
 
+# FONCTION : dashboard_version_label — Dashboard version label
 def dashboard_version_label(version: str) -> str:
     return _scan_dashboard_version_label(version, _dir())
 
 
+# FONCTION : dashboard_version_for_label — Dashboard version for label
 def dashboard_version_for_label(label: str) -> str:
     return _scan_dashboard_version_for_label(label, _dir())
 
 
+# FONCTION : dashboard_select_options — Dashboard select options
 def dashboard_select_options(hass: HomeAssistant | None = None) -> list[str]:
     versions = available_dashboard_versions()
     if hass is not None and _dashboard_customized(hass):
@@ -95,6 +109,7 @@ def dashboard_select_options(hass: HomeAssistant | None = None) -> list[str]:
     return versions
 
 
+# FONCTION : _dashboard_customized — Dashboard customized
 def _dashboard_customized(hass: HomeAssistant) -> bool:
     target = _target(hass)
     if not target.exists():
@@ -105,6 +120,7 @@ def _dashboard_customized(hass: HomeAssistant) -> bool:
     return not managed_hash or managed_hash != current_hash
 
 
+# FONCTION : dashboard_status — Dashboard status
 def dashboard_status(hass: HomeAssistant) -> dict[str, Any]:
     state = _read(_state(hass))
     target = _target(hass)
@@ -121,6 +137,7 @@ def dashboard_status(hass: HomeAssistant) -> dict[str, Any]:
     }
 
 
+# FONCTION : _render — Render
 def _render(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], version: str) -> str:
     source = _dir() / f"dashboard_v{version}.yaml"
     if not source.is_file():
@@ -129,6 +146,7 @@ def _render(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], ver
     return render_dashboard_template(template, resolve_registry(hass, entry, config))[0]
 
 
+# FONCTION : _apply — Apply
 def _apply(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], version: str) -> dict[str, Any]:
     if version not in available_dashboard_versions():
         raise ValueError(f"Version de dashboard inconnue : {version}")
@@ -179,12 +197,14 @@ def _apply(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], vers
         raise
 
 
+# FONCTION ASYNCHRONE : async_switch_dashboard — traitement asynchrone : switch dashboard
 async def async_switch_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], selection: str
 ) -> dict[str, Any]:
     return await hass.async_add_executor_job(_apply, hass, entry, config, selection)
 
 
+# FONCTION ASYNCHRONE : async_ensure_dashboard — traitement asynchrone : ensure dashboard
 async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> tuple[bool, str]:
@@ -199,6 +219,7 @@ async def async_ensure_dashboard(
     return True, str(target)
 
 
+# FONCTION ASYNCHRONE : async_regenerate_dashboard — traitement asynchrone : regenerate dashboard
 async def async_regenerate_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> str:
@@ -213,6 +234,7 @@ async def async_regenerate_dashboard(
     return str(_target(hass))
 
 
+# FONCTION : _save_user_dashboard — Save user dashboard
 def _save_user_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> str:
@@ -246,6 +268,7 @@ def _save_user_dashboard(
     return str(_user_dashboard(hass))
 
 
+# FONCTION : _apply_user_dashboard_to_latest — Apply user dashboard to latest
 def _apply_user_dashboard_to_latest(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> dict[str, Any]:
@@ -313,6 +336,7 @@ def _apply_user_dashboard_to_latest(
     return dashboard_status(hass)
 
 
+# FONCTION ASYNCHRONE : async_save_user_dashboard — traitement asynchrone : save user dashboard
 async def async_save_user_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> str:
@@ -321,6 +345,7 @@ async def async_save_user_dashboard(
     )
 
 
+# FONCTION ASYNCHRONE : async_apply_user_dashboard_to_latest — traitement asynchrone : apply user dashboard to latest
 async def async_apply_user_dashboard_to_latest(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> dict[str, Any]:
@@ -329,6 +354,7 @@ async def async_apply_user_dashboard_to_latest(
     )
 
 
+# FONCTION ASYNCHRONE : async_restore_previous_dashboard — traitement asynchrone : restore previous dashboard
 async def async_restore_previous_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> dict[str, Any]:

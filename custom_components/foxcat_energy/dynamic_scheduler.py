@@ -26,6 +26,7 @@ class Candidate:
     favorable: bool
 
 
+# FONCTION : _local_datetime — Local datetime
 def _local_datetime(day: date, minute_of_day: int, tzinfo: Any) -> datetime:
     minute_of_day %= 24 * 60
     return datetime.combine(
@@ -35,6 +36,7 @@ def _local_datetime(day: date, minute_of_day: int, tzinfo: Any) -> datetime:
     )
 
 
+# FONCTION : _machine_windows — Expand the two user-configured machine windows over the requested horizon.
 def _machine_windows(
     machine: MachineDefinition,
     start: datetime,
@@ -65,6 +67,7 @@ def _machine_windows(
     return result
 
 
+# FONCTION : _ceil_step — Ceil step
 def _ceil_step(value: datetime, minutes: int = 15) -> datetime:
     step = max(int(minutes), 1)
     clean = value.replace(second=0, microsecond=0)
@@ -74,6 +77,7 @@ def _ceil_step(value: datetime, minutes: int = 15) -> datetime:
     return clean + timedelta(minutes=(step - remainder) % step)
 
 
+# FONCTION : _candidate_starts — Candidate starts
 def _candidate_starts(window: ScheduleWindow, duration: timedelta, step_minutes: int = 15) -> Iterable[datetime]:
     cursor = _ceil_step(window.start, step_minutes)
     while cursor + duration <= window.end:
@@ -81,10 +85,12 @@ def _candidate_starts(window: ScheduleWindow, duration: timedelta, step_minutes:
         cursor += timedelta(minutes=step_minutes)
 
 
+# FONCTION : _parse_forecast_window — Parse forecast window
 def _parse_forecast_window(now: datetime, forecast: SolarForecast | None) -> ScheduleWindow | None:
     if forecast is None or not bool(getattr(forecast, "available", False)):
         return None
 
+    # FONCTION : parse — Parse
     def parse(value: Any) -> datetime | None:
         raw = str(value or "").strip()
         if not raw or raw in {"--:--", "Indisponible"}:
@@ -114,6 +120,7 @@ def _parse_forecast_window(now: datetime, forecast: SolarForecast | None) -> Sch
     return ScheduleWindow(start, end)
 
 
+# FONCTION : _overlap_ratio — Overlap ratio
 def _overlap_ratio(start: datetime, end: datetime, window: ScheduleWindow | None) -> float:
     if window is None or end <= start:
         return 0.0
@@ -124,12 +131,14 @@ def _overlap_ratio(start: datetime, end: datetime, window: ScheduleWindow | None
     return max(0.0, min(1.0, (overlap_end - overlap_start).total_seconds() / (end - start).total_seconds()))
 
 
+# FONCTION : _position — Position
 def _position(price: float, pmin: float, pmax: float) -> float:
     if pmax <= pmin:
         return 50.0
     return max(0.0, min(100.0, (price - pmin) / (pmax - pmin) * 100.0))
 
 
+# FONCTION : _group_price_zones — Group price zones
 def _group_price_zones(
     points: list[PricePoint],
     *,
@@ -143,6 +152,7 @@ def _group_price_zones(
     if not future:
         return None, None
 
+    # FONCTION : first_block — First block
     def first_block(predicate: Any, label: str) -> dict[str, Any] | None:
         block: list[PricePoint] = []
         for point in future:
@@ -171,6 +181,7 @@ def _group_price_zones(
     return valley, peak
 
 
+# FONCTION : _machine_profile — Machine profile
 def _machine_profile(machine: MachineDefinition, learning: dict[str, Any]) -> tuple[float, float | None, str]:
     profile = learning.get(machine.machine_id, {}) if isinstance(learning, dict) else {}
     duration_s = profile.get("average_duration_s_10")
@@ -185,6 +196,7 @@ def _machine_profile(machine: MachineDefinition, learning: dict[str, Any]) -> tu
     return duration_h, energy_kwh, source
 
 
+# FONCTION : _best_machine_candidate — Best machine candidate
 def _best_machine_candidate(
     *,
     machine: MachineDefinition,
@@ -237,6 +249,7 @@ def _best_machine_candidate(
     )
 
 
+# FONCTION : build_dynamic_schedule — Build the V1.6.159 planner
 def build_dynamic_schedule(
     *,
     now: datetime,

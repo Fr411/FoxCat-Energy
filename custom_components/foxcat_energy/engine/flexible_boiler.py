@@ -13,6 +13,7 @@ from .models import BoilerIntent, EnergySnapshot
 from .tariff import is_offpeak, distribution_period
 
 
+# FONCTION : evaluate_flexible_boiler — Boiler = charge flexible universelle FoxCat 1.7.0
 def evaluate_flexible_boiler(
     snapshot: EnergySnapshot, settings: dict[str, Any], economic_view: dict[str, Any],
     now: datetime, thermal: dict[str, Any], user_override: str = "AUTO",

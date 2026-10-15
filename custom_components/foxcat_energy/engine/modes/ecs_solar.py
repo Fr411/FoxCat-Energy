@@ -8,6 +8,7 @@ from ..tariff import is_offpeak_day, is_offpeak_night, is_peak, minute_of_day
 from .common import coverage, ecs_last_departure
 
 
+# FONCTION : evaluate_ecs_solar — ECS solaire V1.2.0
 def evaluate_ecs_solar(
     snapshot: EnergySnapshot,
     t0: EnergySnapshot,

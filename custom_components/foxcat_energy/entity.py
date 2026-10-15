@@ -10,6 +10,7 @@ from .coordinator import FoxCatEnergyCoordinator
 class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
     _attr_has_entity_name = True
 
+    # MÉTHODE : FoxCatEntity.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator, key: str, name: str, icon: str | None = None, device: str = "ems") -> None:
         super().__init__(coordinator)
         self._key = key
@@ -18,6 +19,7 @@ class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
         self._attr_icon = icon
         self._device = device
 
+    # MÉTHODE : FoxCatEntity.device_info — Device info
     @property
     def device_info(self) -> DeviceInfo:
         names = {

@@ -67,6 +67,7 @@ TARIFF_PRICE_KEYS: dict[str, tuple[str, ...]] = {
 ALL_PRICE_KEYS: frozenset[str] = frozenset(k for keys in TARIFF_PRICE_KEYS.values() for k in keys)
 
 
+# FONCTION : active_tariff — Return the selected tariff id, or None for legacy entries.
 def active_tariff(config: dict[str, Any]) -> str | None:
     """Return the selected tariff id, or None for legacy entries."""
     family = config.get(CONF_TARIFF_FAMILY)
@@ -79,6 +80,7 @@ def active_tariff(config: dict[str, Any]) -> str | None:
     return None
 
 
+# FONCTION : apply_configured_tariff — Apply the tariff selected during setup to runtime tariff settings.
 def apply_configured_tariff(settings: dict[str, Any], config: dict[str, Any]) -> None:
     """Apply the tariff selected during setup to runtime tariff settings."""
     tariff = active_tariff(config)
@@ -114,17 +116,20 @@ def apply_configured_tariff(settings: dict[str, Any], config: dict[str, Any]) ->
         )
 
 
+# FONCTION : allowed_price_keys — Allowed price keys
 def allowed_price_keys(config: dict[str, Any]) -> frozenset[str] | None:
     tariff = active_tariff(config)
     return None if tariff is None else frozenset(TARIFF_PRICE_KEYS[tariff])
 
 
+# FONCTION : foreign_price_keys — Price keys that belong to another tariff than the selected one.
 def foreign_price_keys(config: dict[str, Any]) -> frozenset[str]:
     """Price keys that belong to another tariff than the selected one."""
     allowed = allowed_price_keys(config)
     return frozenset() if allowed is None else ALL_PRICE_KEYS - allowed
 
 
+# FONCTION : scoped_config — Drop price sensors that do not belong to the selected tariff.
 def scoped_config(config: dict[str, Any]) -> dict[str, Any]:
     """Drop price sensors that do not belong to the selected tariff."""
     foreign = foreign_price_keys(config)
