@@ -250,17 +250,20 @@ async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> tuple[bool, str]:
     """Preserve the legacy tablet result and independently attempt mobile setup."""
+    tablet_created = False
+    tablet_error: OSError | ValueError | None = None
     try:
         tablet_created = await _ensure_dashboard_variant(
             hass, entry, config, "tablet"
         )
-    finally:
-        try:
-            await _ensure_dashboard_variant(hass, entry, config, "mobile")
-        except (OSError, ValueError) as err:
-            _LOGGER.warning(
-                "Impossible de générer le dashboard FoxCat mobile : %s", err
-            )
+    except (OSError, ValueError) as err:
+        tablet_error = err
+    try:
+        await _ensure_dashboard_variant(hass, entry, config, "mobile")
+    except (OSError, ValueError) as err:
+        _LOGGER.warning("Impossible de générer le dashboard FoxCat mobile : %s", err)
+    if tablet_error is not None:
+        raise tablet_error
     return tablet_created, str(_target(hass))
 
 
