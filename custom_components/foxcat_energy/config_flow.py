@@ -95,6 +95,20 @@ from .const import (
 )
 from .machines import records_for_options
 from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
+from .virtual_assets.config import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_CHARGE_EFFICIENCY,
+    CONF_BATTERY_DISCHARGE_EFFICIENCY,
+    CONF_BATTERY_MAX_CHARGE,
+    CONF_BATTERY_MAX_DISCHARGE,
+    CONF_BATTERY_RESERVE,
+    CONF_ENABLED as CONF_VIRTUAL_ASSETS_ENABLED,
+    CONF_EV_CAPACITY,
+    CONF_EV_CHARGE_EFFICIENCY,
+    CONF_EV_ENABLED,
+    CONF_EV_MAX_CHARGE,
+    CONF_SHADOW as CONF_VIRTUAL_ASSETS_SHADOW,
+)
 
 
 
@@ -386,6 +400,44 @@ def _solar_schema() -> vol.Schema:
     )
 
 
+def _virtual_assets_schema() -> vol.Schema:
+    number = selector.NumberSelectorMode.BOX
+    return vol.Schema(
+        {
+            vol.Optional(CONF_VIRTUAL_ASSETS_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_VIRTUAL_ASSETS_SHADOW, default=True): selector.BooleanSelector(),
+            vol.Optional(CONF_BATTERY_CAPACITY, default=10.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=1000, step=0.1, unit_of_measurement="kWh", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_MAX_CHARGE, default=5.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_MAX_DISCHARGE, default=5.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_CHARGE_EFFICIENCY, default=95.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_DISCHARGE_EFFICIENCY, default=95.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_RESERVE, default=20.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_EV_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_EV_CAPACITY, default=50.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=300, step=1, unit_of_measurement="kWh", mode=number)
+            ),
+            vol.Optional(CONF_EV_MAX_CHARGE, default=7.4): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=number)
+            ),
+            vol.Optional(CONF_EV_CHARGE_EFFICIENCY, default=90.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+        }
+    )
+
+
 _SCHEMA_BUILDERS = {
     "core": _core_schema,
     "metronome": _metronome_schema,
@@ -398,6 +450,7 @@ _SCHEMA_BUILDERS = {
     "solar": _solar_schema,
     "ia": _solar_schema,
     "pricing_dynamic": _pricing_schema,
+    "battery_ev": _virtual_assets_schema,
 }
 
 
@@ -673,6 +726,10 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_boiler — traitement asynchrone : step boiler
     async def async_step_boiler(self, user_input=None):
         return await self._section("boiler", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_battery_ev — Configuration batterie et VE virtuels
+    async def async_step_battery_ev(self, user_input=None):
+        return await self._section("battery_ev", user_input)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pri — traitement asynchrone : step pri
     async def async_step_pri(self, user_input=None):

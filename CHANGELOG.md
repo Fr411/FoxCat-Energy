@@ -1,3 +1,10 @@
+# Changelog — FoxCat Energy V1.7.5
+
+## V1.7.5
+- Rétablissement de la génération indépendante des dashboards tablette et mobile.
+- Configuration validée du simulateur batterie + véhicule électrique, désactivé par défaut et sans commande physique.
+- Correction de l’initialisation des capteurs et alignement des versions d’intégration.
+
 # Changelog — FoxCat Energy V1.7.4
 
 ## V1.7.4
