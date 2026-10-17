@@ -19799,12 +19799,18 @@ views:
             entities:
               - entity: '[[foxcat:battery_ev.status]]'
                 name: Module Batterie + VE
+              - entity: '[[foxcat:battery_ev.mode]]'
+                name: Mode de simulation
               - entity: '[[foxcat:battery_ev.battery_capacity]]'
                 name: Capacité utile
               - entity: '[[foxcat:battery_ev.battery_charge_power]]'
                 name: Puissance de charge maximale
               - entity: '[[foxcat:battery_ev.battery_discharge_power]]'
                 name: Puissance de décharge maximale
+              - entity: '[[foxcat:battery_ev.battery_charge_efficiency]]'
+                name: Rendement de charge
+              - entity: '[[foxcat:battery_ev.battery_discharge_efficiency]]'
+                name: Rendement de décharge
               - entity: '[[foxcat:battery_ev.battery_reserve]]'
                 name: Réserve minimale
           - type: markdown
@@ -19828,6 +19834,8 @@ views:
                 name: Capacité batterie VE
               - entity: '[[foxcat:battery_ev.ev_charge_power]]'
                 name: Puissance de charge maximale
+              - entity: '[[foxcat:battery_ev.ev_charge_efficiency]]'
+                name: Rendement de charge
           - type: markdown
             content: >
               Configurez les capacités dans Paramètres → Appareils et services
