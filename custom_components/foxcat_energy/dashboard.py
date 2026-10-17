@@ -250,57 +250,59 @@ async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> tuple[bool, str]:
     """Preserve the legacy tablet result and independently attempt mobile setup."""
-    tablet_created = False
-    tablet_error: OSError | ValueError | None = None
-    try:
-        tablet_created = await _ensure_dashboard_variant(
-            hass, entry, config, "tablet"
+    created_paths, errors = await _ensure_dashboard_variants(
+        hass, entry, config, DASHBOARD_VARIANTS
+    )
+    if "mobile" in errors:
+        _LOGGER.warning(
+            "Impossible de générer le dashboard FoxCat mobile : %s", errors["mobile"]
         )
-    except (OSError, ValueError) as err:
-        tablet_error = err
-    try:
-        await _ensure_dashboard_variant(hass, entry, config, "mobile")
-    except (OSError, ValueError) as err:
-        _LOGGER.warning("Impossible de générer le dashboard FoxCat mobile : %s", err)
-    if tablet_error is not None:
-        raise tablet_error
-    return tablet_created, str(_target(hass))
+    if "tablet" in errors:
+        raise errors["tablet"]
+    return str(_target(hass)) in created_paths, str(_target(hass))
 
 
-async def _ensure_dashboard_variant(
+async def _ensure_dashboard_variants(
     hass: HomeAssistant,
     entry: ConfigEntry,
     config: dict[str, Any],
-    variant: DashboardVariant,
-) -> bool:
-    target = _target(hass, variant)
-    if target.exists():
-        return False
-    options = dashboard_select_options(hass, variant)
-    if not options:
-        raise FileNotFoundError(
-            f"Aucune version de dashboard {variant} n’est disponible."
-        )
-    recommended = recommended_dashboard_version(variant) or options[0]
-    await async_switch_dashboard(hass, entry, config, recommended, variant)
-    return True
+    variants: tuple[DashboardVariant, ...],
+) -> tuple[list[str], dict[DashboardVariant, OSError | ValueError]]:
+    created_paths: list[str] = []
+    errors: dict[DashboardVariant, OSError | ValueError] = {}
+    for variant in variants:
+        target = _target(hass, variant)
+        if target.exists():
+            continue
+        try:
+            options = dashboard_select_options(hass, variant)
+            if not options:
+                raise FileNotFoundError(
+                    f"Aucune version de dashboard {variant} n’est disponible."
+                )
+            recommended = recommended_dashboard_version(variant) or options[0]
+            await async_switch_dashboard(
+                hass, entry, config, recommended, variant
+            )
+            created_paths.append(str(target))
+        except (OSError, ValueError) as err:
+            errors[variant] = err
+    return created_paths, errors
 
 
 async def async_ensure_dashboards(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> list[str]:
     """Create each missing dashboard independently and return paths created."""
-    created_paths: list[str] = []
-    for variant in DASHBOARD_VARIANTS:
-        try:
-            if await _ensure_dashboard_variant(hass, entry, config, variant):
-                created_paths.append(str(_target(hass, variant)))
-        except (OSError, ValueError) as err:
-            _LOGGER.warning(
-                "Impossible de générer le dashboard FoxCat %s : %s",
-                variant,
-                err,
-            )
+    created_paths, errors = await _ensure_dashboard_variants(
+        hass, entry, config, DASHBOARD_VARIANTS
+    )
+    for variant, err in errors.items():
+        _LOGGER.warning(
+            "Impossible de générer le dashboard FoxCat %s : %s",
+            variant,
+            err,
+        )
     return created_paths
 
 

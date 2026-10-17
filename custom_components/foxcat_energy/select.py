@@ -18,7 +18,7 @@ from .const import (
 from .tariff_model import tariff_dimensions
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
-from .dashboard_versions import DashboardVariant, dashboard_variant_files
+from .dashboard_versions import DashboardVariant
 from .select_options import (
     constrained_option,
     mode_option,
@@ -253,10 +253,11 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     def __init__(
         self, coordinator: FoxCatEnergyCoordinator, variant: DashboardVariant
     ) -> None:
-        # Validate the variant before selecting its entity identity.
-        dashboard_variant_files(variant)
+        try:
+            key, name = _DASHBOARD_SELECT_NAMES[variant]
+        except KeyError as err:
+            raise ValueError(f"Type de dashboard inconnu : {variant}") from err
         self._variant = variant
-        key, name = _DASHBOARD_SELECT_NAMES[variant]
         super().__init__(coordinator, key, name, "mdi:view-dashboard", "diagnostic")
 
     # MÉTHODE : FoxCatDashboardVersionSelect.options — Options
