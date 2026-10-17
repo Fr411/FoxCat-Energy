@@ -10,8 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .const import DEFAULT_SETTINGS, DOMAIN, NUMBER_DEFINITIONS, PLATFORMS, SWITCH_DEFINITIONS, TIME_SETTING_KEYS
 from .coordinator import FoxCatEnergyCoordinator
-from .dashboard import DASHBOARD_FOLDER, async_ensure_dashboards
-from .dashboard_versions import DASHBOARD_VARIANTS, dashboard_variant_files
+from .dashboard import async_ensure_dashboards
 from .profiles import read_settings_profile, write_settings_profile
 
 _LOGGER = logging.getLogger(__name__)
@@ -127,17 +126,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     "Dashboard FoxCat Energy créé depuis le registre: %s",
                     dashboard_path,
                 )
-        elif all(
-            Path(
-                hass.config.path(
-                    DASHBOARD_FOLDER, dashboard_variant_files(variant)[0]
-                )
-            ).is_file()
-            for variant in DASHBOARD_VARIANTS
-        ):
-            _LOGGER.debug(
-                "Les dashboards FoxCat Energy existent déjà."
-            )
     except (OSError, FileNotFoundError) as err:
         # Une erreur de dashboard ne doit jamais empêcher l'EMS de démarrer.
         _LOGGER.warning("Impossible de générer le dashboard FoxCat Energy: %s", err)

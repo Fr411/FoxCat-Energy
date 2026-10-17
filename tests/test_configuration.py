@@ -374,6 +374,20 @@ class DashboardAndProfileTests(unittest.TestCase):
                     self.assertEqual(created_paths, [str(tablet_path)])
                     self.assertTrue(tablet_path.is_file())
                     self.assertFalse(mobile_path.exists())
+
+                    tablet_path.unlink()
+                    (tablet_path.parent / "dashboard_state.json").unlink()
+                    (versions / "dashboard_v1.7.4.yaml").unlink()
+                    (versions / "dashboard_mobile_v1.7.4.yaml").write_text(
+                        "layout: mobile\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(FileNotFoundError):
+                        asyncio.run(
+                            dashboard.async_ensure_dashboard(FakeHass(), None, {})
+                        )
+                    self.assertTrue(mobile_path.is_file())
+                    self.assertFalse(tablet_path.exists())
             finally:
                 sys.modules.pop("foxcat_energy.dashboard", None)
                 if original_dashboard_attr is None and hasattr(package, "dashboard"):
