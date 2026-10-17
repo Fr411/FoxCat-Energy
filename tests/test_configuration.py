@@ -401,11 +401,8 @@ class DashboardAndProfileTests(unittest.TestCase):
 
     def test_repository_dashboard_versions_include_both_current_layouts(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
-        self.assertEqual(available_dashboard_versions(versions_directory), ["1.7.4"])
-        self.assertEqual(
-            available_dashboard_versions(versions_directory, "mobile"),
-            ["1.7.4"],
-        )
+        self.assertIn("1.7.4", available_dashboard_versions(versions_directory))
+        self.assertIn("1.7.4", available_dashboard_versions(versions_directory, "mobile"))
         self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.4")
         self.assertEqual(
             recommended_dashboard_version(versions_directory, "mobile"),

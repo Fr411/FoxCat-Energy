@@ -211,9 +211,10 @@
           "energy_bus": "5 • Energy Bus",
           "machines": "6 • Machines",
           "boiler": "7 • Boiler",
-          "pricing": "8 • Tarification",
-          "metronome": "9 • Métronome",
-          "diagnostic": "10 • Diagnostic",
+          "battery_ev": "8 • Batterie + VE",
+          "pricing": "9 • Tarification",
+          "metronome": "10 • Métronome",
+          "diagnostic": "11 • Diagnostic",
           "finish": "✓ Enregistrer et quitter"
         }
       },
@@ -257,6 +258,24 @@
           "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
           "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
           "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
+        }
+      },
+      "battery_ev": {
+        "title": "Batterie + véhicule électrique virtuels",
+        "description": "Configurez une simulation en lecture seule. Aucun équipement physique n’est commandé.",
+        "data": {
+          "virtual_assets_enabled": "Activer la simulation",
+          "virtual_assets_shadow": "Mode shadow",
+          "virtual_battery_capacity_kwh": "Capacité batterie (kWh)",
+          "virtual_battery_max_charge_kw": "Puissance max. de charge batterie (kW)",
+          "virtual_battery_max_discharge_kw": "Puissance max. de décharge batterie (kW)",
+          "virtual_battery_charge_efficiency_pct": "Rendement de charge batterie (%)",
+          "virtual_battery_discharge_efficiency_pct": "Rendement de décharge batterie (%)",
+          "virtual_battery_reserve_soc_pct": "Réserve batterie (%)",
+          "virtual_ev_enabled": "Configurer un véhicule électrique virtuel",
+          "virtual_ev_capacity_kwh": "Capacité batterie VE (kWh)",
+          "virtual_ev_max_charge_kw": "Puissance max. de charge VE (kW)",
+          "virtual_ev_charge_efficiency_pct": "Rendement de charge VE (%)"
         }
       },
       "pri": {
