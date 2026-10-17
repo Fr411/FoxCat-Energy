@@ -13,6 +13,20 @@ from .const import DOMAIN, VERSION, CONF_GRID_SIGNED_SENSOR, CONF_PV_SENSOR
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .registry import registry_diagnostics
+from .virtual_assets.config import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_CHARGE_EFFICIENCY,
+    CONF_BATTERY_DISCHARGE_EFFICIENCY,
+    CONF_BATTERY_MAX_CHARGE,
+    CONF_BATTERY_MAX_DISCHARGE,
+    CONF_BATTERY_RESERVE,
+    CONF_ENABLED as CONF_VIRTUAL_ASSETS_ENABLED,
+    CONF_EV_CAPACITY,
+    CONF_EV_CHARGE_EFFICIENCY,
+    CONF_EV_ENABLED,
+    CONF_EV_MAX_CHARGE,
+    CONF_SHADOW as CONF_VIRTUAL_ASSETS_SHADOW,
+)
 
 
 # FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
@@ -204,6 +218,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "ems_onduleur_plafond_pv", "EMS Onduleur • Plafond PV", "mdi:solar-power", "pri", lambda d: d["energy_bus"]["inverter"].get("pv_limit_w", 0.0), "W"),
         FoxCatNumericSensor(c, "ems_onduleur_utilisation_plafond", "EMS Onduleur • Utilisation plafond", "mdi:gauge", "pri", lambda d: d["energy_bus"]["inverter"].get("pv_ratio_pct", 0.0), PERCENTAGE),
         FoxCatValueSensor(c, "ems_onduleur_potentiel", "EMS Onduleur • Potentiel solaire", "mdi:weather-sunny-alert", "pri", lambda d: "PLUS POSSIBLE" if d["energy_bus"]["inverter"].get("more_solar_possible") else ("MAX SOLAIRE ATTEINT" if d["energy_bus"]["inverter"].get("max_solar_reached") else "STABLE")),
+        FoxCatValueSensor(c, "virtual_assets_status", "Batterie + VE • Module", "mdi:battery-sync", "battery_ev", lambda d: "CONFIGURÉ • LECTURE SEULE" if c.config.get(CONF_VIRTUAL_ASSETS_ENABLED) is True else "DÉSACTIVÉ"),
+        FoxCatValueSensor(c, "virtual_assets_mode", "Batterie + VE • Mode", "mdi:eye-outline", "battery_ev", lambda d: "SHADOW" if c.config.get(CONF_VIRTUAL_ASSETS_SHADOW, True) is not False else "CONTREFACTUEL"),
+        FoxCatNumericSensor(c, "virtual_battery_capacity", "Batterie + VE • Capacité batterie", "mdi:battery", "battery_ev", lambda d: c.config.get(CONF_BATTERY_CAPACITY, 10.0), UnitEnergy.KILO_WATT_HOUR),
+        FoxCatNumericSensor(c, "virtual_battery_charge_power", "Batterie + VE • Puissance max. charge batterie", "mdi:battery-arrow-up", "battery_ev", lambda d: c.config.get(CONF_BATTERY_MAX_CHARGE, 5.0), "kW"),
+        FoxCatNumericSensor(c, "virtual_battery_discharge_power", "Batterie + VE • Puissance max. décharge batterie", "mdi:battery-arrow-down", "battery_ev", lambda d: c.config.get(CONF_BATTERY_MAX_DISCHARGE, 5.0), "kW"),
+        FoxCatNumericSensor(c, "virtual_battery_charge_efficiency", "Batterie + VE • Rendement charge batterie", "mdi:battery-arrow-up-outline", "battery_ev", lambda d: c.config.get(CONF_BATTERY_CHARGE_EFFICIENCY, 95.0), PERCENTAGE),
+        FoxCatNumericSensor(c, "virtual_battery_discharge_efficiency", "Batterie + VE • Rendement décharge batterie", "mdi:battery-arrow-down-outline", "battery_ev", lambda d: c.config.get(CONF_BATTERY_DISCHARGE_EFFICIENCY, 95.0), PERCENTAGE),
+        FoxCatNumericSensor(c, "virtual_battery_reserve", "Batterie + VE • Réserve batterie", "mdi:battery-lock", "battery_ev", lambda d: c.config.get(CONF_BATTERY_RESERVE, 20.0), PERCENTAGE),
+        FoxCatValueSensor(c, "virtual_ev_status", "Batterie + VE • Véhicule électrique", "mdi:car-electric", "battery_ev", lambda d: "CONFIGURÉ" if c.config.get(CONF_EV_ENABLED) is True else "NON CONFIGURÉ"),
+        FoxCatNumericSensor(c, "virtual_ev_capacity", "Batterie + VE • Capacité VE", "mdi:car-battery", "battery_ev", lambda d: c.config.get(CONF_EV_CAPACITY, 50.0), UnitEnergy.KILO_WATT_HOUR),
+        FoxCatNumericSensor(c, "virtual_ev_charge_power", "Batterie + VE • Puissance max. charge VE", "mdi:ev-station", "battery_ev", lambda d: c.config.get(CONF_EV_MAX_CHARGE, 7.4), "kW"),
+        FoxCatNumericSensor(c, "virtual_ev_charge_efficiency", "Batterie + VE • Rendement charge VE", "mdi:car-electric-outline", "battery_ev", lambda d: c.config.get(CONF_EV_CHARGE_EFFICIENCY, 90.0), PERCENTAGE),
+        FoxCatNumericSensor(c, "virtual_battery_soc_simulated", "Batterie + VE • SOC Batterie (Simulé)", "mdi:battery-charging-50", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_soc_pct"), PERCENTAGE),
+        FoxCatNumericSensor(c, "virtual_battery_energy_simulated", "Batterie + VE • Énergie Batterie (Simulé)", "mdi:battery-heart-variant", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_soc_kwh"), UnitOfEnergy.KILO_WATT_HOUR),
+        FoxCatNumericSensor(c, "virtual_battery_cycles_simulated", "Batterie + VE • Cycles équivalents (Simulé)", "mdi:recycle", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_cycles"), None),
+        FoxCatNumericSensor(c, "virtual_savings_simulated", "Batterie + VE • Économie nette (Simulé)", "mdi:piggy-bank-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("savings_eur"), "€"),
+        FoxCatValueSensor(c, "virtual_last_decision_simulated", "Batterie + VE • Décision planificateur (Simulé)", "mdi:brain", "battery_ev", lambda d: d.get("virtual_assets", {}).get("last_action", "idle")),
+        FoxCatValueSensor(c, "virtual_last_reason_simulated", "Batterie + VE • Justification décision (Simulé)", "mdi:comment-check-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("last_reason_description", "Aucune")),
+        FoxCatValueSensor(c, "virtual_data_quality_badge", "Batterie + VE • Qualité des données", "mdi:shield-check-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("data_badge", "SIMULÉ")),
     ])
 
     # Un jeu de capteurs est créé automatiquement pour chaque appareil FoxCat mesuré.

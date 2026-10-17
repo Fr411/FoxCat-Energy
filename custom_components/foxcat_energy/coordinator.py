@@ -159,6 +159,7 @@ from .machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
 from .inverter_core import InverterCore
 from .accounting import EnergyAccounting
+from .virtual_assets.ha import setup_virtual_assets
 from .dynamic_scheduler import build_dynamic_schedule
 from .migration import (
     MIGRATION_MODEL_VERSION,
@@ -339,6 +340,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         self._loaded_existing_state = False
         self.accounting = EnergyAccounting()
+        self.virtual_assets = setup_virtual_assets({**self.config, **self.settings})
 
         super().__init__(
             hass,
@@ -495,6 +497,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.settings.update(option_settings)
             self._entry_options_snapshot = option_settings
             self.accounting.restore(stored.get("accounting"))
+            self.virtual_assets.reconfigure({**self.config, **self.settings})
+            self.virtual_assets.restore_state(stored.get("virtual_assets"))
             self.machine_learning.restore(stored.get("machine_learning"))
             price_backup = stored.get("price_backup", {})
             self.price_backup = (
@@ -615,6 +619,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "settings": self.settings,
                 "entry_option_settings": self._entry_options_snapshot,
                 "accounting": self.accounting.dump(),
+                "virtual_assets": self.virtual_assets.dump_state(),
                 "machine_learning": self.machine_learning.dump(),
                 "price_backup": self.price_backup,
                 "solar_forecast": {
@@ -2373,6 +2378,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "name": "Chauffe-eau",
                 "power_w": snapshot.boiler_power_w,
             })
+            self.virtual_assets.observe_snapshot(
+                timestamp=snapshot.timestamp,
+                house_w=snapshot.house_w,
+                pv_w=snapshot.pv_w,
+                prices=self.prices(),
+                settings=self.settings,
+            )
             if self.accounting.process(snapshot, self.prices(), accounting_appliances):
                 self.hass.async_create_task(self._async_save())
 
@@ -3935,6 +3947,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "economic_decision": economic.get("decision", {}).get("label", "Indisponible"),
             },
             "accounting": self.accounting.view(),
+            "virtual_assets": self.virtual_assets.view(),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
             "machine_guard": {
