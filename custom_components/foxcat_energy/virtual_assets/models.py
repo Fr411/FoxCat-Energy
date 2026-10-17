@@ -46,7 +46,7 @@ class Slot:
     load_quality: DataQuality = DataQuality.MEASURED
     pv_quality: DataQuality = DataQuality.MEASURED
     price_quality: DataQuality = DataQuality.MEASURED
-    # True : prix final client déjà validé par TariffAdapter (sinon non utilisé en comptabilité)
+    # True : prix futur (estimé), utilisable pour planifier mais pas pour comptabiliser du réalisé
     price_is_future: bool = False
 
     def __post_init__(self) -> None:

@@ -86,7 +86,8 @@ class VirtualAssetsConfig:
 
 
 def config_from_settings(settings: Mapping[str, Any] | None) -> VirtualAssetsConfig:
-    """Lit les réglages ; sans clé ``virtual_assets_enabled`` le module reste désactivé."""
+    """Lit uniquement les drapeaux enabled/shadow ; batterie, VE et planificateur gardent leurs
+    défauts (à fournir via ``VirtualAssetsConfig``). Sans clé le module reste désactivé."""
     settings = settings or {}
     return VirtualAssetsConfig(
         enabled=settings.get(CONF_ENABLED) is True,
