@@ -8,6 +8,7 @@ import types
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 COMPONENT_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
 package = types.ModuleType("foxcat_energy")
@@ -284,14 +285,17 @@ class DashboardAndProfileTests(unittest.TestCase):
             root = Path(temporary)
             versions = root / "versions"
             versions.mkdir()
-            (root / "dashboard.yaml").write_text("layout: tablet\n", encoding="utf-8")
+            (versions / "dashboard_v1.7.4.yaml").write_text(
+                "layout: tablet\n",
+                encoding="utf-8",
+            )
             (versions / "dashboard_mobile_v1.7.4.yaml").write_text(
                 "layout: mobile\n",
                 encoding="utf-8",
             )
             self.assertEqual(
                 dashboard_template_path(versions, "1.7.4", "tablet"),
-                root / "dashboard.yaml",
+                versions / "dashboard_v1.7.4.yaml",
             )
             self.assertEqual(
                 dashboard_template_path(versions, "1.7.4", "mobile"),
@@ -323,35 +327,53 @@ class DashboardAndProfileTests(unittest.TestCase):
                 "homeassistant.core": core,
                 "foxcat_energy.registry": registry,
             }
-            original = {name: sys.modules.get(name) for name in stubs}
             original_dashboard = sys.modules.pop("foxcat_energy.dashboard", None)
             original_dashboard_attr = getattr(package, "dashboard", None)
-            sys.modules.update(stubs)
             try:
-                dashboard = importlib.import_module("foxcat_energy.dashboard")
-                dashboard._dir = lambda: versions
+                with patch.dict(sys.modules, stubs):
+                    dashboard = importlib.import_module("foxcat_energy.dashboard")
+                    dashboard._dir = lambda: versions
 
-                class FakeConfig:
-                    def path(self, *parts: str) -> str:
-                        return str(root.joinpath("config", *parts))
+                    class FakeConfig:
+                        def path(self, *parts: str) -> str:
+                            return str(root.joinpath("config", *parts))
 
-                class FakeHass:
-                    config = FakeConfig()
+                    class FakeHass:
+                        config = FakeConfig()
 
-                    async def async_add_executor_job(self, function, *args):
-                        return function(*args)
+                        async def async_add_executor_job(self, function, *args):
+                            return function(*args)
 
-                created_paths = asyncio.run(
-                    dashboard.async_ensure_dashboard(FakeHass(), None, {})
-                )
-                self.assertEqual(
-                    {Path(path).name for path in created_paths},
-                    {"dashboard.yaml", "dashboardmob1.yaml"},
-                )
-                tablet_path = root / "config" / "foxcat_energy" / "dashboard.yaml"
-                self.assertEqual(Path(tablet_path).read_text(encoding="utf-8"), "layout: tablet\n")
-                mobile_path = root / "config" / "foxcat_energy" / "dashboardmob1.yaml"
-                self.assertEqual(mobile_path.read_text(encoding="utf-8"), "layout: mobile\n")
+                    created_paths = asyncio.run(
+                        dashboard.async_ensure_dashboards(FakeHass(), None, {})
+                    )
+                    self.assertEqual(
+                        {Path(path).name for path in created_paths},
+                        {"dashboard.yaml", "dashboardmob1.yaml"},
+                    )
+                    tablet_path = root / "config" / "foxcat_energy" / "dashboard.yaml"
+                    self.assertEqual(tablet_path.read_text(encoding="utf-8"), "layout: tablet\n")
+                    mobile_path = root / "config" / "foxcat_energy" / "dashboardmob1.yaml"
+                    self.assertEqual(mobile_path.read_text(encoding="utf-8"), "layout: mobile\n")
+                    legacy_result = asyncio.run(
+                        dashboard.async_ensure_dashboard(FakeHass(), None, {})
+                    )
+                    self.assertEqual(legacy_result, (False, str(tablet_path)))
+
+                    for filename in (
+                        "dashboard.yaml",
+                        "dashboard_state.json",
+                        "dashboardmob1.yaml",
+                        "dashboard_state_mobile.json",
+                    ):
+                        (tablet_path.parent / filename).unlink()
+                    (versions / "dashboard_mobile_v1.7.4.yaml").unlink()
+                    created_paths = asyncio.run(
+                        dashboard.async_ensure_dashboards(FakeHass(), None, {})
+                    )
+                    self.assertEqual(created_paths, [str(tablet_path)])
+                    self.assertTrue(tablet_path.is_file())
+                    self.assertFalse(mobile_path.exists())
             finally:
                 sys.modules.pop("foxcat_energy.dashboard", None)
                 if original_dashboard_attr is None and hasattr(package, "dashboard"):
@@ -360,11 +382,6 @@ class DashboardAndProfileTests(unittest.TestCase):
                     package.dashboard = original_dashboard_attr
                 if original_dashboard is not None:
                     sys.modules["foxcat_energy.dashboard"] = original_dashboard
-                for name, module in original.items():
-                    if module is None:
-                        sys.modules.pop(name, None)
-                    else:
-                        sys.modules[name] = module
 
     def test_repository_dashboard_versions_include_both_current_layouts(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"

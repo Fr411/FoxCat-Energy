@@ -243,18 +243,20 @@ class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntit
         await self.coordinator.async_set_setting("network_policy", option)
 
 
+_DASHBOARD_SELECT_NAMES: dict[DashboardVariant, tuple[str, str]] = {
+    "tablet": ("dashboard_version", "Version du dashboard tablette/PC"),
+    "mobile": ("dashboard_mobile_version", "Version du dashboard mobile"),
+}
+
+
 class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     def __init__(
         self, coordinator: FoxCatEnergyCoordinator, variant: DashboardVariant
     ) -> None:
+        # Validate the variant before selecting its entity identity.
         dashboard_variant_files(variant)
         self._variant = variant
-        if variant == "mobile":
-            key = "dashboard_mobile_version"
-            name = "Version du dashboard mobile"
-        else:
-            key = "dashboard_version"
-            name = "Version du dashboard tablette/PC"
+        key, name = _DASHBOARD_SELECT_NAMES[variant]
         super().__init__(coordinator, key, name, "mdi:view-dashboard", "diagnostic")
 
     # MÉTHODE : FoxCatDashboardVersionSelect.options — Options

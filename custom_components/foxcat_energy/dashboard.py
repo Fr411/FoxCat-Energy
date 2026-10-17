@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +25,8 @@ from .dashboard_versions import (
     dashboard_variant_files,
 )
 from .registry import render_dashboard_template, resolve_registry
+
+_LOGGER = logging.getLogger(__name__)
 
 DASHBOARD_FOLDER = "foxcat_energy"
 DASHBOARD_FILENAME = "dashboard.yaml"
@@ -245,22 +248,39 @@ async def async_switch_dashboard(
 # FONCTION ASYNCHRONE : async_ensure_dashboard — traitement asynchrone : ensure dashboard
 async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+) -> tuple[bool, str]:
+    """Preserve the legacy result while ensuring both dashboard files."""
+    tablet_target = str(_target(hass))
+    created_paths = await async_ensure_dashboards(hass, entry, config)
+    return tablet_target in created_paths, tablet_target
+
+
+async def async_ensure_dashboards(
+    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> list[str]:
+    """Create each missing dashboard independently and return paths created."""
     created_paths: list[str] = []
     for variant in DASHBOARD_VARIANTS:
         target = _target(hass, variant)
         if target.exists():
             continue
-        options = dashboard_select_options(hass, variant)
-        if not options:
-            raise FileNotFoundError(
-                f"Aucune version de dashboard {variant} n’est disponible."
+        try:
+            options = dashboard_select_options(hass, variant)
+            if not options:
+                raise FileNotFoundError(
+                    f"Aucune version de dashboard {variant} n’est disponible."
+                )
+            recommended = recommended_dashboard_version(variant) or options[0]
+            await async_switch_dashboard(
+                hass, entry, config, recommended, variant
             )
-        recommended = recommended_dashboard_version(variant) or options[0]
-        await async_switch_dashboard(
-            hass, entry, config, recommended, variant
-        )
-        created_paths.append(str(target))
+            created_paths.append(str(target))
+        except Exception as err:
+            _LOGGER.warning(
+                "Impossible de générer le dashboard FoxCat %s : %s",
+                variant,
+                err,
+            )
     return created_paths
 
 
