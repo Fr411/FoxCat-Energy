@@ -8,6 +8,16 @@ from .models import VirtualAssetsError, require_number
 
 CONF_ENABLED = "virtual_assets_enabled"
 CONF_SHADOW = "virtual_assets_shadow_mode"
+CONF_BATTERY_CAPACITY = "virtual_battery_capacity_kwh"
+CONF_BATTERY_MAX_CHARGE = "virtual_battery_max_charge_kw"
+CONF_BATTERY_MAX_DISCHARGE = "virtual_battery_max_discharge_kw"
+CONF_BATTERY_CHARGE_EFFICIENCY = "virtual_battery_charge_efficiency_pct"
+CONF_BATTERY_DISCHARGE_EFFICIENCY = "virtual_battery_discharge_efficiency_pct"
+CONF_BATTERY_RESERVE = "virtual_battery_reserve_soc_pct"
+CONF_EV_ENABLED = "virtual_ev_enabled"
+CONF_EV_CAPACITY = "virtual_ev_capacity_kwh"
+CONF_EV_MAX_CHARGE = "virtual_ev_max_charge_kw"
+CONF_EV_CHARGE_EFFICIENCY = "virtual_ev_charge_efficiency_pct"
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,10 +96,31 @@ class VirtualAssetsConfig:
 
 
 def config_from_settings(settings: Mapping[str, Any] | None) -> VirtualAssetsConfig:
-    """Lit uniquement les drapeaux enabled/shadow ; batterie, VE et planificateur gardent leurs
-    défauts (à fournir via ``VirtualAssetsConfig``). Sans clé le module reste désactivé."""
+    """Construit la configuration Virtual Assets depuis les options FoxCat."""
     settings = settings or {}
+
+    def efficiency(key: str, default: float) -> float:
+        return require_number(key, settings.get(key, default), minimum=0, maximum=100,
+                              exclusive_min=True) / 100
+
     return VirtualAssetsConfig(
         enabled=settings.get(CONF_ENABLED) is True,
         shadow_mode=settings.get(CONF_SHADOW, True) is not False,
+        battery=BatterySpec(
+            capacity_kwh=settings.get(CONF_BATTERY_CAPACITY, 10.0),
+            max_charge_kw=settings.get(CONF_BATTERY_MAX_CHARGE, 5.0),
+            max_discharge_kw=settings.get(CONF_BATTERY_MAX_DISCHARGE, 5.0),
+            charge_efficiency=efficiency(CONF_BATTERY_CHARGE_EFFICIENCY, 95.0),
+            discharge_efficiency=efficiency(CONF_BATTERY_DISCHARGE_EFFICIENCY, 95.0),
+            reserve_soc_pct=settings.get(CONF_BATTERY_RESERVE, 20.0),
+        ),
+        ev=(
+            EVSpec(
+                capacity_kwh=settings.get(CONF_EV_CAPACITY, 50.0),
+                max_charge_kw=settings.get(CONF_EV_MAX_CHARGE, 7.4),
+                charge_efficiency=efficiency(CONF_EV_CHARGE_EFFICIENCY, 90.0),
+            )
+            if settings.get(CONF_EV_ENABLED) is True
+            else None
+        ),
     )

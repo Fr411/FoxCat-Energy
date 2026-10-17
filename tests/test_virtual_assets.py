@@ -394,6 +394,37 @@ class IsolationTests(unittest.TestCase):
         self.assertIsNone(setup_virtual_assets({}).shadow)
         self.assertTrue(setup_virtual_assets({"virtual_assets_enabled": True}).shadow is not None)
 
+    def test_settings_build_battery_and_ev_specs(self):
+        configured = config_from_settings({
+            "virtual_assets_enabled": True,
+            "virtual_battery_capacity_kwh": 13.5,
+            "virtual_battery_max_charge_kw": 6.0,
+            "virtual_battery_max_discharge_kw": 4.0,
+            "virtual_battery_charge_efficiency_pct": 96.0,
+            "virtual_battery_discharge_efficiency_pct": 94.0,
+            "virtual_battery_reserve_soc_pct": 25.0,
+            "virtual_ev_enabled": True,
+            "virtual_ev_capacity_kwh": 64.0,
+            "virtual_ev_max_charge_kw": 11.0,
+            "virtual_ev_charge_efficiency_pct": 92.0,
+        })
+
+        self.assertTrue(configured.enabled)
+        self.assertEqual(configured.battery.capacity_kwh, 13.5)
+        self.assertEqual(configured.battery.max_charge_kw, 6.0)
+        self.assertEqual(configured.battery.max_discharge_kw, 4.0)
+        self.assertEqual(configured.battery.charge_efficiency, 0.96)
+        self.assertEqual(configured.battery.discharge_efficiency, 0.94)
+        self.assertEqual(configured.battery.reserve_soc_pct, 25.0)
+        self.assertEqual(configured.ev.capacity_kwh, 64.0)
+        self.assertEqual(configured.ev.max_charge_kw, 11.0)
+        self.assertEqual(configured.ev.charge_efficiency, 0.92)
+        self.assertIsNone(config_from_settings({"virtual_ev_enabled": False}).ev)
+
+    def test_invalid_configured_efficiency_is_rejected(self):
+        with self.assertRaises(VirtualAssetsError):
+            config_from_settings({"virtual_battery_charge_efficiency_pct": 0})
+
     def test_no_physical_command_in_source(self):
         for path in (COMPONENT_PATH / "virtual_assets").glob("*.py"):
             text = path.read_text(encoding="utf-8")

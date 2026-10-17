@@ -10808,6 +10808,66 @@ views:
     theme: ios-dark-mode-blue-red
     subview: true
   - type: sections
+    max_columns: 2
+    title: Batterie + VE
+    path: batterie-ve
+    icon: mdi:battery-sync
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Batterie domestique
+            heading_style: title
+            icon: mdi:battery
+          - type: entities
+            title: Configuration
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:battery_ev.status]]'
+                name: Module Batterie + VE
+              - entity: '[[foxcat:battery_ev.mode]]'
+                name: Mode de simulation
+              - entity: '[[foxcat:battery_ev.battery_capacity]]'
+                name: Capacité utile
+              - entity: '[[foxcat:battery_ev.battery_charge_power]]'
+                name: Puissance de charge maximale
+              - entity: '[[foxcat:battery_ev.battery_discharge_power]]'
+                name: Puissance de décharge maximale
+              - entity: '[[foxcat:battery_ev.battery_charge_efficiency]]'
+                name: Rendement de charge
+              - entity: '[[foxcat:battery_ev.battery_discharge_efficiency]]'
+                name: Rendement de décharge
+              - entity: '[[foxcat:battery_ev.battery_reserve]]'
+                name: Réserve minimale
+          - type: markdown
+            content: >
+              Les valeurs affichées sont les paramètres configurés, pas le SoC
+              mesuré d’une batterie physique. Le module est désactivé par défaut
+              et n’envoie aucune commande à vos équipements.
+      - type: grid
+        cards:
+          - type: heading
+            heading: Véhicule électrique
+            heading_style: title
+            icon: mdi:car-electric
+          - type: entities
+            title: Configuration
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:battery_ev.ev_status]]'
+                name: Configuration du VE
+              - entity: '[[foxcat:battery_ev.ev_capacity]]'
+                name: Capacité batterie VE
+              - entity: '[[foxcat:battery_ev.ev_charge_power]]'
+                name: Puissance de charge maximale
+              - entity: '[[foxcat:battery_ev.ev_charge_efficiency]]'
+                name: Rendement de charge
+          - type: markdown
+            content: >
+              Configurez les capacités dans Paramètres → Appareils et services
+              → FoxCat Energy → Configurer → Batterie + VE. La charge V2G n’est
+              pas prise en charge.
+  - type: sections
     max_columns: 4
     title: Appareils
     path: appareils

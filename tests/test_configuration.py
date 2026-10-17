@@ -6,6 +6,7 @@ import sys
 import tempfile
 import types
 import unittest
+import yaml
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -20,6 +21,7 @@ from foxcat_energy.const import (
     DYNAMIC_STRUCT_IMPACT,
     MODES,
     NETWORK_POLICIES,
+    OFFICIAL_MENU_STEPS,
     PRICE_SOURCE_INTEGRATION,
     PRICE_SOURCES,
     TARIFF_BI,
@@ -409,6 +411,20 @@ class DashboardAndProfileTests(unittest.TestCase):
             recommended_dashboard_version(versions_directory, "mobile"),
             "1.7.4",
         )
+
+    def test_battery_ev_menu_and_dashboard_view_exist_for_both_layouts(self) -> None:
+        self.assertIn("battery_ev", OFFICIAL_MENU_STEPS)
+        versions_directory = COMPONENT_PATH / "dashboard" / "versions"
+        for filename in ("dashboard_v1.7.4.yaml", "dashboard_mobile_v1.7.4.yaml"):
+            dashboard = yaml.safe_load(
+                (versions_directory / filename).read_text(encoding="utf-8")
+            )
+            view = next(
+                (view for view in dashboard["views"] if view.get("title") == "Batterie + VE"),
+                None,
+            )
+            self.assertIsNotNone(view, filename)
+            self.assertEqual(view["path"], "batterie-ve")
 
     def test_profile_values_are_bounded_and_names_cannot_escape_directory(self) -> None:
         self.assertEqual(

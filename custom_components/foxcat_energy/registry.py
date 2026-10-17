@@ -114,6 +114,20 @@ _native("energy.today.export", "Énergie", "bilan_export_jour")
 _native("energy.today.self_consumption_pct", "Énergie", "bilan_autoconsommation_jour")
 _native("energy.today.autonomy_pct", "Énergie", "bilan_autonomie_jour")
 
+# Batterie + VE
+_native("battery_ev.status", "Batterie + VE", "virtual_assets_status")
+_native("battery_ev.mode", "Batterie + VE", "virtual_assets_mode")
+_native("battery_ev.battery_capacity", "Batterie + VE", "virtual_battery_capacity")
+_native("battery_ev.battery_charge_power", "Batterie + VE", "virtual_battery_charge_power")
+_native("battery_ev.battery_discharge_power", "Batterie + VE", "virtual_battery_discharge_power")
+_native("battery_ev.battery_charge_efficiency", "Batterie + VE", "virtual_battery_charge_efficiency")
+_native("battery_ev.battery_discharge_efficiency", "Batterie + VE", "virtual_battery_discharge_efficiency")
+_native("battery_ev.battery_reserve", "Batterie + VE", "virtual_battery_reserve")
+_native("battery_ev.ev_status", "Batterie + VE", "virtual_ev_status")
+_native("battery_ev.ev_capacity", "Batterie + VE", "virtual_ev_capacity")
+_native("battery_ev.ev_charge_power", "Batterie + VE", "virtual_ev_charge_power")
+_native("battery_ev.ev_charge_efficiency", "Batterie + VE", "virtual_ev_charge_efficiency")
+
 # Onduleur / PRI interne
 _native("inverter.enabled", "Onduleur", "pri_enabled", "switch.foxcat_energy_pri_solaredge_reduction_de_puissance_onduleur")
 _native("inverter.level_current", "Onduleur", "pri_niveau_actuel")
