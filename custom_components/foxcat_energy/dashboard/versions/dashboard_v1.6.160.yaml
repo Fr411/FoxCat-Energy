@@ -284,217 +284,6 @@ views:
                 box-shadow:
                   0 0 10px rgba(0,216,255,0.40);
               }
-          - type: custom:bubble-card
-            card_type: select
-            entity: [[foxcat:ems.mode]]
-            name: Mode EMS
-            icon: mdi:lightning-bolt-circle
-            sub_button:
-              main: []
-              bottom: []
-            force_icon: false
-            show_state: true
-            show_last_changed: false
-            show_last_updated: false
-            show_attribute: false
-            card_layout: large
-            theme: ios-dark-mode-dark-blue
-            rows: '1'
-            styles: |
-              .bubble-button-card-container {
-                position: relative;
-                min-height: 78px !important;
-                border-radius: 22px !important;
-                overflow: hidden;
-
-                background:
-                  linear-gradient(
-                    145deg,
-                    rgba(14, 20, 31, 0.96),
-                    rgba(8, 13, 22, 0.98)
-                  ) !important;
-
-                border: 1px solid rgba(255,255,255,0.07) !important;
-
-                box-shadow:
-                  0 14px 36px rgba(0,0,0,0.30),
-                  inset 0 1px 0 rgba(255,255,255,0.035) !important;
-
-                backdrop-filter: blur(18px);
-              }
-
-              /* Barre d'accent verticale */
-              .bubble-button-card-container::before {
-                content: "";
-                position: absolute;
-                left: 0;
-                top: 14px;
-                bottom: 14px;
-                width: 4px;
-                border-radius: 0 8px 8px 0;
-
-                background:
-                  ${state === 'Économie énergie'
-                    ? '#22d3ee'
-                  : state === 'Réinjection autorisée'
-                    ? '#38bdf8'
-                  : state === 'Réinjection refusée'
-                    ? '#fb7185'
-                  : state === 'Bihoraire'
-                    ? '#fbbf24'
-                  : state === 'Tarification dynamique'
-                    ? '#c084fc'
-                  : state === 'Confort'
-                    ? '#f472b6'
-                  : '#64748b'};
-              }
-
-              /* Halo discret */
-              .bubble-button-card-container::after {
-                content: "";
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 120px;
-                height: 100%;
-                pointer-events: none;
-
-                background:
-                  ${state === 'Économie énergie'
-                    ? 'linear-gradient(90deg, rgba(34,211,238,0.08), transparent)'
-                  : state === 'Réinjection autorisée'
-                    ? 'linear-gradient(90deg, rgba(56,189,248,0.08), transparent)'
-                  : state === 'Réinjection refusée'
-                    ? 'linear-gradient(90deg, rgba(251,113,133,0.08), transparent)'
-                  : state === 'Bihoraire'
-                    ? 'linear-gradient(90deg, rgba(251,191,36,0.08), transparent)'
-                  : state === 'Tarification dynamique'
-                    ? 'linear-gradient(90deg, rgba(192,132,252,0.08), transparent)'
-                  : state === 'Confort'
-                    ? 'linear-gradient(90deg, rgba(244,114,182,0.08), transparent)'
-                  : 'transparent'};
-              }
-
-              .bubble-icon-container {
-                width: 48px !important;
-                height: 48px !important;
-                margin-left: 6px !important;
-                border-radius: 15px !important;
-
-                background:
-                  ${state === 'Économie énergie'
-                    ? 'rgba(34,211,238,0.10)'
-                  : state === 'Réinjection autorisée'
-                    ? 'rgba(56,189,248,0.10)'
-                  : state === 'Réinjection refusée'
-                    ? 'rgba(251,113,133,0.10)'
-                  : state === 'Bihoraire'
-                    ? 'rgba(251,191,36,0.10)'
-                  : state === 'Tarification dynamique'
-                    ? 'rgba(192,132,252,0.10)'
-                  : state === 'Confort'
-                    ? 'rgba(244,114,182,0.10)'
-                  : 'rgba(255,255,255,0.05)'} !important;
-
-                border:
-                  1px solid
-                  ${state === 'Économie énergie'
-                    ? 'rgba(34,211,238,0.16)'
-                  : state === 'Réinjection autorisée'
-                    ? 'rgba(56,189,248,0.16)'
-                  : state === 'Réinjection refusée'
-                    ? 'rgba(251,113,133,0.16)'
-                  : state === 'Bihoraire'
-                    ? 'rgba(251,191,36,0.16)'
-                  : state === 'Tarification dynamique'
-                    ? 'rgba(192,132,252,0.16)'
-                  : state === 'Confort'
-                    ? 'rgba(244,114,182,0.16)'
-                  : 'rgba(255,255,255,0.06)'} !important;
-              }
-
-              .bubble-icon {
-                color:
-                  ${state === 'Économie énergie'
-                    ? '#22d3ee'
-                  : state === 'Réinjection autorisée'
-                    ? '#38bdf8'
-                  : state === 'Réinjection refusée'
-                    ? '#fb7185'
-                  : state === 'Bihoraire'
-                    ? '#fbbf24'
-                  : state === 'Tarification dynamique'
-                    ? '#c084fc'
-                  : state === 'Confort'
-                    ? '#f472b6'
-                  : '#94a3b8'} !important;
-
-                filter:
-                  ${state === 'Économie énergie'
-                    ? 'drop-shadow(0 0 8px rgba(34,211,238,0.35))'
-                  : state === 'Réinjection autorisée'
-                    ? 'drop-shadow(0 0 8px rgba(56,189,248,0.35))'
-                  : state === 'Réinjection refusée'
-                    ? 'drop-shadow(0 0 8px rgba(251,113,133,0.35))'
-                  : state === 'Bihoraire'
-                    ? 'drop-shadow(0 0 8px rgba(251,191,36,0.35))'
-                  : state === 'Tarification dynamique'
-                    ? 'drop-shadow(0 0 8px rgba(192,132,252,0.35))'
-                  : state === 'Confort'
-                    ? 'drop-shadow(0 0 8px rgba(244,114,182,0.35))'
-                  : 'none'};
-              }
-
-              .bubble-name {
-                font-size: 10px !important;
-                font-weight: 800 !important;
-                text-transform: uppercase;
-                letter-spacing: 1.5px;
-                color: rgba(255,255,255,0.38) !important;
-                margin-bottom: 2px !important;
-              }
-
-              .bubble-state {
-                font-size: 18px !important;
-                font-weight: 850 !important;
-                letter-spacing: -0.2px;
-
-                color:
-                  ${state === 'Économie énergie'
-                    ? '#a5f3fc'
-                  : state === 'Réinjection autorisée'
-                    ? '#bae6fd'
-                  : state === 'Réinjection refusée'
-                    ? '#fecdd3'
-                  : state === 'Bihoraire'
-                    ? '#fde68a'
-                  : state === 'Tarification dynamique'
-                    ? '#e9d5ff'
-                  : state === 'Confort'
-                    ? '#fbcfe8'
-                  : '#f8fafc'} !important;
-              }
-
-              .bubble-select-card {
-                border-radius: 16px !important;
-                background: rgba(255,255,255,0.035) !important;
-                border: 1px solid rgba(255,255,255,0.05) !important;
-              }
-
-              .bubble-dropdown-container {
-                background: rgba(255,255,255,0.03) !important;
-                border-radius: 14px !important;
-              }
-          - type: custom:bubble-card
-            card_type: select
-            entity: [[foxcat:pricing.network_policy]]
-            grid_options:
-              columns: 6
-          - type: custom:bubble-card
-            card_type: select
-            entity: [[foxcat:pricing.regime]]
-            grid_options:
-              columns: 6
       - type: grid
         cards:
           - type: custom:button-card
@@ -507,10 +296,7 @@ views:
               main: |
                 [[[
                   /* ==========================================================
-                     FOXCAT ENERGY V1.3.200 — COCKPIT EMS
-                     Données prioritaires : entités natives FoxCat Energy.
-                     Fallbacks conservés uniquement pour les mesures journalières
-                     et pour faciliter la migration depuis l'ancienne carte.
+                     FOXCAT ENERGY — COCKPIT EMS (Optimisé & Enrichi)
                      ========================================================== */
 
                   const norm = (value) => String(value ?? '')
@@ -578,35 +364,19 @@ views:
                      ========================================================== */
 
                   const E = {
-                    mode: findFox('select', ['mode', 'ems'], [
-                      '[[foxcat:ems.mode]]'
-                    ]),
-
-                    regulation: findFox('switch', ['regulation', 'foxcat', 'active'], [
-                      '[[foxcat:ems.regulation_active]]'
-                    ]),
-
+                    mode: findFox('select', ['mode', 'ems'], ['[[foxcat:ems.mode]]']),
+                    regulation: findFox('switch', ['regulation', 'foxcat', 'active'], ['[[foxcat:ems.regulation_active]]']),
                     dataValid: findFox('binary_sensor', ['donnees', 'energetiques', 'valides']),
 
                     phase: findFox('sensor', ['phase', 'regulation']),
                     coreAck: findFox('sensor', ['validation', 'execution', 'ems']),
                     lastDecision: findFox('sensor', ['derniere', 'decision', 'ems']),
 
-                    pv: findFox('sensor', ['puissance', 'production', 'photovoltaique'], [
-                      '[[foxcat:energy.pv_power]]'
-                    ]),
-                    house: findFox('sensor', ['puissance', 'consommation', 'maison'], [
-                      '[[foxcat:energy.house_power]]'
-                    ]),
-                    export: findFox('sensor', ['puissance', 'reinjectee', 'reseau'], [
-                      '[[foxcat:energy.grid_export]]'
-                    ]),
-                    import: findFox('sensor', ['puissance', 'prelevee', 'reseau'], [
-                      '[[foxcat:energy.grid_import]]'
-                    ]),
-                    gridNet: findFox('sensor', ['puissance', 'nette', 'reseau'], [
-                      '[[foxcat:energy.grid_power]]'
-                    ]),
+                    pv: findFox('sensor', ['puissance', 'production', 'photovoltaique'], ['[[foxcat:energy.pv_power]]']),
+                    house: findFox('sensor', ['puissance', 'consommation', 'maison'], ['[[foxcat:energy.house_power]]']),
+                    export: findFox('sensor', ['puissance', 'reinjectee', 'reseau'], ['[[foxcat:energy.grid_export]]']),
+                    import: findFox('sensor', ['puissance', 'prelevee', 'reseau'], ['[[foxcat:energy.grid_import]]']),
+                    gridNet: findFox('sensor', ['puissance', 'nette', 'reseau'], ['[[foxcat:energy.grid_power]]']),
 
                     priLevel: findFox('sensor', ['niveau', 'puissance', 'pri', 'actuel']),
                     priTarget: findFox('sensor', ['niveau', 'puissance', 'pri', 'cible']),
@@ -632,13 +402,18 @@ views:
                     solarEnd: findFox('sensor', ['fin', 'fenetre', 'solaire']),
                     solarReason: findFox('sensor', ['raison', 'prevision', 'solaire']),
 
-                    buyPrice: findFox('sensor', ['prix', 'achat', 'actif']),
-                    tariffPeriod: findFox('sensor', ['periode', 'tarifaire']),
-                    priceStatus: findFox('sensor', ['statut', 'prix'])
+                    buyPrice: findFox('sensor', ['prix', 'achat', 'actif'], ['sensor.foxcat_energy_tarification_prix_d_achat_actif']),
+                    tariffPeriod: findFox('sensor', ['periode', 'tarifaire'], ['sensor.foxcat_energy_tarification_periode_tarifaire']),
+                    priceStatus: findFox('sensor', ['statut', 'prix'], ['sensor.foxcat_energy_tarification_statut_du_prix']),
+                    
+                    // Nouveaux capteurs financiers & économiques intégrés
+                    netCostToday: findFox('sensor', ['maison', 'cout', 'net', 'aujourdhui'], ['sensor.foxcat_energy_tarification_maison_cout_net_aujourdhui']),
+                    economicDecision: findFox('sensor', ['decision', 'economique', 'ems'], ['sensor.foxcat_energy_tarification_decision_economique_ems']),
+                    bestSlot: findFox('sensor', ['meilleur', 'creneau', 'economique'], ['sensor.foxcat_energy_tarification_meilleur_creneau_economique'])
                   };
 
                   /* ==========================================================
-                     VALEURS INSTANTANÉES
+                     VALEURS INSTANTANÉES ET BILANS
                      ========================================================== */
 
                   const pv = Math.max(numberOf(E.pv, numberOf('[[foxcat:sources.pv]]', 0)), 0);
@@ -658,10 +433,8 @@ views:
                   const priAckGrid = stateOf(E.priAckGrid, '—');
                   const priReason = stateOf(E.priReason, 'Aucune décision PRI disponible.');
 
-                  const boilerTemp = numberOf(E.boilerTemp,
-                    numberOf('[[foxcat:boiler.temperature_source]]', 0));
-                  const boilerPower = Math.max(numberOf(E.boilerPower,
-                    numberOf('[[foxcat:boiler.power_source]]', 0)), 0);
+                  const boilerTemp = numberOf(E.boilerTemp, numberOf('[[foxcat:boiler.temperature_source]]', 0));
+                  const boilerPower = Math.max(numberOf(E.boilerPower, numberOf('[[foxcat:boiler.power_source]]', 0)), 0);
                   const boilerRunning = E.boilerPhysical ? isOn(E.boilerPhysical) : boilerPower > 200;
                   const boilerDemand = stateOf(E.boilerDemand, 'AUCUNE');
                   const boilerOrigin = stateOf(E.boilerOrigin, 'AUCUNE');
@@ -683,25 +456,23 @@ views:
                   const lastDecision = stateOf(E.lastDecision, 'Aucune décision EMS disponible.');
 
                   /* ==========================================================
-                     TARIF NATIF FOXCAT
+                     TARIF ET FINANCIER NATIF FOXCAT
                      ========================================================== */
 
-                  const buyPrice = numberOf(E.buyPrice,
-                    numberOf('[[foxcat:pricing.active_buy]]', 0));
+                  const buyPrice = numberOf(E.buyPrice, numberOf('[[foxcat:pricing.active_buy]]', 0));
                   const tariffPeriod = stateOf(E.tariffPeriod, '—');
                   const priceStatus = stateOf(E.priceStatus, '—');
-
-                  /* ==========================================================
-                     BILAN JOURNALIER — comptabilité native FoxCat
-                     ========================================================== */
 
                   const productionToday = Math.max(numberOf('[[foxcat:energy.today.pv]]', 0), 0);
                   const consumptionToday = Math.max(numberOf('[[foxcat:energy.today.house]]', 0), 0);
                   const injectionToday = Math.max(numberOf('[[foxcat:energy.today.export]]', 0), 0);
                   const selfConsumed = Math.max(numberOf('[[foxcat:energy.today.self_consumed]]', 0), 0);
                   const selfConsumption = clamp(numberOf('[[foxcat:energy.today.self_consumption_pct]]', 0), 0, 100);
-                  const gridEnergyToday = Math.max(numberOf('[[foxcat:energy.today.import]]', 0), 0);
-                  const dailyCost = Math.max(numberOf('[[foxcat:pricing.cost_today]]', 0), 0);
+                  
+                  // Utilisation du coût net intelligent (inclut import + export + réinjection selon les sources V1.6.158+)[cite: 42, 46]
+                  const netCostToday = numberOf(E.netCostToday, numberOf('[[foxcat:pricing.cost_today]]', 0));
+                  const ecoDecisionText = stateOf(E.economicDecision, '—');
+                  const bestSlotText = stateOf(E.bestSlot, 'Maintenant');
 
                   /* ==========================================================
                      COULEURS / ÉTATS
@@ -746,7 +517,7 @@ views:
                   const systemColor = regulationActive && dataValid ? '#34d399' : '#fb7185';
 
                   /* ==========================================================
-                     RENDU
+                     RENDU HTML DE LA CARTE
                      ========================================================== */
 
                   return `
@@ -842,12 +613,12 @@ views:
 
                       <div class="decision-grid">
                         <div class="decision-card">
-                          <div class="decision-title">⚡ DERNIÈRE DÉCISION EMS</div>
-                          <div class="decision-text">${lastDecision}</div>
+                          <div class="decision-title">⚡ DÉCISION ÉCONOMIQUE EMS</div>
+                          <div class="decision-text">${ecoDecisionText}</div>
                         </div>
                         <div class="decision-card">
-                          <div class="decision-title">⚙️ DERNIÈRE DÉCISION ONDULEUR</div>
-                          <div class="decision-text">${priReason}</div>
+                          <div class="decision-title">🕒 MEILLEUR CRÉNEAU / TENDANCE</div>
+                          <div class="decision-text">${bestSlotText}</div>
                         </div>
                       </div>
 
@@ -858,19 +629,19 @@ views:
                       </div>
 
                       <div class="today">
-                        <div class="section-head"><div>AUJOURD’HUI</div><div class="section-muted">bilan énergétique</div></div>
+                        <div class="section-head"><div>AUJOURD’HUI</div><div class="section-muted">bilan énergétique & financier</div></div>
                         <div class="today-grid">
                           <div class="today-item"><span>☀️</span><b>${fmtKwh(productionToday)}</b><small>Production</small></div>
                           <div class="today-item"><span>🏠</span><b>${fmtKwh(consumptionToday)}</b><small>Consommation</small></div>
                           <div class="today-item"><span>↗️</span><b>${fmtKwh(injectionToday)}</b><small>Injection</small></div>
                           <div class="today-item"><span>♻️</span><b>${fmtPct(selfConsumption)}</b><small>Autoconsommation</small></div>
-                          <div class="today-item"><span>💶</span><b>${fmtEuro(dailyCost)}</b><small>Coût estimé</small></div>
+                          <div class="today-item"><span>💶</span><b>${fmtEuro(netCostToday)}</b><small>Coût net jour</small></div>
                         </div>
                       </div>
 
                       <div class="footer">
                         <span>FOXCAT ENERGY V1.3.200</span>
-                        <span>Données natives FoxCat · temps réel</span>
+                        <span>Comptabilité Signée & Pilotage Temps Réel</span>
                       </div>
                     </div>
                   `;
@@ -1456,7 +1227,10 @@ views:
                     - height: 150px
                     - border-radius: 26px
                     - padding: 20px
-                    - background: radial-gradient(circle at 100% 0%,rgba(34,211,238,.18),transparent 46%),linear-gradient(145deg,#070b14,#101827 55%,#080d16)
+                    - background: >-
+                        radial-gradient(circle at 100%
+                        0%,rgba(34,211,238,.18),transparent
+                        46%),linear-gradient(145deg,#070b14,#101827 55%,#080d16)
                     - border: 1px solid rgba(34,211,238,.20)
                   grid:
                     - grid-template-areas: '"i" "n" "l"'
@@ -10643,7 +10417,7 @@ views:
             cards:
               - type: markdown
                 title: ⚡ Onduleur SolarEdge
-                content: >
+                content: |
                   {% set code =
                     ('1' if is_state('[[foxcat:inverter.rrcr_l4]]','on') else '0')
                     ~
@@ -10653,7 +10427,6 @@ views:
                     ~
                     ('1' if is_state('[[foxcat:inverter.rrcr_l1]]','on') else '0')
                   %}
-
                   {% set table = {
                     '0000': 100,
                     '0001': 10,
@@ -10667,45 +10440,41 @@ views:
                     '1001': 90,
                     '1010': 0
                   } %}
-
                   {% set niveau = table.get(code, -1) %}
-
                   {% if niveau >= 0 %}
-
                   ## {{ niveau }} %
-
                   **Puissance onduleur maximale : {{ niveau * 40 }} W**
-
                   {% else %}
-
                   ## ⚠️ État onduleur inconnu
-
                   {% endif %}
-
                   Onduleur : **4000 W**
-
-                  Mode EMS : **{{ states('[[foxcat:ems.mode]]')
-                  }}**
+                  Mode EMS : **{{ states('[[foxcat:ems.mode]]') }}**
               - type: entities
                 title: État de la régulation
                 show_header_toggle: false
                 entities:
-                  - entity: [[foxcat:ems.mode]]
+                  - entity:
+                      - - foxcat:ems.mode
                     name: Mode EMS
                     icon: mdi:cog
-                  - entity: [[foxcat:legacy.sensor_consommation_reelle_maison]]
+                  - entity:
+                      - - foxcat:legacy.sensor_consommation_reelle_maison
                     name: Consommation maison
                     icon: mdi:home-lightning-bolt
-                  - entity: [[foxcat:legacy.sensor_retourne_au_reseau]]
+                  - entity:
+                      - - foxcat:legacy.sensor_retourne_au_reseau
                     name: Flux réseau
                     icon: mdi:transmission-tower
-                  - entity: >-
-                      [[foxcat:inverter.enabled]]
-                  - entity: [[foxcat:sources.pv]]
-                  - entity: [[foxcat:inverter.reason]]
+                  - entity: '[[foxcat:inverter.enabled]]'
+                  - entity:
+                      - - foxcat:sources.pv
+                  - entity:
+                      - - foxcat:inverter.reason
               - type: markdown
                 content: >
-                  {% if is_state('[[foxcat:legacy.input_select_ems_mode]]','Manuel') %}
+                  {% if
+                  is_state('[[foxcat:legacy.input_select_ems_mode]]','Manuel')
+                  %}
 
                   ✅ **Commande onduleur manuelle autorisée**
 
@@ -10852,10 +10621,14 @@ views:
                   **0000 = état libéré = 100 %**
               - type: glance
                 entities:
-                  - entity: [[foxcat:inverter.rrcr_l4]]
-                  - entity: [[foxcat:inverter.rrcr_l3]]
-                  - entity: [[foxcat:inverter.rrcr_l2]]
-                  - entity: [[foxcat:inverter.rrcr_l1]]
+                  - entity:
+                      - - foxcat:inverter.rrcr_l4
+                  - entity:
+                      - - foxcat:inverter.rrcr_l3
+                  - entity:
+                      - - foxcat:inverter.rrcr_l2
+                  - entity:
+                      - - foxcat:inverter.rrcr_l1
     subview: true
     cards: []
     background:
@@ -10927,8 +10700,15 @@ views:
                   custom_fields:
                     content:
                       - width: 100%
-                extra_styles: |
-                  .fcb{width:100%}.fcb-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.fcb-title{font-size:24px;font-weight:900;letter-spacing:1px}.fcb-sub{font-size:11px;opacity:.45;margin-top:4px}.fcb-run{padding:8px 12px;border-radius:18px;font-size:11px;font-weight:900}.fcb-run.on{background:rgba(251,146,60,.14);color:#fb923c}.fcb-run.off{background:rgba(148,163,184,.08);color:#94a3b8}.fcb-sync,.fcb-grid,.fcb-dyn-grid{display:grid;gap:10px}.fcb-sync{grid-template-columns:repeat(3,1fr);margin-top:18px}.fcb-sync>div,.cell,.fcb-dyn-grid>div{padding:12px;border-radius:15px;text-align:center;background:rgba(255,255,255,.04)}.fcb-sync span,.cell span,.fcb-dyn-grid span{display:block;font-size:9px;opacity:.45;letter-spacing:.06em}.fcb-sync b,.cell b,.fcb-dyn-grid b{display:block;margin-top:5px;font-size:14px}.fcb-grid{grid-template-columns:repeat(3,1fr);margin-top:10px}.fcb-dynamic{margin-top:12px;padding:16px;border-radius:18px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}.fcb-dynamic.active{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.22)}.fcb-dyn-title{font-size:11px;font-weight:900;letter-spacing:.12em}.fcb-dyn-grid{grid-template-columns:repeat(4,1fr);margin-top:10px}.fcb-decision{margin-top:14px;text-align:center;font-size:15px;font-weight:900}.fcb-note{text-align:center;font-size:10px;opacity:.48;margin-top:6px}@media(max-width:700px){.fcb-grid{grid-template-columns:repeat(2,1fr)}.fcb-dyn-grid{grid-template-columns:repeat(2,1fr)}.fcb-sync{grid-template-columns:1fr}}
+                extra_styles: >
+                  .fcb{width:100%}.fcb-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.fcb-title{font-size:24px;font-weight:900;letter-spacing:1px}.fcb-sub{font-size:11px;opacity:.45;margin-top:4px}.fcb-run{padding:8px
+                  12px;border-radius:18px;font-size:11px;font-weight:900}.fcb-run.on{background:rgba(251,146,60,.14);color:#fb923c}.fcb-run.off{background:rgba(148,163,184,.08);color:#94a3b8}.fcb-sync,.fcb-grid,.fcb-dyn-grid{display:grid;gap:10px}.fcb-sync{grid-template-columns:repeat(3,1fr);margin-top:18px}.fcb-sync>div,.cell,.fcb-dyn-grid>div{padding:12px;border-radius:15px;text-align:center;background:rgba(255,255,255,.04)}.fcb-sync
+                  span,.cell span,.fcb-dyn-grid
+                  span{display:block;font-size:9px;opacity:.45;letter-spacing:.06em}.fcb-sync
+                  b,.cell b,.fcb-dyn-grid
+                  b{display:block;margin-top:5px;font-size:14px}.fcb-grid{grid-template-columns:repeat(3,1fr);margin-top:10px}.fcb-dynamic{margin-top:12px;padding:16px;border-radius:18px;background:rgba(255,255,255,.025);border:1px
+                  solid
+                  rgba(255,255,255,.05)}.fcb-dynamic.active{background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.22)}.fcb-dyn-title{font-size:11px;font-weight:900;letter-spacing:.12em}.fcb-dyn-grid{grid-template-columns:repeat(4,1fr);margin-top:10px}.fcb-decision{margin-top:14px;text-align:center;font-size:15px;font-weight:900}.fcb-note{text-align:center;font-size:10px;opacity:.48;margin-top:6px}@media(max-width:700px){.fcb-grid{grid-template-columns:repeat(2,1fr)}.fcb-dyn-grid{grid-template-columns:repeat(2,1fr)}.fcb-sync{grid-template-columns:1fr}}
               - type: grid
                 columns: 3
                 square: false
@@ -11025,6 +10805,8 @@ views:
                     stroke_width: 2
                     opacity: 0.14
     cards: []
+    theme: ios-dark-mode-blue-red
+    subview: true
   - type: sections
     max_columns: 4
     title: Appareils
@@ -11211,7 +10993,8 @@ views:
                 square: false
                 cards:
                   - type: custom:button-card
-                    entity: [[foxcat:legacy.switch_boiler_prise_1]]
+                    entity:
+                      - - foxcat:legacy.switch_boiler_prise_1
                     show_name: false
                     show_icon: false
                     show_state: false
@@ -11633,7 +11416,8 @@ views:
                         opacity:.45;
                       }
                   - type: custom:button-card
-                    entity: [[foxcat:machines.washer.switch]]
+                    entity:
+                      - - foxcat:machines.washer.switch
                     show_name: false
                     show_icon: false
                     show_state: false
@@ -12058,7 +11842,8 @@ views:
                         opacity:.45;
                       }
                   - type: custom:button-card
-                    entity: [[foxcat:machines.dryer.switch]]
+                    entity:
+                      - - foxcat:machines.dryer.switch
                     show_name: false
                     show_icon: false
                     show_state: false
@@ -12520,7 +12305,8 @@ views:
                         opacity:.45;
                       }
                   - type: custom:button-card
-                    entity: [[foxcat:machines.dishwasher.switch]]
+                    entity:
+                      - - foxcat:machines.dishwasher.switch
                     show_name: false
                     show_icon: false
                     show_state: false
@@ -13821,7 +13607,8 @@ views:
             cards:
               - type: custom:modern-circular-gauge
                 name: ⚡ Conso Instantanée
-                entity: [[foxcat:sources.grid_signed]]
+                entity:
+                  - - foxcat:sources.grid_signed
                 max: 10000
                 start_from_zero: true
                 show_state: true
@@ -13835,14 +13622,16 @@ views:
                   stroke: '#f44336'
                   stroke-width: 10
                 secondary:
-                  entity: [[foxcat:energy.today.import]]
+                  entity:
+                    - - foxcat:energy.today.import
                   start_from_zero: true
                   gauge_foreground_style:
                     stroke: '#ff9800'
                     stroke-width: 6
                   adaptive_state_color: true
                 tertiary:
-                  entity: [[foxcat:energy.house_power]]
+                  entity:
+                    - - foxcat:energy.house_power
                   show_gauge: inner
                   min: '0'
                   max: 10000
@@ -13862,7 +13651,8 @@ views:
                 gauge_type: standard
               - type: custom:modern-circular-gauge
                 name: ☀️ Production Solaire
-                entity: [[foxcat:sources.pv]]
+                entity:
+                  - - foxcat:sources.pv
                 start_from_zero: true
                 show_state: true
                 show_unit: true
@@ -13875,10 +13665,12 @@ views:
                   stroke: '#ffc107'
                   stroke-width: 10
                 secondary:
-                  entity: [[foxcat:energy.today.pv]]
+                  entity:
+                    - - foxcat:energy.today.pv
                   adaptive_state_color: true
                 tertiary:
-                  entity: [[foxcat:energy.today.self_consumption_pct]]
+                  entity:
+                    - - foxcat:energy.today.self_consumption_pct
                   show_gauge: inner
                   adaptive_state_color: true
                 adaptive_state_color: true
@@ -13887,7 +13679,8 @@ views:
                 max: 4000
               - type: custom:modern-circular-gauge
                 name: 🔁 Injection
-                entity: [[foxcat:energy.grid_export]]
+                entity:
+                  - - foxcat:energy.grid_export
                 max: 4000
                 start_from_zero: true
                 show_state: true
@@ -13901,7 +13694,8 @@ views:
                   stroke: '#03a9f4'
                   stroke-width: 10
                 secondary:
-                  entity: [[foxcat:energy.today.export]]
+                  entity:
+                    - - foxcat:energy.today.export
                   state_size: small
                   show_gauge: inner
                   adaptive_state_color: true
@@ -13909,7 +13703,8 @@ views:
                 adaptive_state_color: true
               - type: custom:modern-circular-gauge
                 name: 🔥 Puissance Boiler
-                entity: [[foxcat:boiler.power_source]]
+                entity:
+                  - - foxcat:boiler.power_source
                 max: 3000
                 start_from_zero: true
                 show_state: true
@@ -13927,7 +13722,8 @@ views:
                 adaptive_state_color: true
               - type: custom:modern-circular-gauge
                 name: 💰 Prix actuel (€/kWh)
-                entity: [[foxcat:pricing.active_buy]]
+                entity:
+                  - - foxcat:pricing.active_buy
                 max: 0.5
                 start_from_zero: true
                 show_state: true
@@ -13945,7 +13741,8 @@ views:
                       return prix < seuil ? "#4caf50" : "#f44336";
                     ]]]
                 secondary:
-                  entity: [[foxcat:legacy.input_number_seuil_energie_prix_kwh]]
+                  entity:
+                    - - foxcat:legacy.input_number_seuil_energie_prix_kwh
                   show_gauge: inner
                   start_from_zero: false
                   min: 0
@@ -13956,11 +13753,13 @@ views:
                   show_in_graph: false
                   show_state: true
                 tertiary:
-                  entity: [[foxcat:legacy.sensor_prix_electricite_client_aiesh_tvac]]
+                  entity:
+                    - - foxcat:legacy.sensor_prix_electricite_client_aiesh_tvac
                 adaptive_state_color: true
                 min: 0
               - type: custom:modern-circular-gauge
-                entity: [[foxcat:legacy.sensor_homefoxcat_load_autre]]
+                entity:
+                  - - foxcat:legacy.sensor_homefoxcat_load_autre
                 secondary: {}
                 tertiary: {}
                 start_from_zero: true
@@ -13985,15 +13784,21 @@ views:
             type: glance
             entities:
               - entity: automation.ems_pri_boiler_v5_6_climate_sonde_hc_normale
-              - entity: [[foxcat:inverter.level_current]]
+              - entity:
+                  - - foxcat:inverter.level_current
                 show_last_changed: false
-              - entity: [[foxcat:legacy.climate_chauffage_sol_2]]
-              - entity: [[foxcat:legacy.switch_boiler_prise_1]]
+              - entity:
+                  - - foxcat:legacy.climate_chauffage_sol_2
+              - entity:
+                  - - foxcat:legacy.switch_boiler_prise_1
                 icon: mdi:water-boiler
                 name: Chauffe-Eau
-              - entity: [[foxcat:machines.dryer.switch]]
-              - entity: [[foxcat:machines.washer.switch]]
-              - entity: [[foxcat:machines.dishwasher.switch]]
+              - entity:
+                  - - foxcat:machines.dryer.switch
+              - entity:
+                  - - foxcat:machines.washer.switch
+              - entity:
+                  - - foxcat:machines.dishwasher.switch
             theme: ios-dark-mode-blue-red
             state_color: true
             title: 🕹️ Commande
@@ -14003,28 +13808,38 @@ views:
             show_state: true
             type: glance
             entities:
-              - entity: [[foxcat:boiler.binary_source]]
+              - entity:
+                  - - foxcat:boiler.binary_source
                 icon: mdi:water-boiler
                 show_last_changed: false
-              - entity: [[foxcat:legacy.binary_sensor_seche_linge]]
-              - entity: [[foxcat:legacy.binary_sensor_lave_linge]]
-              - entity: [[foxcat:legacy.binary_sensor_lave_vaisselle]]
+              - entity:
+                  - - foxcat:legacy.binary_sensor_seche_linge
+              - entity:
+                  - - foxcat:legacy.binary_sensor_lave_linge
+              - entity:
+                  - - foxcat:legacy.binary_sensor_lave_vaisselle
             theme: ios-dark-mode-blue-red
             state_color: true
             columns: 4
             title: '🚨 Status '
           - type: tile
-            entity: [[foxcat:inverter.level_current]]
+            entity:
+              - - foxcat:inverter.level_current
           - show_name: true
             show_icon: true
             show_state: true
             type: glance
             entities:
-              - entity: [[foxcat:inverter.rrcr_l1]]
-              - entity: [[foxcat:inverter.rrcr_l2]]
-              - entity: [[foxcat:inverter.rrcr_l3]]
-              - entity: [[foxcat:inverter.rrcr_l4]]
-              - entity: [[foxcat:legacy.input_boolean_emi_active]]
+              - entity:
+                  - - foxcat:inverter.rrcr_l1
+              - entity:
+                  - - foxcat:inverter.rrcr_l2
+              - entity:
+                  - - foxcat:inverter.rrcr_l3
+              - entity:
+                  - - foxcat:inverter.rrcr_l4
+              - entity:
+                  - - foxcat:legacy.input_boolean_emi_active
             theme: ios-dark-mode-blue-red
             state_color: true
             columns: 4
@@ -15440,7 +15255,8 @@ views:
           - type: custom:bubble-card
             card_type: button
             button_type: switch
-            entity: [[foxcat:legacy.input_boolean_ems_head_menu]]
+            entity:
+              - - foxcat:legacy.input_boolean_ems_head_menu
             name: Menu
             icon: mdi:menu
             show_state: false
@@ -15498,7 +15314,8 @@ views:
           - type: custom:bubble-card
             card_type: button
             button_type: switch
-            entity: [[foxcat:legacy.input_boolean_ems_head_lateral]]
+            entity:
+              - - foxcat:legacy.input_boolean_ems_head_lateral
             name: Barre latérale
             icon: mdi:dock-left
             show_state: false
@@ -18445,28 +18262,32 @@ views:
             heading_style: title
             icon: mdi:home-lightning-bolt-outline
           - type: tile
-            entity: [[foxcat:legacy.input_select_ems_mode]]
+            entity:
+              - - foxcat:legacy.input_select_ems_mode
             name: Mode EMS
             icon: mdi:tune-variant
             color: purple
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.input_select_ems_regulation_phase]]
+            entity:
+              - - foxcat:legacy.input_select_ems_regulation_phase
             name: Phase du moteur
             icon: mdi:state-machine
             color: blue
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.input_select_ems_ack_status]]
+            entity:
+              - - foxcat:legacy.input_select_ems_ack_status
             name: Validation ACK
             icon: mdi:check-decagram-outline
             color: green
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.input_boolean_ems_regulation_ack]]
+            entity:
+              - - foxcat:legacy.input_boolean_ems_regulation_ack
             name: Régulation autorisée
             icon: mdi:shield-check-outline
             color: green
@@ -18483,33 +18304,41 @@ views:
             title: État du moteur
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:ems.phase]]
+              - entity:
+                  - - foxcat:ems.phase
                 name: Phase actuelle
                 icon: mdi:state-machine
-              - entity: [[foxcat:ems.pending_action]]
+              - entity:
+                  - - foxcat:ems.pending_action
                 name: Action en attente
                 icon: mdi:lightning-bolt
-              - entity: [[foxcat:ems.ack]]
+              - entity:
+                  - - foxcat:ems.ack
                 name: État de validation
                 icon: mdi:check-decagram
-              - entity: [[foxcat:ems.regulation_active]]
+              - entity:
+                  - - foxcat:ems.regulation_active
                 name: Autorisation de régulation
                 icon: mdi:shield-check
           - type: entities
             title: Dernière décision
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.input_text_ems_last_reason]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_last_reason
                 name: Raisonnement EMS
                 icon: mdi:brain
-              - entity: [[foxcat:legacy.input_text_ems_boiler_origine]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_boiler_origine
                 name: Origine de la décision Boiler
                 icon: mdi:source-branch
-              - entity: [[foxcat:legacy.input_select_ems_boiler_demande]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_boiler_demande
                 name: Demande Boiler
                 icon: mdi:water-boiler
           - type: custom:mushroom-template-card
-            entity: [[foxcat:legacy.input_text_ems_last_reason]]
+            entity:
+              - - foxcat:legacy.input_text_ems_last_reason
             primary: |
               {{ states('[[foxcat:legacy.input_text_ems_pending_action]]') }}
             secondary: |
@@ -18527,7 +18356,8 @@ views:
             heading_style: title
             icon: mdi:check-decagram-outline
           - type: tile
-            entity: [[foxcat:legacy.input_select_ems_ack_status]]
+            entity:
+              - - foxcat:legacy.input_select_ems_ack_status
             name: Résultat de la validation
             icon: mdi:check-circle-outline
             color: green
@@ -18537,29 +18367,36 @@ views:
             title: Séquence de validation
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.input_number_ems_grid_t0]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_grid_t0
                 name: 1 · Mesure de référence T0
                 icon: mdi:numeric-1-circle-outline
-              - entity: [[foxcat:legacy.input_number_ems_action_reference_grid]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_action_reference_grid
                 name: 2 · Réseau avant action
                 icon: mdi:numeric-2-circle-outline
-              - entity: [[foxcat:legacy.input_number_ems_grid_expected]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_grid_expected
                 name: 3 · Réseau attendu
                 icon: mdi:numeric-3-circle-outline
-              - entity: [[foxcat:legacy.input_number_ems_ack_error]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_ack_error
                 name: 4 · Erreur constatée
                 icon: mdi:numeric-4-circle-outline
           - type: entities
             title: Tolérances
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.input_number_ems_pending_delta]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_pending_delta
                 name: Variation énergétique prévue
                 icon: mdi:delta
-              - entity: [[foxcat:legacy.input_number_ems_ack_tolerance]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_ack_tolerance
                 name: Tolérance de validation
                 icon: mdi:plus-minus-variant
-              - entity: [[foxcat:legacy.input_number_ems_stability_tolerance]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_stability_tolerance
                 name: Tolérance de stabilité
                 icon: mdi:chart-bell-curve-cumulative
       - type: grid
@@ -18573,40 +18410,49 @@ views:
             show_header_toggle: false
             state_color: true
             entities:
-              - entity: [[foxcat:legacy.input_select_ems_boiler_demande]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_boiler_demande
                 name: 1 · Demande stratégique
                 icon: mdi:message-arrow-right-outline
-              - entity: [[foxcat:legacy.input_text_ems_pending_action]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_pending_action
                 name: 2 · Ordre du CORE
                 icon: mdi:lightning-bolt-outline
-              - entity: [[foxcat:boiler.climate]]
+              - entity:
+                  - - foxcat:boiler.climate
                 name: 3 · Commande Climate
                 icon: mdi:thermostat
-              - entity: [[foxcat:legacy.switch_boiler_prise_1]]
+              - entity:
+                  - - foxcat:legacy.switch_boiler_prise_1
                 name: 4 · Alimentation Boiler
                 icon: mdi:power-socket-eu
-              - entity: [[foxcat:boiler.binary_source]]
+              - entity:
+                  - - foxcat:boiler.binary_source
                 name: 5 · État physique Boiler
                 icon: mdi:water-boiler
-              - entity: [[foxcat:boiler.power_source]]
+              - entity:
+                  - - foxcat:boiler.power_source
                 name: 6 · Puissance réellement mesurée
                 icon: mdi:flash
           - type: tile
-            entity: [[foxcat:legacy.switch_boiler_prise_1]]
+            entity:
+              - - foxcat:legacy.switch_boiler_prise_1
             name: Prise Boiler
             icon: mdi:power-socket-eu
             color: orange
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:boiler.binary_source]]
+            entity:
+              - - foxcat:boiler.binary_source
             name: Chauffe réelle
             icon: mdi:fire
             color: orange
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:boiler.power_source]]
+            entity:
+              - - foxcat:boiler.power_source
             name: Puissance Boiler
             icon: mdi:flash
             color: orange
@@ -18619,28 +18465,32 @@ views:
             heading_style: title
             icon: mdi:transmission-tower
           - type: tile
-            entity: [[foxcat:sources.pv]]
+            entity:
+              - - foxcat:sources.pv
             name: Production photovoltaïque
             icon: mdi:solar-power
             color: amber
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.sensor_consommation_reelle_maison]]
+            entity:
+              - - foxcat:legacy.sensor_consommation_reelle_maison
             name: Consommation maison
             icon: mdi:home-lightning-bolt
             color: blue
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:sources.grid_fallback]]
+            entity:
+              - - foxcat:sources.grid_fallback
             name: Réinjection réseau
             icon: mdi:transmission-tower-export
             color: green
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:sources.grid_signed]]
+            entity:
+              - - foxcat:sources.grid_signed
             name: Prélèvement réseau
             icon: mdi:transmission-tower-import
             color: orange
@@ -18656,33 +18506,39 @@ views:
             title: Flux réseau
             hours_to_show: 3
             entities:
-              - entity: [[foxcat:sources.grid_fallback]]
+              - entity:
+                  - - foxcat:sources.grid_fallback
                 name: Réinjection
-              - entity: [[foxcat:sources.grid_signed]]
+              - entity:
+                  - - foxcat:sources.grid_signed
                 name: Prélèvement
           - type: tile
-            entity: [[foxcat:boiler.temperature_source]]
+            entity:
+              - - foxcat:boiler.temperature_source
             name: Température basse
             icon: mdi:thermometer-water
             color: orange
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature]]
+            entity:
+              - - foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature
             name: Température isolant
             icon: mdi:thermometer
             color: blue
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne]]
+            entity:
+              - - foxcat:legacy.sensor_temperature_boiler_2sondes_moyenne
             name: Température FoxCat estimée
             icon: mdi:thermometer-lines
             color: green
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:boiler.power_source]]
+            entity:
+              - - foxcat:boiler.power_source
             name: Puissance de chauffe
             icon: mdi:flash
             color: orange
@@ -18693,33 +18549,42 @@ views:
             show_header_toggle: false
             state_color: true
             entities:
-              - entity: [[foxcat:legacy.input_select_ems_boiler_demande]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_boiler_demande
                 name: Demande FoxCat
                 icon: mdi:message-processing-outline
-              - entity: [[foxcat:legacy.input_text_ems_boiler_origine]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_boiler_origine
                 name: Origine
                 icon: mdi:source-branch
-              - entity: [[foxcat:boiler.climate]]
+              - entity:
+                  - - foxcat:boiler.climate
                 name: Régulateur
                 icon: mdi:thermostat
-              - entity: [[foxcat:legacy.switch_boiler_prise_1]]
+              - entity:
+                  - - foxcat:legacy.switch_boiler_prise_1
                 name: Prise
                 icon: mdi:power-socket-eu
-              - entity: [[foxcat:boiler.binary_source]]
+              - entity:
+                  - - foxcat:boiler.binary_source
                 name: Chauffe physique
                 icon: mdi:fire
-              - entity: [[foxcat:boiler.power_source]]
+              - entity:
+                  - - foxcat:boiler.power_source
                 name: Puissance physique
                 icon: mdi:flash
           - type: history-graph
             title: Températures Boiler
             hours_to_show: 12
             entities:
-              - entity: [[foxcat:boiler.temperature_source]]
+              - entity:
+                  - - foxcat:boiler.temperature_source
                 name: Sonde basse
-              - entity: [[foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature]]
+              - entity:
+                  - - foxcat:legacy.sensor_t_h_sensor_with_external_probe_probe_temperature
                 name: Sonde isolant
-              - entity: [[foxcat:boiler.temperature]]
+              - entity:
+                  - - foxcat:boiler.temperature
                 name: Température FoxCat
       - type: grid
         cards:
@@ -18728,21 +18593,24 @@ views:
             heading_style: title
             icon: mdi:washing-machine
           - type: tile
-            entity: [[foxcat:machines.washer.cycle]]
+            entity:
+              - - foxcat:machines.washer.cycle
             name: Lave-linge
             icon: mdi:washing-machine
             color: green
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:machines.dryer.cycle]]
+            entity:
+              - - foxcat:machines.dryer.cycle
             name: Sèche-linge
             icon: mdi:tumble-dryer
             color: green
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:machines.dishwasher.switch]]
+            entity:
+              - - foxcat:machines.dishwasher.switch
             name: Lave-vaisselle
             icon: mdi:dishwasher
             color: green
@@ -18753,13 +18621,16 @@ views:
             show_header_toggle: false
             state_color: true
             entities:
-              - entity: [[foxcat:legacy.input_boolean_ems_lave_linge]]
+              - entity:
+                  - - foxcat:legacy.input_boolean_ems_lave_linge
                 name: Gestion EMS lave-linge
                 icon: mdi:washing-machine
-              - entity: [[foxcat:legacy.input_boolean_ems_seche_linge]]
+              - entity:
+                  - - foxcat:legacy.input_boolean_ems_seche_linge
                 name: Gestion EMS sèche-linge
                 icon: mdi:tumble-dryer
-              - entity: [[foxcat:legacy.input_boolean_ems_lave_vaisselle]]
+              - entity:
+                  - - foxcat:legacy.input_boolean_ems_lave_vaisselle
                 name: Gestion EMS lave-vaisselle
                 icon: mdi:dishwasher
       - type: grid
@@ -18772,7 +18643,7 @@ views:
             cards:
               - type: markdown
                 title: ⚡ Onduleur SolarEdge
-                content: |
+                content: >
                   {% set code =
                     ('1' if is_state('[[foxcat:inverter.rrcr_l4]]','on') else '0')
                     ~
@@ -18782,6 +18653,7 @@ views:
                     ~
                     ('1' if is_state('[[foxcat:inverter.rrcr_l1]]','on') else '0')
                   %}
+
                   {% set table = {
                     '0000': 100,
                     '0001': 10,
@@ -18795,31 +18667,46 @@ views:
                     '1001': 90,
                     '1010': 0
                   } %}
+
                   {% set niveau = table.get(code, -1) %}
+
                   {% if niveau >= 0 %}
+
                   ## {{ niveau }} %
+
                   **Puissance onduleur maximale : {{ niveau * 40 }} W**
+
                   {% else %}
+
                   ## ⚠️ État onduleur inconnu
+
                   {% endif %}
+
                   Onduleur : **4000 W**
-                  Mode EMS : **{{ states('[[foxcat:legacy.input_select_ems_mode]]') }}**
+
+                  Mode EMS : **{{
+                  states('[[foxcat:legacy.input_select_ems_mode]]') }}**
               - type: entities
                 title: État de la régulation
                 show_header_toggle: false
                 entities:
-                  - entity: [[foxcat:legacy.input_select_ems_mode]]
+                  - entity:
+                      - - foxcat:legacy.input_select_ems_mode
                     name: Mode EMS
                     icon: mdi:cog
-                  - entity: [[foxcat:legacy.sensor_consommation_reelle_maison]]
+                  - entity:
+                      - - foxcat:legacy.sensor_consommation_reelle_maison
                     name: Consommation maison
                     icon: mdi:home-lightning-bolt
-                  - entity: [[foxcat:legacy.sensor_retourne_au_reseau]]
+                  - entity:
+                      - - foxcat:legacy.sensor_retourne_au_reseau
                     name: Flux réseau
                     icon: mdi:transmission-tower
               - type: markdown
                 content: >
-                  {% if is_state('[[foxcat:legacy.input_select_ems_mode]]','Manuel') %}
+                  {% if
+                  is_state('[[foxcat:legacy.input_select_ems_mode]]','Manuel')
+                  %}
 
                   ✅ **Commande onduleur manuelle autorisée**
 
@@ -18966,10 +18853,14 @@ views:
                   **0000 = état libéré = 100 %**
               - type: glance
                 entities:
-                  - entity: [[foxcat:inverter.rrcr_l4]]
-                  - entity: [[foxcat:inverter.rrcr_l3]]
-                  - entity: [[foxcat:inverter.rrcr_l2]]
-                  - entity: [[foxcat:inverter.rrcr_l1]]
+                  - entity:
+                      - - foxcat:inverter.rrcr_l4
+                  - entity:
+                      - - foxcat:inverter.rrcr_l3
+                  - entity:
+                      - - foxcat:inverter.rrcr_l2
+                  - entity:
+                      - - foxcat:inverter.rrcr_l1
       - type: grid
         cards:
           - type: heading
@@ -18977,21 +18868,24 @@ views:
             heading_style: title
             icon: mdi:brain
           - type: tile
-            entity: [[foxcat:legacy.input_boolean_ems_prevision_solaire_disponible]]
+            entity:
+              - - foxcat:legacy.input_boolean_ems_prevision_solaire_disponible
             name: Fenêtre solaire disponible
             icon: mdi:weather-sunny
             color: amber
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.input_number_ems_prevision_solaire_confiance]]
+            entity:
+              - - foxcat:legacy.input_number_ems_prevision_solaire_confiance
             name: Confiance
             icon: mdi:percent
             color: green
             vertical: false
             features_position: bottom
           - type: tile
-            entity: [[foxcat:legacy.input_select_ems_prevision_solaire_potentiel]]
+            entity:
+              - - foxcat:legacy.input_select_ems_prevision_solaire_potentiel
             name: Potentiel solaire
             icon: mdi:solar-power
             color: amber
@@ -19001,54 +18895,53 @@ views:
             title: Analyse prédictive
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.input_text_ems_prevision_solaire_debut]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_prevision_solaire_debut
                 name: Début fenêtre
                 icon: mdi:clock-start
-              - entity: [[foxcat:legacy.input_text_ems_prevision_solaire_fin]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_prevision_solaire_fin
                 name: Fin fenêtre
                 icon: mdi:clock-end
-              - entity: [[foxcat:legacy.input_number_ems_prevision_solaire_confiance]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_prevision_solaire_confiance
                 name: Confiance
                 icon: mdi:percent
-              - entity: [[foxcat:legacy.input_select_ems_prevision_solaire_potentiel]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_prevision_solaire_potentiel
                 name: Potentiel
                 icon: mdi:solar-power
-              - entity: [[foxcat:legacy.input_text_ems_prevision_solaire_tendance]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_prevision_solaire_tendance
                 name: Tendance
                 icon: mdi:trending-up
-              - entity: [[foxcat:legacy.input_text_ems_prevision_solaire_raison]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_prevision_solaire_raison
                 name: Justification
                 icon: mdi:brain
           - type: entities
             title: Forecast Solar
             show_header_toggle: false
             entities:
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_production_d_electricite_estimee_maintenant]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_production_d_electricite_estimee_maintenant]]'
                 name: Maintenant
                 icon: mdi:weather-sunny
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_cette_heure]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_cette_heure]]'
                 name: Cette heure
                 icon: mdi:clock-outline
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_heure_suivante]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_heure_suivante]]'
                 name: Heure suivante
                 icon: mdi:clock-plus-outline
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_restante_aujourd_hui]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_restante_aujourd_hui]]'
                 name: Restant aujourd'hui
                 icon: mdi:solar-power-variant-outline
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_aujourd_hui]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_aujourd_hui]]'
                 name: Prévision du jour
                 icon: mdi:calendar-today
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_en_12_heures]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_production_d_energie_estimee_en_12_heures]]'
                 name: Prévision 12 h
                 icon: mdi:hours-12
-              - entity: >-
-                  [[foxcat:legacy.sensor_solar_production_forecast_heure_de_pointe_de_puissance_la_plus_elevee_aujourd_hui]]
+              - entity: '[[foxcat:legacy.sensor_solar_production_forecast_heure_de_pointe_de_puissance_la_plus_elevee_aujourd_hui]]'
                 name: Heure du pic
                 icon: mdi:weather-sunset-up
           - type: horizontal-stack
@@ -19073,24 +18966,31 @@ views:
                 features_position: bottom
           - type: conditional
             conditions:
-              - entity: [[foxcat:legacy.input_boolean_ems_2_afficher_reglages]]
+              - entity:
+                  - - foxcat:legacy.input_boolean_ems_2_afficher_reglages
                 state: 'on'
             card:
               type: entities
               title: Paramètres du moteur prédictif
               show_header_toggle: false
               entities:
-                - entity: [[foxcat:legacy.input_number_ems_solaire_seuil_minimum]]
+                - entity:
+                    - - foxcat:legacy.input_number_ems_solaire_seuil_minimum
                   name: Seuil solaire minimum
-                - entity: [[foxcat:legacy.input_number_ems_solaire_seuil_possible]]
+                - entity:
+                    - - foxcat:legacy.input_number_ems_solaire_seuil_possible
                   name: Fenêtre possible
-                - entity: [[foxcat:legacy.input_number_ems_solaire_seuil_bon]]
+                - entity:
+                    - - foxcat:legacy.input_number_ems_solaire_seuil_bon
                   name: Bonne fenêtre
-                - entity: [[foxcat:legacy.input_number_ems_solaire_seuil_fort]]
+                - entity:
+                    - - foxcat:legacy.input_number_ems_solaire_seuil_fort
                   name: Forte fenêtre
-                - entity: [[foxcat:legacy.input_number_ems_solaire_confiance_minimum]]
+                - entity:
+                    - - foxcat:legacy.input_number_ems_solaire_confiance_minimum
                   name: Confiance minimale
-                - entity: [[foxcat:legacy.input_number_ems_solaire_duree_minimum]]
+                - entity:
+                    - - foxcat:legacy.input_number_ems_solaire_duree_minimum
                   name: Durée minimale
       - type: grid
         cards:
@@ -19102,49 +19002,65 @@ views:
             title: Décision actuelle
             show_header_toggle: false
             entities:
-              - entity: [[foxcat:legacy.input_select_ems_mode]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_mode
                 name: Mode
                 icon: mdi:tune
-              - entity: [[foxcat:legacy.input_select_ems_regulation_phase]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_regulation_phase
                 name: Phase
                 icon: mdi:state-machine
-              - entity: [[foxcat:legacy.input_select_ems_ack_status]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_ack_status
                 name: ACK
                 icon: mdi:check-decagram
-              - entity: [[foxcat:legacy.input_text_ems_pending_action]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_pending_action
                 name: Action
                 icon: mdi:lightning-bolt
-              - entity: [[foxcat:legacy.input_text_ems_last_reason]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_last_reason
                 name: Raison
                 icon: mdi:brain
           - type: entities
             title: Boiler · Diagnostic
             state_color: true
             entities:
-              - entity: [[foxcat:legacy.input_select_ems_boiler_demande]]
+              - entity:
+                  - - foxcat:legacy.input_select_ems_boiler_demande
                 name: Demande
-              - entity: [[foxcat:legacy.input_text_ems_boiler_origine]]
+              - entity:
+                  - - foxcat:legacy.input_text_ems_boiler_origine
                 name: Origine
-              - entity: [[foxcat:boiler.climate]]
+              - entity:
+                  - - foxcat:boiler.climate
                 name: Climate
-              - entity: [[foxcat:legacy.switch_boiler_prise_1]]
+              - entity:
+                  - - foxcat:legacy.switch_boiler_prise_1
                 name: Prise
-              - entity: [[foxcat:boiler.binary_source]]
+              - entity:
+                  - - foxcat:boiler.binary_source
                 name: État physique
-              - entity: [[foxcat:boiler.power_source]]
+              - entity:
+                  - - foxcat:boiler.power_source
                 name: Puissance
           - type: entities
             title: Réseau · Diagnostic
             entities:
-              - entity: [[foxcat:sources.grid_fallback]]
+              - entity:
+                  - - foxcat:sources.grid_fallback
                 name: Export physique
-              - entity: [[foxcat:sources.grid_signed]]
+              - entity:
+                  - - foxcat:sources.grid_signed
                 name: Import physique
-              - entity: [[foxcat:legacy.input_number_ems_grid_t0]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_grid_t0
                 name: T0 mémorisé
-              - entity: [[foxcat:legacy.input_number_ems_grid_expected]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_grid_expected
                 name: Réseau attendu
-              - entity: [[foxcat:legacy.input_number_ems_ack_error]]
+              - entity:
+                  - - foxcat:legacy.input_number_ems_ack_error
                 name: Erreur ACK
     cards: []
   - type: sections
@@ -19219,8 +19135,13 @@ views:
                 content:
                   - width: 100%
                   - text-align: center
-            extra_styles: |
-              .main{width:100%;display:flex;flex-direction:column;align-items:center;text-align:center}.title{width:100%;font-size:22px;font-weight:800;letter-spacing:1.4px}.subtitle{width:100%;margin-top:6px;font-size:11px;opacity:.48}.price-zone{width:100%;padding:26px 0 24px}.label{width:100%;font-size:10px;opacity:.52;letter-spacing:1px}.price{width:100%;margin-top:6px;font-size:35px;font-weight:800}.source{width:100%;margin-top:5px;font-size:10px;opacity:.42}.grid{width:100%;max-width:540px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:0 auto}.box{min-height:94px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:18px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}.value{width:100%;margin-top:6px;font-size:19px;font-weight:750}.value.small{font-size:15px}.note{width:100%;margin-top:4px;font-size:10px;opacity:.42}
+            extra_styles: >
+              .main{width:100%;display:flex;flex-direction:column;align-items:center;text-align:center}.title{width:100%;font-size:22px;font-weight:800;letter-spacing:1.4px}.subtitle{width:100%;margin-top:6px;font-size:11px;opacity:.48}.price-zone{width:100%;padding:26px
+              0
+              24px}.label{width:100%;font-size:10px;opacity:.52;letter-spacing:1px}.price{width:100%;margin-top:6px;font-size:35px;font-weight:800}.source{width:100%;margin-top:5px;font-size:10px;opacity:.42}.grid{width:100%;max-width:540px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:0
+              auto}.box{min-height:94px;padding:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:18px;background:rgba(255,255,255,.045);border:1px
+              solid
+              rgba(255,255,255,.06)}.value{width:100%;margin-top:6px;font-size:19px;font-weight:750}.value.small{font-size:15px}.note{width:100%;margin-top:4px;font-size:10px;opacity:.42}
           - type: entities
             title: Réglages Day-Ahead · Dynamic uniquement
             show_header_toggle: false
@@ -19280,9 +19201,17 @@ views:
                 borderColor: rgba(255,255,255,0.08)
               stroke:
                 curve: smooth
-                dashArray: [0, 6, 5, 0]
+                dashArray:
+                  - 0
+                  - 6
+                  - 5
+                  - 0
               markers:
-                size: [0, 0, 0, 7]
+                size:
+                  - 0
+                  - 0
+                  - 0
+                  - 7
                 strokeWidth: 3
               xaxis:
                 type: datetime
@@ -19303,9 +19232,13 @@ views:
                 show:
                   in_header: false
                   extremas: true
-                data_generator: |
-                  const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-                  return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new Date(r.start).getTime(),Number(r.all_in)]);
+                data_generator: >
+                  const
+                  rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+
+                  return
+                  rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>[new
+                  Date(r.start).getTime(),Number(r.all_in)]);
               - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
                 name: Tendance
                 type: line
@@ -19315,10 +19248,13 @@ views:
                 float_precision: 3
                 show:
                   in_header: false
-                data_generator: |
-                  const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]
+                data_generator: >
+                  const
+                  rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])]
                     .filter(r=>r.start!=null&&Number.isFinite(Number(r.all_in))).map(r=>({time:new Date(r.start).getTime(),price:Number(r.all_in)})).sort((a,b)=>a.time-b.time);
-                  return rows.map((r,i)=>{const w=rows.slice(Math.max(0,i-1),Math.min(rows.length,i+2));return [r.time,w.reduce((s,x)=>s+x.price,0)/w.length];});
+                  return rows.map((r,i)=>{const
+                  w=rows.slice(Math.max(0,i-1),Math.min(rows.length,i+2));return
+                  [r.time,w.reduce((s,x)=>s+x.price,0)/w.length];});
               - entity: sensor.luminus_luminus_dynamic_wallonia_prix_d_injection
                 name: Réinjection
                 type: line
@@ -19328,9 +19264,13 @@ views:
                 float_precision: 3
                 show:
                   in_header: false
-                data_generator: |
-                  const rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
-                  return rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new Date(r.start).getTime(),Number(r.injection)]);
+                data_generator: >
+                  const
+                  rows=[...(entity.attributes.today||[]),...(entity.attributes.tomorrow||[])];
+
+                  return
+                  rows.filter(r=>r.start!=null&&Number.isFinite(Number(r.injection))).map(r=>[new
+                  Date(r.start).getTime(),Number(r.injection)]);
               - entity: sensor.luminus_luminus_dynamic_wallonia_prix_actuel
                 name: Maintenant
                 type: line
@@ -19340,8 +19280,10 @@ views:
                 float_precision: 3
                 show:
                   in_header: false
-                data_generator: |
-                  const value=Number(entity.state);if(!Number.isFinite(value))return [];return [[Date.now(),value]];
+                data_generator: >
+                  const
+                  value=Number(entity.state);if(!Number.isFinite(value))return
+                  [];return [[Date.now(),value]];
       - type: grid
         cards:
           - type: heading
@@ -19352,16 +19294,21 @@ views:
             title: Fenêtres optimales · plages utilisateur souveraines
             show_header_toggle: false
             entities:
-              - entity: '[[foxcat:machines.washer.day_ahead_plan]]'
+              - entity: sensor.foxcat_energy_machines_day_ahead_lave_linge
                 name: Lave-linge
-              - entity: '[[foxcat:machines.dryer.day_ahead_plan]]'
+              - entity: sensor.foxcat_energy_machines_day_ahead_lave_linge
                 name: Sèche-linge
-              - entity: '[[foxcat:machines.dishwasher.day_ahead_plan]]'
+              - entity: sensor.foxcat_energy_machines_day_ahead_lave_vaisselle
                 name: Lave-vaisselle
           - type: markdown
-            content: |
+            content: >
               **Règle 1.6.159**  
-              Le planificateur est actif **uniquement en mode Dynamique**. Il respecte d'abord les plages horaires utilisateur et la durée apprise du cycle. Un cycle déjà démarré reste protégé. Sous le seuil Day-Ahead, le complément réseau peut être autorisé si le solaire est insuffisant.
+
+              Le planificateur est actif **uniquement en mode Dynamique**. Il
+              respecte d'abord les plages horaires utilisateur et la durée
+              apprise du cycle. Un cycle déjà démarré reste protégé. Sous le
+              seuil Day-Ahead, le complément réseau peut être autorisé si le
+              solaire est insuffisant.
       - type: grid
         cards:
           - type: heading
@@ -19397,3 +19344,5 @@ views:
               - entity: '[[foxcat:accounting.dynamic.net_cost_today]]'
                 name: Coût net Dynamic
     cards: []
+    theme: ios-dark-mode-blue-red
+    subview: true
