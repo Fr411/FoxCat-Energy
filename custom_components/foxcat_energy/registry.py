@@ -241,6 +241,7 @@ _native("machines.flexible_planner", "Machines", "planificateur_charges_flexible
 _native("diagnostic.engine_version", "Diagnostic", "version_moteur")
 _native("diagnostic.dashboard_version", "Diagnostic", "version_dashboard_active")
 _native("diagnostic.dashboard_select", "Diagnostic", "dashboard_version")
+_native("diagnostic.dashboard_mobile_select", "Diagnostic", "dashboard_mobile_version")
 _native("pricing.network_policy", "Tarification", "politique_reseau", "select.foxcat_energy_tarification_politique_reseau")
 
 for _setting_key in NUMBER_DEFINITIONS:

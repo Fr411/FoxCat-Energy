@@ -510,7 +510,10 @@
           "name": "Politique réseau"
         },
         "dashboard_version": {
-          "name": "Version du dashboard"
+          "name": "Version du dashboard tablette/PC"
+        },
+        "dashboard_mobile_version": {
+          "name": "Version du dashboard mobile"
         }
       }
     }

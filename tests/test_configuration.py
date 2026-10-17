@@ -226,6 +226,29 @@ class DashboardAndProfileTests(unittest.TestCase):
                 "V1.7.0 Premium",
             )
 
+    def test_dashboard_versions_are_discovered_independently_by_variant(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for filename in (
+                "dashboard_v1.7.3.yaml",
+                "dashboard_mobile_v1.7.1.yaml",
+                "dashboard_mobile_v1.7.4.yaml",
+            ):
+                (directory / filename).touch()
+
+            self.assertEqual(
+                available_dashboard_versions(directory, "tablet"),
+                ["1.7.3"],
+            )
+            self.assertEqual(
+                available_dashboard_versions(directory, "mobile"),
+                ["1.7.4", "1.7.1"],
+            )
+            self.assertEqual(
+                recommended_dashboard_version(directory, "mobile"),
+                "1.7.4",
+            )
+
     def test_repository_dashboard_versions_include_recommended_release_candidate(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         versions = available_dashboard_versions(versions_directory)

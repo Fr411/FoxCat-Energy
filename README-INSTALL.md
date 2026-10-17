@@ -20,13 +20,15 @@ Le reste du composant FoxCat Energy reste inchangé.
 Au chargement de FoxCat Energy :
 
 - si `/config/foxcat_energy/dashboard.yaml` n'existe pas, le composant le crée automatiquement ;
-- s'il existe déjà, il n'est pas écrasé ;
+- si `/config/foxcat_energy/dashboardmob1.yaml` n'existe pas, le composant crée aussi le dashboard mobile ;
+- les fichiers existants ne sont pas écrasés au démarrage ;
 - le bouton `Régénérer le dashboard FoxCat` permet de forcer sa régénération ;
-- avant une régénération forcée, l'ancien fichier est sauvegardé en `dashboard.yaml.bak`.
+- les sélecteurs `Version du dashboard tablette/PC` et `Version du dashboard mobile` changent leurs fichiers indépendamment, avec une sauvegarde `.bak` avant chaque remplacement.
 
 ## Enregistrement Lovelace
 
 Home Assistant doit savoir que ce fichier est un dashboard YAML.
 Fusionner une seule fois le contenu de `configuration.yaml.snippet` dans `/config/configuration.yaml`, puis redémarrer Home Assistant.
+Le snippet enregistre les deux dashboards dans la barre latérale : `foxcat-energy` pour tablette/PC et `foxcat-energy2` pour mobile.
 
 Ne pas modifier directement `.storage/lovelace_dashboards`.

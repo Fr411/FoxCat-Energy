@@ -24,6 +24,11 @@ from .registry import render_dashboard_template, resolve_registry
 DASHBOARD_FOLDER = "foxcat_energy"
 DASHBOARD_FILENAME = "dashboard.yaml"
 CUSTOM_DASHBOARD_OPTION = "Personnalisé"
+CURRENT_DASHBOARD_VERSION = "1.7.4"
+_DASHBOARD_VARIANTS = {
+    "tablet": (DASHBOARD_FILENAME, "dashboard_state.json"),
+    "mobile": ("dashboardmob1.yaml", "dashboard_state_mobile.json"),
+}
 
 
 # FONCTION : _dir — Dir
@@ -32,13 +37,13 @@ def _dir() -> Path:
 
 
 # FONCTION : _target — Target
-def _target(hass: HomeAssistant) -> Path:
-    return Path(hass.config.path(DASHBOARD_FOLDER, DASHBOARD_FILENAME))
+def _target(hass: HomeAssistant, variant: str = "tablet") -> Path:
+    return Path(hass.config.path(DASHBOARD_FOLDER, _DASHBOARD_VARIANTS[variant][0]))
 
 
 # FONCTION : _state — State
-def _state(hass: HomeAssistant) -> Path:
-    return Path(hass.config.path(DASHBOARD_FOLDER, "dashboard_state.json"))
+def _state(hass: HomeAssistant, variant: str = "tablet") -> Path:
+    return Path(hass.config.path(DASHBOARD_FOLDER, _DASHBOARD_VARIANTS[variant][1]))
 
 
 # FONCTION : _user_dashboard — User dashboard
@@ -82,13 +87,27 @@ def _write_text(path: Path, content: str) -> None:
 
 
 # FONCTION : available_dashboard_versions — Available dashboard versions
-def available_dashboard_versions() -> list[str]:
-    return _scan_dashboard_versions(_dir())
+def available_dashboard_versions(variant: str = "tablet") -> list[str]:
+    versions = _scan_dashboard_versions(_dir(), variant)
+    fallback = _template_path(CURRENT_DASHBOARD_VERSION, variant)
+    if fallback.is_file() and CURRENT_DASHBOARD_VERSION not in versions:
+        versions.append(CURRENT_DASHBOARD_VERSION)
+    return sorted(
+        versions,
+        key=lambda version: (
+            tuple(int(part) for part in version.split("-")[0].split(".")),
+            "-" not in version,
+            version.partition("-")[2],
+        ),
+        reverse=True,
+    )
 
 
 # FONCTION : recommended_dashboard_version — Recommended dashboard version
-def recommended_dashboard_version() -> str | None:
-    return _scan_recommended_version(_dir())
+def recommended_dashboard_version(variant: str = "tablet") -> str | None:
+    versions = available_dashboard_versions(variant)
+    recommended = _scan_recommended_version(_dir(), variant)
+    return recommended if recommended in versions else (versions[0] if versions else None)
 
 
 # FONCTION : dashboard_version_label — Dashboard version label
@@ -102,28 +121,30 @@ def dashboard_version_for_label(label: str) -> str:
 
 
 # FONCTION : dashboard_select_options — Dashboard select options
-def dashboard_select_options(hass: HomeAssistant | None = None) -> list[str]:
-    versions = available_dashboard_versions()
-    if hass is not None and _dashboard_customized(hass):
+def dashboard_select_options(
+    hass: HomeAssistant | None = None, variant: str = "tablet"
+) -> list[str]:
+    versions = available_dashboard_versions(variant)
+    if hass is not None and _dashboard_customized(hass, variant):
         versions.append(CUSTOM_DASHBOARD_OPTION)
     return versions
 
 
 # FONCTION : _dashboard_customized — Dashboard customized
-def _dashboard_customized(hass: HomeAssistant) -> bool:
-    target = _target(hass)
+def _dashboard_customized(hass: HomeAssistant, variant: str = "tablet") -> bool:
+    target = _target(hass, variant)
     if not target.exists():
         return False
-    state = _read(_state(hass))
+    state = _read(_state(hass, variant))
     managed_hash = state.get("sha256")
     current_hash = hashlib.sha256(target.read_bytes()).hexdigest()
     return not managed_hash or managed_hash != current_hash
 
 
 # FONCTION : dashboard_status — Dashboard status
-def dashboard_status(hass: HomeAssistant) -> dict[str, Any]:
-    state = _read(_state(hass))
-    target = _target(hass)
+def dashboard_status(hass: HomeAssistant, variant: str = "tablet") -> dict[str, Any]:
+    state = _read(_state(hass, variant))
+    target = _target(hass, variant)
     current_hash = hashlib.sha256(target.read_bytes()).hexdigest() if target.exists() else None
     managed_hash = state.get("sha256")
     customized = bool(target.exists() and (not managed_hash or managed_hash != current_hash))
@@ -131,15 +152,37 @@ def dashboard_status(hass: HomeAssistant) -> dict[str, Any]:
         "engine_version": VERSION,
         "active_version": CUSTOM_DASHBOARD_OPTION if customized else state.get("active_version"),
         "previous_version": state.get("previous_version"),
-        "available": available_dashboard_versions(),
+        "available": available_dashboard_versions(variant),
         "sha256": current_hash,
         "customized": customized,
     }
 
 
 # FONCTION : _render — Render
-def _render(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], version: str) -> str:
+def _template_path(version: str, variant: str) -> Path:
+    if variant == "mobile":
+        source = _dir() / f"dashboard_mobile_v{version}.yaml"
+        if source.is_file():
+            return source
+        if version == CURRENT_DASHBOARD_VERSION:
+            return _dir() / "Mobile Dash.yaml"
+        return source
     source = _dir() / f"dashboard_v{version}.yaml"
+    if source.is_file():
+        return source
+    if version == CURRENT_DASHBOARD_VERSION:
+        return Path(__file__).parent / "dashboard" / "dashboard.yaml"
+    return source
+
+
+def _render(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    version: str,
+    variant: str = "tablet",
+) -> str:
+    source = _template_path(version, variant)
     if not source.is_file():
         raise ValueError(f"Version de dashboard inconnue : {version}")
     template = source.read_text(encoding="utf-8")
@@ -147,12 +190,18 @@ def _render(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], ver
 
 
 # FONCTION : _apply — Apply
-def _apply(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], version: str) -> dict[str, Any]:
-    if version not in available_dashboard_versions():
+def _apply(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    version: str,
+    variant: str = "tablet",
+) -> dict[str, Any]:
+    if version not in available_dashboard_versions(variant):
         raise ValueError(f"Version de dashboard inconnue : {version}")
 
-    target = _target(hass)
-    state_path = _state(hass)
+    target = _target(hass, variant)
+    state_path = _state(hass, variant)
     state = _read(state_path)
     old_content = target.read_bytes() if target.exists() else None
     old_state = state_path.read_bytes() if state_path.exists() else None
@@ -168,7 +217,7 @@ def _apply(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], vers
     temporary = target.with_suffix(target.suffix + ".tmp")
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        rendered = _render(hass, entry, config, version)
+        rendered = _render(hass, entry, config, version, variant)
         temporary.write_text(rendered, encoding="utf-8")
         temporary.replace(target)
         digest = hashlib.sha256(target.read_bytes()).hexdigest()
@@ -182,7 +231,7 @@ def _apply(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], vers
                 "sha256": digest,
             },
         )
-        return dashboard_status(hass)
+        return dashboard_status(hass, variant)
     except Exception:
         if temporary.exists():
             temporary.unlink()
@@ -199,39 +248,55 @@ def _apply(hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], vers
 
 # FONCTION ASYNCHRONE : async_switch_dashboard — traitement asynchrone : switch dashboard
 async def async_switch_dashboard(
-    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any], selection: str
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    selection: str,
+    variant: str = "tablet",
 ) -> dict[str, Any]:
-    return await hass.async_add_executor_job(_apply, hass, entry, config, selection)
+    return await hass.async_add_executor_job(
+        _apply, hass, entry, config, selection, variant
+    )
 
 
 # FONCTION ASYNCHRONE : async_ensure_dashboard — traitement asynchrone : ensure dashboard
 async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> tuple[bool, str]:
-    target = _target(hass)
-    if target.exists():
-        return False, str(target)
-    options = dashboard_select_options(hass)
-    if not options:
-        raise FileNotFoundError("Aucune version de dashboard FoxCat n’est disponible.")
-    recommended = recommended_dashboard_version() or options[0]
-    await async_switch_dashboard(hass, entry, config, recommended)
-    return True, str(target)
+    tablet_target = _target(hass)
+    tablet_created = False
+    for variant in _DASHBOARD_VARIANTS:
+        target = _target(hass, variant)
+        if target.exists():
+            continue
+        options = dashboard_select_options(hass, variant)
+        if not options:
+            continue
+        recommended = recommended_dashboard_version(variant) or options[0]
+        await async_switch_dashboard(
+            hass, entry, config, recommended, variant
+        )
+        if variant == "tablet":
+            tablet_created = True
+    return tablet_created, str(tablet_target)
 
 
 # FONCTION ASYNCHRONE : async_regenerate_dashboard — traitement asynchrone : regenerate dashboard
 async def async_regenerate_dashboard(
-    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    variant: str = "tablet",
 ) -> str:
-    state = _read(_state(hass))
+    state = _read(_state(hass, variant))
     version = state.get("active_version")
-    options = dashboard_select_options(hass)
+    options = dashboard_select_options(hass, variant)
     if version not in options:
-        version = recommended_dashboard_version() or (options[0] if options else None)
+        version = recommended_dashboard_version(variant) or (options[0] if options else None)
     if version is None:
         raise FileNotFoundError("Aucune version de dashboard FoxCat n’est disponible.")
-    await async_switch_dashboard(hass, entry, config, version)
-    return str(_target(hass))
+    await async_switch_dashboard(hass, entry, config, version, variant)
+    return str(_target(hass, variant))
 
 
 # FONCTION : _save_user_dashboard — Save user dashboard
