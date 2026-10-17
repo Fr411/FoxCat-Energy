@@ -33,6 +33,7 @@ DEFAULT_EV_CHARGE_EFF_PCT = 90.0
 REASON_SOLAR_SURPLUS_AVAILABLE = "SOLAR_SURPLUS_AVAILABLE"
 REASON_LOW_IMPORT_PRICE = "LOW_IMPORT_PRICE"
 REASON_HIGH_IMPORT_PRICE = "HIGH_IMPORT_PRICE"
+REASON_HIGH_EXPORT_PRICE = "HIGH_EXPORT_PRICE"
 REASON_EV_DEPART_DEADLINE = "EV_DEPART_DEADLINE"
 REASON_SOC_RESERVE_REQUIRED = "SOC_RESERVE_REQUIRED"
 REASON_INSUFFICIENT_TARIFF_DATA = "INSUFFICIENT_TARIFF_DATA"
@@ -44,6 +45,7 @@ REASON_DESCRIPTIONS: dict[str, str] = {
     REASON_SOLAR_SURPLUS_AVAILABLE: "Surplus photovoltaïque disponible valorisé dans les actifs virtuels.",
     REASON_LOW_IMPORT_PRICE: "Prix final d'importation bas permettant un arbitrage économique positif.",
     REASON_HIGH_IMPORT_PRICE: "Prix final d'importation élevé : décharge ou maintien de réserve pour éviter l'import coûteux.",
+    REASON_HIGH_EXPORT_PRICE: "Pic dynamique de réinjection valorisé par une décharge batterie simulée.",
     REASON_EV_DEPART_DEADLINE: "Échéance de départ du véhicule électrique prioritaire.",
     REASON_SOC_RESERVE_REQUIRED: "Préservation du SOC de réserve ou du seuil minimal de sécurité.",
     REASON_INSUFFICIENT_TARIFF_DATA: "Données tarifaires finales absentes ou incomplètes : arbitrage désactivé.",
@@ -58,6 +60,7 @@ INTERNAL_TO_OFFICIAL_REASON: dict[str, str] = {
     "tariff_arbitrage": REASON_LOW_IMPORT_PRICE,
     "import_reduction": REASON_HIGH_IMPORT_PRICE,
     "holdback_for_higher_price": REASON_HIGH_IMPORT_PRICE,
+    "export_arbitrage": REASON_HIGH_EXPORT_PRICE,
     "ev_departure_need": REASON_EV_DEPART_DEADLINE,
     "reserve_preserved": REASON_SOC_RESERVE_REQUIRED,
     "price_missing_no_arbitrage": REASON_INSUFFICIENT_TARIFF_DATA,

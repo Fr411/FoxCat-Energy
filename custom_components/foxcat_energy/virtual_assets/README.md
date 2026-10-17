@@ -16,13 +16,15 @@ configuration, pas le SoC d'équipements physiques.
 (jamais inventé : pas d'arbitrage, pas de coût, compté dans `unpriced_slots`).
 
 ## Défauts
-Batterie 10 kWh, 5 kW, rendements 95 %, SoC min 10 %, réserve 20 %. VE 50 kWh, 7,4 kW, 90 %, sans V2G.
+Batterie 10 kWh, 5 kW, rendements 95 %, SoC min 10 %, réserve 20 %. VE 80 kWh, 7,4 kW, rendement 90 %, SoC initial 50 %, cible semaine 80 %.
 Horizon 48 pas, marge d'arbitrage 0,02 €/kWh. Rentabilité : 10 ans, taux 4 %, période observée >= 7 jours.
+
+## Planification
+- Le VE est simulé branché en semaine de 19:00 à 07:00, avec une cible minimale de 80 % au départ ; il est considéré absent entre 07:00 et 19:00.
+- Le week-end, le VE reste présent et peut absorber le surplus solaire, jusqu'à sa capacité.
+- L'export batterie est réservé aux tarifs dynamiques : un pic courant doit dépasser les prix d'export futurs connus et le coût d'usure. En l'absence de prévisions exploitables, aucune décharge opportuniste n'est simulée.
 
 ## Limitations
 - Le shadow suppose que les mesures réelles ne contiennent pas d'effet de batterie/VE virtuels (une éventuelle batterie réelle n'est pas déduite).
-- Pas de V2G ni d'export batterie ; fenêtre VE limitée à l'horizon ; le planificateur est glouton (non optimal).
-- La page Batterie + VE enregistre la configuration de simulation. Le flux de mesures HA
-  n'est pas encore raccordé au simulateur : l'activation seule ne produit pas de télémétrie
-  ni de pilotage.
-- Hooks HA (`ha.py`) fournis mais non câblés dans `__init__.py` / `diagnostics.py` existants pour garder l'isolation.
+- Aucun V2G : le VE ne fait que charger ; le planificateur est glouton (non optimal).
+- La décharge batterie vers le réseau est une décision simulée uniquement et n'émet aucune commande matérielle.
