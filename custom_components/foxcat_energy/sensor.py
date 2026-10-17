@@ -230,6 +230,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "virtual_ev_capacity", "Batterie + VE • Capacité VE", "mdi:car-battery", "battery_ev", lambda d: c.config.get(CONF_EV_CAPACITY, 50.0), UnitEnergy.KILO_WATT_HOUR),
         FoxCatNumericSensor(c, "virtual_ev_charge_power", "Batterie + VE • Puissance max. charge VE", "mdi:ev-station", "battery_ev", lambda d: c.config.get(CONF_EV_MAX_CHARGE, 7.4), "kW"),
         FoxCatNumericSensor(c, "virtual_ev_charge_efficiency", "Batterie + VE • Rendement charge VE", "mdi:car-electric-outline", "battery_ev", lambda d: c.config.get(CONF_EV_CHARGE_EFFICIENCY, 90.0), PERCENTAGE),
+        FoxCatNumericSensor(c, "virtual_battery_soc_simulated", "Batterie + VE • SOC Batterie (Simulé)", "mdi:battery-charging-50", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_soc_pct"), PERCENTAGE),
+        FoxCatNumericSensor(c, "virtual_battery_energy_simulated", "Batterie + VE • Énergie Batterie (Simulé)", "mdi:battery-heart-variant", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_soc_kwh"), UnitOfEnergy.KILO_WATT_HOUR),
+        FoxCatNumericSensor(c, "virtual_battery_cycles_simulated", "Batterie + VE • Cycles équivalents (Simulé)", "mdi:recycle", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_cycles"), None),
+        FoxCatNumericSensor(c, "virtual_savings_simulated", "Batterie + VE • Économie nette (Simulé)", "mdi:piggy-bank-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("savings_eur"), "€"),
+        FoxCatValueSensor(c, "virtual_last_decision_simulated", "Batterie + VE • Décision planificateur (Simulé)", "mdi:brain", "battery_ev", lambda d: d.get("virtual_assets", {}).get("last_action", "idle")),
+        FoxCatValueSensor(c, "virtual_last_reason_simulated", "Batterie + VE • Justification décision (Simulé)", "mdi:comment-check-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("last_reason_description", "Aucune")),
+        FoxCatValueSensor(c, "virtual_data_quality_badge", "Batterie + VE • Qualité des données", "mdi:shield-check-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("data_badge", "SIMULÉ")),
     ])
 
     # Un jeu de capteurs est créé automatiquement pour chaque appareil FoxCat mesuré.

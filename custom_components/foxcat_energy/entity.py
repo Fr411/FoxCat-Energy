@@ -36,7 +36,6 @@ class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
             "pricing": "FoxCat Energy – Tarification",
             "metronome": "FoxCat Energy – Métronome",
             "diagnostic": "FoxCat Energy – Diagnostic",
-            "battery_ev": "FoxCat Energy – Batterie + VE",
             "user_functions": "FoxCat Energy – Fonctions utilisateur",
             "solar": "FoxCat Energy – IA",
             "accounting": "FoxCat Energy – Énergie",
