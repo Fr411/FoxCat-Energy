@@ -311,6 +311,7 @@
         "title": "Tarification",
         "description": "Sépare clairement tarification dynamique et HP/HC. Le comparateur économique reste distinct d’Energy Bus.",
         "menu_options": {
+          "pricing_switch": "Choisir le type de tarif (HP/HC ou dynamique)",
           "pricing_dynamic": "Tarification dynamique",
           "hphc": "Tarification HP/HC",
           "init": "← Retour au menu principal"
@@ -496,6 +497,14 @@
         "title": "Machine Learning • Présentation",
         "description": "FoxCat enregistre localement jusqu’à 30 cycles récents par machine mesurée. Les données observées comprennent puissance, courant, tension, durée, énergie, tarif et contexte solaire/réseau. Cette collecte reste strictement passive et n’influence pas l’EMS.",
         "data": {}
+      },
+      "pricing_switch": {
+        "title": "Type de tarif",
+        "description": "Basculez entre tarification HP/HC et dynamique, puis choisissez la structure (Mono-horaire/Bi-horaire pour HP/HC, Simple/Impact pour dynamique).",
+        "data": {
+          "tariff_family": "Famille de tarif (hphc ou dynamique)",
+          "tariff_structure": "Structure tarifaire"
+        }
       },
       "pricing_dynamic": {
         "title": "Tarification dynamique",
