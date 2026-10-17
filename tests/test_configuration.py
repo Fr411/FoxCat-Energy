@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import importlib
 import sys
 import tempfile
 import types
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 COMPONENT_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
 package = types.ModuleType("foxcat_energy")
@@ -26,6 +29,9 @@ from foxcat_energy.const import (
 )
 from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
+    dashboard_template_path,
+    dashboard_variant_files,
+    dashboard_version_for_label,
     dashboard_version_label,
     recommended_dashboard_version,
 )
@@ -226,14 +232,183 @@ class DashboardAndProfileTests(unittest.TestCase):
                 "V1.7.0 Premium",
             )
 
-    def test_repository_dashboard_versions_include_recommended_release_candidate(self) -> None:
+    def test_dashboard_versions_are_discovered_independently_by_variant(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for filename in (
+                "dashboard_v1.7.3.yaml",
+                "dashboard_mobile_v1.7.1.yaml",
+                "dashboard_mobile_v1.7.4.yaml",
+            ):
+                (directory / filename).touch()
+
+            self.assertEqual(
+                available_dashboard_versions(directory, "tablet"),
+                ["1.7.3"],
+            )
+            self.assertEqual(
+                available_dashboard_versions(directory, "mobile"),
+                ["1.7.4", "1.7.1"],
+            )
+            self.assertEqual(
+                recommended_dashboard_version(directory, "mobile"),
+                "1.7.4",
+            )
+            (directory / "dashboard_v1.7.4.yaml").touch()
+            (directory / "manifest_v1.7.4.json").write_text(
+                '{"name":"Tablette 1.7.4"}',
+                encoding="utf-8",
+            )
+            (directory / "manifest_mobile_v1.7.4.json").write_text(
+                '{"name":"Mobile 1.7.4"}',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                dashboard_version_label("1.7.4", directory, "tablet"),
+                "Tablette 1.7.4",
+            )
+            self.assertEqual(
+                dashboard_version_label("1.7.4", directory, "mobile"),
+                "Mobile 1.7.4",
+            )
+            self.assertEqual(
+                dashboard_version_for_label("Tablette 1.7.4", directory, "tablet"),
+                "1.7.4",
+            )
+            self.assertEqual(
+                dashboard_version_for_label("Mobile 1.7.4", directory, "mobile"),
+                "1.7.4",
+            )
+
+    def test_dashboard_templates_and_generated_files_are_independent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            versions = root / "versions"
+            versions.mkdir()
+            (versions / "dashboard_v1.7.4.yaml").write_text(
+                "layout: tablet\n",
+                encoding="utf-8",
+            )
+            (versions / "dashboard_mobile_v1.7.4.yaml").write_text(
+                "layout: mobile\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                dashboard_template_path(versions, "1.7.4", "tablet"),
+                versions / "dashboard_v1.7.4.yaml",
+            )
+            self.assertEqual(
+                dashboard_template_path(versions, "1.7.4", "mobile"),
+                versions / "dashboard_mobile_v1.7.4.yaml",
+            )
+            self.assertEqual(
+                dashboard_variant_files("tablet"),
+                ("dashboard.yaml", "dashboard_state.json"),
+            )
+            self.assertEqual(
+                dashboard_variant_files("mobile"),
+                ("dashboardmob1.yaml", "dashboard_state_mobile.json"),
+            )
+            with self.assertRaises(ValueError):
+                dashboard_variant_files("other")
+
+            homeassistant = types.ModuleType("homeassistant")
+            homeassistant.__path__ = []
+            config_entries = types.ModuleType("homeassistant.config_entries")
+            config_entries.ConfigEntry = object
+            core = types.ModuleType("homeassistant.core")
+            core.HomeAssistant = object
+            registry = types.ModuleType("foxcat_energy.registry")
+            registry.resolve_registry = lambda hass, entry, config: {}
+            registry.render_dashboard_template = lambda template, bindings: (template, [])
+            stubs = {
+                "homeassistant": homeassistant,
+                "homeassistant.config_entries": config_entries,
+                "homeassistant.core": core,
+                "foxcat_energy.registry": registry,
+            }
+            original_dashboard = sys.modules.pop("foxcat_energy.dashboard", None)
+            original_dashboard_attr = getattr(package, "dashboard", None)
+            try:
+                with patch.dict(sys.modules, stubs):
+                    dashboard = importlib.import_module("foxcat_energy.dashboard")
+                    dashboard._dir = lambda: versions
+
+                    class FakeConfig:
+                        def path(self, *parts: str) -> str:
+                            return str(root.joinpath("config", *parts))
+
+                    class FakeHass:
+                        config = FakeConfig()
+
+                        async def async_add_executor_job(self, function, *args):
+                            return function(*args)
+
+                    created_paths = asyncio.run(
+                        dashboard.async_ensure_dashboards(FakeHass(), None, {})
+                    )
+                    self.assertEqual(
+                        {Path(path).name for path in created_paths},
+                        {"dashboard.yaml", "dashboardmob1.yaml"},
+                    )
+                    tablet_path = root / "config" / "foxcat_energy" / "dashboard.yaml"
+                    self.assertEqual(tablet_path.read_text(encoding="utf-8"), "layout: tablet\n")
+                    mobile_path = root / "config" / "foxcat_energy" / "dashboardmob1.yaml"
+                    self.assertEqual(mobile_path.read_text(encoding="utf-8"), "layout: mobile\n")
+                    legacy_result = asyncio.run(
+                        dashboard.async_ensure_dashboard(FakeHass(), None, {})
+                    )
+                    self.assertEqual(legacy_result, (False, str(tablet_path)))
+
+                    for filename in (
+                        "dashboard.yaml",
+                        "dashboard_state.json",
+                        "dashboardmob1.yaml",
+                        "dashboard_state_mobile.json",
+                    ):
+                        (tablet_path.parent / filename).unlink()
+                    (versions / "dashboard_mobile_v1.7.4.yaml").unlink()
+                    created_paths = asyncio.run(
+                        dashboard.async_ensure_dashboards(FakeHass(), None, {})
+                    )
+                    self.assertEqual(created_paths, [str(tablet_path)])
+                    self.assertTrue(tablet_path.is_file())
+                    self.assertFalse(mobile_path.exists())
+
+                    tablet_path.unlink()
+                    (tablet_path.parent / "dashboard_state.json").unlink()
+                    (versions / "dashboard_v1.7.4.yaml").unlink()
+                    (versions / "dashboard_mobile_v1.7.4.yaml").write_text(
+                        "layout: mobile\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(FileNotFoundError):
+                        asyncio.run(
+                            dashboard.async_ensure_dashboard(FakeHass(), None, {})
+                        )
+                    self.assertTrue(mobile_path.is_file())
+                    self.assertFalse(tablet_path.exists())
+            finally:
+                sys.modules.pop("foxcat_energy.dashboard", None)
+                if original_dashboard_attr is None and hasattr(package, "dashboard"):
+                    delattr(package, "dashboard")
+                elif original_dashboard_attr is not None:
+                    package.dashboard = original_dashboard_attr
+                if original_dashboard is not None:
+                    sys.modules["foxcat_energy.dashboard"] = original_dashboard
+
+    def test_repository_dashboard_versions_include_both_current_layouts(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
-        versions = available_dashboard_versions(versions_directory)
-        self.assertIn("1.7.3", versions)
-        self.assertIn("1.7.1", versions)
-        self.assertIn("1.7.0-premium", versions)
-        self.assertIn("1.6.160", versions)
-        self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.3")
+        self.assertEqual(available_dashboard_versions(versions_directory), ["1.7.4"])
+        self.assertEqual(
+            available_dashboard_versions(versions_directory, "mobile"),
+            ["1.7.4"],
+        )
+        self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.4")
+        self.assertEqual(
+            recommended_dashboard_version(versions_directory, "mobile"),
+            "1.7.4",
+        )
 
     def test_profile_values_are_bounded_and_names_cannot_escape_directory(self) -> None:
         self.assertEqual(
