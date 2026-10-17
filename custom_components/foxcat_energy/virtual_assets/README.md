@@ -1,8 +1,10 @@
 # Virtual Assets Core
 
-Sous-système **isolé, en lecture seule et désactivé par défaut** (`virtual_assets_enabled`)
-qui simule une batterie et un VE virtuels. Il ne commande **aucun** équipement physique
-(aucun appel de service HA) et n'est branché dans aucun fichier existant.
+Sous-système de simulation **en lecture seule et désactivé par défaut**
+(`virtual_assets_enabled`) pour une batterie domestique et un VE. Il ne commande
+**aucun** équipement physique (aucun appel de service HA). Les paramètres se
+configurent dans FoxCat Energy → Batterie + VE; le dashboard expose leur
+configuration, pas le SoC d'équipements physiques.
 
 ## Réutilisation
 - Calendrier HP/HC : `engine.tariff.tariff_period` (AIESH : HP 07:00-11:00 et 17:00-22:00, HC sinon, identique tous les jours).
@@ -20,5 +22,7 @@ Horizon 48 pas, marge d'arbitrage 0,02 €/kWh. Rentabilité : 10 ans, taux 4 %,
 ## Limitations
 - Le shadow suppose que les mesures réelles ne contiennent pas d'effet de batterie/VE virtuels (une éventuelle batterie réelle n'est pas déduite).
 - Pas de V2G ni d'export batterie ; fenêtre VE limitée à l'horizon ; le planificateur est glouton (non optimal).
-- Réglages batterie/VE : à fournir via `VirtualAssetsConfig` (pas encore d'UI/config flow).
+- La page Batterie + VE enregistre la configuration de simulation. Le flux de mesures HA
+  n'est pas encore raccordé au simulateur : l'activation seule ne produit pas de télémétrie
+  ni de pilotage.
 - Hooks HA (`ha.py`) fournis mais non câblés dans `__init__.py` / `diagnostics.py` existants pour garder l'isolation.

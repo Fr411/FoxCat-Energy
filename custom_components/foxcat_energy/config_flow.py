@@ -421,7 +421,7 @@ def _battery_ev_schema() -> vol.Schema:
                 selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Optional(CONF_BATTERY_RESERVE, default=20.0): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=0, max=90, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
+                selector.NumberSelectorConfig(min=10, max=90, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
             ),
             vol.Optional(CONF_EV_ENABLED, default=False): selector.BooleanSelector(),
             vol.Optional(CONF_EV_CAPACITY, default=50.0): selector.NumberSelector(

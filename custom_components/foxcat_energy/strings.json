@@ -165,7 +165,7 @@
         }
       },
       "ia": {
-        "title": "FoxCat Energy – 7/7 • IA",
+        "title": "FoxCat Energy – 7/8 • IA",
         "description": "Configurez le module prédictif IA. Il analyse les prévisions solaires et reste consultatif : les décisions opérationnelles restent prises par l’EMS FoxCat.",
         "data": {
           "ai_task": "Agent IA (AI Task)",
@@ -197,7 +197,7 @@
         }
       },
       "battery_ev": {
-        "title": "FoxCat Energy • Batterie + VE",
+        "title": "FoxCat Energy – 8/8 • Batterie + VE",
         "description": "Définissez les capacités utilisées par le module de simulation en lecture seule. Aucun équipement physique n’est commandé.",
         "data": {
           "virtual_assets_enabled": "Activer le module Batterie + VE",
