@@ -8,10 +8,16 @@ _VERSION_PATTERN = re.compile(r"^dashboard_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)
 
 
 # FONCTION : available_dashboard_versions — Available dashboard versions
-def available_dashboard_versions(directory: Path) -> list[str]:
+def available_dashboard_versions(directory: Path, variant: str = "tablet") -> list[str]:
     versions = []
-    for path in directory.glob("dashboard_v*.yaml"):
-        match = _VERSION_PATTERN.fullmatch(path.name)
+    pattern = (
+        re.compile(r"^dashboard_mobile_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)\.yaml$")
+        if variant == "mobile"
+        else _VERSION_PATTERN
+    )
+    prefix = "dashboard_mobile_v" if variant == "mobile" else "dashboard_v"
+    for path in directory.glob(f"{prefix}*.yaml"):
+        match = pattern.fullmatch(path.name)
         if match:
             versions.append(match.group(1))
     return sorted(
@@ -45,8 +51,8 @@ def dashboard_version_for_label(label: str, directory: Path) -> str:
 
 
 # FONCTION : recommended_dashboard_version — Recommended dashboard version
-def recommended_dashboard_version(directory: Path) -> str | None:
-    versions = available_dashboard_versions(directory)
+def recommended_dashboard_version(directory: Path, variant: str = "tablet") -> str | None:
+    versions = available_dashboard_versions(directory, variant)
     for version in versions:
         manifest = directory / f"manifest_v{version}.json"
         try:
