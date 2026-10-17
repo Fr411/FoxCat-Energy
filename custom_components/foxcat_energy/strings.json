@@ -195,6 +195,24 @@
           "forecast_tomorrow": "Production solaire estimée demain.",
           "forecast_peak_tomorrow": "Heure prévue du pic solaire demain."
         }
+      },
+      "battery_ev": {
+        "title": "FoxCat Energy • Batterie + VE",
+        "description": "Définissez les capacités utilisées par le module de simulation en lecture seule. Aucun équipement physique n’est commandé.",
+        "data": {
+          "virtual_assets_enabled": "Activer le module Batterie + VE",
+          "virtual_assets_shadow_mode": "Mode shadow (comparaison simulée)",
+          "virtual_battery_capacity_kwh": "Capacité utile de la batterie (kWh)",
+          "virtual_battery_max_charge_kw": "Puissance maximale de charge batterie (kW)",
+          "virtual_battery_max_discharge_kw": "Puissance maximale de décharge batterie (kW)",
+          "virtual_battery_charge_efficiency_pct": "Rendement de charge batterie (%)",
+          "virtual_battery_discharge_efficiency_pct": "Rendement de décharge batterie (%)",
+          "virtual_battery_reserve_soc_pct": "Réserve minimale batterie (%)",
+          "virtual_ev_enabled": "Configurer un véhicule électrique",
+          "virtual_ev_capacity_kwh": "Capacité de la batterie du VE (kWh)",
+          "virtual_ev_max_charge_kw": "Puissance maximale de charge du VE (kW)",
+          "virtual_ev_charge_efficiency_pct": "Rendement de charge du VE (%)"
+        }
       }
     }
   },
@@ -214,6 +232,7 @@
           "pricing": "8 • Tarification",
           "metronome": "9 • Métronome",
           "diagnostic": "10 • Diagnostic",
+          "battery_ev": "11 • Batterie + VE",
           "finish": "✓ Enregistrer et quitter"
         }
       },
@@ -427,6 +446,24 @@
         "title": "Diagnostic",
         "description": "État du registre, sources, trames, erreurs, watchdog et outils de maintenance. Les capteurs techniques sont classés dans l’appareil FoxCat Energy – Diagnostic.",
         "data": {}
+      },
+      "battery_ev": {
+        "title": "Batterie + VE",
+        "description": "Paramètres du module Virtual Assets, désactivé par défaut et sans commande d’équipement physique.",
+        "data": {
+          "virtual_assets_enabled": "Activer le module Batterie + VE",
+          "virtual_assets_shadow_mode": "Mode shadow (comparaison simulée)",
+          "virtual_battery_capacity_kwh": "Capacité utile de la batterie (kWh)",
+          "virtual_battery_max_charge_kw": "Puissance maximale de charge batterie (kW)",
+          "virtual_battery_max_discharge_kw": "Puissance maximale de décharge batterie (kW)",
+          "virtual_battery_charge_efficiency_pct": "Rendement de charge batterie (%)",
+          "virtual_battery_discharge_efficiency_pct": "Rendement de décharge batterie (%)",
+          "virtual_battery_reserve_soc_pct": "Réserve minimale batterie (%)",
+          "virtual_ev_enabled": "Configurer un véhicule électrique",
+          "virtual_ev_capacity_kwh": "Capacité de la batterie du VE (kWh)",
+          "virtual_ev_max_charge_kw": "Puissance maximale de charge du VE (kW)",
+          "virtual_ev_charge_efficiency_pct": "Rendement de charge du VE (%)"
+        }
       },
       "ems_core": {
         "title": "EMS • Fonctionnement et réglages",

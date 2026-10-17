@@ -17,6 +17,7 @@ OFFICIAL_SECTION_ORDER = (
     "Tarification",
     "Métronome",
     "Diagnostic",
+    "Batterie + VE",
 )
 OFFICIAL_MENU_STEPS = (
     "sources",
@@ -29,6 +30,7 @@ OFFICIAL_MENU_STEPS = (
     "pricing",
     "metronome",
     "diagnostic",
+    "battery_ev",
     "finish",
 )
 

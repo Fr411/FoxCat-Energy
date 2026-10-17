@@ -95,6 +95,20 @@ from .const import (
 )
 from .machines import records_for_options
 from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
+from .virtual_assets.config import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_CHARGE_EFFICIENCY,
+    CONF_BATTERY_DISCHARGE_EFFICIENCY,
+    CONF_BATTERY_MAX_CHARGE,
+    CONF_BATTERY_MAX_DISCHARGE,
+    CONF_BATTERY_RESERVE,
+    CONF_ENABLED as CONF_VIRTUAL_ASSETS_ENABLED,
+    CONF_EV_CAPACITY,
+    CONF_EV_CHARGE_EFFICIENCY,
+    CONF_EV_ENABLED,
+    CONF_EV_MAX_CHARGE,
+    CONF_SHADOW as CONF_VIRTUAL_ASSETS_SHADOW,
+)
 
 
 
@@ -386,6 +400,43 @@ def _solar_schema() -> vol.Schema:
     )
 
 
+def _battery_ev_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Optional(CONF_VIRTUAL_ASSETS_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_VIRTUAL_ASSETS_SHADOW, default=True): selector.BooleanSelector(),
+            vol.Optional(CONF_BATTERY_CAPACITY, default=10.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=1000, step=0.1, unit_of_measurement="kWh", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_BATTERY_MAX_CHARGE, default=5.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_BATTERY_MAX_DISCHARGE, default=5.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_BATTERY_CHARGE_EFFICIENCY, default=95.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_BATTERY_DISCHARGE_EFFICIENCY, default=95.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_BATTERY_RESERVE, default=20.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=90, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_EV_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_EV_CAPACITY, default=50.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=300, step=1, unit_of_measurement="kWh", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_EV_MAX_CHARGE, default=7.4): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_EV_CHARGE_EFFICIENCY, default=90.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX)
+            ),
+        }
+    )
+
+
 _SCHEMA_BUILDERS = {
     "core": _core_schema,
     "metronome": _metronome_schema,
@@ -398,6 +449,7 @@ _SCHEMA_BUILDERS = {
     "solar": _solar_schema,
     "ia": _solar_schema,
     "pricing_dynamic": _pricing_schema,
+    "battery_ev": _battery_ev_schema,
 }
 
 
@@ -526,11 +578,19 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_ia(self, user_input=None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
+            return await self.async_step_battery_ev()
+        return self.async_show_form(step_id="ia", data_schema=_solar_schema())
+
+    async def async_step_battery_ev(self, user_input=None):
+        if user_input is not None:
+            self._data.update(_normalise_input(user_input))
             title = str(self._data.get(CONF_INSTALLATION_NAME, "FoxCat Energy"))
             await self.async_set_unique_id("foxcat_energy_main")
             self._abort_if_unique_id_configured()
             return self.async_create_entry(title=title, data=self._data)
-        return self.async_show_form(step_id="ia", data_schema=_solar_schema())
+        return self.async_show_form(
+            step_id="battery_ev", data_schema=_battery_ev_schema()
+        )
 
     # MÉTHODE : FoxCatEnergyConfigFlow.async_step_solar — Compatibilité avec l'ancien nom de l'étape EMS 2 solaire.
     async def async_step_solar(self, user_input=None):
@@ -664,6 +724,9 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_diagnostic — traitement asynchrone : step diagnostic
     async def async_step_diagnostic(self, user_input=None):
         return await self._info_section("diagnostic", user_input)
+
+    async def async_step_battery_ev(self, user_input=None):
+        return await self._section("battery_ev", user_input)
 
     # Compatibility with the pre-1.6 route name.
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_core — traitement asynchrone : step core
