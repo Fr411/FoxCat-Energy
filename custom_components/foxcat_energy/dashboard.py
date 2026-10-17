@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from .const import VERSION
 from .dashboard_merge import merge_dashboard_text
 from .dashboard_versions import (
+    CURRENT_DASHBOARD_VERSION,
     available_dashboard_versions as _scan_dashboard_versions,
     dashboard_version_for_label as _scan_dashboard_version_for_label,
     dashboard_version_label as _scan_dashboard_version_label,
@@ -24,7 +25,6 @@ from .registry import render_dashboard_template, resolve_registry
 DASHBOARD_FOLDER = "foxcat_energy"
 DASHBOARD_FILENAME = "dashboard.yaml"
 CUSTOM_DASHBOARD_OPTION = "Personnalisé"
-CURRENT_DASHBOARD_VERSION = "1.7.4"
 _DASHBOARD_VARIANTS = {
     "tablet": (DASHBOARD_FILENAME, "dashboard_state.json"),
     "mobile": ("dashboardmob1.yaml", "dashboard_state_mobile.json"),
@@ -88,19 +88,7 @@ def _write_text(path: Path, content: str) -> None:
 
 # FONCTION : available_dashboard_versions — Available dashboard versions
 def available_dashboard_versions(variant: str = "tablet") -> list[str]:
-    versions = _scan_dashboard_versions(_dir(), variant)
-    fallback = _template_path(CURRENT_DASHBOARD_VERSION, variant)
-    if fallback.is_file() and CURRENT_DASHBOARD_VERSION not in versions:
-        versions.append(CURRENT_DASHBOARD_VERSION)
-    return sorted(
-        versions,
-        key=lambda version: (
-            tuple(int(part) for part in version.split("-")[0].split(".")),
-            "-" not in version,
-            version.partition("-")[2],
-        ),
-        reverse=True,
-    )
+    return _scan_dashboard_versions(_dir(), variant)
 
 
 # FONCTION : recommended_dashboard_version — Recommended dashboard version
@@ -116,8 +104,8 @@ def dashboard_version_label(version: str) -> str:
 
 
 # FONCTION : dashboard_version_for_label — Dashboard version for label
-def dashboard_version_for_label(label: str) -> str:
-    return _scan_dashboard_version_for_label(label, _dir())
+def dashboard_version_for_label(label: str, variant: str = "tablet") -> str:
+    return _scan_dashboard_version_for_label(label, _dir(), variant)
 
 
 # FONCTION : dashboard_select_options — Dashboard select options
@@ -264,7 +252,7 @@ async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
 ) -> tuple[bool, str]:
     tablet_target = _target(hass)
-    tablet_created = False
+    dashboard_created = False
     for variant in _DASHBOARD_VARIANTS:
         target = _target(hass, variant)
         if target.exists():
@@ -276,9 +264,8 @@ async def async_ensure_dashboard(
         await async_switch_dashboard(
             hass, entry, config, recommended, variant
         )
-        if variant == "tablet":
-            tablet_created = True
-    return tablet_created, str(tablet_target)
+        dashboard_created = True
+    return dashboard_created, str(tablet_target)
 
 
 # FONCTION ASYNCHRONE : async_regenerate_dashboard — traitement asynchrone : regenerate dashboard
@@ -421,10 +408,13 @@ async def async_apply_user_dashboard_to_latest(
 
 # FONCTION ASYNCHRONE : async_restore_previous_dashboard — traitement asynchrone : restore previous dashboard
 async def async_restore_previous_dashboard(
-    hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    config: dict[str, Any],
+    variant: str = "tablet",
 ) -> dict[str, Any]:
-    previous = _read(_state(hass)).get("previous_version")
-    options = dashboard_select_options(hass)
+    previous = _read(_state(hass, variant)).get("previous_version")
+    options = dashboard_select_options(hass, variant)
     if previous not in options:
         raise ValueError("Aucune version précédente disponible à restaurer.")
-    return await async_switch_dashboard(hass, entry, config, previous)
+    return await async_switch_dashboard(hass, entry, config, previous, variant)

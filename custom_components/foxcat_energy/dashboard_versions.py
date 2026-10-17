@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 _VERSION_PATTERN = re.compile(r"^dashboard_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)\.yaml$")
+CURRENT_DASHBOARD_VERSION = "1.7.4"
 
 
 # FONCTION : available_dashboard_versions — Available dashboard versions
@@ -20,6 +21,13 @@ def available_dashboard_versions(directory: Path, variant: str = "tablet") -> li
         match = pattern.fullmatch(path.name)
         if match:
             versions.append(match.group(1))
+    fallback = (
+        directory / "Mobile Dash.yaml"
+        if variant == "mobile"
+        else directory.parent / "dashboard.yaml"
+    )
+    if fallback.is_file() and CURRENT_DASHBOARD_VERSION not in versions:
+        versions.append(CURRENT_DASHBOARD_VERSION)
     return sorted(
         versions,
         key=lambda version: (
@@ -43,8 +51,10 @@ def dashboard_version_label(version: str, directory: Path) -> str:
 
 
 # FONCTION : dashboard_version_for_label — Dashboard version for label
-def dashboard_version_for_label(label: str, directory: Path) -> str:
-    for version in available_dashboard_versions(directory):
+def dashboard_version_for_label(
+    label: str, directory: Path, variant: str = "tablet"
+) -> str:
+    for version in available_dashboard_versions(directory, variant):
         if dashboard_version_label(version, directory) == label:
             return version
     return label

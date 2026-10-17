@@ -294,7 +294,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
                 self.coordinator.hass,
                 self.coordinator.entry,
                 self.coordinator.config,
-                dashboard_version_for_label(option),
+                dashboard_version_for_label(option, self._variant),
                 self._variant,
             )
         except ValueError as err:

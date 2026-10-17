@@ -25,6 +25,8 @@ Au chargement de FoxCat Energy :
 - le bouton `Régénérer le dashboard FoxCat` permet de forcer sa régénération ;
 - les sélecteurs `Version du dashboard tablette/PC` et `Version du dashboard mobile` changent leurs fichiers indépendamment, avec une sauvegarde `.bak` avant chaque remplacement.
 
+Les versions tablette/PC sont recherchées dans `dashboard/versions/dashboard_vX.yaml` et les versions mobiles dans `dashboard/versions/dashboard_mobile_vX.yaml`. Les modèles intégrés actuels sont proposés comme version 1.7.4.
+
 ## Enregistrement Lovelace
 
 Home Assistant doit savoir que ce fichier est un dashboard YAML.

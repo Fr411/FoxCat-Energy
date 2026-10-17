@@ -249,14 +249,18 @@ class DashboardAndProfileTests(unittest.TestCase):
                 "1.7.4",
             )
 
-    def test_repository_dashboard_versions_include_recommended_release_candidate(self) -> None:
+    def test_repository_dashboard_versions_include_both_current_layouts(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
-        versions = available_dashboard_versions(versions_directory)
-        self.assertIn("1.7.3", versions)
-        self.assertIn("1.7.1", versions)
-        self.assertIn("1.7.0-premium", versions)
-        self.assertIn("1.6.160", versions)
-        self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.3")
+        self.assertEqual(available_dashboard_versions(versions_directory), ["1.7.4"])
+        self.assertEqual(
+            available_dashboard_versions(versions_directory, "mobile"),
+            ["1.7.4"],
+        )
+        self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.4")
+        self.assertEqual(
+            recommended_dashboard_version(versions_directory, "mobile"),
+            "1.7.4",
+        )
 
     def test_profile_values_are_bounded_and_names_cannot_escape_directory(self) -> None:
         self.assertEqual(
