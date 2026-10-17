@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import importlib
 import sys
 import tempfile
 import types
@@ -26,6 +28,8 @@ from foxcat_energy.const import (
 )
 from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
+    dashboard_template_path,
+    dashboard_variant_files,
     dashboard_version_label,
     recommended_dashboard_version,
 )
@@ -248,6 +252,89 @@ class DashboardAndProfileTests(unittest.TestCase):
                 recommended_dashboard_version(directory, "mobile"),
                 "1.7.4",
             )
+
+    def test_dashboard_templates_and_generated_files_are_independent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            versions = root / "versions"
+            versions.mkdir()
+            (root / "dashboard.yaml").write_text("layout: tablet\n", encoding="utf-8")
+            (versions / "dashboard_mobile_v1.7.4.yaml").write_text(
+                "layout: mobile\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                dashboard_template_path(versions, "1.7.4", "tablet"),
+                root / "dashboard.yaml",
+            )
+            self.assertEqual(
+                dashboard_template_path(versions, "1.7.4", "mobile"),
+                versions / "dashboard_mobile_v1.7.4.yaml",
+            )
+            self.assertEqual(
+                dashboard_variant_files("tablet"),
+                ("dashboard.yaml", "dashboard_state.json"),
+            )
+            self.assertEqual(
+                dashboard_variant_files("mobile"),
+                ("dashboardmob1.yaml", "dashboard_state_mobile.json"),
+            )
+            with self.assertRaises(ValueError):
+                dashboard_variant_files("other")
+
+            homeassistant = types.ModuleType("homeassistant")
+            homeassistant.__path__ = []
+            config_entries = types.ModuleType("homeassistant.config_entries")
+            config_entries.ConfigEntry = object
+            core = types.ModuleType("homeassistant.core")
+            core.HomeAssistant = object
+            registry = types.ModuleType("foxcat_energy.registry")
+            registry.resolve_registry = lambda hass, entry, config: {}
+            registry.render_dashboard_template = lambda template, bindings: (template, [])
+            stubs = {
+                "homeassistant": homeassistant,
+                "homeassistant.config_entries": config_entries,
+                "homeassistant.core": core,
+                "foxcat_energy.registry": registry,
+            }
+            original = {name: sys.modules.get(name) for name in stubs}
+            original_dashboard = sys.modules.pop("foxcat_energy.dashboard", None)
+            original_dashboard_attr = getattr(package, "dashboard", None)
+            sys.modules.update(stubs)
+            try:
+                dashboard = importlib.import_module("foxcat_energy.dashboard")
+                dashboard._dir = lambda: versions
+
+                class FakeConfig:
+                    def path(self, *parts: str) -> str:
+                        return str(root.joinpath("config", *parts))
+
+                class FakeHass:
+                    config = FakeConfig()
+
+                    async def async_add_executor_job(self, function, *args):
+                        return function(*args)
+
+                created, tablet_path = asyncio.run(
+                    dashboard.async_ensure_dashboard(FakeHass(), None, {})
+                )
+                self.assertTrue(created)
+                self.assertEqual(Path(tablet_path).read_text(encoding="utf-8"), "layout: tablet\n")
+                mobile_path = root / "config" / "foxcat_energy" / "dashboardmob1.yaml"
+                self.assertEqual(mobile_path.read_text(encoding="utf-8"), "layout: mobile\n")
+            finally:
+                sys.modules.pop("foxcat_energy.dashboard", None)
+                if original_dashboard_attr is None and hasattr(package, "dashboard"):
+                    delattr(package, "dashboard")
+                elif original_dashboard_attr is not None:
+                    package.dashboard = original_dashboard_attr
+                if original_dashboard is not None:
+                    sys.modules["foxcat_energy.dashboard"] = original_dashboard
+                for name, module in original.items():
+                    if module is None:
+                        sys.modules.pop(name, None)
+                    else:
+                        sys.modules[name] = module
 
     def test_repository_dashboard_versions_include_both_current_layouts(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"

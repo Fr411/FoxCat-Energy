@@ -1,32 +1,64 @@
 from __future__ import annotations
 
-import re
 import json
+import re
 from pathlib import Path
+from typing import Literal
 
 _VERSION_PATTERN = re.compile(r"^dashboard_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)\.yaml$")
+_MOBILE_VERSION_PATTERN = re.compile(
+    r"^dashboard_mobile_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)\.yaml$"
+)
 CURRENT_DASHBOARD_VERSION = "1.7.4"
+DashboardVariant = Literal["tablet", "mobile"]
+_VARIANT_FILES: dict[DashboardVariant, tuple[str, str]] = {
+    "tablet": ("dashboard.yaml", "dashboard_state.json"),
+    "mobile": ("dashboardmob1.yaml", "dashboard_state_mobile.json"),
+}
+DASHBOARD_VARIANTS = tuple(_VARIANT_FILES)
+_VARIANT_SOURCES: dict[DashboardVariant, tuple[str, re.Pattern[str]]] = {
+    "tablet": ("dashboard_v", _VERSION_PATTERN),
+    "mobile": ("dashboard_mobile_v", _MOBILE_VERSION_PATTERN),
+}
+
+
+def dashboard_variant_files(variant: DashboardVariant) -> tuple[str, str]:
+    try:
+        return _VARIANT_FILES[variant]
+    except KeyError as err:
+        raise ValueError(f"Type de dashboard inconnu : {variant}") from err
+
+
+def dashboard_template_path(
+    directory: Path, version: str, variant: DashboardVariant = "tablet"
+) -> Path:
+    try:
+        prefix, _ = _VARIANT_SOURCES[variant]
+    except KeyError as err:
+        raise ValueError(f"Type de dashboard inconnu : {variant}") from err
+    source = directory / f"{prefix}{version}.yaml"
+    if source.is_file():
+        return source
+    if variant == "tablet" and version == CURRENT_DASHBOARD_VERSION:
+        return directory.parent / "dashboard.yaml"
+    return source
 
 
 # FONCTION : available_dashboard_versions — Available dashboard versions
-def available_dashboard_versions(directory: Path, variant: str = "tablet") -> list[str]:
+def available_dashboard_versions(
+    directory: Path, variant: DashboardVariant = "tablet"
+) -> list[str]:
+    try:
+        prefix, pattern = _VARIANT_SOURCES[variant]
+    except KeyError as err:
+        raise ValueError(f"Type de dashboard inconnu : {variant}") from err
     versions = []
-    pattern = (
-        re.compile(r"^dashboard_mobile_v(\d+(?:\.\d+)+(?:-[a-z][a-z0-9-]*)?)\.yaml$")
-        if variant == "mobile"
-        else _VERSION_PATTERN
-    )
-    prefix = "dashboard_mobile_v" if variant == "mobile" else "dashboard_v"
     for path in directory.glob(f"{prefix}*.yaml"):
         match = pattern.fullmatch(path.name)
         if match:
             versions.append(match.group(1))
-    fallback = (
-        directory / "Mobile Dash.yaml"
-        if variant == "mobile"
-        else directory.parent / "dashboard.yaml"
-    )
-    if fallback.is_file() and CURRENT_DASHBOARD_VERSION not in versions:
+    fallback = directory.parent / "dashboard.yaml" if variant == "tablet" else None
+    if fallback is not None and fallback.is_file() and CURRENT_DASHBOARD_VERSION not in versions:
         versions.append(CURRENT_DASHBOARD_VERSION)
     return sorted(
         versions,
@@ -52,7 +84,7 @@ def dashboard_version_label(version: str, directory: Path) -> str:
 
 # FONCTION : dashboard_version_for_label — Dashboard version for label
 def dashboard_version_for_label(
-    label: str, directory: Path, variant: str = "tablet"
+    label: str, directory: Path, variant: DashboardVariant = "tablet"
 ) -> str:
     for version in available_dashboard_versions(directory, variant):
         if dashboard_version_label(version, directory) == label:
@@ -61,7 +93,9 @@ def dashboard_version_for_label(
 
 
 # FONCTION : recommended_dashboard_version — Recommended dashboard version
-def recommended_dashboard_version(directory: Path, variant: str = "tablet") -> str | None:
+def recommended_dashboard_version(
+    directory: Path, variant: DashboardVariant = "tablet"
+) -> str | None:
     versions = available_dashboard_versions(directory, variant)
     for version in versions:
         manifest = directory / f"manifest_v{version}.json"
