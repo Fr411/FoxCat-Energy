@@ -18,7 +18,6 @@ from .const import (
 from .tariff_model import tariff_dimensions
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
-from .dashboard_versions import DashboardVariant
 from .select_options import (
     constrained_option,
     mode_option,
@@ -39,8 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatTariffStructureSelect(coordinator),
             FoxCatNetworkPolicySelect(coordinator),
             FoxCatPriManualLevelSelect(coordinator),
-            FoxCatDashboardVersionSelect(coordinator, "tablet"),
-            FoxCatDashboardVersionSelect(coordinator, "mobile"),
+            FoxCatDashboardVersionSelect(coordinator),
         ]
     )
 
@@ -243,44 +241,28 @@ class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntit
         await self.coordinator.async_set_setting("network_policy", option)
 
 
-_DASHBOARD_SELECT_NAMES: dict[DashboardVariant, tuple[str, str]] = {
-    "tablet": ("dashboard_version", "Version du dashboard tablette/PC"),
-    "mobile": ("dashboard_mobile_version", "Version du dashboard mobile"),
-}
-
-
 class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
-    def __init__(
-        self, coordinator: FoxCatEnergyCoordinator, variant: DashboardVariant
-    ) -> None:
-        try:
-            key, name = _DASHBOARD_SELECT_NAMES[variant]
-        except KeyError as err:
-            raise ValueError(f"Type de dashboard inconnu : {variant}") from err
-        self._variant = variant
-        super().__init__(coordinator, key, name, "mdi:view-dashboard", "diagnostic")
-
     # MÉTHODE : FoxCatDashboardVersionSelect.options — Options
     @property
     def options(self) -> list[str]:
         from .dashboard import dashboard_select_options, dashboard_version_label
 
         return [
-            dashboard_version_label(option, self._variant)
-            for option in dashboard_select_options(
-                self.coordinator.hass, self._variant
-            )
+            dashboard_version_label(option)
+            for option in dashboard_select_options(self.coordinator.hass)
         ]
+
+    # MÉTHODE : FoxCatDashboardVersionSelect.__init__ — méthode spéciale __init__
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(coordinator, "dashboard_version", "Version du dashboard", "mdi:view-dashboard", "diagnostic")
 
     # MÉTHODE : FoxCatDashboardVersionSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
         from .dashboard import dashboard_status, dashboard_version_label
 
-        active = dashboard_status(
-            self.coordinator.hass, self._variant
-        ).get("active_version")
-        active = dashboard_version_label(active, self._variant) if active else active
+        active = dashboard_status(self.coordinator.hass).get("active_version")
+        active = dashboard_version_label(active) if active else active
         return active if active in self.options else (self.options[0] if self.options else None)
 
     # MÉTHODE : FoxCatDashboardVersionSelect.async_select_option — traitement asynchrone : select option
@@ -301,8 +283,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
                 self.coordinator.hass,
                 self.coordinator.entry,
                 self.coordinator.config,
-                dashboard_version_for_label(option, self._variant),
-                self._variant,
+                dashboard_version_for_label(option),
             )
         except ValueError as err:
             from homeassistant.components import persistent_notification
