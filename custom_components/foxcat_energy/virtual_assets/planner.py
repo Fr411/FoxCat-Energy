@@ -59,6 +59,16 @@ def _ev_allocation(first: Slot, window: list[Slot], ev: VirtualEV) -> float:
         else:
             key = (2, 0.0, idx)
         cands.append((key, idx, cap))
+    first_candidate = next((candidate for candidate in cands if candidate[1] == 0), None)
+    if first_candidate is not None and _net(first) > _EPS:
+        _, _, first_cap = first_candidate
+        departure_is_due = ev.session.departure <= first.start + timedelta(hours=first.hours)
+        if not departure_is_due:
+            solar_cap = min(first_cap, _net(first))
+            cands = [
+                (key, idx, solar_cap if idx == 0 else cap)
+                for key, idx, cap in cands
+            ]
     cands.sort()
     for _, idx, cap in cands:
         take = min(cap, need)
@@ -75,7 +85,7 @@ def _arbitrage_charge(window: list[Slot], battery: VirtualBattery, cfg: PlannerC
     """Énergie AC à charger depuis le réseau sur le premier pas (0 si non rentable)."""
     first = window[0]
     p0 = first.import_price
-    if p0 is None:
+    if p0 is None or len(window) < 2 or any(s.import_price is None for s in window[1:]):
         return 0.0
     eta_c, eta_d = battery.spec.charge_efficiency, battery.spec.discharge_efficiency
     cost = p0 / (eta_c * eta_d) + wear
@@ -107,6 +117,20 @@ def _holdback(window: list[Slot], first: Slot) -> float:
                if _net(s) < 0 and s.import_price is not None and s.import_price > first.import_price)
 
 
+def _export_peak(window: list[Slot], first: Slot, cfg: PlannerConfig, wear: float) -> bool:
+    """Autorise l'export batterie seulement sur un pic dynamique confirmé par l'horizon."""
+    if not cfg.allow_export_arbitrage or first.export_price is None:
+        return False
+    if len(window) < 2 or any(s.export_price is None for s in window[1:]):
+        return False
+    future_prices = [s.export_price for s in window[1:]]
+    return bool(
+        future_prices
+        and first.export_price > wear
+        and first.export_price - max(future_prices) >= cfg.min_arbitrage_margin_eur_kwh
+    )
+
+
 def plan_and_apply(window: list[Slot], battery: VirtualBattery, ev: VirtualEV | None,
                    cfg: PlannerConfig) -> SlotFlow:
     """Décide pour ``window[0]`` et applique la décision aux modèles (clones appelant)."""
@@ -121,6 +145,7 @@ def plan_and_apply(window: list[Slot], battery: VirtualBattery, ev: VirtualEV | 
         wear = 0.0
         reasons.append("wear_unknown")
     net = pv - load
+    export_peak = _export_peak(window, s, cfg, wear)
 
     ev_ac = 0.0
     if ev is not None:
@@ -136,7 +161,8 @@ def plan_and_apply(window: list[Slot], battery: VirtualBattery, ev: VirtualEV | 
 
     bat_chg = bat_grid = bat_dis = 0.0
     if surplus > _EPS:
-        bat_chg = battery.charge(surplus, h)
+        if not export_peak:
+            bat_chg = battery.charge(surplus, h)
         if bat_chg > _EPS:
             reasons.append("solar_surplus_to_battery")
     if deficit > _EPS:
@@ -153,7 +179,14 @@ def plan_and_apply(window: list[Slot], battery: VirtualBattery, ev: VirtualEV | 
                 reasons.append("import_reduction")
         if battery.soc_kwh <= battery.reserve_kwh + _EPS:
             reasons.append("reserve_preserved")
-    if cfg.allow_grid_arbitrage and bat_dis <= _EPS and surplus - bat_chg <= _EPS:
+    bat_export = 0.0
+    if export_peak and deficit <= _EPS and bat_dis <= _EPS:
+        bat_export = battery.discharge(battery.max_discharge_ac(h, battery.reserve_kwh), h,
+                                       battery.reserve_kwh)
+        if bat_export > _EPS:
+            reasons.append("export_arbitrage")
+
+    if cfg.allow_grid_arbitrage and not export_peak and bat_dis <= _EPS and surplus - bat_chg <= _EPS:
         if s.import_price is None:
             reasons.append("price_missing_no_arbitrage")
         else:
@@ -163,16 +196,17 @@ def plan_and_apply(window: list[Slot], battery: VirtualBattery, ev: VirtualEV | 
                 bat_chg += grid_ac
                 reasons.append("tariff_arbitrage")
 
-    export = max(surplus - (bat_chg - bat_grid), 0.0)
+    export = max(surplus - (bat_chg - bat_grid), 0.0) + bat_export
     imp = max(deficit - bat_dis, 0.0) + ev_grid + bat_grid
     action = ("charge_battery_grid" if bat_grid > _EPS else
+              "discharge_battery_to_grid" if bat_export > _EPS else
               "discharge_battery" if bat_dis > _EPS else
               "charge_battery_solar" if bat_chg > _EPS else
               "charge_ev" if ev_ac > _EPS else "idle")
     return SlotFlow(
         start=s.start, hours=h, action=action, reasons=tuple(reasons), load_kwh=load, pv_kwh=pv,
         battery_charge_kwh=bat_chg, battery_charge_from_grid_kwh=bat_grid,
-        battery_discharge_kwh=bat_dis, ev_charge_kwh=ev_ac, ev_charge_from_grid_kwh=ev_grid,
+        battery_discharge_kwh=bat_dis + bat_export, ev_charge_kwh=ev_ac, ev_charge_from_grid_kwh=ev_grid,
         import_kwh=imp, export_kwh=export, soc_battery_kwh=battery.soc_kwh,
         soc_ev_kwh=0.0 if ev is None else ev.soc_kwh, import_price=s.import_price,
         export_price=s.export_price, quality=DataQuality.SIMULATED,

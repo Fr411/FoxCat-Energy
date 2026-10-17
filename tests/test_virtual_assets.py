@@ -95,7 +95,30 @@ class EVTests(unittest.TestCase):
     def test_departure_shortfall(self):
         ev = VirtualEV(EVSpec(), self.session())
         ev.charge(1.0, T0, 1.0)
-        self.assertAlmostEqual(ev.departure_shortfall_kwh(), 30 - 0.9)
+        self.assertAlmostEqual(ev.departure_shortfall_kwh(), 48 - 0.9)
+
+    def test_default_weekday_schedule_charges_before_departure(self):
+        start = datetime(2026, 1, 5, 18, tzinfo=timezone.utc)
+        ev = VirtualEV(EVSpec(capacity_kwh=80, charge_efficiency=1.0))
+        slots = [
+            Slot(start + timedelta(hours=i), 1.0, 0, 0, 0.2, 0.05)
+            for i in range(14)
+        ]
+        res = simulate(slots, VirtualBattery(SPEC, 20), ev,
+                       PlannerConfig(allow_grid_arbitrage=False))
+        self.assertEqual(res.flows[0].ev_charge_kwh, 0.0)  # absent avant 19 h
+        self.assertAlmostEqual(sum(f.ev_charge_kwh for f in res.flows), 24.0)
+        self.assertEqual(res.flows[-1].ev_charge_kwh, 0.0)  # départ à 07 h
+        self.assertEqual(res.ev_reports[0][1], 0.0)
+
+    def test_weekend_ev_absorbs_solar(self):
+        saturday = datetime(2026, 1, 10, 12, tzinfo=timezone.utc)
+        ev = VirtualEV(EVSpec(capacity_kwh=80, charge_efficiency=1.0))
+        res = simulate([Slot(saturday, 1.0, 0, 6, 0.2, 0.05)],
+                       VirtualBattery(SPEC, 20), ev,
+                       PlannerConfig(allow_grid_arbitrage=False))
+        self.assertEqual(res.flows[0].ev_charge_kwh, 6.0)
+        self.assertEqual(res.flows[0].ev_charge_from_grid_kwh, 0.0)
 
 
 class TariffTests(unittest.TestCase):
@@ -210,6 +233,34 @@ class PlannerTests(unittest.TestCase):
         res = simulate([slot(0, 0, 0, None), slot(1, 4, 0, 0.40)], VirtualBattery(SPEC, 20), None)
         self.assertEqual(res.flows[0].action, "idle")
         self.assertIn("price_missing_no_arbitrage", res.flows[0].reasons)
+
+    def test_missing_future_price_blocks_arbitrage(self):
+        slots = [slot(0, 0, 0, 0.10), slot(1, 4, 0, None), slot(2, 4, 0, 0.40)]
+        res = simulate(slots, VirtualBattery(SPEC, 20), None)
+        self.assertEqual(res.flows[0].battery_charge_from_grid_kwh, 0.0)
+
+    def test_dynamic_export_peak_can_discharge_battery_to_grid(self):
+        slots = [slot(0, 0, 0, 0.2, 0.50), slot(1, 0, 0, 0.2, 0.10)]
+        cfg = PlannerConfig(allow_grid_arbitrage=False, allow_export_arbitrage=True)
+        res = simulate(slots, VirtualBattery(SPEC, 80), None, cfg)
+        self.assertEqual(res.flows[0].action, "discharge_battery_to_grid")
+        self.assertEqual(res.flows[0].battery_discharge_kwh, 5.0)
+        self.assertEqual(res.flows[0].export_kwh, 5.0)
+        self.assertIn("export_arbitrage", res.flows[0].reasons)
+
+    def test_missing_future_export_price_blocks_export_arbitrage(self):
+        slots = [slot(0, 0, 0, 0.2, 0.50), slot(1, 0, 0, 0.2, None),
+                 slot(2, 0, 0, 0.2, 0.10)]
+        res = simulate(slots, VirtualBattery(SPEC, 80), None,
+                       PlannerConfig(allow_grid_arbitrage=False, allow_export_arbitrage=True))
+        self.assertEqual(res.flows[0].battery_discharge_kwh, 0.0)
+
+    def test_export_arbitrage_is_disabled_outside_dynamic_tariffs(self):
+        self.assertFalse(config_from_settings({"tariff_regime": "Bi-horaire"}).planner.allow_export_arbitrage)
+        self.assertTrue(config_from_settings({"tariff_regime": "Dynamique"}).planner.allow_export_arbitrage)
+        slots = [slot(0, 0, 0, 0.2, 0.50), slot(1, 0, 0, 0.2, 0.10)]
+        res = simulate(slots, VirtualBattery(SPEC, 80), None, PlannerConfig(allow_grid_arbitrage=False))
+        self.assertEqual(res.flows[0].battery_discharge_kwh, 0.0)
 
     def test_ev_departure_prefers_cheapest_slots(self):
         ev = VirtualEV(EVSpec(capacity_kwh=50, max_charge_kw=10, charge_efficiency=1.0),
@@ -420,6 +471,7 @@ class IsolationTests(unittest.TestCase):
         self.assertEqual(configured.ev.max_charge_kw, 11.0)
         self.assertEqual(configured.ev.charge_efficiency, 0.92)
         self.assertIsNone(config_from_settings({"virtual_ev_enabled": False}).ev)
+        self.assertEqual(config_from_settings({"virtual_ev_enabled": True}).ev.capacity_kwh, 80.0)
 
     def test_invalid_configured_efficiency_is_rejected(self):
         with self.assertRaises(VirtualAssetsError):
@@ -454,6 +506,19 @@ class IsolationTests(unittest.TestCase):
         self.assertIsNone(read_float_state(hass, "b"))
         self.assertIsNone(read_float_state(hass, "c"))
         self.assertIsNone(read_float_state(hass, None))
+
+    def test_virtual_asset_soc_is_restored(self):
+        config = VirtualAssetsConfig(enabled=True, battery=SPEC, ev=EVSpec())
+        runtime = VirtualAssetsRuntime(config)
+        runtime.shadow.observe(slot(0, 0, 4, 0.2))
+        saved = runtime.dump_state()
+
+        restored = VirtualAssetsRuntime(config)
+        self.assertTrue(restored.restore_state(saved))
+        self.assertAlmostEqual(restored.shadow.battery.soc_kwh, runtime.shadow.battery.soc_kwh)
+        self.assertAlmostEqual(
+            restored.shadow._tracker.car.soc_kwh, runtime.shadow._tracker.car.soc_kwh
+        )
 
 
 if __name__ == "__main__":

@@ -2378,12 +2378,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "name": "Chauffe-eau",
                 "power_w": snapshot.boiler_power_w,
             })
+            virtual_prices = self.prices()
+            import_points = export_points = ()
+            if self.virtual_assets.config.enabled:
+                import_points = self._economic_import_points(virtual_prices, snapshot.timestamp)
+                export_points = self._economic_export_points(virtual_prices, snapshot.timestamp)
             self.virtual_assets.observe_snapshot(
                 timestamp=snapshot.timestamp,
                 house_w=snapshot.house_w,
                 pv_w=snapshot.pv_w,
-                prices=self.prices(),
+                prices=virtual_prices,
                 settings=self.settings,
+                import_points=import_points,
+                export_points=export_points,
             )
             if self.accounting.process(snapshot, self.prices(), accounting_appliances):
                 self.hass.async_create_task(self._async_save())
