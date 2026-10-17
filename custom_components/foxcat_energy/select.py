@@ -18,6 +18,7 @@ from .const import (
 from .tariff_model import tariff_dimensions
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
+from .dashboard_versions import DashboardVariant, dashboard_variant_files
 from .select_options import (
     constrained_option,
     mode_option,
@@ -243,7 +244,10 @@ class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntit
 
 
 class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
-    def __init__(self, coordinator: FoxCatEnergyCoordinator, variant: str) -> None:
+    def __init__(
+        self, coordinator: FoxCatEnergyCoordinator, variant: DashboardVariant
+    ) -> None:
+        dashboard_variant_files(variant)
         self._variant = variant
         if variant == "mobile":
             key = "dashboard_mobile_version"
@@ -259,7 +263,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
         from .dashboard import dashboard_select_options, dashboard_version_label
 
         return [
-            dashboard_version_label(option)
+            dashboard_version_label(option, self._variant)
             for option in dashboard_select_options(
                 self.coordinator.hass, self._variant
             )
@@ -273,7 +277,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
         active = dashboard_status(
             self.coordinator.hass, self._variant
         ).get("active_version")
-        active = dashboard_version_label(active) if active else active
+        active = dashboard_version_label(active, self._variant) if active else active
         return active if active in self.options else (self.options[0] if self.options else None)
 
     # MÉTHODE : FoxCatDashboardVersionSelect.async_select_option — traitement asynchrone : select option

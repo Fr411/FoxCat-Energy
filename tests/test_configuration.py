@@ -30,6 +30,7 @@ from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
     dashboard_template_path,
     dashboard_variant_files,
+    dashboard_version_for_label,
     dashboard_version_label,
     recommended_dashboard_version,
 )
@@ -252,6 +253,31 @@ class DashboardAndProfileTests(unittest.TestCase):
                 recommended_dashboard_version(directory, "mobile"),
                 "1.7.4",
             )
+            (directory / "dashboard_v1.7.4.yaml").touch()
+            (directory / "manifest_v1.7.4.json").write_text(
+                '{"name":"Tablette 1.7.4"}',
+                encoding="utf-8",
+            )
+            (directory / "manifest_mobile_v1.7.4.json").write_text(
+                '{"name":"Mobile 1.7.4"}',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                dashboard_version_label("1.7.4", directory, "tablet"),
+                "Tablette 1.7.4",
+            )
+            self.assertEqual(
+                dashboard_version_label("1.7.4", directory, "mobile"),
+                "Mobile 1.7.4",
+            )
+            self.assertEqual(
+                dashboard_version_for_label("Tablette 1.7.4", directory, "tablet"),
+                "1.7.4",
+            )
+            self.assertEqual(
+                dashboard_version_for_label("Mobile 1.7.4", directory, "mobile"),
+                "1.7.4",
+            )
 
     def test_dashboard_templates_and_generated_files_are_independent(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -315,10 +341,14 @@ class DashboardAndProfileTests(unittest.TestCase):
                     async def async_add_executor_job(self, function, *args):
                         return function(*args)
 
-                created, tablet_path = asyncio.run(
+                created_paths = asyncio.run(
                     dashboard.async_ensure_dashboard(FakeHass(), None, {})
                 )
-                self.assertTrue(created)
+                self.assertEqual(
+                    {Path(path).name for path in created_paths},
+                    {"dashboard.yaml", "dashboardmob1.yaml"},
+                )
+                tablet_path = root / "config" / "foxcat_energy" / "dashboard.yaml"
                 self.assertEqual(Path(tablet_path).read_text(encoding="utf-8"), "layout: tablet\n")
                 mobile_path = root / "config" / "foxcat_energy" / "dashboardmob1.yaml"
                 self.assertEqual(mobile_path.read_text(encoding="utf-8"), "layout: mobile\n")

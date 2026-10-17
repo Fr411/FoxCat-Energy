@@ -94,14 +94,14 @@ def available_dashboard_versions(variant: DashboardVariant = "tablet") -> list[s
 
 # FONCTION : recommended_dashboard_version — Recommended dashboard version
 def recommended_dashboard_version(variant: DashboardVariant = "tablet") -> str | None:
-    versions = available_dashboard_versions(variant)
-    recommended = _scan_recommended_version(_dir(), variant)
-    return recommended if recommended in versions else (versions[0] if versions else None)
+    return _scan_recommended_version(_dir(), variant)
 
 
 # FONCTION : dashboard_version_label — Dashboard version label
-def dashboard_version_label(version: str) -> str:
-    return _scan_dashboard_version_label(version, _dir())
+def dashboard_version_label(
+    version: str, variant: DashboardVariant = "tablet"
+) -> str:
+    return _scan_dashboard_version_label(version, _dir(), variant)
 
 
 # FONCTION : dashboard_version_for_label — Dashboard version for label
@@ -245,9 +245,8 @@ async def async_switch_dashboard(
 # FONCTION ASYNCHRONE : async_ensure_dashboard — traitement asynchrone : ensure dashboard
 async def async_ensure_dashboard(
     hass: HomeAssistant, entry: ConfigEntry, config: dict[str, Any]
-) -> tuple[bool, str]:
-    tablet_target = _target(hass)
-    created_path = None
+) -> list[str]:
+    created_paths: list[str] = []
     for variant in DASHBOARD_VARIANTS:
         target = _target(hass, variant)
         if target.exists():
@@ -261,8 +260,8 @@ async def async_ensure_dashboard(
         await async_switch_dashboard(
             hass, entry, config, recommended, variant
         )
-        created_path = created_path or str(target)
-    return created_path is not None, created_path or str(tablet_target)
+        created_paths.append(str(target))
+    return created_paths
 
 
 # FONCTION ASYNCHRONE : async_regenerate_dashboard — traitement asynchrone : regenerate dashboard

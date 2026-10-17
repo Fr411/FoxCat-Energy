@@ -72,8 +72,16 @@ def available_dashboard_versions(
 
 
 # FONCTION : dashboard_version_label — Dashboard version label
-def dashboard_version_label(version: str, directory: Path) -> str:
-    manifest = directory / f"manifest_v{version}.json"
+def dashboard_version_label(
+    version: str, directory: Path, variant: DashboardVariant = "tablet"
+) -> str:
+    dashboard_variant_files(variant)
+    manifest_name = (
+        f"manifest_mobile_v{version}.json"
+        if variant == "mobile"
+        else f"manifest_v{version}.json"
+    )
+    manifest = directory / manifest_name
     try:
         metadata = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -87,7 +95,7 @@ def dashboard_version_for_label(
     label: str, directory: Path, variant: DashboardVariant = "tablet"
 ) -> str:
     for version in available_dashboard_versions(directory, variant):
-        if dashboard_version_label(version, directory) == label:
+        if dashboard_version_label(version, directory, variant) == label:
             return version
     return label
 
@@ -98,7 +106,12 @@ def recommended_dashboard_version(
 ) -> str | None:
     versions = available_dashboard_versions(directory, variant)
     for version in versions:
-        manifest = directory / f"manifest_v{version}.json"
+        manifest_name = (
+            f"manifest_mobile_v{version}.json"
+            if variant == "mobile"
+            else f"manifest_v{version}.json"
+        )
+        manifest = directory / manifest_name
         try:
             metadata = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
