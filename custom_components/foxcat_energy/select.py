@@ -7,6 +7,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DOMAIN,
+    DISTRIBUTION_PROFILE_BI,
     DISTRIBUTION_PROFILES,
     MODE_MANUAL,
     MODES,
@@ -204,12 +205,12 @@ class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
     _attr_options = DISTRIBUTION_PROFILES
     option_descriptions = {
         "Simple": "Un tarif de distribution identique à toute heure.",
-        "Bi-horaire": "Profil de comptage jour/nuit, indépendant du contrat d’énergie.",
+        DISTRIBUTION_PROFILE_BI: "Profil de comptage jour/nuit, indépendant du contrat d’énergie.",
         "Impact": "Profil wallon PIC, MEDIUM et ECO selon les plages configurées.",
     }
     option_icons = {
         "Simple": "mdi:clock-outline",
-        "Bi-horaire": "mdi:clock-time-eight-outline",
+        DISTRIBUTION_PROFILE_BI: "mdi:clock-time-eight-outline",
         "Impact": "mdi:chart-sankey",
     }
 
@@ -217,7 +218,7 @@ class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
         super().__init__(
             coordinator,
             "profil_distribution_belgique",
-            "Profil Distribution Belgique",
+            "Profil de distribution Belgique",
             "mdi:transmission-tower",
             "distribution_profile",
             DISTRIBUTION_PROFILES,

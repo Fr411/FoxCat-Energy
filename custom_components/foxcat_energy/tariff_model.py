@@ -9,13 +9,16 @@ from .const import (
     DISTRIBUTION_PROFILE_SIMPLE,
     DISTRIBUTION_PROFILES,
     DYNAMIC_STRUCT_IMPACT,
-    TARIFF_STRUCTURE_IMPACT,
-    TARIFF_STRUCTURE_TOU,
 )
 PRICE_SOURCE_CONTRACT='Contractuelle / fixe'; PRICE_SOURCE_VARIABLE='Variable via entités Home Assistant'; PRICE_SOURCE_INTEGRATION='Intégration externe'; PRICE_SOURCE_DYNAMIC='Dynamique Day-Ahead'
 PRICE_SOURCES=[PRICE_SOURCE_CONTRACT,PRICE_SOURCE_VARIABLE,PRICE_SOURCE_INTEGRATION,PRICE_SOURCE_DYNAMIC]
 TARIFF_STRUCTURE_SIMPLE='Simple'; TARIFF_STRUCTURE_TOU='Bi-horaire'; TARIFF_STRUCTURE_IMPACT='Impact'; TARIFF_STRUCTURES=[TARIFF_STRUCTURE_SIMPLE,TARIFF_STRUCTURE_TOU,TARIFF_STRUCTURE_IMPACT]
 NETWORK_POLICY_COMPENSATION='Compensation'; NETWORK_POLICY_TARIFFED='Injection tarifée'; NETWORK_POLICY_NOT_VALUED='Injection non valorisée'; NETWORK_POLICY_ZERO='Zéro injection'; NETWORK_POLICIES=[NETWORK_POLICY_COMPENSATION,NETWORK_POLICY_TARIFFED,NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO]
+IMPACT_ADDER_KEYS = {
+    "ECO": "impact_eco_adder_eur_kwh",
+    "MEDIUM": "impact_medium_adder_eur_kwh",
+    "PIC": "impact_peak_adder_eur_kwh",
+}
 @dataclass(frozen=True,slots=True)
 class TariffDimensions:
     price_source:str; structure:str; network_policy:str; distribution_profile:str
@@ -95,7 +98,8 @@ def final_client_price(base,at,settings):
     if not settings.get('price_curve_is_final',True): p+=sum(float(settings.get(k,0)) for k in ('tariff_network_component_eur_kwh','tariff_tax_component_eur_kwh','tariff_contract_component_eur_kwh'))
     dims=tariff_dimensions(settings)
     if dims.distribution_profile == DISTRIBUTION_PROFILE_IMPACT:
-        p+=float(settings.get({'ECO':'impact_eco_adder_eur_kwh','MEDIUM':'impact_medium_adder_eur_kwh','PIC':'impact_peak_adder_eur_kwh'}[distribution_period(at,settings)],0))
+        period = impact_period(at, settings)
+        p += float(settings.get(IMPACT_ADDER_KEYS[period], 0))
     elif dims.distribution_profile == DISTRIBUTION_PROFILE_BI and dims.dynamic:
         p+=float(settings.get('tariff_tou_hp_adder_eur_kwh' if tou_period(at,settings)=='HP' else 'tariff_tou_hc_adder_eur_kwh',0))
     return p
