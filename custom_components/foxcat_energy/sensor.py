@@ -9,7 +9,13 @@ from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfTemperature, Unit
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, VERSION, CONF_GRID_SIGNED_SENSOR, CONF_PV_SENSOR
+from .const import (
+    ACCOUNTING_APPLIANCE_LABELS,
+    DOMAIN,
+    VERSION,
+    CONF_GRID_SIGNED_SENSOR,
+    CONF_PV_SENSOR,
+)
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .registry import registry_diagnostics
@@ -241,7 +247,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ])
 
     # Un jeu de capteurs est créé automatiquement pour chaque appareil FoxCat mesuré.
-    appliance_defs = [("boiler", "Chauffe-eau")] + [(m.machine_id, m.name) for m in c.machines if m.power_sensor]
+    appliance_defs = list(ACCOUNTING_APPLIANCE_LABELS.items())
+    known_appliances = set(ACCOUNTING_APPLIANCE_LABELS)
+    appliance_defs.extend(
+        (machine.machine_id, machine.name)
+        for machine in c.machines
+        if machine.power_sensor and machine.machine_id not in known_appliances
+    )
     for appliance_id, appliance_name in appliance_defs:
         safe = appliance_id.replace(" ", "_").lower()
         entities.extend([

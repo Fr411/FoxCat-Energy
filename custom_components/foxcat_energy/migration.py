@@ -23,53 +23,55 @@ def compatibility_tariff_regime(settings):
 
 # FONCTION : migrate_settings_v173 — Migrate settings v173
 def migrate_settings_v173(settings: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
- out, notes = migrate_settings_v171(settings)
+    out, notes = migrate_settings_v171(settings)
 
- mode = str(out.get("mode", MODE_ECO))
- out["mode"] = MODE_ALIASES.get(mode, mode if mode in MODES else MODE_ECO)
+    mode = str(out.get("mode", MODE_ECO))
+    out["mode"] = MODE_ALIASES.get(mode, mode if mode in MODES else MODE_ECO)
 
- price_source = str(out.get("price_source", PRICE_SOURCE_VARIABLE))
- if price_source not in PRICE_SOURCES:
-     price_aliases = {
-         "Dynamique": PRICE_SOURCE_DYNAMIC,
-         "Dynamic": PRICE_SOURCE_DYNAMIC,
-         "Fixe": PRICE_SOURCE_CONTRACT,
-         "Contractuelle": PRICE_SOURCE_CONTRACT,
-         "Variable": PRICE_SOURCE_VARIABLE,
-     }
-     out["price_source"] = price_aliases.get(price_source, PRICE_SOURCE_VARIABLE)
-     notes.append("Source de prix invalide normalisée vers une option prise en charge.")
+    price_source = str(out.get("price_source", PRICE_SOURCE_VARIABLE))
+    if price_source not in PRICE_SOURCES:
+        price_aliases = {
+            "Dynamique": PRICE_SOURCE_DYNAMIC,
+            "Dynamic": PRICE_SOURCE_DYNAMIC,
+            "Fixe": PRICE_SOURCE_CONTRACT,
+            "Contractuelle": PRICE_SOURCE_CONTRACT,
+            "Variable": PRICE_SOURCE_VARIABLE,
+        }
+        out["price_source"] = price_aliases.get(price_source, PRICE_SOURCE_VARIABLE)
+        notes.append("Source de prix invalide normalisée vers une option prise en charge.")
 
- structure = str(out.get("tariff_structure", TARIFF_STRUCTURE_TOU))
- if structure not in TARIFF_STRUCTURES:
-     structure_aliases = {
-         "Bi-horaire HP/HC": TARIFF_STRUCTURE_TOU,
-         "Bihoraire": TARIFF_STRUCTURE_TOU,
-         "HP/HC": TARIFF_STRUCTURE_TOU,
-     }
-     out["tariff_structure"] = structure_aliases.get(structure, TARIFF_STRUCTURE_TOU)
-     notes.append("Structure tarifaire invalide normalisée vers une option prise en charge.")
+    structure = str(out.get("tariff_structure", TARIFF_STRUCTURE_TOU))
+    if structure not in TARIFF_STRUCTURES:
+        structure_aliases = {
+            "Bi-horaire HP/HC": TARIFF_STRUCTURE_TOU,
+            "Bihoraire": TARIFF_STRUCTURE_TOU,
+            "HP/HC": TARIFF_STRUCTURE_TOU,
+        }
+        out["tariff_structure"] = structure_aliases.get(structure, TARIFF_STRUCTURE_TOU)
+        notes.append("Structure tarifaire invalide normalisée vers une option prise en charge.")
 
- network_policy = str(out.get("network_policy", NETWORK_POLICY_COMPENSATION))
- if network_policy not in NETWORK_POLICIES:
-     network_aliases = {
-         NETWORK_POLICY_LEGACY_BILLED_EXPORT: NETWORK_POLICY_BILLED_EXPORT,
-         "Réinjection autorisée": NETWORK_POLICY_BILLED_EXPORT,
-         "Réinjection refusée": NETWORK_POLICY_ZERO_INJECTION,
-     }
-     out["network_policy"] = network_aliases.get(network_policy, NETWORK_POLICY_COMPENSATION)
-     notes.append("Politique réseau invalide normalisée vers une option prise en charge.")
+    network_policy = str(out.get("network_policy", NETWORK_POLICY_COMPENSATION))
+    if network_policy not in NETWORK_POLICIES:
+        network_aliases = {
+            NETWORK_POLICY_LEGACY_BILLED_EXPORT: NETWORK_POLICY_BILLED_EXPORT,
+            "Réinjection autorisée": NETWORK_POLICY_BILLED_EXPORT,
+            "Réinjection refusée": NETWORK_POLICY_ZERO_INJECTION,
+        }
+        out["network_policy"] = network_aliases.get(network_policy, NETWORK_POLICY_COMPENSATION)
+        notes.append("Politique réseau invalide normalisée vers une option prise en charge.")
 
- out["tariff_regime"] = compatibility_tariff_regime(out)
- if "dynamic_high_position_pct" not in out:
-  out["dynamic_high_position_pct"] = DEFAULT_DYNAMIC_HIGH_POSITION_PCT
-  notes.append("Plafond Day-Ahead initialisé à 70 % conformément au nouveau défaut.")
- for key in (
-     "device_inverter_enabled",
-     "device_meter_enabled",
-     "device_boiler_enabled",
-     "device_machines_enabled",
- ):
-     out.setdefault(key, True)
- out["configuration_model_version"] = MIGRATION_MODEL_VERSION
- return out, notes
+    out["tariff_regime"] = compatibility_tariff_regime(out)
+    if "dynamic_high_position_pct" not in out:
+        out["dynamic_high_position_pct"] = DEFAULT_DYNAMIC_HIGH_POSITION_PCT
+        notes.append(
+            f"Plafond Day-Ahead initialisé à {DEFAULT_DYNAMIC_HIGH_POSITION_PCT:g} % conformément au nouveau défaut."
+        )
+    for key in (
+        "device_inverter_enabled",
+        "device_meter_enabled",
+        "device_boiler_enabled",
+        "device_machines_enabled",
+    ):
+        out.setdefault(key, True)
+    out["configuration_model_version"] = MIGRATION_MODEL_VERSION
+    return out, notes

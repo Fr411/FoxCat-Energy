@@ -163,6 +163,12 @@ DISTRIBUTION_PROFILES = [
     DISTRIBUTION_PROFILE_BI,
     DISTRIBUTION_PROFILE_IMPACT,
 ]
+ACCOUNTING_APPLIANCE_LABELS = {
+    "boiler": "Chauffe-eau",
+    "washer": "Lave-linge",
+    "dryer": "Sèche-linge",
+    "dishwasher": "Lave-vaisselle",
+}
 DYNAMIC_STRUCT_SIMPLE = "Simple"
 DYNAMIC_STRUCT_BI = "Bi-horaire"
 DYNAMIC_STRUCT_IMPACT = "Impact (Capacitaire)"

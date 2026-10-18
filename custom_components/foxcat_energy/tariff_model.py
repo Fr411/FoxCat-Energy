@@ -24,6 +24,7 @@ from .const import (
     TARIFF_STRUCTURE_SIMPLE,
     TARIFF_STRUCTURE_TOU,
 )
+# Keep former public aliases for compatibility with existing imports.
 NETWORK_POLICY_TARIFFED = NETWORK_POLICY_BILLED_EXPORT
 NETWORK_POLICY_ZERO = NETWORK_POLICY_ZERO_INJECTION
 IMPACT_ADDER_KEYS = {

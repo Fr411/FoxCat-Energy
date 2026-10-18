@@ -18,6 +18,7 @@ package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.const import (
+    ACCOUNTING_APPLIANCE_LABELS,
     DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     DYNAMIC_STRUCT_BI,
     DYNAMIC_STRUCT_IMPACT,
@@ -362,6 +363,15 @@ class DashboardAndProfileTests(unittest.TestCase):
                     "accounting.appliance.washer.hc_today",
                 ):
                     self.assertIn(role, registry.BINDINGS)
+                for appliance_id in ACCOUNTING_APPLIANCE_LABELS:
+                    self.assertIn(
+                        f"accounting.appliance.{appliance_id}.hp_today",
+                        registry.BINDINGS,
+                    )
+                    self.assertIn(
+                        f"accounting.appliance.{appliance_id}.hc_today",
+                        registry.BINDINGS,
+                    )
         finally:
             sys.modules.pop("foxcat_energy.registry", None)
             if original_registry is not None:
