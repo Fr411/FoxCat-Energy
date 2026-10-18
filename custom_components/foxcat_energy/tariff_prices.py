@@ -129,8 +129,7 @@ def foreign_price_keys(config: dict[str, Any]) -> frozenset[str]:
     return frozenset() if allowed is None else ALL_PRICE_KEYS - allowed
 
 
-# FONCTION : scoped_config — Drop price sensors that do not belong to the selected tariff.
+# FONCTION : scoped_config — Conserve toutes les entités de prix configurées (tous régimes accessibles).
 def scoped_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Drop price sensors that do not belong to the selected tariff."""
-    foreign = foreign_price_keys(config)
-    return {k: v for k, v in config.items() if k not in foreign} if foreign else dict(config)
+    """Keep every configured price entity; the active tariff only drives calculation routing."""
+    return dict(config)

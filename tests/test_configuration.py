@@ -127,6 +127,7 @@ class SelectOptionTests(unittest.TestCase):
                 "tariff_structure": "Bi-horaire",
                 CONF_TARIFF_HP_PRICE_SENSOR: "sensor.custom_hp",
                 CONF_TARIFF_HC_PRICE_SENSOR: "sensor.custom_hc",
+                "price_current": "sensor.dynamic_price",
             },
         )
 
