@@ -10,7 +10,7 @@
         "title": "FoxCat Energy – Contrat",
         "description": "Choisissez la famille de votre contrat.",
         "menu_options": {
-          "hphc": "Tarif HP/HC",
+          "Bi-Horaire": "Tarif HP/HC",
           "dynamique": "Tarif Dynamique"
         }
       },
