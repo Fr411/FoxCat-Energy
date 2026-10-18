@@ -118,6 +118,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "source_prix_reinjection_fixe", "Source prix fixe de réinjection", "mdi:database-arrow-right-outline", "pricing", lambda d: d["prices"].get("fixed_injection_price_source")),
         FoxCatNumericSensor(c, "surplus_disponible_boiler_cycle_protege", "Surplus disponible pour le chauffe-eau pendant cycle protégé", "mdi:solar-power-variant-outline", "machines", lambda d: d["machine_guard"].get("boiler_surplus_available_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatValueSensor(c, "regime_tarifaire_actif", "Régime tarifaire actif", "mdi:cash-sync", "pricing", lambda d: d["prices"].get("regime")),
+        FoxCatValueSensor(c, "periode_distribution_belgique", "Période de distribution Belgique", "mdi:clock-outline", "pricing", lambda d: d["prices"].get("distribution_period")),
         FoxCatValueSensor(c, "periode_tarifaire", "Période tarifaire", "mdi:clock-time-eight-outline", "pricing", lambda d: d["prices"].get("period")),
         FoxCatValueSensor(c, "statut_prix", "Statut du prix", "mdi:chart-line", "pricing", lambda d: d["prices"].get("status")),
         FoxCatValueSensor(c, "modele_cout", "Modèle de coût", "mdi:calculator-variant-outline", "pricing", lambda d: d["prices"].get("cost_model")),

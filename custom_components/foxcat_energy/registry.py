@@ -234,6 +234,7 @@ _native("machines.protected", "Machines", "machine_protegee_active")
 # Tarification
 _native("pricing.regime", "Tarification", "regime_tarifaire", "select.foxcat_energy_tarification_regime_tarifaire")
 _native("pricing.distribution_profile", "Tarification", "profil_distribution_belgique", "select.foxcat_energy_tarification_profil_distribution_belgique")
+_native("pricing.distribution_period", "Tarification", "periode_distribution_belgique")
 _native("pricing.dynamic_structure", "Tarification", "structure_dynamique")
 _native("pricing.price_source", "Tarification", "source_prix")
 _native("pricing.tariff_structure", "Tarification", "structure_tarifaire")
@@ -295,6 +296,17 @@ _native("accounting.hphc.hp.import_today", "Tarification", "bilan_hp_import_jour
 _native("accounting.hphc.hp.export_today", "Tarification", "bilan_hp_export_jour")
 _native("accounting.hphc.hc.import_today", "Tarification", "bilan_hc_import_jour")
 _native("accounting.hphc.hc.export_today", "Tarification", "bilan_hc_export_jour")
+for _appliance_id in ("boiler", "washer", "dryer", "dishwasher"):
+    _native(
+        f"accounting.appliance.{_appliance_id}.hp_today",
+        "Tarification",
+        f"appareil_{_appliance_id}_hp_jour",
+    )
+    _native(
+        f"accounting.appliance.{_appliance_id}.hc_today",
+        "Tarification",
+        f"appareil_{_appliance_id}_hc_jour",
+    )
 _config("pricing.source.current", "Tarification", CONF_PRICE_CURRENT, "sensor.luminus_luminus_dynamic_wallonia_prix_actuel")
 _config("pricing.source.next", "Tarification", CONF_PRICE_NEXT, "sensor.luminus_luminus_dynamic_wallonia_prix_heure_suivante")
 _config("pricing.source.injection", "Tarification", CONF_PRICE_INJECTION, "sensor.luminus_luminus_dynamic_wallonia_prix_d_injection")

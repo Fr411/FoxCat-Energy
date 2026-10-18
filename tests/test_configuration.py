@@ -9,6 +9,7 @@ import unittest
 import yaml
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 COMPONENT_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
@@ -19,6 +20,9 @@ sys.modules.setdefault("foxcat_energy", package)
 from foxcat_energy.const import (
     DYNAMIC_STRUCT_BI,
     DYNAMIC_STRUCT_IMPACT,
+    DISTRIBUTION_PROFILE_IMPACT,
+    DISTRIBUTION_PROFILE_SIMPLE,
+    DISTRIBUTION_PROFILES,
     MODES,
     NETWORK_POLICIES,
     OFFICIAL_MENU_STEPS,
@@ -41,7 +45,13 @@ from foxcat_energy.dashboard_merge import merge_dashboard_text
 from foxcat_energy.devices import apply_device_toggle, device_definitions
 from foxcat_energy.profiles import profile_path, validate_profile_settings
 from foxcat_energy.migration import migrate_settings_v173
-from foxcat_energy.tariff_model import final_client_price, tariff_dimensions
+from foxcat_energy.tariff_model import (
+    distribution_period,
+    distribution_profile,
+    final_client_price,
+    tariff_dimensions,
+)
+from foxcat_energy.accounting import EnergyAccounting
 from foxcat_energy.tariff_prices import (
     CONF_TARIFF_HC_PRICE_SENSOR,
     CONF_TARIFF_HP_PRICE_SENSOR,
@@ -140,6 +150,76 @@ class SelectOptionTests(unittest.TestCase):
             final_client_price(0.1, datetime(2026, 1, 2, 18), settings),
             0.3,
         )
+
+    def test_distribution_profile_is_independent_from_energy_contract(self) -> None:
+        settings = {
+            "price_source": "Dynamique Day-Ahead",
+            "tariff_structure": "Simple",
+            "dynamic_structure": "Simple",
+            "distribution_profile": DISTRIBUTION_PROFILE_IMPACT,
+            "impact_eco_adder_eur_kwh": 0.01,
+            "impact_medium_adder_eur_kwh": 0.02,
+            "impact_peak_adder_eur_kwh": 0.03,
+        }
+
+        dimensions = tariff_dimensions(settings)
+
+        self.assertEqual(dimensions.structure, "Simple")
+        self.assertEqual(dimensions.distribution_profile, DISTRIBUTION_PROFILE_IMPACT)
+        self.assertEqual(dimensions.network_policy, "Compensation")
+        for hour, expected in ((3, 0.11), (8, 0.12), (18, 0.13)):
+            self.assertAlmostEqual(
+                final_client_price(0.1, datetime(2026, 1, 2, hour), settings),
+                expected,
+            )
+        self.assertEqual(
+            [
+                distribution_period(datetime(2026, 1, 2, hour), settings)
+                for hour in (0, 1, 7, 11, 17, 22)
+            ],
+            ["MEDIUM", "ECO", "MEDIUM", "ECO", "PIC", "MEDIUM"],
+        )
+        settings["distribution_profile"] = DISTRIBUTION_PROFILE_SIMPLE
+        self.assertEqual(distribution_profile(settings), DISTRIBUTION_PROFILE_SIMPLE)
+        self.assertEqual(final_client_price(0.1, datetime(2026, 1, 2, 18), settings), 0.1)
+        self.assertEqual(
+            DISTRIBUTION_PROFILES,
+            ["Simple", "Bi-horaire (jour / nuit)", "Impact"],
+        )
+        self.assertEqual(
+            distribution_profile({"dynamic_structure": DYNAMIC_STRUCT_IMPACT}),
+            DISTRIBUTION_PROFILE_IMPACT,
+        )
+        self.assertEqual(
+            distribution_profile(
+                {"dynamic_structure": "Simple", "tariff_structure": "Impact"}
+            ),
+            DISTRIBUTION_PROFILE_IMPACT,
+        )
+
+    def test_reinjection_value_never_changes_physical_import_kwh(self) -> None:
+        accounting = EnergyAccounting()
+        first = datetime(2026, 1, 2, 12, 0)
+        snapshot = SimpleNamespace(
+            timestamp=first,
+            valid=True,
+            house_w=500.0,
+            pv_w=500.0,
+            import_w=100.0,
+            export_w=50.0,
+        )
+        accounting.process(snapshot, {"regime": "Mono-horaire", "active_buy": 0.2}, [])
+        snapshot.timestamp = first.replace(minute=1)
+        accounting.process(
+            snapshot,
+            {"regime": "Mono-horaire", "active_buy": 0.2, "export_value": -0.3},
+            [],
+        )
+
+        totals = accounting.view()["today"]
+        self.assertAlmostEqual(totals["import_kwh"], 100.0 / 1000 * 60 / 3600)
+        self.assertAlmostEqual(totals["export_kwh"], 50.0 / 1000 * 60 / 3600)
+        self.assertGreater(totals["export_cost_eur"], 0)
 
     def test_legacy_invalid_values_migrate_to_supported_options(self) -> None:
         migrated, notes = migrate_settings_v173(

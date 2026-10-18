@@ -42,10 +42,23 @@ def distribution_profile(settings):
     profile = settings.get("distribution_profile")
     if profile in DISTRIBUTION_PROFILES:
         return profile
-    legacy_structure = settings.get("dynamic_structure", settings.get("tariff_structure"))
-    if legacy_structure in {DISTRIBUTION_PROFILE_IMPACT, DYNAMIC_STRUCT_IMPACT, TARIFF_STRUCTURE_IMPACT}:
+    legacy_structures = {
+        value
+        for key in ("dynamic_structure", "tariff_structure")
+        if isinstance((value := settings.get(key)), str)
+    }
+    if legacy_structures & {
+        DISTRIBUTION_PROFILE_IMPACT,
+        DYNAMIC_STRUCT_IMPACT,
+        TARIFF_STRUCTURE_IMPACT,
+    }:
         return DISTRIBUTION_PROFILE_IMPACT
-    if legacy_structure in {DISTRIBUTION_PROFILE_BI, TARIFF_STRUCTURE_TOU, "Bi-horaire (HP/HC)"}:
+    if legacy_structures & {
+        DISTRIBUTION_PROFILE_BI,
+        TARIFF_STRUCTURE_TOU,
+        "Bi-horaire",
+        "Bi-horaire (HP/HC)",
+    }:
         return DISTRIBUTION_PROFILE_BI
     return DISTRIBUTION_PROFILE_SIMPLE
 # FONCTION : _minute — Minute
@@ -65,13 +78,24 @@ def impact_period(at,settings):
     if _within(x,_minute(settings.get('impact_peak_start'),'17:00'),_minute(settings.get('impact_peak_end'),'22:00')): return 'PIC'
     if _within(x,_minute(settings.get('impact_eco_start_1'),'01:00'),_minute(settings.get('impact_eco_end_1'),'07:00')) or _within(x,_minute(settings.get('impact_eco_start_2'),'11:00'),_minute(settings.get('impact_eco_end_2'),'17:00')): return 'ECO'
     return 'MEDIUM'
+
+
+def distribution_period(at, settings):
+    profile = distribution_profile(settings)
+    if profile == DISTRIBUTION_PROFILE_IMPACT:
+        return impact_period(at, settings)
+    if profile == DISTRIBUTION_PROFILE_BI:
+        return tou_period(at, settings)
+    return "ALL"
+
+
 # FONCTION : final_client_price — Final client price
 def final_client_price(base,at,settings):
     p=float(base)
     if not settings.get('price_curve_is_final',True): p+=sum(float(settings.get(k,0)) for k in ('tariff_network_component_eur_kwh','tariff_tax_component_eur_kwh','tariff_contract_component_eur_kwh'))
     dims=tariff_dimensions(settings)
     if dims.distribution_profile == DISTRIBUTION_PROFILE_IMPACT:
-        p+=float(settings.get({'ECO':'impact_eco_adder_eur_kwh','MEDIUM':'impact_medium_adder_eur_kwh','PIC':'impact_peak_adder_eur_kwh'}[impact_period(at,settings)],0))
+        p+=float(settings.get({'ECO':'impact_eco_adder_eur_kwh','MEDIUM':'impact_medium_adder_eur_kwh','PIC':'impact_peak_adder_eur_kwh'}[distribution_period(at,settings)],0))
     elif dims.distribution_profile == DISTRIBUTION_PROFILE_BI and dims.dynamic:
         p+=float(settings.get('tariff_tou_hp_adder_eur_kwh' if tou_period(at,settings)=='HP' else 'tariff_tou_hc_adder_eur_kwh',0))
     return p

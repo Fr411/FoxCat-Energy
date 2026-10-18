@@ -143,7 +143,9 @@
           "price_tomorrow_available": "Disponibilité des prix de demain",
           "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
           "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
-          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)",
+          "dynamic_favorable_position_pct": "Seuil favorable Day-Ahead",
+          "dynamic_high_position_pct": "Plafond acceptable / zone de pic"
         }
       },
       "solar": {
@@ -533,6 +535,9 @@
         },
         "regime_tarifaire": {
           "name": "Régime tarifaire"
+        },
+        "profil_distribution_belgique": {
+          "name": "Profil de distribution Belgique"
         },
         "politique_reseau": {
           "name": "Politique réseau"

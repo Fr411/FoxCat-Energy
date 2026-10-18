@@ -19406,3 +19406,87 @@ views:
     cards: []
     theme: ios-dark-mode-blue-red
     subview: true
+  - type: sections
+    max_columns: 1
+    title: Configuration Contrat énergétique
+    path: configuration-contrat-energetique
+    icon: mdi:file-document-cog-outline
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Paramètres indépendants du contrat
+            heading_style: title
+            icon: mdi:transmission-tower
+          - type: entities
+            title: Les trois piliers tarifaires
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:pricing.regime]]'
+                name: Régime tarifaire / contrat d’énergie
+              - entity: '[[foxcat:pricing.distribution_profile]]'
+                name: Profil de distribution / comptage wallon
+              - entity: '[[foxcat:pricing.distribution_period]]'
+                name: Plage de distribution active
+              - entity: '[[foxcat:pricing.network_policy]]'
+                name: Politique réseau / réinjection
+              - entity: '[[foxcat:pricing.period]]'
+                name: Période tarifaire active
+          - type: markdown
+            content: >
+              Les trois choix sont indépendants. Impact : PIC 17 h–22 h, MEDIUM
+              7 h–11 h et 22 h–1 h, ECO 1 h–7 h et 11 h–17 h.
+          - type: heading
+            heading: Prix et seuils Day-Ahead
+            heading_style: title
+            icon: mdi:chart-timeline-variant
+          - type: entities
+            title: Suivi dynamique
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:pricing.active_buy]]'
+                name: Prix d’achat actif
+              - entity: '[[foxcat:pricing.next_buy]]'
+                name: Prix d’achat suivant
+              - entity: '[[foxcat:pricing.net_today]]'
+                name: Coût net réseau aujourd’hui
+              - entity: '[[foxcat:settings.dynamic_favorable_position_pct]]'
+                name: Seuil favorable
+              - entity: '[[foxcat:settings.dynamic_high_position_pct]]'
+                name: Seuil zone de pic
+              - entity: '[[foxcat:settings.dynamic_negative_price_charge_enabled]]'
+                name: Charge réseau si prix négatif
+              - entity: '[[foxcat:settings.impact_eco_adder_eur_kwh]]'
+                name: Complément Impact ECO
+              - entity: '[[foxcat:settings.impact_medium_adder_eur_kwh]]'
+                name: Complément Impact MEDIUM
+              - entity: '[[foxcat:settings.impact_peak_adder_eur_kwh]]'
+                name: Complément Impact PIC
+          - type: heading
+            heading: Compteurs et ventilation HP / HC
+            heading_style: title
+            icon: mdi:calculator-variant
+          - type: entities
+            title: Totaux physiques
+            show_header_toggle: false
+            entities:
+              - entity: '[[foxcat:energy.today.import]]'
+                name: Prélèvement réseau (kWh)
+              - entity: '[[foxcat:energy.today.export]]'
+                name: Réinjection réseau (kWh)
+              - entity: '[[foxcat:accounting.appliance.boiler.hp_today]]'
+                name: Boiler HP
+              - entity: '[[foxcat:accounting.appliance.boiler.hc_today]]'
+                name: Boiler HC
+              - entity: '[[foxcat:accounting.appliance.washer.hp_today]]'
+                name: Lave-linge HP
+              - entity: '[[foxcat:accounting.appliance.washer.hc_today]]'
+                name: Lave-linge HC
+              - entity: '[[foxcat:accounting.appliance.dryer.hp_today]]'
+                name: Sèche-linge HP
+              - entity: '[[foxcat:accounting.appliance.dryer.hc_today]]'
+                name: Sèche-linge HC
+              - entity: '[[foxcat:accounting.appliance.dishwasher.hp_today]]'
+                name: Lave-vaisselle HP
+              - entity: '[[foxcat:accounting.appliance.dishwasher.hc_today]]'
+                name: Lave-vaisselle HC

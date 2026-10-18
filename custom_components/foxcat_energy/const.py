@@ -155,7 +155,7 @@ TARIFF_TOU = TARIFF_BI
 TARIFF_SIMPLE = "Simple"
 TARIFF_REGIMES = [TARIFF_MONO, TARIFF_BI, TARIFF_DYNAMIC]
 DISTRIBUTION_PROFILE_SIMPLE = "Simple"
-DISTRIBUTION_PROFILE_BI = "Bi-horaire"
+DISTRIBUTION_PROFILE_BI = "Bi-horaire (jour / nuit)"
 DISTRIBUTION_PROFILE_IMPACT = "Impact"
 DISTRIBUTION_PROFILES = [
     DISTRIBUTION_PROFILE_SIMPLE,
@@ -242,7 +242,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "economic_optimizer_enabled": True,
     "predictive_pricing_enabled": True,
     "dynamic_favorable_position_pct": 30.0,
-    "dynamic_high_position_pct": 65.0,
+    "dynamic_high_position_pct": 70.0,
     "solar_forecast_arbitrage": True,
     "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,
@@ -363,6 +363,11 @@ NUMBER_DEFINITIONS = {
     "dynamic_price_significant_delta": ("Écart de prix significatif", 0, 1, 0.001, "€/kWh", "mdi:cash-sync"),
     "dynamic_favorable_position_pct": ("Seuil prix favorable Day-Ahead", 5, 60, 1, "%", "mdi:tune-variant"),
     "dynamic_high_position_pct": ("Seuil zone pic Day-Ahead", 60, 95, 1, "%", "mdi:chart-line-variant"),
+    "tariff_tou_hp_adder_eur_kwh": ("Complément distribution HP", -1, 2, 0.001, "€/kWh", "mdi:weather-sunny"),
+    "tariff_tou_hc_adder_eur_kwh": ("Complément distribution HC", -1, 2, 0.001, "€/kWh", "mdi:weather-night"),
+    "impact_eco_adder_eur_kwh": ("Complément distribution Impact ECO", -1, 2, 0.001, "€/kWh", "mdi:leaf"),
+    "impact_medium_adder_eur_kwh": ("Complément distribution Impact MEDIUM", -1, 2, 0.001, "€/kWh", "mdi:chart-timeline-variant"),
+    "impact_peak_adder_eur_kwh": ("Complément distribution Impact PIC", -1, 2, 0.001, "€/kWh", "mdi:chart-line-variant"),
     "dynamic_injection_lucrative_threshold": ("Seuil injection rémunératrice", -1, 1, 0.0001, "€/kWh", "mdi:cash-plus"),
     "dynamic_grid_charge_threshold_eur_kwh": ("Seuil charge réseau prix négatif", -1, 0, 0.001, "€/kWh", "mdi:transmission-tower-import"),
     "economic_horizon_hours": ("Horizon comparateur économique", 1, 48, 1, "h", "mdi:timeline-clock-outline"),

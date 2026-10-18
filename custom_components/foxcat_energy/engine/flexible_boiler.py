@@ -84,7 +84,7 @@ def evaluate_flexible_boiler(
         # Le plafond haut est une limite économique dure du Boiler Dynamic.
         # Le mode Confort assouplit le déclenchement en dessous de ce plafond,
         # mais ne l'autorise jamais à acheter au-delà.
-        high = float(settings.get("dynamic_high_position_pct", 65.0))
+        high = float(settings.get("dynamic_high_position_pct", 70.0))
         if pos > high:
             return BoilerIntent(BOILER_STOP if snapshot.boiler_on else BOILER_NONE, f"Dynamic : {pos:.1f} % > plafond {high:.1f} %, achat Boiler reporté.", "FLEX_DYNAMIC_WAIT")
         if pos <= low and comfort_missing:
