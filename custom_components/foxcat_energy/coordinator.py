@@ -67,6 +67,7 @@ from .const import (
     CONF_METRONOME_SENSOR,
     CONF_METRONOME_FALLBACK_SENSOR,
     CONF_HOUSE_SENSOR,
+    CONF_HVAC_EQUIPMENT,
     CONF_INSTALLATION_NAME,
     CONF_MACHINES_V13,
     CONF_PRICE_AVG_TODAY,
@@ -154,6 +155,7 @@ from .economic_optimizer import (
     recommend_flexible_load,
 )
 from .machines import MachineDefinition, machine_allowed, machine_definitions, schedule_boundaries
+from .hvac import aggregate_equipment, hvac_records
 from .machine_cycle import MachineCycleManager
 from .machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
@@ -193,6 +195,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._entry_options_snapshot: dict[str, Any] = {}
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         self.machines: list[MachineDefinition] = machine_definitions(self.config)
+        self.hvac_equipment = hvac_records(self.config)
         # FoxCat 1.5.0 : deux cœurs, communication immédiate par EnergyBus.
         self.energy_bus = EnergyBus()
         self.inverter_core = InverterCore()
@@ -352,6 +355,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER,
             name=f"FoxCat Energy {entry.entry_id}",
             update_interval=timedelta(seconds=30),
+        )
+
+        hvac_telemetry_entities = list(dict.fromkeys(
+        str(entity_id)
+        for equipment in self.hvac_equipment
+        for unit in [
+            equipment,
+            *equipment.get("outdoor_units", []),
+            *equipment.get("indoor_units", []),
+        ]
+        for entity_id in (
+            unit.get("power_sensor"),
+            unit.get("current_sensor"),
+            unit.get("state_sensor"),
+        )
+        if entity_id
+        ))
+        if hvac_telemetry_entities:
+        self._unsubs.append(
+            async_track_state_change_event(
+                self.hass, hvac_telemetry_entities, self._on_hvac_telemetry_event
+            )
         )
 
     # MÉTHODE : FoxCatEnergyCoordinator.installation_name — Installation name
@@ -1031,6 +1056,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # mais reste strictement observatrice.
             self._record_machine_learning(snapshot=snapshot, now=pulse_at, source="GRID_FRAME")
             machine_context = self._machine_bus_context(pulse_at)
+            hvac_context = [
+                {
+                    "id": item["id"],
+                    "power_w": item["power_w"],
+                    "status": item["status"],
+                    "estimated": item["estimated"],
+                }
+                for item in self.hvac_view()
+            ]
             self.energy_bus.on_grid_frame(
                 frame_id, pulse_at, source=entity_id, frame_serial=frame_serial,
                 grid_net_w=snapshot.grid_net_w, pv_w=snapshot.pv_w, house_w=snapshot.house_w,
@@ -1038,6 +1072,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 boiler_power_w=snapshot.boiler_power_w, boiler_temp_c=snapshot.boiler_temp_c,
                 boiler_on=snapshot.boiler_on, machine_active=snapshot.machine_active,
                 machine_context=machine_context,
+                hvac_context=hvac_context,
                 mode=str(self.settings.get("mode")),
                 network_policy=str(self.settings.get("network_policy")),
             )
@@ -1118,6 +1153,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         snapshot = self.snapshot()
         self._record_machine_learning(snapshot=snapshot, now=now, source="TELEMETRY_EVENT")
         self.async_set_updated_data(self._build_data(snapshot))
+
+    @callback
+    def _on_hvac_telemetry_event(self, event: Event) -> None:
+        self.async_set_updated_data(self._build_data(self.snapshot()))
 
     # MÉTHODE : FoxCatEnergyCoordinator._on_pv_event — On pv event
     @callback
@@ -2383,6 +2422,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "name": "Chauffe-eau",
                 "power_w": snapshot.boiler_power_w,
             })
+            accounting_appliances.extend(self.hvac_accounting_appliances())
             virtual_prices = self.prices()
             import_points = export_points = ()
             if self.virtual_assets.config.enabled:
@@ -3008,6 +3048,48 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "learning_cycle_active": bool((profile.get("current") or {}).get("active", False)),
                 "learning_cycles_collected": int(profile.get("total_cycles", 0)),
             })
+        return result
+
+    def hvac_view(self) -> list[dict[str, Any]]:
+        result = []
+        for equipment in self.hvac_equipment:
+            measurements = aggregate_equipment(equipment, self.hass.states.get)
+            components = measurements["components"]
+            result.append({
+                **measurements,
+                "id": str(equipment["id"]),
+                "name": str(equipment.get("name") or equipment["id"]),
+                "equipment_type": str(equipment.get("equipment_type") or ""),
+                "model": ", ".join(
+                    str(unit.get("model"))
+                    for unit in equipment.get("outdoor_units", [])
+                    if unit.get("model")
+                ),
+                "outdoor_units": [
+                    item for item in components if item.get("kind") == "outdoor"
+                ],
+                "indoor_units": [
+                    item for item in components if item.get("kind") == "indoor"
+                ],
+            })
+        return result
+
+    def hvac_accounting_appliances(self) -> list[dict[str, Any]]:
+        result = []
+        for equipment in self.hvac_view():
+            result.append({
+                "id": f"hvac_{equipment['id']}",
+                "name": equipment["name"],
+                "power_w": equipment["power_w"],
+            })
+            for component in equipment["components"]:
+                if component.get("kind") == "equipment":
+                    continue
+                result.append({
+                    "id": f"hvac_{equipment['id']}_{component['id']}",
+                    "name": f"{equipment['name']} • {component['name']}",
+                    "power_w": component["power_w"],
+                })
         return result
 
     # MÉTHODE : FoxCatEnergyCoordinator._refresh_machine_cycles — Refresh machine cycles
@@ -3959,6 +4041,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "economic_decision": economic.get("decision", {}).get("label", "Indisponible"),
             },
             "accounting": self.accounting.view(),
+            "hvac": self.hvac_view(),
             "virtual_assets": self.virtual_assets.view(),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),

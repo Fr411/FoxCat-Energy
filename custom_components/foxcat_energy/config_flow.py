@@ -341,11 +341,8 @@ def _hvac_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
         ),
     }
 
-    equipment_type = str(current.get("equipment_type", HVAC_EQUIPMENT_TYPES[0]))
-    if equipment_type != "PAC Air-Air":
-        for key, domain in (("power_sensor", "sensor"), ("current_sensor", "sensor"), ("state_sensor", ["binary_sensor", "climate", "input_boolean", "switch"])):
-            fields[vol.Optional(key, description={"suggested_value": current.get(key, "")})] = _entity(domain)
-        return vol.Schema(fields)
+    for key, domain in (("power_sensor", "sensor"), ("current_sensor", "sensor"), ("state_sensor", ["binary_sensor", "climate", "input_boolean", "switch"])):
+        fields[vol.Optional(key, description={"suggested_value": current.get(key, "")})] = _entity(domain)
 
     model_options = [
         {"value": model, "label": model}
@@ -417,6 +414,7 @@ def _normalise_hvac_record(user_input: dict[str, Any], record_id: str) -> tuple[
 
     outdoor_units = []
     capacity = 0
+    capacity_by_outdoor: dict[str, int] = {}
     for index in range(1, 6):
         model = str(user_input.get(f"outdoor_{index}_model") or "")
         if not model:
@@ -424,7 +422,9 @@ def _normalise_hvac_record(user_input: dict[str, Any], record_id: str) -> tuple[
         if model not in TOSHIBA_G3_MODELS:
             return None, False
         outside_id = f"outdoor_{index}"
-        capacity += int(TOSHIBA_G3_MODELS[model]["heads"])
+        heads = int(TOSHIBA_G3_MODELS[model]["heads"])
+        capacity += heads
+        capacity_by_outdoor[outside_id] = heads
         outdoor_units.append({
             "id": outside_id,
             "name": f"Unité extérieure {index}",
@@ -460,10 +460,40 @@ def _normalise_hvac_record(user_input: dict[str, Any], record_id: str) -> tuple[
         })
     if len(indoor_units) > capacity:
         return None, False
+    for outside_id, heads in capacity_by_outdoor.items():
+        if sum(unit["outdoor_id"] == outside_id for unit in indoor_units) > heads:
+            return None, False
     record["outdoor_units"] = outdoor_units
     record["indoor_units"] = indoor_units
     record["compressor"] = {"type": "DC Twin-Rotary", "heating_min_c": -20, "cooling_max_c": 46}
     return record, True
+
+
+def _hvac_record_form_values(record: dict[str, Any]) -> dict[str, Any]:
+    values = {
+        key: record.get(key)
+        for key in (
+            "name", "equipment_type", "nominal_power_w", "voltage_v", "power_factor",
+            "power_sensor", "current_sensor", "state_sensor",
+        )
+        if key in record
+    }
+    for index in range(1, 6):
+        outside = next(
+            (item for item in record.get("outdoor_units", []) if item.get("id") == f"outdoor_{index}"),
+            {},
+        )
+        for suffix in ("model", "power_sensor", "current_sensor", "state_sensor"):
+            if suffix in outside:
+                values[f"outdoor_{index}_{suffix}"] = outside[suffix]
+        zone = next(
+            (item for item in record.get("indoor_units", []) if item.get("id") == f"indoor_{index}"),
+            {},
+        )
+        for suffix in ("name", "size", "range", "outdoor_id", "power_sensor", "current_sensor", "state_sensor"):
+            if suffix in zone:
+                values[f"indoor_{index}_{suffix}"] = zone[suffix]
+    return values
 
 
 def _hvac_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
@@ -934,8 +964,10 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
                 step_id="hvac_edit_form",
                 data_schema=_hvac_record_schema(current),
             )
+        form_values = _hvac_record_form_values(current)
+        form_values.update(_normalise_input(user_input))
         record, valid = _normalise_hvac_record(
-            _normalise_input(user_input),
+            form_values,
             self._selected_hvac_id or "",
         )
         if not valid or record is None:

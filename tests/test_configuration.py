@@ -58,6 +58,7 @@ from foxcat_energy.tariff_model import (
     tariff_dimensions,
 )
 from foxcat_energy.accounting import EnergyAccounting
+from foxcat_energy.hvac import TOSHIBA_G3_MODELS, aggregate_equipment
 from foxcat_energy.tariff_prices import (
     CONF_TARIFF_HC_PRICE_SENSOR,
     CONF_TARIFF_HP_PRICE_SENSOR,
@@ -308,6 +309,79 @@ class DeviceConfigurationTests(unittest.TestCase):
         self.assertTrue(settings["washer_enabled"])
         with self.assertRaises(ValueError):
             apply_device_toggle(settings, "../unknown", False)
+
+
+class HVACConfigurationTests(unittest.TestCase):
+    @staticmethod
+    def _state(value: str, unit: str = "") -> SimpleNamespace:
+        return SimpleNamespace(state=value, attributes={"unit_of_measurement": unit})
+
+    def test_toshiba_g3_catalog_has_the_requested_model_and_compressor_data(self) -> None:
+        self.assertEqual(len(TOSHIBA_G3_MODELS), 7)
+        self.assertEqual(TOSHIBA_G3_MODELS["RAS-5M34G3AVG-E5"]["heating_kw"], 12.0)
+
+    def test_air_air_aggregation_prefers_indoor_meters_to_avoid_double_counting(self) -> None:
+        record = {
+            "id": "system1",
+            "equipment_type": "PAC Air-Air",
+            "nominal_power_w": 2500,
+            "outdoor_units": [{
+                "id": "outdoor_1",
+                "power_sensor": "sensor.outdoor",
+                "model": "RAS-2M10G3AVG-E2",
+            }],
+            "indoor_units": [
+                {"id": "indoor_1", "name": "Salon", "outdoor_id": "outdoor_1", "power_sensor": "sensor.indoor"},
+            ],
+        }
+        states = {
+            "sensor.outdoor": self._state("1.2", "kW"),
+            "sensor.indoor": self._state("450", "W"),
+        }
+
+        result = aggregate_equipment(record, states.get)
+
+        self.assertEqual(result["power_w"], 450)
+        self.assertEqual(result["status"], "on")
+        self.assertFalse(result["estimated"])
+        self.assertEqual(result["compressor"]["type"], "DC Twin-Rotary")
+
+    def test_missing_indoor_power_uses_current_and_active_zone_for_fallback(self) -> None:
+        record = {
+            "id": "system2",
+            "equipment_type": "PAC Air-Air",
+            "nominal_power_w": 2000,
+            "voltage_v": 230,
+            "power_factor": 0.9,
+            "outdoor_units": [{"id": "outdoor_1", "model": "RAS-2M10G3AVG-E2"}],
+            "indoor_units": [
+                {"id": "indoor_1", "name": "Zone", "outdoor_id": "outdoor_1", "current_sensor": "sensor.amps"},
+            ],
+        }
+        states = {"sensor.amps": self._state("2", "A")}
+
+        result = aggregate_equipment(record, states.get)
+
+        self.assertAlmostEqual(result["power_w"], 414.0)
+        self.assertFalse(result["estimated"])
+        self.assertEqual(result["components"][1]["status"], "on")
+
+    def test_nominal_estimate_is_only_used_when_running_state_is_known(self) -> None:
+        record = {
+            "id": "system3",
+            "equipment_type": "PAC Air-Air",
+            "nominal_power_w": 2000,
+            "outdoor_units": [{"id": "outdoor_1", "model": "RAS-2M10G3AVG-E2", "state_sensor": "binary_sensor.running"}],
+            "indoor_units": [],
+        }
+
+        active = aggregate_equipment(record, {"binary_sensor.running": self._state("on")}.get)
+        unknown = aggregate_equipment(record, {}.get)
+
+        self.assertEqual(active["power_w"], 2000)
+        self.assertTrue(active["estimated"])
+        self.assertEqual(unknown["power_w"], 0)
+        self.assertEqual(unknown["status"], "unknown")
 
 
 class DashboardAndProfileTests(unittest.TestCase):

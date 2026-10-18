@@ -111,11 +111,22 @@ def aggregate_equipment(
         if direct is None:
             direct = 0.0
         status = "on" if direct > 0 or active is True else "off" if active is False else "unknown"
+        units = [{
+            "id": str(record.get("id")),
+            "name": str(record.get("name")),
+            "kind": "equipment",
+            "power_w": direct,
+            "status": status,
+            "estimated": estimated,
+            "power_sensor": record.get("power_sensor"),
+            "current_sensor": record.get("current_sensor"),
+            "state_sensor": record.get("state_sensor"),
+        }]
         return {
             "power_w": direct,
             "status": status,
             "estimated": estimated,
-            "components": [],
+            "components": units,
             "compressor": None,
         }
 
@@ -127,6 +138,7 @@ def aggregate_equipment(
     components: list[dict[str, Any]] = []
     total = 0.0
     used_estimate = False
+    unit_values: dict[str, dict[str, Any]] = {}
     for outside_id, outside in outside_by_id.items():
         zones = zones_by_outside.get(outside_id, [])
         zone_readings = [
@@ -136,16 +148,83 @@ def aggregate_equipment(
         measured_zones = [item for item in zone_readings if item[0] is not None]
         outside_power = _power_w(outside, get_state, voltage_v=voltage_v, power_factor=power_factor)
         outside_active = _active(outside, get_state)
+        unit_values[outside_id] = {
+            "id": outside_id,
+            "name": str(outside.get("name") or outside_id),
+            "kind": "outdoor",
+            "power_w": outside_power or 0.0,
+            "status": "on" if outside_power and outside_power > 0 or outside_active is True else "off" if outside_active is False else "unknown",
+            "estimated": False,
+            "model": outside.get("model"),
+            "specifications": outside.get("specifications"),
+            "power_sensor": outside.get("power_sensor"),
+            "current_sensor": outside.get("current_sensor"),
+            "state_sensor": outside.get("state_sensor"),
+        }
         if measured_zones:
             group_power = sum(float(item[0]) for item in measured_zones)
+            missing_active_zones = [
+                item for item in zone_readings if item[0] is None and item[1] is True
+            ]
+            active_groups = max(
+                sum(
+                    _active(candidate, get_state) is True
+                    or any(
+                        _active(zone, get_state) is True
+                        for zone in zones_by_outside.get(str(candidate.get("id")), [])
+                    )
+                    for candidate in outdoor
+                ),
+                1,
+            )
+            nominal_group_w = max(float(record.get("nominal_power_w") or 0.0), 0.0) / active_groups
+            missing_estimate = min(
+                max(nominal_group_w - group_power, 0.0),
+                nominal_group_w * len(missing_active_zones) / max(len(zones), 1),
+            )
+            group_power += missing_estimate
             total += group_power
+            used_estimate = used_estimate or missing_estimate > 0
             for watts, active, zone in zone_readings:
-                if watts is not None:
-                    components.append({"id": str(zone.get("id")), "name": str(zone.get("name") or zone.get("id")), "power_w": watts, "status": "on" if watts > 0 or active else "off" if active is False else "unknown"})
+                active_now = active if active is not None else watts > 0
+                zone_watts = float(watts or 0.0)
+                estimated_zone = watts is None and active is True and missing_active_zones and missing_estimate > 0
+                if estimated_zone:
+                    zone_watts = missing_estimate / len(missing_active_zones)
+                unit_values[str(zone.get("id"))] = {
+                    "id": str(zone.get("id")),
+                    "name": str(zone.get("name") or zone.get("id")),
+                    "kind": "indoor",
+                    "power_w": zone_watts,
+                    "status": "on" if active_now is True else "off" if active_now is False else "unknown",
+                    "estimated": bool(estimated_zone),
+                    "size": zone.get("size"),
+                    "range": zone.get("range"),
+                    "outdoor_id": outside_id,
+                    "power_sensor": zone.get("power_sensor"),
+                    "current_sensor": zone.get("current_sensor"),
+                    "state_sensor": zone.get("state_sensor"),
+                }
         elif outside_power is not None:
             group_power = outside_power
             total += group_power
-            components.append({"id": outside_id, "name": str(outside.get("name") or outside_id), "power_w": outside_power, "status": "on" if outside_power > 0 or outside_active else "off" if outside_active is False else "unknown"})
+            active_zone_count = sum(active is True for _, active, _ in zone_readings)
+            for watts, active, zone in zone_readings:
+                estimated_zone = active is True and active_zone_count > 0
+                unit_values[str(zone.get("id"))] = {
+                    "id": str(zone.get("id")),
+                    "name": str(zone.get("name") or zone.get("id")),
+                    "kind": "indoor",
+                    "power_w": outside_power / active_zone_count if estimated_zone else 0.0,
+                    "status": "on" if active is True else "off" if active is False else "unknown",
+                    "estimated": estimated_zone,
+                    "size": zone.get("size"),
+                    "range": zone.get("range"),
+                    "outdoor_id": outside_id,
+                    "power_sensor": zone.get("power_sensor"),
+                    "current_sensor": zone.get("current_sensor"),
+                    "state_sensor": zone.get("state_sensor"),
+                }
         else:
             active_zones = sum(active is True for _, active, _ in zone_readings)
             active_group = outside_active is True or active_zones > 0
@@ -161,11 +240,31 @@ def aggregate_equipment(
                 used_estimate = group_power > 0
             else:
                 group_power = 0.0
+            if group_power > 0:
+                unit_values[outside_id].update(
+                    power_w=group_power,
+                    status="on",
+                    estimated=True,
+                )
             for _, active, zone in zone_readings:
-                components.append({"id": str(zone.get("id")), "name": str(zone.get("name") or zone.get("id")), "power_w": 0.0, "status": "on" if active else "off" if active is False else "unknown"})
+                unit_values[str(zone.get("id"))] = {
+                    "id": str(zone.get("id")),
+                    "name": str(zone.get("name") or zone.get("id")),
+                    "kind": "indoor",
+                    "power_w": group_power / active_zones if active is True and active_zones else 0.0,
+                    "status": "on" if active is True else "off" if active is False else "unknown",
+                    "estimated": active is True and group_power > 0,
+                    "size": zone.get("size"),
+                    "range": zone.get("range"),
+                    "outdoor_id": outside_id,
+                    "power_sensor": zone.get("power_sensor"),
+                    "current_sensor": zone.get("current_sensor"),
+                    "state_sensor": zone.get("state_sensor"),
+                }
 
     if not outdoor:
         total = 0.0
+    components = list(unit_values.values())
     status_values = [item["status"] for item in components]
     if total > 0:
         status = "on"
