@@ -15,6 +15,7 @@ OFFICIAL_SECTION_ORDER = (
     "Energy Bus",
     "Machines",
     "Boiler",
+    "Pompes à chaleur & Équipements CVC",
     "Batterie + VE",
     "Tarification",
     "Métronome",
@@ -28,6 +29,7 @@ OFFICIAL_MENU_STEPS = (
     "energy_bus",
     "machines",
     "boiler",
+    "hvac",
     "battery_ev",
     "pricing",
     "metronome",
@@ -70,6 +72,7 @@ CONF_DISHWASHER_CYCLE = "dishwasher_cycle"
 
 # V1.3: liste extensible des machines ON/OFF.
 CONF_MACHINES_V13 = "machines_v13"
+CONF_HVAC_EQUIPMENT = "hvac_equipment"
 
 # Plages horaires configurables des prises machines. Deux fenêtres par machine
 # permettent de conserver le comportement historique 21:30-07:00 et 10:30-17:00.

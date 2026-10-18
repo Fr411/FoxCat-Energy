@@ -54,6 +54,7 @@ from .const import (
     CONF_METRONOME_FALLBACK_SENSOR,
     CONF_HOUSE_SENSOR,
     CONF_INSTALLATION_NAME,
+    CONF_HVAC_EQUIPMENT,
     CONF_MACHINES_V13,
     CONF_PRICE_AVG_TODAY,
     CONF_PRICE_AVG_TOMORROW,
@@ -95,6 +96,7 @@ from .const import (
     OFFICIAL_MENU_STEPS,
 )
 from .machines import records_for_options
+from .hvac import HVAC_EQUIPMENT_TYPES, INDOOR_RANGES, INDOOR_SIZES, TOSHIBA_G3_MODELS
 from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
 from .virtual_assets.config import (
     CONF_BATTERY_CAPACITY,
@@ -313,6 +315,198 @@ def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
 def _machine_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
     choices = {str(item.get("id")): str(item.get("name") or item.get("id")) for item in records if item.get("id")}
     return vol.Schema({vol.Required("machine_id"): vol.In(choices)})
+
+
+def _hvac_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
+    current = current or {}
+    def optional_value(key: str, value: Any = None) -> vol.Optional:
+        return (
+            vol.Optional(key, description={"suggested_value": value})
+            if value not in (None, "")
+            else vol.Optional(key)
+        )
+
+    fields: dict[Any, Any] = {
+        vol.Required("name", default=str(current.get("name", ""))): selector.TextSelector(),
+        vol.Required(
+            "equipment_type",
+            default=str(current.get("equipment_type", HVAC_EQUIPMENT_TYPES[0])),
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(options=list(HVAC_EQUIPMENT_TYPES), mode=selector.SelectSelectorMode.DROPDOWN)
+        ),
+        vol.Required(
+            "nominal_power_w",
+            default=float(current.get("nominal_power_w", 2000.0)),
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0, max=100000, step=100, unit_of_measurement="W", mode=selector.NumberSelectorMode.BOX)
+        ),
+        vol.Optional("voltage_v", default=float(current.get("voltage_v", 230.0))): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=100, max=500, step=1, unit_of_measurement="V", mode=selector.NumberSelectorMode.BOX)
+        ),
+        vol.Optional("power_factor", default=float(current.get("power_factor", 0.9))): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0.1, max=1, step=0.01, mode=selector.NumberSelectorMode.BOX)
+        ),
+    }
+
+    for key, domain in (("power_sensor", "sensor"), ("current_sensor", "sensor"), ("state_sensor", ["binary_sensor", "climate", "input_boolean", "switch"])):
+        fields[optional_value(key, current.get(key))] = _entity(domain)
+
+    model_options = [
+        {"value": model, "label": model}
+        for model in TOSHIBA_G3_MODELS
+    ]
+    for index in range(1, 6):
+        outside = next(
+            (item for item in current.get("outdoor_units", []) if item.get("id") == f"outdoor_{index}"),
+            {},
+        )
+        model_key = f"outdoor_{index}_model"
+        fields[optional_value(model_key, outside.get("model"))] = selector.SelectSelector(
+            selector.SelectSelectorConfig(options=model_options, mode=selector.SelectSelectorMode.DROPDOWN)
+        )
+        for suffix, domain in (("power_sensor", "sensor"), ("current_sensor", "sensor"), ("state_sensor", ["binary_sensor", "climate", "input_boolean", "switch"])):
+            key = f"outdoor_{index}_{suffix}"
+            fields[optional_value(key, outside.get(suffix))] = _entity(domain)
+
+    outside_choices = [
+        {"value": f"outdoor_{index}", "label": f"Unité extérieure {index}"}
+        for index in range(1, 6)
+    ]
+    for index in range(1, 6):
+        zone = next(
+            (item for item in current.get("indoor_units", []) if item.get("id") == f"indoor_{index}"),
+            {},
+        )
+        for suffix in ("name", "size", "range", "outdoor_id", "power_sensor", "current_sensor", "state_sensor"):
+            key = f"indoor_{index}_{suffix}"
+            if suffix == "name":
+                fields[optional_value(key, zone.get(suffix))] = selector.TextSelector()
+            elif suffix == "size":
+                fields[optional_value(key, zone.get(suffix))] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=list(INDOOR_SIZES), mode=selector.SelectSelectorMode.DROPDOWN)
+                )
+            elif suffix == "range":
+                fields[optional_value(key, zone.get(suffix))] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=list(INDOOR_RANGES), mode=selector.SelectSelectorMode.DROPDOWN)
+                )
+            elif suffix == "outdoor_id":
+                fields[optional_value(key, zone.get(suffix))] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=outside_choices, mode=selector.SelectSelectorMode.DROPDOWN)
+                )
+            else:
+                domain = ["binary_sensor", "climate", "input_boolean", "switch"] if suffix == "state_sensor" else "sensor"
+                fields[optional_value(key, zone.get(suffix))] = _entity(domain)
+    return vol.Schema(fields)
+
+
+def _normalise_hvac_record(user_input: dict[str, Any], record_id: str) -> tuple[dict[str, Any] | None, bool]:
+    equipment_type = str(user_input.get("equipment_type") or "")
+    record: dict[str, Any] = {
+        "id": record_id,
+        "name": str(user_input.get("name") or "").strip(),
+        "equipment_type": equipment_type,
+        "nominal_power_w": max(float(user_input.get("nominal_power_w") or 0.0), 0.0),
+        "voltage_v": max(float(user_input.get("voltage_v") or 230.0), 100.0),
+        "power_factor": min(max(float(user_input.get("power_factor") or 0.9), 0.1), 1.0),
+    }
+    if not record["name"] or equipment_type not in HVAC_EQUIPMENT_TYPES:
+        return None, False
+    if equipment_type != "PAC Air-Air":
+        record.update(
+            power_sensor=str(user_input.get("power_sensor") or ""),
+            current_sensor=str(user_input.get("current_sensor") or ""),
+            state_sensor=str(user_input.get("state_sensor") or ""),
+        )
+        return record, True
+
+    outdoor_units = []
+    capacity = 0
+    capacity_by_outdoor: dict[str, int] = {}
+    for index in range(1, 6):
+        model = str(user_input.get(f"outdoor_{index}_model") or "")
+        if not model:
+            continue
+        if model not in TOSHIBA_G3_MODELS:
+            return None, False
+        outside_id = f"outdoor_{index}"
+        heads = int(TOSHIBA_G3_MODELS[model]["heads"])
+        capacity += heads
+        capacity_by_outdoor[outside_id] = heads
+        outdoor_units.append({
+            "id": outside_id,
+            "name": f"Unité extérieure {index}",
+            "model": model,
+            "power_sensor": str(user_input.get(f"outdoor_{index}_power_sensor") or ""),
+            "current_sensor": str(user_input.get(f"outdoor_{index}_current_sensor") or ""),
+            "state_sensor": str(user_input.get(f"outdoor_{index}_state_sensor") or ""),
+            "specifications": dict(TOSHIBA_G3_MODELS[model]),
+        })
+    if not outdoor_units:
+        return None, False
+
+    indoor_units = []
+    for index in range(1, 6):
+        outside_id = str(user_input.get(f"indoor_{index}_outdoor_id") or "")
+        sensor_values = [
+            user_input.get(f"indoor_{index}_{suffix}")
+            for suffix in ("power_sensor", "current_sensor", "state_sensor")
+        ]
+        if not outside_id and not any(sensor_values):
+            continue
+        if outside_id not in {unit["id"] for unit in outdoor_units}:
+            return None, False
+        indoor_units.append({
+            "id": f"indoor_{index}",
+            "name": str(user_input.get(f"indoor_{index}_name") or f"Zone {index}"),
+            "size": str(user_input.get(f"indoor_{index}_size") or ""),
+            "range": str(user_input.get(f"indoor_{index}_range") or ""),
+            "outdoor_id": outside_id,
+            "power_sensor": str(user_input.get(f"indoor_{index}_power_sensor") or ""),
+            "current_sensor": str(user_input.get(f"indoor_{index}_current_sensor") or ""),
+            "state_sensor": str(user_input.get(f"indoor_{index}_state_sensor") or ""),
+        })
+    if len(indoor_units) > capacity:
+        return None, False
+    for outside_id, heads in capacity_by_outdoor.items():
+        if sum(unit["outdoor_id"] == outside_id for unit in indoor_units) > heads:
+            return None, False
+    record["outdoor_units"] = outdoor_units
+    record["indoor_units"] = indoor_units
+    record["compressor"] = {"type": "DC Twin-Rotary", "heating_min_c": -20, "cooling_max_c": 46}
+    return record, True
+
+
+def _hvac_record_form_values(record: dict[str, Any]) -> dict[str, Any]:
+    values = {
+        key: record.get(key)
+        for key in (
+            "name", "equipment_type", "nominal_power_w", "voltage_v", "power_factor",
+            "power_sensor", "current_sensor", "state_sensor",
+        )
+        if key in record
+    }
+    for index in range(1, 6):
+        outside = next(
+            (item for item in record.get("outdoor_units", []) if item.get("id") == f"outdoor_{index}"),
+            {},
+        )
+        for suffix in ("model", "power_sensor", "current_sensor", "state_sensor"):
+            if suffix in outside:
+                values[f"outdoor_{index}_{suffix}"] = outside[suffix]
+        zone = next(
+            (item for item in record.get("indoor_units", []) if item.get("id") == f"indoor_{index}"),
+            {},
+        )
+        for suffix in ("name", "size", "range", "outdoor_id", "power_sensor", "current_sensor", "state_sensor"):
+            if suffix in zone:
+                values[f"indoor_{index}_{suffix}"] = zone[suffix]
+    return values
+
+
+def _hvac_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
+    choices = {str(item.get("id")): str(item.get("name") or item.get("id")) for item in records if item.get("id")}
+    return vol.Schema({vol.Required("equipment_id"): vol.In(choices)})
+
 
 # FONCTION : _dynamic_export_sign_selector — Dynamic export sign selector
 def _dynamic_export_sign_selector() -> selector.SelectSelector:
@@ -617,6 +811,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         super().__init__()
         self._pending_options: dict[str, Any] | None = None
         self._selected_machine_id: str | None = None
+        self._selected_hvac_id: str | None = None
 
     # MÉTHODE : FoxCatEnergyOptionsFlow._ensure_pending — Ensure pending
     def _ensure_pending(self) -> dict[str, Any]:
@@ -728,6 +923,82 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_boiler — traitement asynchrone : step boiler
     async def async_step_boiler(self, user_input=None):
         return await self._section("boiler", user_input)
+
+    def _hvac_records(self) -> list[dict[str, Any]]:
+        records = self._effective().get(CONF_HVAC_EQUIPMENT, [])
+        return [dict(item) for item in records if isinstance(item, dict) and item.get("id")]
+
+    def _store_hvac_records(self, records: list[dict[str, Any]]) -> None:
+        self._ensure_pending()[CONF_HVAC_EQUIPMENT] = records
+
+    async def async_step_hvac(self, user_input=None):
+        return self.async_show_menu(
+            step_id="hvac",
+            menu_options=["hvac_add", "hvac_edit", "hvac_remove", "init"],
+        )
+
+    async def async_step_hvac_add(self, user_input=None):
+        if user_input is None:
+            return self.async_show_form(step_id="hvac_add", data_schema=_hvac_record_schema())
+        record, valid = _normalise_hvac_record(_normalise_input(user_input), uuid4().hex[:12])
+        if not valid or record is None:
+            return self.async_show_form(
+                step_id="hvac_add",
+                data_schema=_hvac_record_schema(),
+                errors={"base": "invalid_hvac_config"},
+            )
+        records = self._hvac_records()
+        records.append(record)
+        self._store_hvac_records(records)
+        return await self.async_step_hvac()
+
+    async def async_step_hvac_edit(self, user_input=None):
+        records = self._hvac_records()
+        if not records:
+            return self.async_abort(reason="no_hvac_configured")
+        if user_input is None:
+            return self.async_show_form(step_id="hvac_edit", data_schema=_hvac_choice_schema(records))
+        self._selected_hvac_id = str(user_input["equipment_id"])
+        return await self.async_step_hvac_edit_form()
+
+    async def async_step_hvac_edit_form(self, user_input=None):
+        records = self._hvac_records()
+        current = next((item for item in records if str(item.get("id")) == self._selected_hvac_id), None)
+        if current is None:
+            return await self.async_step_hvac()
+        if user_input is None:
+            return self.async_show_form(
+                step_id="hvac_edit_form",
+                data_schema=_hvac_record_schema(current),
+            )
+        form_values = _hvac_record_form_values(current)
+        form_values.update(_normalise_input(user_input))
+        record, valid = _normalise_hvac_record(
+            form_values,
+            self._selected_hvac_id or "",
+        )
+        if not valid or record is None:
+            return self.async_show_form(
+                step_id="hvac_edit_form",
+                data_schema=_hvac_record_schema(current),
+                errors={"base": "invalid_hvac_config"},
+            )
+        self._store_hvac_records([
+            record if str(item.get("id")) == self._selected_hvac_id else item
+            for item in records
+        ])
+        self._selected_hvac_id = None
+        return await self.async_step_hvac()
+
+    async def async_step_hvac_remove(self, user_input=None):
+        records = self._hvac_records()
+        if not records:
+            return self.async_abort(reason="no_hvac_configured")
+        if user_input is None:
+            return self.async_show_form(step_id="hvac_remove", data_schema=_hvac_choice_schema(records))
+        equipment_id = str(user_input["equipment_id"])
+        self._store_hvac_records([item for item in records if str(item.get("id")) != equipment_id])
+        return await self.async_step_hvac()
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_battery_ev — Configuration batterie et VE virtuels
     async def async_step_battery_ev(self, user_input=None):

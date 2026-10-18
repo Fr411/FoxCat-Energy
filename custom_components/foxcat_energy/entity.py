@@ -33,6 +33,7 @@ class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
             "machine_learning": "FoxCat Energy – Machine Learning",
             "ai": "FoxCat Energy – IA",
             "boiler": "FoxCat Energy – Boiler",
+            "hvac": "FoxCat Energy – Pompes à chaleur & équipements CVC",
             "pricing": "FoxCat Energy – Tarification",
             "metronome": "FoxCat Energy – Métronome",
             "diagnostic": "FoxCat Energy – Diagnostic",
