@@ -4,6 +4,7 @@
 - Rétablissement de la génération indépendante des dashboards tablette et mobile.
 - Configuration validée du simulateur batterie + véhicule électrique, désactivé par défaut et sans commande physique.
 - Correction de l’initialisation des capteurs et alignement des versions d’intégration.
+- Plafond Day-Ahead fixé à 70 % par défaut; la migration initialise ce nouveau défaut uniquement lorsqu’aucune valeur n’était configurée.
 
 # Changelog — FoxCat Energy V1.7.4
 

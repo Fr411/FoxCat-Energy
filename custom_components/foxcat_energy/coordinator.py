@@ -166,7 +166,12 @@ from .migration import (
     compatibility_tariff_regime,
     migrate_settings_v173,
 )
-from .tariff_model import tariff_dimensions, final_client_price, apply_final_price_components
+from .tariff_model import (
+    distribution_period,
+    tariff_dimensions,
+    final_client_price,
+    apply_final_price_components,
+)
 from .price_analyzer import analyze_price_curve
 from .flexible_load_planner import build_flexible_load_plan
 from .dashboard import dashboard_status
@@ -1385,7 +1390,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if dims.network_policy in {NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO_INJECTION}: export_value=0.0
         elif dims.network_policy==NETWORK_POLICY_BILLED_EXPORT: export_value=inj if dims.dynamic else float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0))
         else: export_value=inj if dims.dynamic else float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0))
-        return {'current':cur,'next':nxt,'injection':inj,'hp_price':hp,'hc_price':hc,'fixed_injection_price':float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0)),'min_today':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TODAY)),'max_today':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TODAY)),'avg_today':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TODAY)),'min_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW)),'max_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW)),'avg_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),'price_source':dims.price_source,'tariff_structure':dims.structure,'network_policy':dims.network_policy,'regime':regime,'period':period,'active_buy':active,'next_buy':next_buy,'active_buy_label':label,'next_buy_label':nlabel,'export_value':export_value,'dynamic_compatible':dims.dynamic,'negative_purchase':bool(active is not None and active<0)}
+        return {'current':cur,'next':nxt,'injection':inj,'hp_price':hp,'hc_price':hc,'fixed_injection_price':float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0)),'min_today':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TODAY)),'max_today':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TODAY)),'avg_today':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TODAY)),'min_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW)),'max_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW)),'avg_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),'price_source':dims.price_source,'tariff_structure':dims.structure,'distribution_profile':dims.distribution_profile,'distribution_period':distribution_period(now,self.settings),'network_policy':dims.network_policy,'regime':regime,'period':period,'active_buy':active,'next_buy':next_buy,'active_buy_label':label,'next_buy_label':nlabel,'export_value':export_value,'dynamic_compatible':dims.dynamic,'negative_purchase':bool(active is not None and active<0)}
 
     # MÉTHODE : FoxCatEnergyCoordinator._economic_import_points — Economic import points
     def _economic_import_points(

@@ -9,7 +9,13 @@ from homeassistant.const import PERCENTAGE, UnitOfPower, UnitOfTemperature, Unit
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, VERSION, CONF_GRID_SIGNED_SENSOR, CONF_PV_SENSOR
+from .const import (
+    ACCOUNTING_APPLIANCE_LABELS,
+    DOMAIN,
+    VERSION,
+    CONF_GRID_SIGNED_SENSOR,
+    CONF_PV_SENSOR,
+)
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .registry import registry_diagnostics
@@ -118,6 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "source_prix_reinjection_fixe", "Source prix fixe de réinjection", "mdi:database-arrow-right-outline", "pricing", lambda d: d["prices"].get("fixed_injection_price_source")),
         FoxCatNumericSensor(c, "surplus_disponible_boiler_cycle_protege", "Surplus disponible pour le chauffe-eau pendant cycle protégé", "mdi:solar-power-variant-outline", "machines", lambda d: d["machine_guard"].get("boiler_surplus_available_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatValueSensor(c, "regime_tarifaire_actif", "Régime tarifaire actif", "mdi:cash-sync", "pricing", lambda d: d["prices"].get("regime")),
+        FoxCatValueSensor(c, "periode_distribution_belgique", "Période de distribution Belgique", "mdi:clock-outline", "pricing", lambda d: d["prices"].get("distribution_period")),
         FoxCatValueSensor(c, "periode_tarifaire", "Période tarifaire", "mdi:clock-time-eight-outline", "pricing", lambda d: d["prices"].get("period")),
         FoxCatValueSensor(c, "statut_prix", "Statut du prix", "mdi:chart-line", "pricing", lambda d: d["prices"].get("status")),
         FoxCatValueSensor(c, "modele_cout", "Modèle de coût", "mdi:calculator-variant-outline", "pricing", lambda d: d["prices"].get("cost_model")),
@@ -240,7 +247,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     ])
 
     # Un jeu de capteurs est créé automatiquement pour chaque appareil FoxCat mesuré.
-    appliance_defs = [("boiler", "Chauffe-eau")] + [(m.machine_id, m.name) for m in c.machines if m.power_sensor]
+    appliance_defs = list(ACCOUNTING_APPLIANCE_LABELS.items())
+    known_appliances = set(ACCOUNTING_APPLIANCE_LABELS)
+    appliance_defs.extend(
+        (machine.machine_id, machine.name)
+        for machine in c.machines
+        if machine.power_sensor and machine.machine_id not in known_appliances
+    )
     for appliance_id, appliance_name in appliance_defs:
         safe = appliance_id.replace(" ", "_").lower()
         entities.extend([

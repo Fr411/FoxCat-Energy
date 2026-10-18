@@ -7,6 +7,7 @@ from ...const import (
     BOILER_HEAT_45,
     BOILER_NONE,
     BOILER_STOP,
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     MODE_MANUAL,
     PRICE_SOURCE_DYNAMIC,
     TARIFF_DYNAMIC,
@@ -27,7 +28,7 @@ def evaluate_dynamic_boiler_v2(
     Cette branche ne s'applique qu'à la source Day-Ahead et ne s'exécute jamais
     en comportement Manuel. Le BOOST 65 °C reste exclusivement solaire.
     Le réseau peut assurer le confort normal jusqu'au plafond Day-Ahead
-    ``dynamic_high_position_pct`` (65 % par défaut), jamais le stockage 65 °C.
+    ``dynamic_high_position_pct`` (par défaut partagé), jamais le stockage 65 °C.
     """
     if str(settings.get("mode")) == MODE_MANUAL:
         return base_intent
@@ -52,7 +53,7 @@ def evaluate_dynamic_boiler_v2(
     boost = min(float(settings.get("boiler_temp_boost_c", 65.0)), safety)
     element_w = max(float(settings.get("boiler_power_w", 1800.0)), 1.0)
     favorable_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
-    high_pct = max(favorable_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 65.0))))
+    high_pct = max(favorable_pct, min(95.0, float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))))
 
     # 1) Le soleil est souverain pour le stockage thermique. On reconstitue le
     # surplus avant charge afin qu'un Boiler déjà ON ne s'arrête pas à cause de

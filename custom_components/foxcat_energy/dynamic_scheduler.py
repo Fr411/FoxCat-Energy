@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Any, Iterable
 
+from .const import DEFAULT_DYNAMIC_HIGH_POSITION_PCT
 from .economic_optimizer import PricePoint, average_price
 from .engine.models import EnergySnapshot, SolarForecast
 from .machines import MachineDefinition, time_minutes
@@ -267,7 +268,7 @@ def build_dynamic_schedule(
 ) -> dict[str, Any]:
     """Build the V1.6.159 planner. It is intentionally inert outside Dynamic mode."""
     threshold_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
-    high_threshold_pct = max(threshold_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 70.0))))
+    high_threshold_pct = max(threshold_pct, min(95.0, float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))))
     if not mode_dynamic_active:
         return {
             "active": False,

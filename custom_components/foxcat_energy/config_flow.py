@@ -91,6 +91,7 @@ from .const import (
     CONF_WASHER_ON_2,
     CONF_WASHER_SOCKET,
     DOMAIN,
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     OFFICIAL_MENU_STEPS,
 )
 from .machines import records_for_options
@@ -344,6 +345,7 @@ def _pricing_schema() -> vol.Schema:
             _optional(CONF_PRICE_FORECAST_EXPORT): _entity("sensor"),
             vol.Required(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, default=DYNAMIC_EXPORT_POSITIVE_IS_REVENUE): _dynamic_export_sign_selector(),
             vol.Optional("dynamic_favorable_position_pct", default=30.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5,max=60,step=1,unit_of_measurement="%",mode=selector.NumberSelectorMode.SLIDER)),
+            vol.Optional("dynamic_high_position_pct", default=DEFAULT_DYNAMIC_HIGH_POSITION_PCT): selector.NumberSelector(selector.NumberSelectorConfig(min=60,max=95,step=1,unit_of_measurement="%",mode=selector.NumberSelectorMode.SLIDER)),
             vol.Optional("dynamic_favorable_max_hours", default=4.0): selector.NumberSelector(selector.NumberSelectorConfig(min=.25,max=12,step=.25,unit_of_measurement="h",mode=selector.NumberSelectorMode.SLIDER)),
             vol.Optional("dynamic_preferred_network_max_eur_kwh", default=.30): _price_number(.30,-1,2),
         }

@@ -9,6 +9,7 @@ import unittest
 import yaml
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 COMPONENT_PATH = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
@@ -17,17 +18,26 @@ package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.const import (
+    ACCOUNTING_APPLIANCE_LABELS,
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     DYNAMIC_STRUCT_BI,
     DYNAMIC_STRUCT_IMPACT,
+    DISTRIBUTION_PROFILE_BI,
+    DISTRIBUTION_PROFILE_IMPACT,
+    DISTRIBUTION_PROFILE_SIMPLE,
+    DISTRIBUTION_PROFILES,
     MODES,
     NETWORK_POLICIES,
+    NUMBER_DEFINITIONS,
     OFFICIAL_MENU_STEPS,
     PRICE_SOURCE_INTEGRATION,
+    PRICE_SOURCE_VARIABLE,
     PRICE_SOURCES,
     TARIFF_BI,
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
     TARIFF_STRUCTURE_TOU,
+    SWITCH_DEFINITIONS,
 )
 from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
@@ -41,7 +51,13 @@ from foxcat_energy.dashboard_merge import merge_dashboard_text
 from foxcat_energy.devices import apply_device_toggle, device_definitions
 from foxcat_energy.profiles import profile_path, validate_profile_settings
 from foxcat_energy.migration import migrate_settings_v173
-from foxcat_energy.tariff_model import final_client_price, tariff_dimensions
+from foxcat_energy.tariff_model import (
+    distribution_period,
+    distribution_profile,
+    final_client_price,
+    tariff_dimensions,
+)
+from foxcat_energy.accounting import EnergyAccounting
 from foxcat_energy.tariff_prices import (
     CONF_TARIFF_HC_PRICE_SENSOR,
     CONF_TARIFF_HP_PRICE_SENSOR,
@@ -141,6 +157,107 @@ class SelectOptionTests(unittest.TestCase):
             0.3,
         )
 
+    def test_distribution_profile_is_independent_from_energy_contract(self) -> None:
+        settings = {
+            "price_source": "Dynamique Day-Ahead",
+            "tariff_structure": "Simple",
+            "dynamic_structure": "Simple",
+            "distribution_profile": DISTRIBUTION_PROFILE_IMPACT,
+            "impact_eco_adder_eur_kwh": 0.01,
+            "impact_medium_adder_eur_kwh": 0.02,
+            "impact_peak_adder_eur_kwh": 0.03,
+        }
+
+        dimensions = tariff_dimensions(settings)
+
+        self.assertEqual(dimensions.structure, "Simple")
+        self.assertEqual(dimensions.distribution_profile, DISTRIBUTION_PROFILE_IMPACT)
+        self.assertEqual(dimensions.network_policy, "Compensation")
+        for hour, expected in ((3, 0.11), (8, 0.12), (18, 0.13)):
+            self.assertAlmostEqual(
+                final_client_price(0.1, datetime(2026, 1, 2, hour), settings),
+                expected,
+            )
+        self.assertEqual(
+            [
+                distribution_period(datetime(2026, 1, 2, hour), settings)
+                for hour in (0, 1, 7, 11, 17, 22)
+            ],
+            ["MEDIUM", "ECO", "MEDIUM", "ECO", "PIC", "MEDIUM"],
+        )
+        settings["distribution_profile"] = DISTRIBUTION_PROFILE_SIMPLE
+        self.assertEqual(distribution_profile(settings), DISTRIBUTION_PROFILE_SIMPLE)
+        self.assertEqual(final_client_price(0.1, datetime(2026, 1, 2, 18), settings), 0.1)
+        self.assertEqual(
+            DISTRIBUTION_PROFILES,
+            ["Simple", "Bi-horaire (jour / nuit)", "Impact"],
+        )
+        self.assertEqual(
+            distribution_profile({"dynamic_structure": DYNAMIC_STRUCT_IMPACT}),
+            DISTRIBUTION_PROFILE_IMPACT,
+        )
+        self.assertEqual(
+            distribution_profile(
+                {"dynamic_structure": "Simple", "tariff_structure": "Impact"}
+            ),
+            DISTRIBUTION_PROFILE_IMPACT,
+        )
+
+    def test_bihourly_distribution_adders_apply_to_fixed_contracts(self) -> None:
+        settings = {
+            "price_source": PRICE_SOURCE_VARIABLE,
+            "tariff_structure": "Simple",
+            "distribution_profile": DISTRIBUTION_PROFILE_BI,
+            "tariff_tou_hp_adder_eur_kwh": 0.05,
+            "tariff_tou_hc_adder_eur_kwh": 0.02,
+        }
+
+        self.assertAlmostEqual(
+            final_client_price(0.2, datetime(2026, 1, 2, 8), settings),
+            0.25,
+        )
+        self.assertAlmostEqual(
+            final_client_price(0.2, datetime(2026, 1, 2, 12), settings),
+            0.22,
+        )
+        self.assertEqual(
+            distribution_period(datetime(2026, 1, 2, 8), settings),
+            "HP",
+        )
+        self.assertEqual(
+            distribution_period(datetime(2026, 1, 2, 12), settings),
+            "HC",
+        )
+        for legacy_value in ("Bi-horaire", "Bi-horaire (HP/HC)"):
+            self.assertEqual(
+                distribution_profile({"tariff_structure": legacy_value}),
+                DISTRIBUTION_PROFILE_BI,
+            )
+
+    def test_reinjection_value_never_changes_physical_import_kwh(self) -> None:
+        accounting = EnergyAccounting()
+        first = datetime(2026, 1, 2, 12, 0)
+        snapshot = SimpleNamespace(
+            timestamp=first,
+            valid=True,
+            house_w=500.0,
+            pv_w=500.0,
+            import_w=100.0,
+            export_w=50.0,
+        )
+        accounting.process(snapshot, {"regime": "Mono-horaire", "active_buy": 0.2}, [])
+        snapshot.timestamp = first.replace(minute=1)
+        accounting.process(
+            snapshot,
+            {"regime": "Mono-horaire", "active_buy": 0.2, "export_value": -0.3},
+            [],
+        )
+
+        totals = accounting.view()["today"]
+        self.assertAlmostEqual(totals["import_kwh"], 100.0 / 1000 * 60 / 3600)
+        self.assertAlmostEqual(totals["export_kwh"], 50.0 / 1000 * 60 / 3600)
+        self.assertGreater(totals["export_cost_eur"], 0)
+
     def test_legacy_invalid_values_migrate_to_supported_options(self) -> None:
         migrated, notes = migrate_settings_v173(
             {
@@ -156,6 +273,20 @@ class SelectOptionTests(unittest.TestCase):
         self.assertIn(migrated["network_policy"], NETWORK_POLICIES)
         self.assertIn(migrated["tariff_regime"], TARIFF_REGIMES)
         self.assertTrue(notes)
+        self.assertEqual(
+            migrated["dynamic_high_position_pct"],
+            DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
+        )
+
+    def test_migration_preserves_configured_dynamic_high_position(self) -> None:
+        migrated, _ = migrate_settings_v173(
+            {
+                "mode": "Éco",
+                "dynamic_high_position_pct": 65.0,
+            }
+        )
+
+        self.assertEqual(migrated["dynamic_high_position_pct"], 65.0)
 
 
 class DeviceConfigurationTests(unittest.TestCase):
@@ -179,6 +310,73 @@ class DeviceConfigurationTests(unittest.TestCase):
 
 
 class DashboardAndProfileTests(unittest.TestCase):
+    def test_contract_dashboard_entities_are_registered(self) -> None:
+        homeassistant = types.ModuleType("homeassistant")
+        homeassistant.__path__ = []
+        config_entries = types.ModuleType("homeassistant.config_entries")
+        config_entries.ConfigEntry = object
+        core = types.ModuleType("homeassistant.core")
+        core.HomeAssistant = object
+        helpers = types.ModuleType("homeassistant.helpers")
+        helpers.__path__ = []
+        entity_registry = types.ModuleType("homeassistant.helpers.entity_registry")
+        helpers.entity_registry = entity_registry
+        stubs = {
+            "homeassistant": homeassistant,
+            "homeassistant.config_entries": config_entries,
+            "homeassistant.core": core,
+            "homeassistant.helpers": helpers,
+            "homeassistant.helpers.entity_registry": entity_registry,
+        }
+        original_registry = sys.modules.pop("foxcat_energy.registry", None)
+        try:
+            with patch.dict(sys.modules, stubs):
+                registry = importlib.import_module("foxcat_energy.registry")
+                self.assertEqual(
+                    registry.BINDINGS["pricing.distribution_profile"].key,
+                    "profil_distribution_belgique",
+                )
+                self.assertEqual(
+                    registry.BINDINGS["pricing.distribution_period"].kind,
+                    "native",
+                )
+                for key in (
+                    "dynamic_favorable_position_pct",
+                    "dynamic_high_position_pct",
+                    "impact_eco_adder_eur_kwh",
+                    "impact_medium_adder_eur_kwh",
+                    "impact_peak_adder_eur_kwh",
+                ):
+                    self.assertIn(key, NUMBER_DEFINITIONS)
+                    self.assertEqual(registry.BINDINGS[f"settings.{key}"].key, key)
+                self.assertIn("dynamic_negative_price_charge_enabled", SWITCH_DEFINITIONS)
+                self.assertEqual(
+                    registry.BINDINGS[
+                        "settings.dynamic_negative_price_charge_enabled"
+                    ].key,
+                    "dynamic_negative_price_charge_enabled",
+                )
+                for role in (
+                    "accounting.appliance.boiler.hp_today",
+                    "accounting.appliance.boiler.hc_today",
+                    "accounting.appliance.washer.hp_today",
+                    "accounting.appliance.washer.hc_today",
+                ):
+                    self.assertIn(role, registry.BINDINGS)
+                for appliance_id in ACCOUNTING_APPLIANCE_LABELS:
+                    self.assertIn(
+                        f"accounting.appliance.{appliance_id}.hp_today",
+                        registry.BINDINGS,
+                    )
+                    self.assertIn(
+                        f"accounting.appliance.{appliance_id}.hc_today",
+                        registry.BINDINGS,
+                    )
+        finally:
+            sys.modules.pop("foxcat_energy.registry", None)
+            if original_registry is not None:
+                sys.modules["foxcat_energy.registry"] = original_registry
+
     def test_dashboard_merge_keeps_disjoint_user_and_latest_changes(self) -> None:
         base = "title: FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"
         user = "title: My FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"

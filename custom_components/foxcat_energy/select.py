@@ -7,6 +7,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DOMAIN,
+    DISTRIBUTION_PROFILE_BI,
+    DISTRIBUTION_PROFILE_IMPACT,
+    DISTRIBUTION_PROFILE_SIMPLE,
+    DISTRIBUTION_PROFILES,
     MODE_MANUAL,
     MODES,
     NETWORK_POLICIES,
@@ -15,7 +19,7 @@ from .const import (
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
 )
-from .tariff_model import tariff_dimensions
+from .tariff_model import distribution_profile, tariff_dimensions
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .select_options import (
@@ -33,6 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         [
             FoxCatModeSelect(coordinator),
             FoxCatTariffRegimeSelect(coordinator),
+            FoxCatDistributionProfileSelect(coordinator),
             FoxCatDynamicStructureSelect(coordinator),
             FoxCatPriceSourceSelect(coordinator),
             FoxCatTariffStructureSelect(coordinator),
@@ -196,6 +201,34 @@ class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
     # MÉTHODE : FoxCatTariffRegimeSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         await super().async_select_option(option)
+
+
+class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
+    _attr_options = DISTRIBUTION_PROFILES
+    option_descriptions = {
+        DISTRIBUTION_PROFILE_SIMPLE: "Un tarif de distribution identique à toute heure.",
+        DISTRIBUTION_PROFILE_BI: "Profil de comptage jour/nuit, indépendant du contrat d’énergie.",
+        DISTRIBUTION_PROFILE_IMPACT: "Profil wallon PIC, MEDIUM et ECO selon les plages configurées.",
+    }
+    option_icons = {
+        DISTRIBUTION_PROFILE_SIMPLE: "mdi:clock-outline",
+        DISTRIBUTION_PROFILE_BI: "mdi:clock-time-eight-outline",
+        DISTRIBUTION_PROFILE_IMPACT: "mdi:chart-sankey",
+    }
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            "profil_distribution_belgique",
+            "Profil distribution Belgique",
+            "mdi:transmission-tower",
+            "distribution_profile",
+            DISTRIBUTION_PROFILES,
+        )
+
+    @property
+    def current_option(self) -> str | None:
+        return distribution_profile(self.coordinator.settings)
 
 
 class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
