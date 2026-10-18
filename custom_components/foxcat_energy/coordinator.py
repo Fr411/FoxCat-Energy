@@ -67,7 +67,6 @@ from .const import (
     CONF_METRONOME_SENSOR,
     CONF_METRONOME_FALLBACK_SENSOR,
     CONF_HOUSE_SENSOR,
-    CONF_HVAC_EQUIPMENT,
     CONF_INSTALLATION_NAME,
     CONF_MACHINES_V13,
     CONF_PRICE_AVG_TODAY,
@@ -355,28 +354,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER,
             name=f"FoxCat Energy {entry.entry_id}",
             update_interval=timedelta(seconds=30),
-        )
-
-        hvac_telemetry_entities = list(dict.fromkeys(
-        str(entity_id)
-        for equipment in self.hvac_equipment
-        for unit in [
-            equipment,
-            *equipment.get("outdoor_units", []),
-            *equipment.get("indoor_units", []),
-        ]
-        for entity_id in (
-            unit.get("power_sensor"),
-            unit.get("current_sensor"),
-            unit.get("state_sensor"),
-        )
-        if entity_id
-        ))
-        if hvac_telemetry_entities:
-        self._unsubs.append(
-            async_track_state_change_event(
-                self.hass, hvac_telemetry_entities, self._on_hvac_telemetry_event
-            )
         )
 
     # MÉTHODE : FoxCatEnergyCoordinator.installation_name — Installation name
@@ -763,6 +740,28 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._unsubs.append(
                 async_track_state_change_event(
                     self.hass, machine_telemetry_entities, self._on_machine_telemetry_event
+                )
+            )
+
+        hvac_telemetry_entities = list(dict.fromkeys(
+            str(entity_id)
+            for equipment in self.hvac_equipment
+            for unit in [
+                equipment,
+                *equipment.get("outdoor_units", []),
+                *equipment.get("indoor_units", []),
+            ]
+            for entity_id in (
+                unit.get("power_sensor"),
+                unit.get("current_sensor"),
+                unit.get("state_sensor"),
+            )
+            if entity_id
+        ))
+        if hvac_telemetry_entities:
+            self._unsubs.append(
+                async_track_state_change_event(
+                    self.hass, hvac_telemetry_entities, self._on_hvac_telemetry_event
                 )
             )
 
@@ -1814,6 +1813,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         price_analysis = analyze_price_curve(now=now, import_points=import_points, export_points=export_points, settings=self.settings, tomorrow_available=tomorrow_available, current_buy=tariff.get("active_buy")) if tariff_dimensions(self.settings).dynamic else {"active":False,"mode":"INACTIF","state":"HORS_DYNAMIQUE","valid":True,"series":[]}
         planner = build_flexible_load_plan(now=now,snapshot=snap,settings=self.settings,import_points=import_points,export_points=export_points,machines=self.machines,learning=learning,cycles=cycles,price_analysis=price_analysis,solar_forecast=self.solar_forecast,boiler_thermal=boiler_thermal,boiler_user_override=str(self.core_state.get("boiler_user_override","AUTO")))
+        planner["observed_hvac"] = [
+            {
+                "id": item["id"],
+                "name": item["name"],
+                "power_w": item["power_w"],
+                "status": item["status"],
+                "estimated": item["estimated"],
+                "control_enabled": False,
+            }
+            for item in self.hvac_view()
+        ]
         for mid,plan in (planner.get("machines") or {}).items():
             recommendations.setdefault(mid,{})["allow_start"]=bool(plan.get("allow_start_now")); recommendations[mid]["scheduler_decision"]=plan.get("decision"); recommendations[mid]["scheduler_reason"]=plan.get("reason")
         best_export = max(export_points, key=lambda p: p.price) if export_points else None

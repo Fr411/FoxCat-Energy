@@ -510,6 +510,8 @@ def _hvac_entities(coordinator: FoxCatEnergyCoordinator, equipment: dict[str, An
     ):
         entities.append(FoxCatHvacSensor(coordinator, equipment_id, None, metric, f"hvac_{safe_id}_{metric}", f"🌡️ {name} • {label}", equipment))
     for component in equipment.get("components", []):
+        if component.get("kind") == "equipment":
+            continue
         component_id = str(component.get("id") or "")
         safe_component = re.sub(r"[^a-z0-9_]", "_", component_id.lower())
         component_name = str(component.get("name") or component_id)
@@ -622,6 +624,7 @@ class FoxCatHvacSensor(FoxCatEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         common = {
+            "equipment_id": self.equipment_id,
             "equipment_type": self.equipment.get("equipment_type"),
             "nominal_power_w": self.equipment.get("nominal_power_w"),
             "measurement_estimated": bool(

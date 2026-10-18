@@ -319,6 +319,13 @@ def _machine_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
 
 def _hvac_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
     current = current or {}
+    def optional_value(key: str, value: Any = None) -> vol.Optional:
+        return (
+            vol.Optional(key, description={"suggested_value": value})
+            if value not in (None, "")
+            else vol.Optional(key)
+        )
+
     fields: dict[Any, Any] = {
         vol.Required("name", default=str(current.get("name", ""))): selector.TextSelector(),
         vol.Required(
@@ -342,7 +349,7 @@ def _hvac_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
     }
 
     for key, domain in (("power_sensor", "sensor"), ("current_sensor", "sensor"), ("state_sensor", ["binary_sensor", "climate", "input_boolean", "switch"])):
-        fields[vol.Optional(key, description={"suggested_value": current.get(key, "")})] = _entity(domain)
+        fields[optional_value(key, current.get(key))] = _entity(domain)
 
     model_options = [
         {"value": model, "label": model}
@@ -354,12 +361,12 @@ def _hvac_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
             {},
         )
         model_key = f"outdoor_{index}_model"
-        fields[vol.Optional(model_key, description={"suggested_value": outside.get("model", "")})] = selector.SelectSelector(
+        fields[optional_value(model_key, outside.get("model"))] = selector.SelectSelector(
             selector.SelectSelectorConfig(options=model_options, mode=selector.SelectSelectorMode.DROPDOWN)
         )
         for suffix, domain in (("power_sensor", "sensor"), ("current_sensor", "sensor"), ("state_sensor", ["binary_sensor", "climate", "input_boolean", "switch"])):
             key = f"outdoor_{index}_{suffix}"
-            fields[vol.Optional(key, description={"suggested_value": outside.get(suffix, "")})] = _entity(domain)
+            fields[optional_value(key, outside.get(suffix))] = _entity(domain)
 
     outside_choices = [
         {"value": f"outdoor_{index}", "label": f"Unité extérieure {index}"}
@@ -373,22 +380,22 @@ def _hvac_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
         for suffix in ("name", "size", "range", "outdoor_id", "power_sensor", "current_sensor", "state_sensor"):
             key = f"indoor_{index}_{suffix}"
             if suffix == "name":
-                fields[vol.Optional(key, description={"suggested_value": zone.get(suffix, "")})] = selector.TextSelector()
+                fields[optional_value(key, zone.get(suffix))] = selector.TextSelector()
             elif suffix == "size":
-                fields[vol.Optional(key, description={"suggested_value": zone.get(suffix, "")})] = selector.SelectSelector(
+                fields[optional_value(key, zone.get(suffix))] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(INDOOR_SIZES), mode=selector.SelectSelectorMode.DROPDOWN)
                 )
             elif suffix == "range":
-                fields[vol.Optional(key, description={"suggested_value": zone.get(suffix, "")})] = selector.SelectSelector(
+                fields[optional_value(key, zone.get(suffix))] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(INDOOR_RANGES), mode=selector.SelectSelectorMode.DROPDOWN)
                 )
             elif suffix == "outdoor_id":
-                fields[vol.Optional(key, description={"suggested_value": zone.get(suffix, "")})] = selector.SelectSelector(
+                fields[optional_value(key, zone.get(suffix))] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=outside_choices, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
             else:
                 domain = ["binary_sensor", "climate", "input_boolean", "switch"] if suffix == "state_sensor" else "sensor"
-                fields[vol.Optional(key, description={"suggested_value": zone.get(suffix, "")})] = _entity(domain)
+                fields[optional_value(key, zone.get(suffix))] = _entity(domain)
     return vol.Schema(fields)
 
 

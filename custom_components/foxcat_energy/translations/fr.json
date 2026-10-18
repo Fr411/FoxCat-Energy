@@ -202,6 +202,12 @@
     }
   },
   "options": {
+    "abort": {
+      "no_hvac_configured": "Aucun équipement CVC n’est configuré."
+    },
+    "error": {
+      "invalid_hvac_config": "Configuration invalide : vérifiez le modèle choisi, les associations de zones et le nombre d’unités raccordées."
+    },
     "step": {
       "init": {
         "title": "Configuration FoxCat Energy",
@@ -358,7 +364,17 @@
           "power_factor": "Facteur de puissance estimé",
           "power_sensor": "Capteur de puissance (optionnel)",
           "current_sensor": "Capteur de courant (optionnel)",
-          "state_sensor": "Capteur d’état (optionnel)"
+          "state_sensor": "Capteur d’état (optionnel)",
+          "outdoor_1_model": "UE 1 • Modèle Toshiba G3", "outdoor_1_power_sensor": "UE 1 • Puissance", "outdoor_1_current_sensor": "UE 1 • Courant", "outdoor_1_state_sensor": "UE 1 • État",
+          "outdoor_2_model": "UE 2 • Modèle Toshiba G3", "outdoor_2_power_sensor": "UE 2 • Puissance", "outdoor_2_current_sensor": "UE 2 • Courant", "outdoor_2_state_sensor": "UE 2 • État",
+          "outdoor_3_model": "UE 3 • Modèle Toshiba G3", "outdoor_3_power_sensor": "UE 3 • Puissance", "outdoor_3_current_sensor": "UE 3 • Courant", "outdoor_3_state_sensor": "UE 3 • État",
+          "outdoor_4_model": "UE 4 • Modèle Toshiba G3", "outdoor_4_power_sensor": "UE 4 • Puissance", "outdoor_4_current_sensor": "UE 4 • Courant", "outdoor_4_state_sensor": "UE 4 • État",
+          "outdoor_5_model": "UE 5 • Modèle Toshiba G3", "outdoor_5_power_sensor": "UE 5 • Puissance", "outdoor_5_current_sensor": "UE 5 • Courant", "outdoor_5_state_sensor": "UE 5 • État",
+          "indoor_1_name": "Zone 1 • Nom", "indoor_1_size": "Zone 1 • Taille", "indoor_1_range": "Zone 1 • Gamme", "indoor_1_outdoor_id": "Zone 1 • UE associée", "indoor_1_power_sensor": "Zone 1 • Puissance", "indoor_1_current_sensor": "Zone 1 • Courant", "indoor_1_state_sensor": "Zone 1 • État",
+          "indoor_2_name": "Zone 2 • Nom", "indoor_2_size": "Zone 2 • Taille", "indoor_2_range": "Zone 2 • Gamme", "indoor_2_outdoor_id": "Zone 2 • UE associée", "indoor_2_power_sensor": "Zone 2 • Puissance", "indoor_2_current_sensor": "Zone 2 • Courant", "indoor_2_state_sensor": "Zone 2 • État",
+          "indoor_3_name": "Zone 3 • Nom", "indoor_3_size": "Zone 3 • Taille", "indoor_3_range": "Zone 3 • Gamme", "indoor_3_outdoor_id": "Zone 3 • UE associée", "indoor_3_power_sensor": "Zone 3 • Puissance", "indoor_3_current_sensor": "Zone 3 • Courant", "indoor_3_state_sensor": "Zone 3 • État",
+          "indoor_4_name": "Zone 4 • Nom", "indoor_4_size": "Zone 4 • Taille", "indoor_4_range": "Zone 4 • Gamme", "indoor_4_outdoor_id": "Zone 4 • UE associée", "indoor_4_power_sensor": "Zone 4 • Puissance", "indoor_4_current_sensor": "Zone 4 • Courant", "indoor_4_state_sensor": "Zone 4 • État",
+          "indoor_5_name": "Zone 5 • Nom", "indoor_5_size": "Zone 5 • Taille", "indoor_5_range": "Zone 5 • Gamme", "indoor_5_outdoor_id": "Zone 5 • UE associée", "indoor_5_power_sensor": "Zone 5 • Puissance", "indoor_5_current_sensor": "Zone 5 • Courant", "indoor_5_state_sensor": "Zone 5 • État"
         }
       },
       "hvac_remove": {
@@ -434,7 +450,17 @@
           "power_factor": "Facteur de puissance estimé",
           "power_sensor": "Capteur de puissance (optionnel)",
           "current_sensor": "Capteur de courant (optionnel)",
-          "state_sensor": "Capteur d’état (optionnel)"
+          "state_sensor": "Capteur d’état (optionnel)",
+          "outdoor_1_model": "UE 1 • Modèle Toshiba G3", "outdoor_1_power_sensor": "UE 1 • Puissance", "outdoor_1_current_sensor": "UE 1 • Courant", "outdoor_1_state_sensor": "UE 1 • État",
+          "outdoor_2_model": "UE 2 • Modèle Toshiba G3", "outdoor_2_power_sensor": "UE 2 • Puissance", "outdoor_2_current_sensor": "UE 2 • Courant", "outdoor_2_state_sensor": "UE 2 • État",
+          "outdoor_3_model": "UE 3 • Modèle Toshiba G3", "outdoor_3_power_sensor": "UE 3 • Puissance", "outdoor_3_current_sensor": "UE 3 • Courant", "outdoor_3_state_sensor": "UE 3 • État",
+          "outdoor_4_model": "UE 4 • Modèle Toshiba G3", "outdoor_4_power_sensor": "UE 4 • Puissance", "outdoor_4_current_sensor": "UE 4 • Courant", "outdoor_4_state_sensor": "UE 4 • État",
+          "outdoor_5_model": "UE 5 • Modèle Toshiba G3", "outdoor_5_power_sensor": "UE 5 • Puissance", "outdoor_5_current_sensor": "UE 5 • Courant", "outdoor_5_state_sensor": "UE 5 • État",
+          "indoor_1_name": "Zone 1 • Nom", "indoor_1_size": "Zone 1 • Taille", "indoor_1_range": "Zone 1 • Gamme", "indoor_1_outdoor_id": "Zone 1 • UE associée", "indoor_1_power_sensor": "Zone 1 • Puissance", "indoor_1_current_sensor": "Zone 1 • Courant", "indoor_1_state_sensor": "Zone 1 • État",
+          "indoor_2_name": "Zone 2 • Nom", "indoor_2_size": "Zone 2 • Taille", "indoor_2_range": "Zone 2 • Gamme", "indoor_2_outdoor_id": "Zone 2 • UE associée", "indoor_2_power_sensor": "Zone 2 • Puissance", "indoor_2_current_sensor": "Zone 2 • Courant", "indoor_2_state_sensor": "Zone 2 • État",
+          "indoor_3_name": "Zone 3 • Nom", "indoor_3_size": "Zone 3 • Taille", "indoor_3_range": "Zone 3 • Gamme", "indoor_3_outdoor_id": "Zone 3 • UE associée", "indoor_3_power_sensor": "Zone 3 • Puissance", "indoor_3_current_sensor": "Zone 3 • Courant", "indoor_3_state_sensor": "Zone 3 • État",
+          "indoor_4_name": "Zone 4 • Nom", "indoor_4_size": "Zone 4 • Taille", "indoor_4_range": "Zone 4 • Gamme", "indoor_4_outdoor_id": "Zone 4 • UE associée", "indoor_4_power_sensor": "Zone 4 • Puissance", "indoor_4_current_sensor": "Zone 4 • Courant", "indoor_4_state_sensor": "Zone 4 • État",
+          "indoor_5_name": "Zone 5 • Nom", "indoor_5_size": "Zone 5 • Taille", "indoor_5_range": "Zone 5 • Gamme", "indoor_5_outdoor_id": "Zone 5 • UE associée", "indoor_5_power_sensor": "Zone 5 • Puissance", "indoor_5_current_sensor": "Zone 5 • Courant", "indoor_5_state_sensor": "Zone 5 • État"
         }
       },
       "hvac_edit": {
@@ -452,7 +478,17 @@
           "power_factor": "Facteur de puissance estimé",
           "power_sensor": "Capteur de puissance (optionnel)",
           "current_sensor": "Capteur de courant (optionnel)",
-          "state_sensor": "Capteur d’état (optionnel)"
+          "state_sensor": "Capteur d’état (optionnel)",
+          "outdoor_1_model": "UE 1 • Modèle Toshiba G3", "outdoor_1_power_sensor": "UE 1 • Puissance", "outdoor_1_current_sensor": "UE 1 • Courant", "outdoor_1_state_sensor": "UE 1 • État",
+          "outdoor_2_model": "UE 2 • Modèle Toshiba G3", "outdoor_2_power_sensor": "UE 2 • Puissance", "outdoor_2_current_sensor": "UE 2 • Courant", "outdoor_2_state_sensor": "UE 2 • État",
+          "outdoor_3_model": "UE 3 • Modèle Toshiba G3", "outdoor_3_power_sensor": "UE 3 • Puissance", "outdoor_3_current_sensor": "UE 3 • Courant", "outdoor_3_state_sensor": "UE 3 • État",
+          "outdoor_4_model": "UE 4 • Modèle Toshiba G3", "outdoor_4_power_sensor": "UE 4 • Puissance", "outdoor_4_current_sensor": "UE 4 • Courant", "outdoor_4_state_sensor": "UE 4 • État",
+          "outdoor_5_model": "UE 5 • Modèle Toshiba G3", "outdoor_5_power_sensor": "UE 5 • Puissance", "outdoor_5_current_sensor": "UE 5 • Courant", "outdoor_5_state_sensor": "UE 5 • État",
+          "indoor_1_name": "Zone 1 • Nom", "indoor_1_size": "Zone 1 • Taille", "indoor_1_range": "Zone 1 • Gamme", "indoor_1_outdoor_id": "Zone 1 • UE associée", "indoor_1_power_sensor": "Zone 1 • Puissance", "indoor_1_current_sensor": "Zone 1 • Courant", "indoor_1_state_sensor": "Zone 1 • État",
+          "indoor_2_name": "Zone 2 • Nom", "indoor_2_size": "Zone 2 • Taille", "indoor_2_range": "Zone 2 • Gamme", "indoor_2_outdoor_id": "Zone 2 • UE associée", "indoor_2_power_sensor": "Zone 2 • Puissance", "indoor_2_current_sensor": "Zone 2 • Courant", "indoor_2_state_sensor": "Zone 2 • État",
+          "indoor_3_name": "Zone 3 • Nom", "indoor_3_size": "Zone 3 • Taille", "indoor_3_range": "Zone 3 • Gamme", "indoor_3_outdoor_id": "Zone 3 • UE associée", "indoor_3_power_sensor": "Zone 3 • Puissance", "indoor_3_current_sensor": "Zone 3 • Courant", "indoor_3_state_sensor": "Zone 3 • État",
+          "indoor_4_name": "Zone 4 • Nom", "indoor_4_size": "Zone 4 • Taille", "indoor_4_range": "Zone 4 • Gamme", "indoor_4_outdoor_id": "Zone 4 • UE associée", "indoor_4_power_sensor": "Zone 4 • Puissance", "indoor_4_current_sensor": "Zone 4 • Courant", "indoor_4_state_sensor": "Zone 4 • État",
+          "indoor_5_name": "Zone 5 • Nom", "indoor_5_size": "Zone 5 • Taille", "indoor_5_range": "Zone 5 • Gamme", "indoor_5_outdoor_id": "Zone 5 • UE associée", "indoor_5_power_sensor": "Zone 5 • Puissance", "indoor_5_current_sensor": "Zone 5 • Courant", "indoor_5_state_sensor": "Zone 5 • État"
         }
       },
       "hvac_remove": {

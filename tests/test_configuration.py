@@ -363,7 +363,7 @@ class HVACConfigurationTests(unittest.TestCase):
         result = aggregate_equipment(record, states.get)
 
         self.assertAlmostEqual(result["power_w"], 414.0)
-        self.assertFalse(result["estimated"])
+        self.assertTrue(result["estimated"])
         self.assertEqual(result["components"][1]["status"], "on")
 
     def test_nominal_estimate_is_only_used_when_running_state_is_known(self) -> None:
@@ -382,6 +382,27 @@ class HVACConfigurationTests(unittest.TestCase):
         self.assertTrue(active["estimated"])
         self.assertEqual(unknown["power_w"], 0)
         self.assertEqual(unknown["status"], "unknown")
+
+    def test_hvac_energy_is_accumulated_as_a_separate_physical_appliance(self) -> None:
+        accounting = EnergyAccounting()
+        timestamp = datetime(2026, 1, 2, 12, 0)
+        snapshot = SimpleNamespace(
+            timestamp=timestamp,
+            valid=True,
+            house_w=1000.0,
+            pv_w=0.0,
+            import_w=1000.0,
+            export_w=0.0,
+        )
+        appliance = {"id": "hvac_system1", "name": "PAC", "power_w": 1000.0}
+        accounting.process(snapshot, {"regime": "Mono-horaire", "active_buy": 0.2}, [appliance])
+        snapshot.timestamp = timestamp.replace(minute=1)
+        accounting.process(snapshot, {"regime": "Mono-horaire", "active_buy": 0.2}, [appliance])
+
+        self.assertAlmostEqual(
+            accounting.view()["today"]["appliances"]["hvac_system1"]["energy_kwh"],
+            1.0 / 60.0,
+        )
 
 
 class DashboardAndProfileTests(unittest.TestCase):
@@ -447,6 +468,21 @@ class DashboardAndProfileTests(unittest.TestCase):
                         f"accounting.appliance.{appliance_id}.hc_today",
                         registry.BINDINGS,
                     )
+                hvac_keys = registry._hvac_registry_keys({
+                    "hvac_equipment": [{
+                        "id": "stable123",
+                        "outdoor_units": [{"id": "outdoor_1"}],
+                        "indoor_units": [{"id": "indoor_1"}],
+                    }]
+                })
+                self.assertEqual(
+                    hvac_keys["hvac.stable123.power"],
+                    "hvac_stable123_power",
+                )
+                self.assertEqual(
+                    hvac_keys["hvac.stable123.indoor_1.energy_lifetime"],
+                    "hvac_stable123_indoor_1_energy_lifetime",
+                )
         finally:
             sys.modules.pop("foxcat_energy.registry", None)
             if original_registry is not None:
