@@ -218,7 +218,7 @@ class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
         super().__init__(
             coordinator,
             "profil_distribution_belgique",
-            "Profil de distribution Belgique",
+            "Profil distribution Belgique",
             "mdi:transmission-tower",
             "distribution_profile",
             DISTRIBUTION_PROFILES,

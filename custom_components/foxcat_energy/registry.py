@@ -491,8 +491,6 @@ _config("pricing.source.mono", "Tarification", CONF_TARIFF_MONO_PRICE_SENSOR)
 _literal("boiler.estimated_temperature", "Boiler", "sensor.foxcat_energy_boiler_temperature_chauffe_eau")
 _literal("boiler.thermal_state", "Boiler", "sensor.foxcat_energy_boiler_etat_thermique")
 _literal("boiler.estimate_confidence", "Boiler", "sensor.foxcat_energy_boiler_confiance_estimation")
-_literal("pricing.distribution_profile", "Tarification", "select.foxcat_energy_tarification_profil_distribution_belgique")
-_literal("pricing.distribution_period", "Tarification", "sensor.foxcat_energy_tarification_periode_de_distribution")
 # Entités du dashboard premium 1.7.0 auparavant référencées en dur
 _literal('legacy.binary_sensor_foxcat_energy_boiler_boiler_physique', 'Boiler', 'binary_sensor.foxcat_energy_boiler_boiler_physique')
 _literal('legacy.button_foxcat_energy_diagnostic_lancer_un_diagnostic_ems', 'Diagnostic', 'button.foxcat_energy_diagnostic_lancer_un_diagnostic_ems')

@@ -20,18 +20,22 @@ sys.modules.setdefault("foxcat_energy", package)
 from foxcat_energy.const import (
     DYNAMIC_STRUCT_BI,
     DYNAMIC_STRUCT_IMPACT,
+    DISTRIBUTION_PROFILE_BI,
     DISTRIBUTION_PROFILE_IMPACT,
     DISTRIBUTION_PROFILE_SIMPLE,
     DISTRIBUTION_PROFILES,
     MODES,
     NETWORK_POLICIES,
+    NUMBER_DEFINITIONS,
     OFFICIAL_MENU_STEPS,
     PRICE_SOURCE_INTEGRATION,
+    PRICE_SOURCE_VARIABLE,
     PRICE_SOURCES,
     TARIFF_BI,
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
     TARIFF_STRUCTURE_TOU,
+    SWITCH_DEFINITIONS,
 )
 from foxcat_energy.dashboard_versions import (
     available_dashboard_versions,
@@ -197,6 +201,37 @@ class SelectOptionTests(unittest.TestCase):
             DISTRIBUTION_PROFILE_IMPACT,
         )
 
+    def test_bihourly_distribution_adders_apply_to_fixed_contracts(self) -> None:
+        settings = {
+            "price_source": PRICE_SOURCE_VARIABLE,
+            "tariff_structure": "Simple",
+            "distribution_profile": DISTRIBUTION_PROFILE_BI,
+            "tariff_tou_hp_adder_eur_kwh": 0.05,
+            "tariff_tou_hc_adder_eur_kwh": 0.02,
+        }
+
+        self.assertAlmostEqual(
+            final_client_price(0.2, datetime(2026, 1, 2, 8), settings),
+            0.25,
+        )
+        self.assertAlmostEqual(
+            final_client_price(0.2, datetime(2026, 1, 2, 12), settings),
+            0.22,
+        )
+        self.assertEqual(
+            distribution_period(datetime(2026, 1, 2, 8), settings),
+            "HP",
+        )
+        self.assertEqual(
+            distribution_period(datetime(2026, 1, 2, 12), settings),
+            "HC",
+        )
+        for legacy_value in ("Bi-horaire", "Bi-horaire (HP/HC)"):
+            self.assertEqual(
+                distribution_profile({"tariff_structure": legacy_value}),
+                DISTRIBUTION_PROFILE_BI,
+            )
+
     def test_reinjection_value_never_changes_physical_import_kwh(self) -> None:
         accounting = EnergyAccounting()
         first = datetime(2026, 1, 2, 12, 0)
@@ -259,6 +294,64 @@ class DeviceConfigurationTests(unittest.TestCase):
 
 
 class DashboardAndProfileTests(unittest.TestCase):
+    def test_contract_dashboard_entities_are_registered(self) -> None:
+        homeassistant = types.ModuleType("homeassistant")
+        homeassistant.__path__ = []
+        config_entries = types.ModuleType("homeassistant.config_entries")
+        config_entries.ConfigEntry = object
+        core = types.ModuleType("homeassistant.core")
+        core.HomeAssistant = object
+        helpers = types.ModuleType("homeassistant.helpers")
+        helpers.__path__ = []
+        entity_registry = types.ModuleType("homeassistant.helpers.entity_registry")
+        helpers.entity_registry = entity_registry
+        stubs = {
+            "homeassistant": homeassistant,
+            "homeassistant.config_entries": config_entries,
+            "homeassistant.core": core,
+            "homeassistant.helpers": helpers,
+            "homeassistant.helpers.entity_registry": entity_registry,
+        }
+        original_registry = sys.modules.pop("foxcat_energy.registry", None)
+        try:
+            with patch.dict(sys.modules, stubs):
+                registry = importlib.import_module("foxcat_energy.registry")
+                self.assertEqual(
+                    registry.BINDINGS["pricing.distribution_profile"].key,
+                    "profil_distribution_belgique",
+                )
+                self.assertEqual(
+                    registry.BINDINGS["pricing.distribution_period"].kind,
+                    "native",
+                )
+                for key in (
+                    "dynamic_favorable_position_pct",
+                    "dynamic_high_position_pct",
+                    "impact_eco_adder_eur_kwh",
+                    "impact_medium_adder_eur_kwh",
+                    "impact_peak_adder_eur_kwh",
+                ):
+                    self.assertIn(key, NUMBER_DEFINITIONS)
+                    self.assertEqual(registry.BINDINGS[f"settings.{key}"].key, key)
+                self.assertIn("dynamic_negative_price_charge_enabled", SWITCH_DEFINITIONS)
+                self.assertEqual(
+                    registry.BINDINGS[
+                        "settings.dynamic_negative_price_charge_enabled"
+                    ].key,
+                    "dynamic_negative_price_charge_enabled",
+                )
+                for role in (
+                    "accounting.appliance.boiler.hp_today",
+                    "accounting.appliance.boiler.hc_today",
+                    "accounting.appliance.washer.hp_today",
+                    "accounting.appliance.washer.hc_today",
+                ):
+                    self.assertIn(role, registry.BINDINGS)
+        finally:
+            sys.modules.pop("foxcat_energy.registry", None)
+            if original_registry is not None:
+                sys.modules["foxcat_energy.registry"] = original_registry
+
     def test_dashboard_merge_keeps_disjoint_user_and_latest_changes(self) -> None:
         base = "title: FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"
         user = "title: My FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"

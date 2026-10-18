@@ -100,7 +100,7 @@ def final_client_price(base,at,settings):
     if dims.distribution_profile == DISTRIBUTION_PROFILE_IMPACT:
         period = impact_period(at, settings)
         p += float(settings.get(IMPACT_ADDER_KEYS[period], 0))
-    elif dims.distribution_profile == DISTRIBUTION_PROFILE_BI and dims.dynamic:
+    elif dims.distribution_profile == DISTRIBUTION_PROFILE_BI:
         p+=float(settings.get('tariff_tou_hp_adder_eur_kwh' if tou_period(at,settings)=='HP' else 'tariff_tou_hc_adder_eur_kwh',0))
     return p
 # FONCTION : apply_final_price_components — Apply final price components
