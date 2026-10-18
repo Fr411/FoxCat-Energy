@@ -115,12 +115,42 @@ Pilote le bridage SolarEdge via contact sec (relais RRCR 0–100 % par pas de 10
 ## 🎛 Modes de Fonctionnement
 
 | Mode | Description |
-| :--- | :--- |
-| **Économie d'énergie** | Mode hybride optimisé : ECS solaire + stockage utile + zéro injection sur surplus résiduel. |
-| **ECS Solaire** | Priorité stricte à la chauffe thermique de l'eau sanitaire sur excédent photovoltaïque. |
-| **Zéro Injection** | Asservissement millimétré du bridage onduleur sur l'export réseau réel. |
-| **Dynamique** | Pilotage indexé sur les prix horaires de marché (charge réseau autorisée sur prix négatif). |
-| **Manuel** | Handover complet à l'utilisateur : automatisations désactivées, sécurités thermiques matérielles conservées. |
+[CONFIGURATION DU CONTRAT ET DU RÉSEAU WALLON]
+  │
+  ├── 1. RÉGIME TARIFAIRE / CONTRAT ÉNERGIE (select.foxcat_energy_tarification_regime_tarifaire)
+  │     │
+  │     ├── A. Mono-horaire / Fixe
+  │     │     └── Valorisation : Tarif unique global (pas de distinction horaire)[cite: 6].
+  │     │
+  │     ├── B. Bi-horaire (HP / HC)
+  │     │     ├── Paramètres : Saisie des prix HP/HC ou liaison via entités (ex: Luminus ComfyFlex)[cite: 6, 9, 11]
+  │     │     └── Plages : Piloté par les entités temporelles (HP / HC)[cite: 2, 8]
+  │     │
+  │     └── C. Dynamique (Day-Ahead / DED)
+  │           ├── Sources : Indexation heure par heure (ex: Luminus Dynamic / ENTSO-E)[cite: 1, 6, 11]
+  │           └── Sous-structures & Variantes de Tarifs Dynamiques :
+  │                 ├── 1. Standard Day-Ahead (Luminus Dynamic, Engie Direct, etc.)
+  │                 │     ├── Prix d'achat horaire (all_in) + Prix de réinjection dédié
+  │                 │     ├── Seuil favorable réglable (défaut 30 %) pour déclencher le stockage/charges[cite: 10, 13]
+  │                 │     └── Plafond acceptable / Zone de pic (défaut 70 %) pour bloquer les prélèvements non urgents[cite: 10, 13]
+  │                 ├── 2. Tarifs Dynamiques avec Option Prix Négatifs
+  │                 │     └── Switch actif : Forçage de charge réseau (ex: Boiler jusqu'à 65 °C) lorsque le marché est négatif[cite: 6, 25]
+  │                 └── 3. Tarifs Dynamiques couplés au Profil Réseau Wallon
+  │                       └── Croisement avec la structure de distribution locale
+  │
+  ├── 2. PROFIL DE DISTRIBUTION & COMPTAGE (Wallonie) (select.foxcat_energy_tarification_profil_distribution_belgique)
+  │     ├── A. Simple (un tarif, toutes les heures)[cite: 2, 4]
+  │     ├── B. Bi-horaire (jour / nuit)[cite: 2, 4]
+  │     └── C. Tarif Impact (3 plages horaires CWApe)[cite: 2, 4]
+  │           ├── Période PIC : 17h – 22h (Alerte / Évitement des pointes réseau)[cite: 2, 4]
+  │           ├── Période MEDIUM : 7h – 11h + 22h – 1h[cite: 2, 4]
+  │           └── Période ECO : 1h – 7h + 11h – 17h (Favorable aux reports)[cite: 2, 4]
+  │
+  └── 3. POLITIQUE RÉSA / RÉINJECTION (select.foxcat_energy_tarification_politique_reseau)
+        ├── A. Régime de compensation (Wallonie, certifié pré-2024, onduleur libéré à 100 % jusqu'en 2030)[cite: 3]
+        ├── B. Tarif d'injection (Compteur communicant / Post-2024)[cite: 3]
+        │     └── Convention signée : Valeur positive = revenu (revente) / Valeur négative = coût de réinjection[cite: 7, 10]
+        └── C. Zéro injection (Best effort / strict)[cite: 5, 11]
 
 ---
 
