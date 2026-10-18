@@ -813,42 +813,8 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing — traitement asynchrone : step pricing
     async def async_step_pricing(self, user_input=None):
-        tariff = active_tariff(self._effective())
-        if tariff == TARIFF_DYNAMIQUE:
-            options = ["pricing_switch", "pricing_dynamic", "init"]
-        elif tariff in (TARIFF_HPHC_MONO, TARIFF_HPHC_BI):
-            options = ["pricing_switch", "hphc", "init"]
-        else:
-            options = ["pricing_switch", "pricing_dynamic", "hphc", "init"]
+        options = ["pricing_dynamic", "hphc", "init"]
         return self.async_show_menu(step_id="pricing", menu_options=options)
-
-    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_switch — bascule entre tarification HP/HC et dynamique
-    async def async_step_pricing_switch(self, user_input=None):
-        if user_input is not None:
-            pending = self._ensure_pending()
-            pending["tariff_family"] = user_input["tariff_family"]
-            pending["tariff_structure"] = user_input["tariff_structure"]
-            return await self.async_step_pricing()
-        current = self._effective()
-        family = current.get("tariff_family") or "dynamique"
-        structure = current.get("tariff_structure")
-        options = list(dict.fromkeys(HPHC_STRUCTURES + DYNAMIQUE_STRUCTURES))
-        if structure not in options:
-            structure = HPHC_MONO if family == "hphc" else DYNAMIQUE_STRUCTURES[0]
-        schema = vol.Schema(
-            {
-                vol.Required("tariff_family", default=family): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=["hphc", "dynamique"],
-                        mode=selector.SelectSelectorMode.LIST,
-                    )
-                ),
-                vol.Required("tariff_structure", default=structure): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=options, mode=selector.SelectSelectorMode.DROPDOWN)
-                ),
-            }
-        )
-        return self.async_show_form(step_id="pricing_switch", data_schema=schema)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_dynamic — traitement asynchrone : step pricing dynamic
     async def async_step_pricing_dynamic(self, user_input=None):
