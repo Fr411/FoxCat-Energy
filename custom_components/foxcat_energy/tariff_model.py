@@ -9,11 +9,23 @@ from .const import (
     DISTRIBUTION_PROFILE_SIMPLE,
     DISTRIBUTION_PROFILES,
     DYNAMIC_STRUCT_IMPACT,
+    NETWORK_POLICIES,
+    NETWORK_POLICY_BILLED_EXPORT,
+    NETWORK_POLICY_COMPENSATION,
+    NETWORK_POLICY_NOT_VALUED,
+    NETWORK_POLICY_ZERO_INJECTION,
+    PRICE_SOURCES,
+    PRICE_SOURCE_CONTRACT,
+    PRICE_SOURCE_DYNAMIC,
+    PRICE_SOURCE_INTEGRATION,
+    PRICE_SOURCE_VARIABLE,
+    TARIFF_STRUCTURES,
+    TARIFF_STRUCTURE_IMPACT,
+    TARIFF_STRUCTURE_SIMPLE,
+    TARIFF_STRUCTURE_TOU,
 )
-PRICE_SOURCE_CONTRACT='Contractuelle / fixe'; PRICE_SOURCE_VARIABLE='Variable via entités Home Assistant'; PRICE_SOURCE_INTEGRATION='Intégration externe'; PRICE_SOURCE_DYNAMIC='Dynamique Day-Ahead'
-PRICE_SOURCES=[PRICE_SOURCE_CONTRACT,PRICE_SOURCE_VARIABLE,PRICE_SOURCE_INTEGRATION,PRICE_SOURCE_DYNAMIC]
-TARIFF_STRUCTURE_SIMPLE='Simple'; TARIFF_STRUCTURE_TOU='Bi-horaire'; TARIFF_STRUCTURE_IMPACT='Impact'; TARIFF_STRUCTURES=[TARIFF_STRUCTURE_SIMPLE,TARIFF_STRUCTURE_TOU,TARIFF_STRUCTURE_IMPACT]
-NETWORK_POLICY_COMPENSATION='Compensation'; NETWORK_POLICY_TARIFFED='Injection tarifée'; NETWORK_POLICY_NOT_VALUED='Injection non valorisée'; NETWORK_POLICY_ZERO='Zéro injection'; NETWORK_POLICIES=[NETWORK_POLICY_COMPENSATION,NETWORK_POLICY_TARIFFED,NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO]
+NETWORK_POLICY_TARIFFED = NETWORK_POLICY_BILLED_EXPORT
+NETWORK_POLICY_ZERO = NETWORK_POLICY_ZERO_INJECTION
 IMPACT_ADDER_KEYS = {
     "ECO": "impact_eco_adder_eur_kwh",
     "MEDIUM": "impact_medium_adder_eur_kwh",
@@ -96,12 +108,11 @@ def distribution_period(at, settings):
 def final_client_price(base,at,settings):
     p=float(base)
     if not settings.get('price_curve_is_final',True): p+=sum(float(settings.get(k,0)) for k in ('tariff_network_component_eur_kwh','tariff_tax_component_eur_kwh','tariff_contract_component_eur_kwh'))
-    dims=tariff_dimensions(settings)
-    if dims.distribution_profile == DISTRIBUTION_PROFILE_IMPACT:
-        period = impact_period(at, settings)
+    period = distribution_period(at, settings)
+    if period in IMPACT_ADDER_KEYS:
         p += float(settings.get(IMPACT_ADDER_KEYS[period], 0))
-    elif dims.distribution_profile == DISTRIBUTION_PROFILE_BI:
-        p+=float(settings.get('tariff_tou_hp_adder_eur_kwh' if tou_period(at,settings)=='HP' else 'tariff_tou_hc_adder_eur_kwh',0))
+    elif period in {"HP", "HC"}:
+        p += float(settings.get(f"tariff_tou_{period.lower()}_adder_eur_kwh", 0))
     return p
 # FONCTION : apply_final_price_components — Apply final price components
 def apply_final_price_components(points:Iterable[PricePoint],settings): return [PricePoint(x.at,final_client_price(x.price,x.at,settings),x.source) for x in points]

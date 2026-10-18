@@ -74,7 +74,7 @@ def evaluate_flexible_boiler(
             "FLEX_IMPACT_WAIT",
         )
 
-    # Dynamique : 30 % = creux favorable ; plafond 65 % (Éco) avec
+    # Dynamique : 30 % = creux favorable ; plafond 70 % par défaut avec
     # assouplissement explicite en Confort. Le boost 65 reste solaire uniquement.
     if regime == TARIFF_DYNAMIC:
         pos = decision.get("dynamic_curve_position_pct")

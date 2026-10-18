@@ -18,6 +18,7 @@ package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.const import (
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     DYNAMIC_STRUCT_BI,
     DYNAMIC_STRUCT_IMPACT,
     DISTRIBUTION_PROFILE_BI,
@@ -271,6 +272,20 @@ class SelectOptionTests(unittest.TestCase):
         self.assertIn(migrated["network_policy"], NETWORK_POLICIES)
         self.assertIn(migrated["tariff_regime"], TARIFF_REGIMES)
         self.assertTrue(notes)
+        self.assertEqual(
+            migrated["dynamic_high_position_pct"],
+            DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
+        )
+
+    def test_migration_preserves_configured_dynamic_high_position(self) -> None:
+        migrated, _ = migrate_settings_v173(
+            {
+                "mode": "Éco",
+                "dynamic_high_position_pct": 65.0,
+            }
+        )
+
+        self.assertEqual(migrated["dynamic_high_position_pct"], 65.0)
 
 
 class DeviceConfigurationTests(unittest.TestCase):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any
 from .const import *
-MIGRATION_MODEL_VERSION = "1.7.3"
+MIGRATION_MODEL_VERSION = "1.7.5"
 MIGRATION_MODEL_VERSION_V171 = "1.7.1"
 # FONCTION : migrate_settings_v171 — Migrate settings v171
 def migrate_settings_v171(settings:dict[str,Any]):
@@ -61,6 +61,9 @@ def migrate_settings_v173(settings: dict[str, Any]) -> tuple[dict[str, Any], lis
      notes.append("Politique réseau invalide normalisée vers une option prise en charge.")
 
  out["tariff_regime"] = compatibility_tariff_regime(out)
+ if "dynamic_high_position_pct" not in out:
+  out["dynamic_high_position_pct"] = DEFAULT_DYNAMIC_HIGH_POSITION_PCT
+  notes.append("Plafond Day-Ahead initialisé à 70 % conformément au nouveau défaut.")
  for key in (
      "device_inverter_enabled",
      "device_meter_enabled",
