@@ -7,6 +7,7 @@ from typing import Any, Iterable
 
 from .const import (
     DYNAMIC_ARBITRAGE_HORIZON_HOURS,
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     DYNAMIC_POSITION_HIGH,
     DYNAMIC_POSITION_LOW,
     MODE_DYNAMIC,
@@ -474,7 +475,7 @@ def _evaluate_dynamic_market(
     # Dynamique. Hors de ce mode, on conserve les bandes historiques 1.6.158.
     if str(settings.get("mode")) == MODE_DYNAMIC:
         low_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
-        high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", 70.0))))
+        high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))))
     else:
         low_pct = DYNAMIC_POSITION_LOW * 100.0
         high_pct = DYNAMIC_POSITION_HIGH * 100.0

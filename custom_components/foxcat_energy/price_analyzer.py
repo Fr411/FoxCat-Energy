@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from statistics import median
 from typing import Any, Iterable
 
+from .const import DEFAULT_DYNAMIC_HIGH_POSITION_PCT
 from .economic_optimizer import PricePoint
 
 REACTIVE = "REACTIVE"
@@ -104,7 +105,7 @@ def analyze_price_curve(
     rank = 1 + sum(price < current for price in reference_prices) if current is not None else None
 
     threshold = max(0.0, min(100.0, float(settings.get("dynamic_favorable_position_pct", 30))))
-    peak_threshold = max(0.0, min(100.0, float(settings.get("dynamic_high_position_pct", 70))))
+    peak_threshold = max(0.0, min(100.0, float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))))
     max_favorable_hours = max(0.0, float(settings.get("dynamic_favorable_max_hours", 4)))
     day_min = min((point.price for point in today_points), default=None)
     day_max = max((point.price for point in today_points), default=None)

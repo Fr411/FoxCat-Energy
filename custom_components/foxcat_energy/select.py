@@ -8,6 +8,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     DOMAIN,
     DISTRIBUTION_PROFILE_BI,
+    DISTRIBUTION_PROFILE_IMPACT,
+    DISTRIBUTION_PROFILE_SIMPLE,
     DISTRIBUTION_PROFILES,
     MODE_MANUAL,
     MODES,
@@ -17,7 +19,7 @@ from .const import (
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
 )
-from .tariff_model import tariff_dimensions
+from .tariff_model import distribution_profile, tariff_dimensions
 from .coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .select_options import (
@@ -204,14 +206,14 @@ class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
 class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
     _attr_options = DISTRIBUTION_PROFILES
     option_descriptions = {
-        "Simple": "Un tarif de distribution identique à toute heure.",
+        DISTRIBUTION_PROFILE_SIMPLE: "Un tarif de distribution identique à toute heure.",
         DISTRIBUTION_PROFILE_BI: "Profil de comptage jour/nuit, indépendant du contrat d’énergie.",
-        "Impact": "Profil wallon PIC, MEDIUM et ECO selon les plages configurées.",
+        DISTRIBUTION_PROFILE_IMPACT: "Profil wallon PIC, MEDIUM et ECO selon les plages configurées.",
     }
     option_icons = {
-        "Simple": "mdi:clock-outline",
+        DISTRIBUTION_PROFILE_SIMPLE: "mdi:clock-outline",
         DISTRIBUTION_PROFILE_BI: "mdi:clock-time-eight-outline",
-        "Impact": "mdi:chart-sankey",
+        DISTRIBUTION_PROFILE_IMPACT: "mdi:chart-sankey",
     }
 
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
@@ -226,8 +228,6 @@ class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
 
     @property
     def current_option(self) -> str | None:
-        from .tariff_model import distribution_profile
-
         return distribution_profile(self.coordinator.settings)
 
 

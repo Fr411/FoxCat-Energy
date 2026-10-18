@@ -3,6 +3,7 @@ from __future__ import annotations
 DOMAIN = "foxcat_energy"
 VERSION = "1.7.5"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "time", "button"]
+DEFAULT_DYNAMIC_HIGH_POSITION_PCT = 70.0
 
 # Ordre fonctionnel officiel FoxCat Energy. Cet ordre est partagé par les
 # menus, le registre et les diagnostics et ne doit pas être réordonné.
@@ -242,7 +243,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "economic_optimizer_enabled": True,
     "predictive_pricing_enabled": True,
     "dynamic_favorable_position_pct": 30.0,
-    "dynamic_high_position_pct": 70.0,
+    "dynamic_high_position_pct": DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     "solar_forecast_arbitrage": True,
     "persistent_status_notification_enabled": True,
     "high_load_shed_enabled": False,

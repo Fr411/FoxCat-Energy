@@ -5,6 +5,7 @@ from typing import Any
 
 from ..const import (
     BOILER_BOOST_65, BOILER_HEAT_45, BOILER_NONE, BOILER_STOP,
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     MODE_ECO, MODE_COMFORT, MODE_MANUAL, TARIFF_DYNAMIC, TARIFF_TOU,
     DISTRIBUTION_WALLONIA_IMPACT,
 )
@@ -84,7 +85,7 @@ def evaluate_flexible_boiler(
         # Le plafond haut est une limite économique dure du Boiler Dynamic.
         # Le mode Confort assouplit le déclenchement en dessous de ce plafond,
         # mais ne l'autorise jamais à acheter au-delà.
-        high = float(settings.get("dynamic_high_position_pct", 70.0))
+        high = float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))
         if pos > high:
             return BoilerIntent(BOILER_STOP if snapshot.boiler_on else BOILER_NONE, f"Dynamic : {pos:.1f} % > plafond {high:.1f} %, achat Boiler reporté.", "FLEX_DYNAMIC_WAIT")
         if pos <= low and comfort_missing:
