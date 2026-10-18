@@ -7,6 +7,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DOMAIN,
+    DISTRIBUTION_PROFILES,
     MODE_MANUAL,
     MODES,
     NETWORK_POLICIES,
@@ -33,6 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         [
             FoxCatModeSelect(coordinator),
             FoxCatTariffRegimeSelect(coordinator),
+            FoxCatDistributionProfileSelect(coordinator),
             FoxCatDynamicStructureSelect(coordinator),
             FoxCatPriceSourceSelect(coordinator),
             FoxCatTariffStructureSelect(coordinator),
@@ -196,6 +198,36 @@ class FoxCatTariffRegimeSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
     # MÉTHODE : FoxCatTariffRegimeSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
         await super().async_select_option(option)
+
+
+class FoxCatDistributionProfileSelect(FoxCatDescribedSelect, FoxCatBaseSelect):
+    _attr_options = DISTRIBUTION_PROFILES
+    option_descriptions = {
+        "Simple": "Un tarif de distribution identique à toute heure.",
+        "Bi-horaire": "Profil de comptage jour/nuit, indépendant du contrat d’énergie.",
+        "Impact": "Profil wallon PIC, MEDIUM et ECO selon les plages configurées.",
+    }
+    option_icons = {
+        "Simple": "mdi:clock-outline",
+        "Bi-horaire": "mdi:clock-time-eight-outline",
+        "Impact": "mdi:chart-sankey",
+    }
+
+    def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            "profil_distribution_belgique",
+            "Profil Distribution Belgique",
+            "mdi:transmission-tower",
+            "distribution_profile",
+            DISTRIBUTION_PROFILES,
+        )
+
+    @property
+    def current_option(self) -> str | None:
+        from .tariff_model import distribution_profile
+
+        return distribution_profile(self.coordinator.settings)
 
 
 class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
