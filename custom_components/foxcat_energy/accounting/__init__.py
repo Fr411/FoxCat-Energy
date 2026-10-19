@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from .manager import EnergyAccounting as _LegacyEnergyAccounting
+from .battery import BatteryOriginTracker
 from .bihoraire import BihoraireAccounting
 from .dynamic import DynamicAccounting
 from .monohoraire import MonohoraireAccounting
@@ -34,9 +35,12 @@ class EnergyAccounting(_LegacyEnergyAccounting):
         self._mono = MonohoraireAccounting()
         self._bi = BihoraireAccounting()
         self._dynamic = DynamicAccounting()
+        self.battery = BatteryOriginTracker()
 
     def restore(self, raw: Any) -> None:
         super().restore(raw)
+        if isinstance(raw, dict):
+            self.battery.restore(raw.get("battery_origin"))
         self._last_checks = {
             "status": "not_checked", "regime": self._active_regime,
             "errors": [], "warnings": ["Données restaurées; validation au prochain cycle de comptabilité."],
@@ -54,6 +58,19 @@ class EnergyAccounting(_LegacyEnergyAccounting):
         if self._active_regime in REGIME_BI_ALIASES:
             normalized_prices["regime"] = "Bi-horaire HP/HC"
         save_requested = super().process(snapshot, normalized_prices, appliances)
+        # Always-On : suivi batterie indépendant du régime, si la mesure existe.
+        raw_snap = getattr(snapshot, "raw", None)
+        charge = raw_snap.get("battery_charge_w") if isinstance(raw_snap, dict) else None
+        if getattr(snapshot, "valid", False) and isinstance(charge, (int, float)):
+            buy = prices.get("active_buy")
+            self.battery.update(
+                snapshot.timestamp, charge_w=float(charge), pv_w=snapshot.pv_w,
+                house_w=snapshot.house_w,
+                buy_price=float(buy) if isinstance(buy, (int, float)) else None,
+                period=str(prices.get("period") or ""),
+            )
+        elif not getattr(snapshot, "valid", False):
+            self.battery.last_ts = None
         ledger_view = super().view()
         if self._active_regime in REGIME_BI_ALIASES:
             self._last_checks = self._bi.validate(ledger_view)
@@ -68,9 +85,15 @@ class EnergyAccounting(_LegacyEnergyAccounting):
             }
         return save_requested
 
+    def dump(self) -> dict[str, Any]:
+        data = super().dump()
+        data["battery_origin"] = self.battery.dump()
+        return data
+
     def view(self) -> dict[str, Any]:
         result = super().view()
         result["accounting_checks"] = dict(self._last_checks)
+        result["battery_origin"] = self.battery.view()
         return result
 
 __all__ = ["EnergyAccounting"]
