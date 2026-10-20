@@ -1226,6 +1226,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (TypeError, ValueError):
             return None
 
+    def _power_w_state(self, entity_id: str | None) -> float | None:
+        """Lit une puissance en W, en convertissant kW/MW selon l'unité du capteur."""
+        value = self._optional_float_state(entity_id)
+        if value is None:
+            return None
+        state = self.hass.states.get(entity_id)
+        unit = str(state.attributes.get("unit_of_measurement") or "").strip().lower() if state else ""
+        return value * {"kw": 1000.0, "mw": 1_000_000.0}.get(unit, 1.0)
+
     # MÉTHODE : FoxCatEnergyCoordinator._is_on — Is on
     def _is_on(self, entity_id: str | None) -> bool:
         state = self.hass.states.get(entity_id) if entity_id else None
@@ -1299,7 +1308,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             imp = max(self._float_state(import_id), 0.0)
             valid = all(self._numeric_valid(eid) for eid in [pv_id, house_id, export_id, import_id])
 
-        boiler_power = max(self._float_state(self.config.get(CONF_BOILER_POWER_SENSOR)), 0.0)
+        boiler_power = max(self._power_w_state(self.config.get(CONF_BOILER_POWER_SENSOR)) or 0.0, 0.0)
         boiler_binary = self._is_on(self.config.get(CONF_BOILER_BINARY))
         boiler_on = boiler_binary or boiler_power > 200
         boiler_temp = self._float_state(self.config.get(CONF_BOILER_TEMP_SENSOR))
@@ -3049,7 +3058,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "id": machine.machine_id,
                 "name": machine.name,
                 "switch_on": self._is_on(machine.switch_entity),
-                "power_w": self._optional_float_state(machine.power_sensor),
+                "power_w": self._power_w_state(machine.power_sensor),
                 "current_a": self._optional_float_state(machine.current_sensor),
                 "voltage_v": self._optional_float_state(machine.voltage_sensor),
                 "cycle_state": cycle.get("state", "IDLE"),
