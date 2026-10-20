@@ -36,7 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     legacy_keys = {"washer_enabled", "dryer_enabled", "dishwasher_enabled"}
     entities.extend(
         FoxCatMachineManagementSwitch(coordinator, machine)
-        for machine in coordinator.machines
+        for machine in coordinator.controllable_machines
         if machine.setting_key not in legacy_keys
     )
     entities.extend(

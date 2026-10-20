@@ -49,7 +49,6 @@ from .const import (
     CONF_PRI_L3,
     CONF_PRI_L4,
     CONF_INVERTER_POWER_SENSOR,
-    CONF_HVAC_EQUIPMENT,
     CONF_PV_SENSOR,
     CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR,
     CONF_TARIFF_HC_PRICE_SENSOR,
@@ -570,32 +569,6 @@ def _native_entities_by_key(hass: HomeAssistant, entry: ConfigEntry) -> dict[str
     return result
 
 
-def _hvac_registry_keys(config: dict[str, Any]) -> dict[str, str]:
-    roles: dict[str, str] = {}
-    for equipment in config.get(CONF_HVAC_EQUIPMENT, []):
-        if not isinstance(equipment, dict) or not equipment.get("id"):
-            continue
-        equipment_id = str(equipment["id"])
-        safe_id = re.sub(r"[^a-z0-9_]", "_", equipment_id.lower())
-        metrics = ("power", "status", "energy_today", "energy_month", "energy_year", "energy_lifetime")
-        for metric in metrics:
-            roles[f"hvac.{equipment_id}.{metric}"] = f"hvac_{safe_id}_{metric}"
-        components = [
-            *equipment.get("outdoor_units", []),
-            *equipment.get("indoor_units", []),
-        ]
-        for component in components:
-            if not isinstance(component, dict) or not component.get("id"):
-                continue
-            component_id = str(component["id"])
-            safe_component = re.sub(r"[^a-z0-9_]", "_", component_id.lower())
-            for metric in metrics:
-                roles[f"hvac.{equipment_id}.{component_id}.{metric}"] = (
-                    f"hvac_{safe_id}_{safe_component}_{metric}"
-                )
-    return roles
-
-
 # FONCTION : resolve_registry — Resolve all FoxCat roles to the current HA entity_ids
 def resolve_registry(
     hass: HomeAssistant,
@@ -630,10 +603,6 @@ def resolve_registry(
             entity_id = binding.fallback_entity_id
         if entity_id:
             resolved[role] = entity_id
-
-    for role, native_key in _hvac_registry_keys(config).items():
-        if native.get(native_key):
-            resolved[role] = native[native_key]
 
     # Boutons utilisateurs des machines extensibles : rôles déterministes
     # construits à partir des unique_id natifs FoxCat.
@@ -701,14 +670,6 @@ def registry_diagnostics(hass: HomeAssistant, entry: ConfigEntry, config: dict[s
         else:
             unresolved.append(role)
     native = _native_entities_by_key(hass, entry)
-    for role, native_key in _hvac_registry_keys(config).items():
-        entity_id = native.get(native_key)
-        if entity_id:
-            sections.setdefault("Pompes à chaleur & Équipements CVC", {})[role] = entity_id
-            if hass.states.get(entity_id) is None:
-                unavailable.append(role)
-        else:
-            unresolved.append(role)
     return {
         "order": list(OFFICIAL_SECTION_ORDER),
         "resolved_count": len(resolved),

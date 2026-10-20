@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-import re
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
@@ -267,11 +266,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatNumericSensor(c, f"appareil_{safe}_dynamic_jour", f"🔌 {appliance_name} • Consommation Dynamic aujourd’hui", "mdi:chart-timeline-variant", "accounting", lambda d, aid=appliance_id: d["accounting"]["today"]["appliances"].get(aid,{}).get("dynamic_kwh",0.0), UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
             FoxCatValueSensor(c, f"appareil_{safe}_tarif_actuel", f"🔌 {appliance_name} • Tarif actuel", "mdi:clock-check-outline", "accounting", lambda d: d["prices"].get("period","—")),
         ])
-    for equipment in c.hvac_view():
-        entities.extend(_hvac_entities(c, equipment))
     # V1.6.152 — collecte passive des signatures machines. Les données brutes
     # restent dans le Store local; seules des synthèses légères sont exposées à HA.
-    for machine in c.machines:
+    for machine in c.controllable_machines:
         mid = machine.machine_id
         safe = mid.replace(" ", "_").lower()
         name = machine.name
@@ -495,46 +492,6 @@ def _iso(value: Any) -> str:
     return value.isoformat() if hasattr(value, "isoformat") else "Jamais"
 
 
-def _hvac_entities(coordinator: FoxCatEnergyCoordinator, equipment: dict[str, Any]) -> list[SensorEntity]:
-    equipment_id = str(equipment.get("id") or "")
-    safe_id = re.sub(r"[^a-z0-9_]", "_", equipment_id.lower())
-    name = str(equipment.get("name") or equipment_id)
-    entities: list[SensorEntity] = []
-    for metric, label in (
-        ("power", "Puissance"),
-        ("status", "État"),
-        ("energy_today", "Énergie aujourd’hui"),
-        ("energy_month", "Énergie ce mois"),
-        ("energy_year", "Énergie cette année"),
-        ("energy_lifetime", "Énergie cumulée"),
-    ):
-        entities.append(FoxCatHvacSensor(coordinator, equipment_id, None, metric, f"hvac_{safe_id}_{metric}", f"🌡️ {name} • {label}", equipment))
-    for component in equipment.get("components", []):
-        if component.get("kind") == "equipment":
-            continue
-        component_id = str(component.get("id") or "")
-        safe_component = re.sub(r"[^a-z0-9_]", "_", component_id.lower())
-        component_name = str(component.get("name") or component_id)
-        for metric, label in (
-            ("power", "Puissance"),
-            ("status", "État"),
-            ("energy_today", "Énergie aujourd’hui"),
-            ("energy_month", "Énergie ce mois"),
-            ("energy_year", "Énergie cette année"),
-            ("energy_lifetime", "Énergie cumulée"),
-        ):
-            entities.append(FoxCatHvacSensor(
-                coordinator,
-                equipment_id,
-                component_id,
-                metric,
-                f"hvac_{safe_id}_{safe_component}_{metric}",
-                f"🌡️ {name} • {component_name} • {label}",
-                equipment,
-            ))
-    return entities
-
-
 class FoxCatValueSensor(FoxCatEntity, SensorEntity):
     # MÉTHODE : FoxCatValueSensor.__init__ — méthode spéciale __init__
     def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any]):
@@ -551,113 +508,6 @@ class FoxCatValueSensor(FoxCatEntity, SensorEntity):
             return value
         except Exception:
             return "Indisponible"
-
-
-class FoxCatHvacSensor(FoxCatEntity, SensorEntity):
-    def __init__(
-        self,
-        coordinator: FoxCatEnergyCoordinator,
-        equipment_id: str,
-        component_id: str | None,
-        metric: str,
-        key: str,
-        name: str,
-        equipment: dict[str, Any],
-    ) -> None:
-        super().__init__(coordinator, key, name, "mdi:heat-pump", "hvac")
-        self.equipment_id = equipment_id
-        self.component_id = component_id
-        self.metric = metric
-        self.equipment = equipment
-        if metric == "power":
-            self._attr_native_unit_of_measurement = UnitOfPower.WATT
-            self._attr_device_class = SensorDeviceClass.POWER
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-        elif metric.startswith("energy_"):
-            self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-            self._attr_device_class = SensorDeviceClass.ENERGY
-            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-    def _component(self) -> dict[str, Any]:
-        return next(
-            (
-                item for equipment in self.coordinator.data.get("hvac", [])
-                if equipment.get("id") == self.equipment_id
-                for item in equipment.get("components", [])
-                if item.get("id") == self.component_id
-            ),
-            {},
-        )
-
-    @property
-    def native_value(self) -> Any:
-        if self.metric == "status":
-            if self.component_id is None:
-                return next(
-                    (item.get("status") for item in self.coordinator.data.get("hvac", []) if item.get("id") == self.equipment_id),
-                    "unknown",
-                )
-            return self._component().get("status", "unknown")
-        if self.metric == "power":
-            if self.component_id is None:
-                target = next(
-                    (item for item in self.coordinator.data.get("hvac", []) if item.get("id") == self.equipment_id),
-                    {},
-                )
-                value = target.get("power_w")
-            else:
-                value = self._component().get("power_w")
-            return round(float(value), 2) if value is not None else None
-        horizon = self.metric.removeprefix("energy_")
-        account_id = f"hvac_{self.equipment_id}"
-        if self.component_id is not None:
-            account_id += f"_{self.component_id}"
-        appliance = (
-            self.coordinator.data.get("accounting", {})
-            .get(horizon, {})
-            .get("appliances", {})
-            .get(account_id, {})
-        )
-        value = appliance.get("energy_kwh")
-        return round(float(value), 4) if value is not None else 0.0
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        common = {
-            "equipment_id": self.equipment_id,
-            "equipment_type": self.equipment.get("equipment_type"),
-            "nominal_power_w": self.equipment.get("nominal_power_w"),
-            "measurement_estimated": bool(
-                self._component().get("estimated", False)
-                if self.component_id is not None
-                else self.equipment.get("estimated", False)
-            ),
-        }
-        if self.component_id is None:
-            return {
-                **common,
-                "model": self.equipment.get("model"),
-                "compressor": self.equipment.get("compressor"),
-            }
-        config = next(
-            (
-                unit
-                for unit in [
-                    *self.equipment.get("indoor_units", []),
-                    *self.equipment.get("outdoor_units", []),
-                ]
-                if unit.get("id") == self.component_id
-            ),
-            {},
-        )
-        return {
-            **common,
-            **config,
-            "unit_kind": config.get("kind"),
-            "power_sensor": config.get("power_sensor"),
-            "current_sensor": config.get("current_sensor"),
-            "state_sensor": config.get("state_sensor"),
-        }
 
 
 class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
