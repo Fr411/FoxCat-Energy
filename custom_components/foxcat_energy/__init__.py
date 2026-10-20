@@ -32,7 +32,7 @@ def _profile_setting_keys(coordinator: FoxCatEnergyCoordinator) -> set[str]:
         | set(NUMBER_DEFINITIONS)
         | set(SWITCH_DEFINITIONS)
         | set(TIME_SETTING_KEYS)
-        | {machine.setting_key for machine in coordinator.machines}
+        | {machine.setting_key for machine in coordinator.controllable_machines}
     )
 
 
@@ -81,7 +81,10 @@ def _async_register_profile_services(hass: HomeAssistant) -> None:
         coordinator = _coordinator(hass)
         defaults = dict(DEFAULT_SETTINGS)
         defaults.update(
-            {machine.setting_key: machine.automatic_default for machine in coordinator.machines}
+            {
+                machine.setting_key: machine.automatic_default
+                for machine in coordinator.controllable_machines
+            }
         )
         await coordinator.async_apply_settings_profile(defaults)
 

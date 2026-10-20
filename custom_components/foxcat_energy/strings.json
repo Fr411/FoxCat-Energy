@@ -356,12 +356,13 @@
       },
       "machine_add": {
         "title": "Ajouter une machine",
-        "description": "Déclare une machine ON/OFF. Les capteurs puissance, courant et tension sont observés passivement par FoxCat pour constituer un historique local, sans modifier la logique EMS.",
+        "description": "Ajoutez un Switch pilotable ou un CVC en télémétrie seule. Chaque capteur de puissance dispose de son propre compte énergétique.",
         "data": {
           "name": "Nom de la machine",
-          "switch": "Prise / relais de commande",
+          "machine_type": "Type de machine",
+          "switch": "Prise / relais de commande (Switch)",
           "cycle": "Cycle protégé (optionnel)",
-          "power_sensor": "Capteur de puissance (optionnel)",
+          "power_sensor": "Capteur de puissance (obligatoire pour CVC)",
           "current_sensor": "Capteur de courant (optionnel)",
           "voltage_sensor": "Capteur de tension (optionnel)",
           "automatic": "Gestion automatique",
@@ -380,12 +381,13 @@
       },
       "machine_edit_form": {
         "title": "Modifier la machine",
-        "description": "Déclare une machine ON/OFF. Les capteurs puissance, courant et tension sont observés passivement par FoxCat pour constituer un historique local, sans modifier la logique EMS.",
+        "description": "Les Switch restent pilotables ; un CVC est observé uniquement via son capteur de puissance et comptabilisé séparément.",
         "data": {
           "name": "Nom de la machine",
-          "switch": "Prise / relais de commande",
+          "machine_type": "Type de machine",
+          "switch": "Prise / relais de commande (Switch)",
           "cycle": "Cycle protégé (optionnel)",
-          "power_sensor": "Capteur de puissance (optionnel)",
+          "power_sensor": "Capteur de puissance (obligatoire pour CVC)",
           "current_sensor": "Capteur de courant (optionnel)",
           "voltage_sensor": "Capteur de tension (optionnel)",
           "automatic": "Gestion automatique",

@@ -609,6 +609,8 @@ def resolve_registry(
     try:
         from .machines import machine_definitions
         for machine in machine_definitions(config):
+            if not machine.controllable:
+                continue
             safe_key = machine.machine_id.replace(" ", "_").lower()
             start_key = f"machine_{safe_key}_demarrage_utilisateur"
             stop_key = f"machine_{safe_key}_arret_utilisateur"
