@@ -154,7 +154,6 @@ from .economic_optimizer import (
     recommend_flexible_load,
 )
 from .machines import MachineDefinition, machine_allowed, machine_definitions, schedule_boundaries
-from .hvac import aggregate_equipment, hvac_records
 from .machine_cycle import MachineCycleManager
 from .machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
@@ -194,7 +193,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._entry_options_snapshot: dict[str, Any] = {}
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
         self.machines: list[MachineDefinition] = machine_definitions(self.config)
-        self.hvac_equipment = hvac_records(self.config)
+        self.controllable_machines = [machine for machine in self.machines if machine.controllable]
         # FoxCat 1.5.0 : deux cœurs, communication immédiate par EnergyBus.
         self.energy_bus = EnergyBus()
         self.inverter_core = InverterCore()
@@ -560,7 +559,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # V1.3 : chaque machine extensible possède son propre interrupteur de gestion.
         # Les trois clés historiques restent utilisées pour les appareils migrés.
-        for machine in self.machines:
+        for machine in self.controllable_machines:
             self.settings.setdefault(machine.setting_key, machine.automatic_default)
 
         self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
@@ -713,7 +712,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 async_track_state_change_event(self.hass, grid_entities, self._on_grid_event)
             )
 
-        machine_cycle_entities = [m.cycle_entity for m in self.machines if m.cycle_entity]
+        machine_cycle_entities = [m.cycle_entity for m in self.controllable_machines if m.cycle_entity]
         safety_entities = [x for x in [
             self.config.get(CONF_BOILER_TEMP_SENSOR),
             self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR),
@@ -729,7 +728,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # ni EMS Core ni Onduleur Core.
         machine_telemetry_entities = list(dict.fromkeys(
             entity_id
-            for machine in self.machines
+            for machine in self.controllable_machines
             for entity_id in (
                 machine.switch_entity, machine.power_sensor,
                 machine.current_sensor, machine.voltage_sensor,
@@ -740,28 +739,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._unsubs.append(
                 async_track_state_change_event(
                     self.hass, machine_telemetry_entities, self._on_machine_telemetry_event
-                )
-            )
-
-        hvac_telemetry_entities = list(dict.fromkeys(
-            str(entity_id)
-            for equipment in self.hvac_equipment
-            for unit in [
-                equipment,
-                *equipment.get("outdoor_units", []),
-                *equipment.get("indoor_units", []),
-            ]
-            for entity_id in (
-                unit.get("power_sensor"),
-                unit.get("current_sensor"),
-                unit.get("state_sensor"),
-            )
-            if entity_id
-        ))
-        if hvac_telemetry_entities:
-            self._unsubs.append(
-                async_track_state_change_event(
-                    self.hass, hvac_telemetry_entities, self._on_hvac_telemetry_event
                 )
             )
 
@@ -1055,15 +1032,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # mais reste strictement observatrice.
             self._record_machine_learning(snapshot=snapshot, now=pulse_at, source="GRID_FRAME")
             machine_context = self._machine_bus_context(pulse_at)
-            hvac_context = [
-                {
-                    "id": item["id"],
-                    "power_w": item["power_w"],
-                    "status": item["status"],
-                    "estimated": item["estimated"],
-                }
-                for item in self.hvac_view()
-            ]
             self.energy_bus.on_grid_frame(
                 frame_id, pulse_at, source=entity_id, frame_serial=frame_serial,
                 grid_net_w=snapshot.grid_net_w, pv_w=snapshot.pv_w, house_w=snapshot.house_w,
@@ -1071,7 +1039,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 boiler_power_w=snapshot.boiler_power_w, boiler_temp_c=snapshot.boiler_temp_c,
                 boiler_on=snapshot.boiler_on, machine_active=snapshot.machine_active,
                 machine_context=machine_context,
-                hvac_context=hvac_context,
                 mode=str(self.settings.get("mode")),
                 network_policy=str(self.settings.get("network_policy")),
             )
@@ -1152,10 +1119,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         snapshot = self.snapshot()
         self._record_machine_learning(snapshot=snapshot, now=now, source="TELEMETRY_EVENT")
         self.async_set_updated_data(self._build_data(snapshot))
-
-    @callback
-    def _on_hvac_telemetry_event(self, event: Event) -> None:
-        self.async_set_updated_data(self._build_data(self.snapshot()))
 
     # MÉTHODE : FoxCatEnergyCoordinator._on_pv_event — On pv event
     @callback
@@ -1325,7 +1288,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             setpoint = float(self.settings["boiler_temp_normal_c"])
         machine_active = any(
             self._is_on(machine.cycle_entity)
-            for machine in self.machines
+            for machine in self.controllable_machines
             if machine.cycle_entity
         )
         return EnergySnapshot(
@@ -1754,7 +1717,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         learning = self.machine_learning.view()
         cycles = self.machine_cycle_manager.snapshot(now)
         recommendations: dict[str, Any] = {}
-        for machine in self.machines:
+        for machine in self.controllable_machines:
             profile = learning.get(machine.machine_id, {})
             duration_s = profile.get("average_duration_s_10")
             energy_wh = profile.get("average_energy_wh_10")
@@ -1790,7 +1753,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             mode_dynamic_active=scheduler_active,
             import_points=import_points,
             export_points=export_points,
-            machines=self.machines,
+            machines=self.controllable_machines,
             learning=learning,
             cycles=cycles,
             market_decision=decision,
@@ -1812,18 +1775,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 rec["day_ahead_threshold_pct"] = day_ahead.get("threshold_pct")
 
         price_analysis = analyze_price_curve(now=now, import_points=import_points, export_points=export_points, settings=self.settings, tomorrow_available=tomorrow_available, current_buy=tariff.get("active_buy")) if tariff_dimensions(self.settings).dynamic else {"active":False,"mode":"INACTIF","state":"HORS_DYNAMIQUE","valid":True,"series":[]}
-        planner = build_flexible_load_plan(now=now,snapshot=snap,settings=self.settings,import_points=import_points,export_points=export_points,machines=self.machines,learning=learning,cycles=cycles,price_analysis=price_analysis,solar_forecast=self.solar_forecast,boiler_thermal=boiler_thermal,boiler_user_override=str(self.core_state.get("boiler_user_override","AUTO")))
-        planner["observed_hvac"] = [
-            {
-                "id": item["id"],
-                "name": item["name"],
-                "power_w": item["power_w"],
-                "status": item["status"],
-                "estimated": item["estimated"],
-                "control_enabled": False,
-            }
-            for item in self.hvac_view()
-        ]
+        planner = build_flexible_load_plan(now=now,snapshot=snap,settings=self.settings,import_points=import_points,export_points=export_points,machines=self.controllable_machines,learning=learning,cycles=cycles,price_analysis=price_analysis,solar_forecast=self.solar_forecast,boiler_thermal=boiler_thermal,boiler_user_override=str(self.core_state.get("boiler_user_override","AUTO")))
         for mid,plan in (planner.get("machines") or {}).items():
             recommendations.setdefault(mid,{})["allow_start"]=bool(plan.get("allow_start_now")); recommendations[mid]["scheduler_decision"]=plan.get("decision"); recommendations[mid]["scheduler_reason"]=plan.get("reason")
         best_export = max(export_points, key=lambda p: p.price) if export_points else None
@@ -2432,7 +2384,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "name": "Chauffe-eau",
                 "power_w": snapshot.boiler_power_w,
             })
-            accounting_appliances.extend(self.hvac_accounting_appliances())
             virtual_prices = self.prices()
             import_points = export_points = ()
             if self.virtual_assets.config.enabled:
@@ -2949,12 +2900,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # MÉTHODE : FoxCatEnergyCoordinator._machine_allowed — Machine allowed
     def _machine_allowed(self, machine_id: str, now: datetime) -> bool:
-        machine = next((item for item in self.machines if item.machine_id == machine_id), None)
+        machine = next((item for item in self.controllable_machines if item.machine_id == machine_id), None)
         return machine_allowed(machine, now) if machine else False
 
     # MÉTHODE : FoxCatEnergyCoordinator._machine_schedule_boundaries — Machine schedule boundaries
     def _machine_schedule_boundaries(self) -> set[tuple[int, int]]:
-        return schedule_boundaries(self.machines)
+        return schedule_boundaries(self.controllable_machines)
 
     # MÉTHODE : FoxCatEnergyCoordinator._tariff_start_favorable — Décide si une NOUVELLE charge flexible peut démarrer
     def _tariff_start_favorable(self, machine: MachineDefinition | None = None, economic_view: dict[str, Any] | None = None) -> bool:
@@ -3002,7 +2953,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, *, snapshot: EnergySnapshot, now: datetime, source: str
     ) -> None:
         """Observe les machines sans modifier leur machine à états."""
-        if not self.machines:
+        if not self.controllable_machines:
             return
         prices = self.prices()
         cycle_snapshot = self.machine_cycle_manager.snapshot(now)
@@ -3014,7 +2965,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "tariff": prices.get("period") if prices.get("regime") != TARIFF_DYNAMIC else "DYNAMIQUE",
         }
         save_requested = False
-        for machine in self.machines:
+        for machine in self.controllable_machines:
             cycle = cycle_snapshot.get(machine.machine_id, {})
             save_requested = self.machine_learning.observe(
                 machine_id=machine.machine_id,
@@ -3042,7 +2993,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         cycles = self.machine_cycle_manager.snapshot(now)
         learning = self.machine_learning.view()
         result: list[dict[str, Any]] = []
-        for machine in self.machines:
+        for machine in self.controllable_machines:
             cycle = cycles.get(machine.machine_id, {})
             profile = learning.get(machine.machine_id, {})
             result.append({
@@ -3060,52 +3011,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             })
         return result
 
-    def hvac_view(self) -> list[dict[str, Any]]:
-        result = []
-        for equipment in self.hvac_equipment:
-            measurements = aggregate_equipment(equipment, self.hass.states.get)
-            components = measurements["components"]
-            result.append({
-                **measurements,
-                "id": str(equipment["id"]),
-                "name": str(equipment.get("name") or equipment["id"]),
-                "equipment_type": str(equipment.get("equipment_type") or ""),
-                "model": ", ".join(
-                    str(unit.get("model"))
-                    for unit in equipment.get("outdoor_units", [])
-                    if unit.get("model")
-                ),
-                "outdoor_units": [
-                    item for item in components if item.get("kind") == "outdoor"
-                ],
-                "indoor_units": [
-                    item for item in components if item.get("kind") == "indoor"
-                ],
-            })
-        return result
-
-    def hvac_accounting_appliances(self) -> list[dict[str, Any]]:
-        result = []
-        for equipment in self.hvac_view():
-            result.append({
-                "id": f"hvac_{equipment['id']}",
-                "name": equipment["name"],
-                "power_w": equipment["power_w"],
-            })
-            for component in equipment["components"]:
-                if component.get("kind") == "equipment":
-                    continue
-                result.append({
-                    "id": f"hvac_{equipment['id']}_{component['id']}",
-                    "name": f"{equipment['name']} • {component['name']}",
-                    "power_w": component["power_w"],
-                })
-        return result
-
     # MÉTHODE : FoxCatEnergyCoordinator._refresh_machine_cycles — Refresh machine cycles
     def _refresh_machine_cycles(self) -> None:
         now = dt_util.now()
-        for machine in self.machines:
+        for machine in self.controllable_machines:
             power = self._optional_float_state(machine.power_sensor) or 0.0
             external = bool(machine.cycle_entity and self._is_on(machine.cycle_entity))
             self.machine_cycle_manager.update(
@@ -3123,13 +3032,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def machine_states(self, economic_view: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         self._refresh_machine_cycles()
         now = dt_util.now()
-        if economic_view is None and self.machines:
+        if economic_view is None and self.controllable_machines:
             economic_view = self._economic_view(self.snapshot(), prices=self.prices(), now=now)
         result: list[dict[str, Any]] = []
         for machine in self.machines:
             result.append({
                 "id": machine.machine_id,
                 "name": machine.name,
+                "machine_type": machine.machine_type,
                 "switch": machine.switch_entity,
                 "cycle_entity": machine.cycle_entity,
                 "power_sensor": machine.power_sensor,
@@ -3141,17 +3051,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "cycle_active": self.machine_cycle_manager.is_protected(machine.machine_id),
                 "foxcat_cycle_state": self.machine_cycle_manager.state_for(machine.machine_id).state,
                 "foxcat_cycle_origin": self.machine_cycle_manager.state_for(machine.machine_id).origin,
-                "automatic": bool(self.settings.get(machine.setting_key, machine.automatic_default)),
-                "sheddable": machine.sheddable,
-                "window_open": machine_allowed(machine, now),
+                "automatic": bool(self.settings.get(machine.setting_key, machine.automatic_default)) if machine.controllable else False,
+                "sheddable": machine.sheddable if machine.controllable else False,
+                "window_open": machine_allowed(machine, now) if machine.controllable else False,
                 "tariff_period": tariff_period(now, self.settings),
-                "tariff_start_favorable": self._tariff_start_favorable(machine, economic_view=economic_view),
+                "tariff_start_favorable": self._tariff_start_favorable(machine, economic_view=economic_view) if machine.controllable else False,
             })
         return result
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_set_machine_enabled — traitement asynchrone : set machine enabled
     async def async_set_machine_enabled(self, machine_id: str, enabled: bool) -> None:
-        machine = next((item for item in self.machines if item.machine_id == machine_id), None)
+        machine = next((item for item in self.controllable_machines if item.machine_id == machine_id), None)
         if machine is None:
             return
         self.settings[machine.setting_key] = bool(enabled)
@@ -4051,7 +3961,6 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "economic_decision": economic.get("decision", {}).get("label", "Indisponible"),
             },
             "accounting": self.accounting.view(),
-            "hvac": self.hvac_view(),
             "virtual_assets": self.virtual_assets.view(),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
@@ -4061,5 +3970,5 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "boiler_allowed": protected_cycle_boiler_allowed(snap, self.settings),
             },
             "machines": self.machine_states(economic),
-            "machine_window": {machine.machine_id: machine_allowed(machine, dt_util.now()) for machine in self.machines},
+            "machine_window": {machine.machine_id: machine_allowed(machine, dt_util.now()) for machine in self.controllable_machines},
         }

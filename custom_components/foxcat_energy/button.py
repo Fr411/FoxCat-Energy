@@ -118,7 +118,7 @@ async def async_setup_entry(
     )
 
     machine_buttons: list[FoxCatActionButton] = []
-    for machine in coordinator.machines:
+    for machine in coordinator.controllable_machines:
         safe_key = machine.machine_id.replace(" ", "_").lower()
         machine_buttons.extend([
             FoxCatActionButton(

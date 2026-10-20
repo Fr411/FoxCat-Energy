@@ -37,6 +37,7 @@ class MachineDefinition:
     machine_id: str
     name: str
     switch_entity: str
+    machine_type: str = "switch"
     cycle_entity: str | None = None
     power_sensor: str | None = None
     current_sensor: str | None = None
@@ -66,11 +67,16 @@ class MachineDefinition:
     def setting_key(self) -> str:
         return self.legacy_setting_key or f"machine_{self.machine_id}_enabled"
 
+    @property
+    def controllable(self) -> bool:
+        return self.machine_type == "switch" and bool(self.switch_entity)
+
     # MÉTHODE : MachineDefinition.as_dict — As dict
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.machine_id,
             "name": self.name,
+            "machine_type": self.machine_type,
             "switch": self.switch_entity,
             "cycle": self.cycle_entity or "",
             "power_sensor": self.power_sensor or "",
@@ -102,7 +108,15 @@ def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
     machine_id = _str(raw.get("id")).strip()
     name = _str(raw.get("name")).strip()
     switch = _str(raw.get("switch")).strip()
-    if not machine_id or not name or not switch:
+    machine_type = _str(raw.get("machine_type"), "switch").strip().lower()
+    power_sensor = _str(raw.get("power_sensor")).strip()
+    if (
+        not machine_id
+        or not name
+        or machine_type not in {"switch", "cvc"}
+        or (machine_type == "switch" and not switch)
+        or (machine_type == "cvc" and not power_sensor)
+    ):
         return None
     legacy_setting_key = {
         "washer": "washer_enabled",
@@ -113,8 +127,9 @@ def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
         machine_id=machine_id,
         name=name,
         switch_entity=switch,
+        machine_type=machine_type,
         cycle_entity=_str(raw.get("cycle")).strip() or None,
-        power_sensor=_str(raw.get("power_sensor")).strip() or None,
+        power_sensor=power_sensor or None,
         current_sensor=_str(raw.get("current_sensor")).strip() or None,
         voltage_sensor=_str(raw.get("voltage_sensor")).strip() or None,
         automatic_default=bool(raw.get("automatic", True)),
