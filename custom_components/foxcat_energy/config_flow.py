@@ -21,31 +21,18 @@ from .const import (
     CONF_BOILER_TEMP_SENSOR,
     CONF_BOILER_POWER_SENSOR,
     CONF_BOILER_VOLUME,
-    CONF_BOILER_ELEMENT_POWER,
-    CONF_BOILER_COLD_WATER_TEMP,
     CONF_BOILER_BINARY,
     CONF_PRI_L1,
     CONF_PRI_L2,
-    CONF_PRI_L3,
-    CONF_PRI_L4,
     CONF_INVERTER_POWER_SENSOR,
     CONF_MACHINES_V13,
     DOMAIN,
 )
 from .machines import records_for_options
-from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
+from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, TARIFF_HPHC_BI, TARIFF_HPHC_MONO
 from .virtual_assets.config import (
     CONF_BATTERY_CAPACITY,
-    CONF_BATTERY_CHARGE_EFFICIENCY,
-    CONF_BATTERY_DISCHARGE_EFFICIENCY,
-    CONF_BATTERY_MAX_CHARGE,
-    CONF_BATTERY_MAX_DISCHARGE,
-    CONF_BATTERY_RESERVE,
-    CONF_ENABLED as CONF_VIRTUAL_ASSETS_ENABLED,
     CONF_EV_CAPACITY,
-    CONF_EV_CHARGE_EFFICIENCY,
-    CONF_EV_ENABLED,
-    CONF_EV_MAX_CHARGE,
 )
 
 def _entity(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector:
@@ -61,6 +48,21 @@ def _normalise_value(value: Any) -> Any:
 
 def _normalise_input(user_input: dict[str, Any]) -> dict[str, Any]:
     return {key: _normalise_value(value) for key, value in user_input.items()}
+
+def _schema_with_current(schema: vol.Schema, current: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {}
+    for marker, validator in schema.schema.items():
+        key = marker.schema
+        if key in current:
+            value = _normalise_value(current[key])
+            if isinstance(marker, vol.Required):
+                new_marker = vol.Required(key, default=value)
+            else:
+                new_marker = vol.Optional(key, description={"suggested_value": value})
+        else:
+            new_marker = marker
+        fields[new_marker] = validator
+    return vol.Schema(fields)
 
 class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Assistant de configuration guidé et professionnalisé pour FoxCat Energy."""
@@ -231,3 +233,91 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_PRI_L2, default="switch.l2_pri"): _entity("switch"),
             })
         )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry):
+        return FoxCatEnergyOptionsFlow()
+
+
+class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
+    """Menu de reconfiguration et d'options pour modifier les entités à tout moment."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._pending_options: dict[str, Any] | None = None
+
+    def _ensure_pending(self) -> dict[str, Any]:
+        if self._pending_options is None:
+            self._pending_options = dict(self.config_entry.options)
+            if not self._pending_options:
+                self._pending_options = dict(self.config_entry.data)
+        return self._pending_options
+
+    async def async_step_init(self, user_input=None):
+        """Menu principal des options : choix de la section à modifier."""
+        self._ensure_pending()
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=[
+                "edit_metering",
+                "edit_inverter_battery",
+                "edit_boiler",
+                "edit_ev",
+                "edit_finish",
+            ],
+        )
+
+    async def edit_section(self, step_id: str, schema: vol.Schema, user_input=None):
+        """Fonction générique pour enregistrer ou afficher le formulaire d'une section."""
+        if user_input is not None:
+            pending = self._ensure_pending()
+            pending.update(_normalise_input(user_input))
+            return await self.async_step_init()
+        
+        current = self._ensure_pending()
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=_schema_with_current(schema, current),
+        )
+
+    async def async_step_edit_metering(self, user_input=None):
+        """Reconfigurer le comptage et le réseau."""
+        schema = vol.Schema({
+            vol.Required(CONF_GRID_SIGNED_SENSOR): _entity("sensor", "power"),
+            vol.Required(CONF_PV_SENSOR): _entity("sensor", "power"),
+        })
+        return await self.edit_section("edit_metering", schema, user_input)
+
+    async def async_step_edit_boiler(self, user_input=None):
+        """Reconfigurer le boiler."""
+        schema = vol.Schema({
+            vol.Required(CONF_BOILER_CLIMATE): _entity("climate"),
+            vol.Required(CONF_BOILER_TEMP_SENSOR): _entity("sensor", "temperature"),
+            vol.Required(CONF_BOILER_POWER_SENSOR): _entity("sensor", "power"),
+        })
+        return await self.edit_section("edit_boiler", schema, user_input)
+
+    async def async_step_edit_ev(self, user_input=None):
+        """Reconfigurer le véhicule électrique."""
+        schema = vol.Schema({
+            vol.Optional("ev_enabled"): selector.BooleanSelector(),
+            vol.Optional(CONF_EV_CAPACITY): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=10, max=200, step=1, unit_of_measurement="kWh", mode=selector.NumberSelectorMode.BOX)
+            ),
+        })
+        return await self.edit_section("edit_ev", schema, user_input)
+
+    async def async_step_edit_inverter_battery(self, user_input=None):
+        """Reconfigurer l'onduleur et la batterie."""
+        schema = vol.Schema({
+            vol.Required(CONF_INVERTER_POWER_SENSOR): _entity("sensor", "power"),
+            vol.Optional(CONF_BATTERY_CAPACITY): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=1000, step=0.1, unit_of_measurement="kWh", mode=selector.NumberSelectorMode.BOX)
+            ),
+        })
+        return await self.edit_section("edit_inverter_battery", schema, user_input)
+
+    async def async_step_edit_finish(self, user_input=None):
+        """Sauvegarde finale de toutes les modifications."""
+        return self.async_create_entry(title="", data=self._ensure_pending())
