@@ -57,6 +57,7 @@ def evaluate_v2h(
     max_power_w: float,
     soc_pct: float | None,
     min_soc_pct: float,
+    peak_shaving_armed: bool = True,
 ) -> dict[str, Any]:
     """Return a V2H request without issuing a hardware command."""
     breaker_limit_w = _finite_number(breaker_limit_w)
@@ -69,7 +70,11 @@ def evaluate_v2h(
         if breaker_limit_w is not None and breaker_limit_w > 0
         else None
     )
-    peak_shaving = peak_trigger_w is not None and house_w >= peak_trigger_w
+    peak_shaving = (
+        peak_shaving_armed
+        and peak_trigger_w is not None
+        and house_w >= peak_trigger_w
+    )
     tariff_shield = price_status == "TRÈS ÉLEVÉ"
     allowed = enabled and (peak_shaving or tariff_shield)
 

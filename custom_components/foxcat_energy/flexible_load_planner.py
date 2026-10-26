@@ -37,6 +37,12 @@ def _conflict(a,b,p,res,maxp): return sum(r.power_w for r in res if a<r.end and 
 # FONCTION : build_flexible_load_plan — Build flexible load plan
 def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points,machines,learning,cycles,price_analysis,solar_forecast,boiler_thermal=None,boiler_user_override='AUTO',peak_shaving_active=False):
  ps=sorted(import_points,key=lambda x:x.at); step=_step(ps); dyn=bool(price_analysis.get('active')); result={'active':dyn,'ready':bool(ps),'loads':{},'machines':{},'timeline':[],'behavior':settings.get('mode'),'mode':price_analysis.get('mode','REACTIVE')}
+ if peak_shaving_active:
+  result['safety_override']=True
+  result['machines']={m.machine_id:{'name':m.name,'decision':SAFETY_OVERRIDE,'allow_start_now':False,'reason':'Peak shaving : nouveau démarrage suspendu'} for m in machines}
+  result['boiler']={'name':'Boiler','decision':SAFETY_OVERRIDE,'allow_start_now':False,'reason':'Peak shaving : chauffe suspendue'}
+  result['loads']={**result['machines'],'boiler':result['boiler']}
+  return result
  if not dyn:return result|{'reason':'Planner V1.7.1 réservé à Dynamique Day-Ahead'}
  maxp=min(float(settings.get('planner_max_parallel_power_w',5000)),max(float(settings.get('planner_grid_import_limit_w',5000))+max(snapshot.pv_w,0)-max(snapshot.house_w,0),100))
  result['max_parallel_power_w']=maxp; reservations=[]; behavior=settings.get('mode','Éco'); waitpen=float(settings.get('comfort_wait_penalty_eur_h',.03) if behavior=='Confort' else settings.get('eco_wait_penalty_eur_h',0)); minsaving=float(settings.get('comfort_min_saving_eur',.10) if behavior=='Confort' else settings.get('eco_min_saving_eur',.03)); maxwait=float(settings.get('comfort_max_wait_h',6) if behavior=='Confort' else settings.get('eco_max_wait_h',24))
