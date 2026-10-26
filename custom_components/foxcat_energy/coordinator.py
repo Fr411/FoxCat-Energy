@@ -2612,7 +2612,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         mode = str(self.settings.get("mode"))
         user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
-        if user_override == "FORCE_ON":
+        if self.load_shed_state.get("active"):
+            intent = BoilerIntent(
+                BOILER_STOP,
+                "Urgence capacitaire : chauffe du Boiler suspendue.",
+                "PEAK_SHAVING",
+            )
+        elif user_override == "FORCE_ON":
             if snapshot.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
                 intent = BoilerIntent(BOILER_STOP, "Utilisateur : démarrage Boiler bloqué par sécurité température.", "UTILISATEUR")
             else:
@@ -3373,9 +3379,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
         now = dt_util.now()
         self._refresh_machine_cycles()
+        high_load_active = bool(self.load_shed_state.get("active"))
         economic_view = (
             self._economic_view(self.snapshot(), prices=self.prices(), now=now)
-            if bool(self.settings.get("economic_optimizer_enabled", True)) else None
+            if high_load_active or bool(self.settings.get("economic_optimizer_enabled", True))
+            else None
         )
         for machine in self.machines:
             socket = machine.switch_entity
@@ -3387,13 +3395,20 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             allowed = machine_allowed(machine, now)
             # Règle souveraine : un cycle déjà commencé n'est jamais interrompu.
-            # Pendant un délestage, seules les machines explicitement délestables
-            # et sans cycle protégé actif sont coupées.
-            high_load_block = bool(self.load_shed_state.get("active")) and machine.sheddable and not cycle_active
-            tariff_ok = self._tariff_start_favorable(machine, economic_view=economic_view)
+            # En urgence, le planificateur interdit tout nouveau démarrage.
+            planner_machines = (
+                (economic_view or {}).get("planner", {}).get("machines", {})
+                if high_load_active else {}
+            )
+            peak_plan = planner_machines.get(machine.machine_id) if isinstance(planner_machines, dict) else None
+            tariff_ok = (
+                bool(peak_plan.get("allow_start_now", False))
+                if high_load_active and isinstance(peak_plan, dict)
+                else self._tariff_start_favorable(machine, economic_view=economic_view)
+            )
             # Un cycle utilisateur/protégé reste prioritaire. Seul un NOUVEAU
             # démarrage automatique est bloqué en période défavorable.
-            should_on = cycle_active or (management and allowed and tariff_ok and not high_load_block)
+            should_on = cycle_active or (management and allowed and tariff_ok)
             service = "turn_on" if should_on else "turn_off"
             try:
                 await self.hass.services.async_call("switch", service, {"entity_id": socket}, blocking=False)
@@ -3440,7 +3455,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._high_load_high_frames=0
             self._high_load_low_frames = self._high_load_low_frames + 1 if snapshot.house_w <= release else 0
             if self._high_load_low_frames >= 5:
-                self.load_shed_state.update({"active":False,"reason":f"5 trames sous {release:.0f} W","triggered_at":None})
+                self.load_shed_state.update({"active":False,"reason":f"Urgence capacitaire levée : 5 trames sous {release:.0f} W","triggered_at":None})
                 self._high_load_low_frames=0
                 self.reset_core("Fin délestage : 5 trames basses confirmées.")
                 await self.async_reconcile_machines()
@@ -3448,6 +3463,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _evaluate_v2h(self, snapshot: EnergySnapshot) -> None:
         """Apply opt-in V2H demand while enforcing SoC and thermal interlocks."""
         switch_entity = self.config.get(CONF_EV_V2H_SWITCH)
+        peak_shaving_armed = bool(
+            self.load_shed_state.get("active")
+            and self.settings.get("high_load_shed_enabled")
+            and str(self.settings.get("mode")) != MODE_MANUAL
+        )
         enabled = (
             self.config.get(CONF_EV_V2H_ENABLED) is True
             and bool(switch_entity)
@@ -3467,6 +3487,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             max_power_w=self.config.get(CONF_EV_V2H_MAX_POWER_W, 5000.0),
             soc_pct=soc_pct,
             min_soc_pct=self.config.get(CONF_EV_V2H_MIN_SOC_PCT, 25.0),
+            peak_shaving_armed=peak_shaving_armed,
         )
         if self.config.get(CONF_EV_V2H_ENABLED) is True and not switch_entity:
             decision.update(
@@ -3526,7 +3547,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _activate_high_load_shed(self, snapshot: EnergySnapshot, trigger_w: float) -> None:
         self.load_shed_state.update({
             "active": True,
-            "reason": f"Puissance maison {snapshot.house_w:.0f} W >= {trigger_w:.0f} W",
+            "reason": f"Urgence capacitaire : maison {snapshot.house_w:.0f} W >= {trigger_w:.0f} W",
             "triggered_at": dt_util.now(),
             "house_w": snapshot.house_w,
         })

@@ -78,6 +78,21 @@ class VPPDecisionTests(unittest.TestCase):
         self.assertFalse(decision["active"])
         self.assertIn("SoC", decision["reason"])
 
+    def test_v2h_peak_shaving_waits_for_load_shedding_to_be_armed(self):
+        decision = evaluate_v2h(
+            enabled=True,
+            price_status="NORMAL",
+            house_w=8300,
+            breaker_limit_w=9200,
+            max_power_w=3000,
+            soc_pct=55,
+            min_soc_pct=25,
+            peak_shaving_armed=False,
+        )
+        self.assertFalse(decision["active"])
+        self.assertFalse(decision["peak_shaving"])
+        self.assertEqual(decision["target_power_w"], 0)
+
     def test_malformed_trade_and_v2h_values_fail_safely(self):
         trade = evaluate_trade(
             "invalid",
@@ -134,6 +149,29 @@ class VPPDecisionTests(unittest.TestCase):
         result = plan["machines"]["washer"]
         self.assertEqual(result["decision"], SAFETY_OVERRIDE)
         self.assertFalse(result["allow_start_now"])
+
+    def test_flexible_planner_applies_peak_override_without_dynamic_prices(self):
+        machine = MachineDefinition("washer", "Washer", "switch.washer")
+        plan = build_flexible_load_plan(
+            now=NOW,
+            snapshot=SimpleNamespace(pv_w=0, house_w=9000),
+            settings={"mode": "Éco", machine.setting_key: False},
+            import_points=[],
+            export_points=[],
+            machines=[machine],
+            learning={},
+            cycles={"washer": {"protected": True}},
+            price_analysis={"active": False, "mode": "INACTIF"},
+            solar_forecast=None,
+            peak_shaving_active=True,
+        )
+
+        self.assertFalse(plan["active"])
+        self.assertTrue(plan["safety_override"])
+        self.assertFalse(plan["machines"]["washer"]["allow_start_now"])
+        self.assertEqual(plan["machines"]["washer"]["decision"], SAFETY_OVERRIDE)
+        self.assertFalse(plan["boiler"]["allow_start_now"])
+        self.assertFalse(plan["loads"]["boiler"]["allow_start_now"])
 
     def test_virtual_grid_trade_uses_future_export_spread_and_wear(self):
         battery = VirtualBattery(
