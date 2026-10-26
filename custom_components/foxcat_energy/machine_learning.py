@@ -16,7 +16,7 @@ class MachineLearningRecorder:
     MAX_CYCLES_PER_MACHINE = 30
     MAX_POINTS_PER_CYCLE = 720
     MIN_POINT_INTERVAL_S = 10.0
-    MAX_INTEGRATION_GAP_S = 120.0
+    MAX_INTEGRATION_GAP_S = 3600.0
     PERIODIC_SAVE_S = 300.0
 
     # MÉTHODE : MachineLearningRecorder.__init__ — méthode spéciale __init__

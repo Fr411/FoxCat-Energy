@@ -1,6 +1,15 @@
 from __future__ import annotations
 from datetime import datetime, time
 from typing import Any
+from ..const import (
+    DISTRIBUTION_PROFILE_BI,
+    DISTRIBUTION_PROFILE_IMPACT,
+    DISTRIBUTION_PROFILE_SIMPLE,
+    DISTRIBUTION_PROFILES,
+    DYNAMIC_STRUCT_IMPACT,
+    TARIFF_STRUCTURE_IMPACT,
+    TARIFF_STRUCTURE_TOU,
+)
 
 def minute_of_day(now: datetime) -> float:
     return now.hour * 60 + now.minute + now.second / 60
@@ -54,11 +63,43 @@ def tariff_period(now: datetime, settings: dict[str, Any] | None = None) -> str:
 
 def distribution_period(now: datetime, settings: dict[str, Any] | None = None) -> str:
     settings = settings or {}
-    m = minute_of_day(now)
-    s2 = _time_minutes(settings.get("tariff_hp_start_2"), "17:00:00")
-    e2 = _time_minutes(settings.get("tariff_hp_end_2"), "22:00:00")
-    if _within(m, s2, e2): return "PIC"
-    return "NORMAL"
+    profile = settings.get("distribution_profile")
+    if profile not in DISTRIBUTION_PROFILES:
+        structures = {
+            settings.get("dynamic_structure"),
+            settings.get("tariff_structure"),
+        }
+        if structures & {DISTRIBUTION_PROFILE_IMPACT, DYNAMIC_STRUCT_IMPACT, TARIFF_STRUCTURE_IMPACT}:
+            profile = DISTRIBUTION_PROFILE_IMPACT
+        elif structures & {DISTRIBUTION_PROFILE_BI, TARIFF_STRUCTURE_TOU, "Bi-horaire", "Bi-horaire (HP/HC)"}:
+            profile = DISTRIBUTION_PROFILE_BI
+        else:
+            profile = DISTRIBUTION_PROFILE_SIMPLE
+    if profile == DISTRIBUTION_PROFILE_BI:
+        return tariff_period(now, settings)
+    if profile == DISTRIBUTION_PROFILE_IMPACT:
+        minute = minute_of_day(now)
+        peak = _within(
+            minute,
+            _time_minutes(settings.get("impact_peak_start"), "17:00:00"),
+            _time_minutes(settings.get("impact_peak_end"), "22:00:00"),
+        )
+        eco = _within(
+            minute,
+            _time_minutes(settings.get("impact_eco_start_1"), "01:00:00"),
+            _time_minutes(settings.get("impact_eco_end_1"), "07:00:00"),
+        ) or _within(
+            minute,
+            _time_minutes(settings.get("impact_eco_start_2"), "11:00:00"),
+            _time_minutes(settings.get("impact_eco_end_2"), "17:00:00"),
+        )
+        return "PIC" if peak else "ECO" if eco else "MEDIUM"
+    return "ALL"
+
+
+def impact_period(now: datetime, settings: dict[str, Any] | None = None) -> str:
+    """Return the configured Impact distribution period."""
+    return distribution_period(now, {**(settings or {}), "distribution_profile": DISTRIBUTION_PROFILE_IMPACT})
 
 def tariff_boundaries(settings: dict[str, object] | None = None) -> set[tuple[int, int]]:
     settings = settings or {}

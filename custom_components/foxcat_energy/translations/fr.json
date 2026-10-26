@@ -22,14 +22,22 @@
           "grid_signed_sensor": "Puissance réseau signée",
           "grid_sign_convention": "Convention du signe réseau",
           "pv_sensor": "Production photovoltaïque",
-          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)"
+          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)",
+          "developer_mode": "Mode développeur",
+          "high_load_shed_enabled": "Activer le peak shaving",
+          "main_breaker_current_a": "Calibre du disjoncteur principal",
+          "main_breaker_voltage_v": "Tension nominale utilisée pour le seuil"
         },
         "data_description": {
           "installation_name": "Nom visible de votre installation FoxCat Energy.",
           "grid_signed_sensor": "Puissance instantanée au point de raccordement. Convention recommandée : positif = prélèvement, négatif = réinjection.",
           "grid_sign_convention": "Permet d’adapter FoxCat au signe utilisé par votre compteur ou votre intégration.",
           "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison.",
-          "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale."
+          "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale.",
+          "developer_mode": "Active les diagnostics avancés, les compteurs ML et les scénarios de simulation. Désactivé par défaut.",
+          "high_load_shed_enabled": "Autorise le délestage de charges et le V2H à partir du seuil configuré; les champs d’entités restent toujours accessibles.",
+          "main_breaker_current_a": "Utilisé pour calculer le seuil de délestage et de V2H à 90 % du calibre. Laissez à 0 pour conserver le seuil manuel.",
+          "main_breaker_voltage_v": "Tension effective utilisée avec le calibre (ex. 230 V pour 40 A = 9 200 W)."
         }
       },
       "hphc": {
@@ -231,14 +239,22 @@
           "grid_signed_sensor": "Puissance réseau signée",
           "grid_sign_convention": "Convention du signe réseau",
           "pv_sensor": "Production photovoltaïque",
-          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)"
+          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)",
+          "developer_mode": "Mode développeur",
+          "high_load_shed_enabled": "Activer le peak shaving",
+          "main_breaker_current_a": "Calibre du disjoncteur principal",
+          "main_breaker_voltage_v": "Tension nominale utilisée pour le seuil"
         },
         "data_description": {
           "installation_name": "Nom visible de votre installation FoxCat Energy.",
           "grid_signed_sensor": "Puissance instantanée au point de raccordement. Convention recommandée : positif = prélèvement, négatif = réinjection.",
           "grid_sign_convention": "Permet d’adapter FoxCat au signe utilisé par votre compteur ou votre intégration.",
           "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison.",
-          "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale."
+          "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale.",
+          "developer_mode": "Active les diagnostics avancés, les compteurs ML et les scénarios de simulation. Désactivé par défaut.",
+          "high_load_shed_enabled": "Autorise le délestage de charges et le V2H à partir du seuil configuré; les champs d’entités restent toujours accessibles.",
+          "main_breaker_current_a": "Utilisé pour calculer le seuil de délestage et de V2H à 90 % du calibre. Laissez à 0 pour conserver le seuil manuel.",
+          "main_breaker_voltage_v": "Tension effective utilisée avec le calibre (ex. 230 V pour 40 A = 9 200 W)."
         }
       },
       "boiler": {
@@ -267,7 +283,7 @@
       },
       "battery_ev": {
         "title": "Batterie + véhicule électrique virtuels",
-        "description": "Configurez une simulation en lecture seule. Aucun équipement physique n’est commandé.",
+        "description": "La simulation batterie/VE reste isolée du ledger réel. Le V2H physique est une fonction opt-in distincte et nécessite des entités de commande explicitement configurées.",
         "data": {
           "virtual_assets_enabled": "Activer la simulation",
           "virtual_assets_shadow": "Mode shadow",
@@ -280,7 +296,15 @@
           "virtual_ev_enabled": "Configurer un véhicule électrique virtuel",
           "virtual_ev_capacity_kwh": "Capacité batterie VE (kWh)",
           "virtual_ev_max_charge_kw": "Puissance max. de charge VE (kW)",
-          "virtual_ev_charge_efficiency_pct": "Rendement de charge VE (%)"
+          "virtual_ev_charge_efficiency_pct": "Rendement de charge VE (%)",
+          "battery_degradation_cost_eur_kwh": "Coût d’usure batterie (€/kWh)",
+          "ev_degradation_cost_eur_kwh": "Coût d’usure véhicule (€/kWh)",
+          "ev_v2h_enabled": "Activer le V2H physique",
+          "ev_v2h_switch": "Commande V2H du chargeur",
+          "ev_v2h_power_entity": "Consigne de puissance V2H (optionnelle)",
+          "ev_soc_sensor": "État de charge réel du véhicule (%)",
+          "ev_v2h_max_power_w": "Puissance maximale V2H (W)",
+          "ev_v2h_min_soc_pct": "Réserve minimale de mobilité (%)"
         }
       },
       "pri": {

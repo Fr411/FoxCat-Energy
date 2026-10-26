@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.7.5"
+VERSION = "1.7.6"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "time", "button"]
 DEFAULT_DYNAMIC_HIGH_POSITION_PCT = 70.0
 
@@ -37,6 +37,17 @@ OFFICIAL_MENU_STEPS = (
 
 # Configuration keys
 CONF_INSTALLATION_NAME = "installation_name"
+CONF_DEVELOPER_MODE = "developer_mode"
+CONF_MAIN_BREAKER_CURRENT_A = "main_breaker_current_a"
+CONF_MAIN_BREAKER_VOLTAGE_V = "main_breaker_voltage_v"
+CONF_EV_V2H_ENABLED = "ev_v2h_enabled"
+CONF_EV_V2H_SWITCH = "ev_v2h_switch"
+CONF_EV_V2H_POWER_ENTITY = "ev_v2h_power_entity"
+CONF_EV_SOC_SENSOR = "ev_soc_sensor"
+CONF_EV_V2H_MAX_POWER_W = "ev_v2h_max_power_w"
+CONF_EV_V2H_MIN_SOC_PCT = "ev_v2h_min_soc_pct"
+CONF_BATTERY_DEGRADATION_COST_EUR_KWH = "battery_degradation_cost_eur_kwh"
+CONF_EV_DEGRADATION_COST_EUR_KWH = "ev_degradation_cost_eur_kwh"
 CONF_PV_SENSOR = "pv_sensor"
 CONF_GRID_SIGNED_SENSOR = "grid_signed_sensor"
 CONF_GRID_SIGN_CONVENTION = "grid_sign_convention"
@@ -210,6 +221,8 @@ RRCR_CODE_TO_LEVEL = {v: k for k, v in RRCR_LEVEL_TO_CODE.items()}
 
 # Defaults intentionally mirror the supplied EMS automations where values were explicit.
 DEFAULT_SETTINGS: dict[str, object] = {
+    CONF_DEVELOPER_MODE: False,
+    "high_load_shed_enabled": False,
     "price_source": PRICE_SOURCE_VARIABLE,
     "tariff_structure": TARIFF_STRUCTURE_SIMPLE,
     "dynamic_structure": DYNAMIC_STRUCT_SIMPLE,
@@ -319,6 +332,8 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "high_load_release_w": 3500.0,
     "high_load_confirm_s": 30.0,
     "high_load_restore_s": 120.0,
+    CONF_MAIN_BREAKER_CURRENT_A: 0.0,
+    CONF_MAIN_BREAKER_VOLTAGE_V: 230.0,
 }
 
 NUMBER_DEFINITIONS = {
@@ -387,6 +402,8 @@ NUMBER_DEFINITIONS = {
     "high_load_release_w": ("Seuil de réarmement après haute consommation", 500, 19000, 100, "W", "mdi:flash-check"),
     "high_load_confirm_s": ("Confirmation haute consommation", 0, 300, 5, "s", "mdi:timer-alert-outline"),
     "high_load_restore_s": ("Temporisation de réarmement du délestage", 0, 900, 10, "s", "mdi:timer-check-outline"),
+    CONF_MAIN_BREAKER_CURRENT_A: ("Calibre du disjoncteur principal", 0, 200, 1, "A", "mdi:current-ac"),
+    CONF_MAIN_BREAKER_VOLTAGE_V: ("Tension nominale utilisée pour le seuil", 100, 500, 10, "V", "mdi:flash-outline"),
 }
 
 SWITCH_DEFINITIONS = {

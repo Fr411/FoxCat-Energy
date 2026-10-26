@@ -138,6 +138,11 @@ def config_from_settings(settings: Mapping[str, Any] | None) -> VirtualAssetsCon
         battery=battery,
         ev=ev,
         planner=PlannerConfig(
+            wear_cost_eur_per_kwh=(
+                None
+                if values.get("battery_degradation_cost_eur_kwh") is None
+                else _setting_number(values, "battery_degradation_cost_eur_kwh", 0.0)
+            ),
             allow_export_arbitrage=(
                 values.get("tariff_regime") == "Dynamique"
                 or values.get("price_source") in {"dynamic", "integration"}

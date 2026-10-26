@@ -7,7 +7,7 @@ from typing import Any
 from .const import ALGORITHM_VERSION, SCHEMA_VERSION
 from .shadow import ShadowSimulator
 
-MAX_EXPECTED_GAP_SECONDS = 900.0
+MAX_EXPECTED_GAP_SECONDS = 3600.0
 
 
 class VirtualAssetsStateStore:
@@ -22,7 +22,7 @@ class VirtualAssetsStateStore:
         self.restored: bool = False
 
     def check_and_advance_timestamp(
-        self, current_ts: datetime, max_step_s: float = 300.0
+        self, current_ts: datetime, max_step_s: float = 3600.0
     ) -> tuple[bool, float, str]:
         if self.last_processed_ts is None:
             self.last_processed_ts = current_ts
