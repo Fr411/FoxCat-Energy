@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -112,7 +113,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "prevision_solaire_debut", "Début fenêtre solaire", "mdi:clock-start", "ai", lambda d: d["solar"].start),
         FoxCatValueSensor(c, "prevision_solaire_fin", "Fin fenêtre solaire", "mdi:clock-end", "ai", lambda d: d["solar"].end),
         FoxCatValueSensor(c, "prevision_solaire_raison", "Raison prévision solaire", "mdi:text-box-outline", "ai", lambda d: d["solar"].reason),
-        FoxCatValueSensor(c, "prevision_solaire_brute", "Prévision solaire brute", "mdi:code-json", "ai", lambda d: d["solar"].raw),
+        FoxCatValueSensor(c, "prevision_solaire_brute", "Prévision solaire brute", "mdi:code-json", "ai", lambda d: json.dumps(d["solar"].raw, ensure_ascii=False, default=str), enabled_default=bool(c.settings.get("developer_mode", False))),
         FoxCatNumericSensor(c, "prix_actuel", "Prix dynamique actuel", "mdi:cash", "pricing", lambda d: d["prices"].get("current"), "€/kWh"),
         FoxCatNumericSensor(c, "prix_suivant", "Prix dynamique heure suivante", "mdi:cash-clock", "pricing", lambda d: d["prices"].get("next"), "€/kWh"),
         FoxCatNumericSensor(c, "prix_injection", "Prix dynamique de réinjection brut", "mdi:cash-plus", "pricing", lambda d: d["prices"].get("injection"), "€/kWh"),
@@ -239,11 +240,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "virtual_ev_charge_efficiency", "Véhicule électrique virtuel • Rendement de charge", "mdi:car-electric-outline", "battery_ev", lambda d: c.config.get(CONF_EV_CHARGE_EFFICIENCY, 90.0), PERCENTAGE),
         FoxCatNumericSensor(c, "virtual_battery_soc_simulated", "Batterie virtuelle • Niveau de charge (simulé)", "mdi:battery-charging-50", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_soc_pct"), PERCENTAGE),
         FoxCatNumericSensor(c, "virtual_battery_energy_simulated", "Batterie virtuelle • Énergie stockée (simulée)", "mdi:battery-heart-variant", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_soc_kwh"), UnitOfEnergy.KILO_WATT_HOUR),
-        FoxCatNumericSensor(c, "virtual_battery_cycles_simulated", "Batterie virtuelle • Cycles équivalents (simulés)", "mdi:recycle", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_cycles"), None),
+        FoxCatNumericSensor(c, "virtual_battery_cycles_simulated", "Batterie virtuelle • Cycles équivalents (simulés)", "mdi:recycle", "battery_ev", lambda d: d.get("virtual_assets", {}).get("battery_cycles"), None, enabled_default=bool(c.settings.get("developer_mode", False))),
         FoxCatNumericSensor(c, "virtual_savings_simulated", "Simulation énergétique • Économie nette (simulée)", "mdi:piggy-bank-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("savings_eur"), "€"),
         FoxCatValueSensor(c, "virtual_last_decision_simulated", "Simulation énergétique • Décision du planificateur", "mdi:brain", "battery_ev", lambda d: d.get("virtual_assets", {}).get("last_action", "idle")),
         FoxCatValueSensor(c, "virtual_last_reason_simulated", "Simulation énergétique • Justification de la décision", "mdi:comment-check-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("last_reason_description", "Aucune")),
         FoxCatValueSensor(c, "virtual_data_quality_badge", "Simulation énergétique • Qualité des données", "mdi:shield-check-outline", "battery_ev", lambda d: d.get("virtual_assets", {}).get("data_badge", "SIMULÉ")),
+        FoxCatValueSensor(c, "vpp_decision_json", "VPP • Décision JSON", "mdi:code-json", "diagnostic", lambda d: json.dumps(d.get("economic", {}).get("vpp", {}), ensure_ascii=False, default=str, sort_keys=True), enabled_default=bool(c.settings.get("developer_mode", False))),
+        FoxCatValueSensor(c, "developer_price_simulation", "Simulation tarifaire développeur", "mdi:flask-outline", "diagnostic", lambda d: json.dumps(d.get("developer_simulation", {}), ensure_ascii=False, sort_keys=True), enabled_default=bool(c.settings.get("developer_mode", False))),
+        FoxCatValueSensor(c, "v2h_decision", "V2H • Décision et interverrouillage", "mdi:car-electric", "battery_ev", lambda d: d.get("v2h", {}).get("reason", "Indisponible")),
+        FoxCatNumericSensor(c, "v2h_target_power", "V2H • Consigne de puissance", "mdi:transmission-tower-export", "battery_ev", lambda d: d.get("v2h", {}).get("target_power_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
+        FoxCatValueSensor(c, "v2h_interlock", "V2H • Interverrouillage thermique", "mdi:water-boiler-off", "boiler", lambda d: "ACTIF" if d.get("v2h", {}).get("thermal_interlock") else "INACTIF"),
     ])
 
     # Un jeu de capteurs est créé automatiquement pour chaque appareil FoxCat mesuré.
@@ -273,7 +279,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         safe = mid.replace(" ", "_").lower()
         name = machine.name
         entities.extend([
-            FoxCatNumericSensor(c, f"apprentissage_{safe}_cycles", f"🧠 {name} • Cycles collectés", "mdi:brain", "machine_learning", lambda d, aid=mid: d.get("machine_learning",{}).get(aid,{}).get("total_cycles",0)),
+            FoxCatNumericSensor(c, f"apprentissage_{safe}_cycles", f"🧠 {name} • Cycles collectés", "mdi:brain", "machine_learning", lambda d, aid=mid: d.get("machine_learning",{}).get(aid,{}).get("total_cycles",0), enabled_default=bool(c.settings.get("developer_mode", False))),
             FoxCatValueSensor(c, f"apprentissage_{safe}_collecte", f"🧠 {name} • Collecte en cours", "mdi:record-rec", "machine_learning", lambda d, aid=mid: "OUI" if (d.get("machine_learning",{}).get(aid,{}).get("current") or {}).get("active") else "NON"),
             FoxCatNumericSensor(c, f"apprentissage_{safe}_energie_moyenne", f"🧠 {name} • Énergie moyenne 10 cycles", "mdi:chart-bell-curve-cumulative", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_energy_wh_10") or 0.0) / 1000.0), UnitOfEnergy.KILO_WATT_HOUR),
             FoxCatNumericSensor(c, f"apprentissage_{safe}_duree_moyenne", f"🧠 {name} • Durée moyenne 10 cycles", "mdi:timer-outline", "machine_learning", lambda d, aid=mid: ((d.get("machine_learning",{}).get(aid,{}).get("average_duration_s_10") or 0.0) / 60.0), "min"),
@@ -494,8 +500,8 @@ def _iso(value: Any) -> str:
 
 class FoxCatValueSensor(FoxCatEntity, SensorEntity):
     # MÉTHODE : FoxCatValueSensor.__init__ — méthode spéciale __init__
-    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any]):
-        super().__init__(coordinator, key, name, icon, device)
+    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], *, enabled_default: bool | None = None):
+        super().__init__(coordinator, key, name, icon, device, enabled_default=enabled_default)
         self._getter = getter
 
     # MÉTHODE : FoxCatValueSensor.native_value — Native value
@@ -514,8 +520,8 @@ class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     # MÉTHODE : FoxCatNumericSensor.__init__ — méthode spéciale __init__
-    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], unit: str | None = None, device_class=None, state_class=None, device_name: str | None = None, device_identifier: str | None = None, suggested_object_id: str | None = None):
-        super().__init__(coordinator, key, name, icon, device)
+    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], unit: str | None = None, device_class=None, state_class=None, device_name: str | None = None, device_identifier: str | None = None, suggested_object_id: str | None = None, *, enabled_default: bool | None = None):
+        super().__init__(coordinator, key, name, icon, device, enabled_default=enabled_default)
         if suggested_object_id:
             self._attr_suggested_object_id = suggested_object_id
         self._getter = getter

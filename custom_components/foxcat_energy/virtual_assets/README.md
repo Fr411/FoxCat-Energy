@@ -22,9 +22,12 @@ Horizon 48 pas, marge d'arbitrage 0,02 €/kWh. Rentabilité : 10 ans, taux 4 %,
 ## Planification
 - Le VE est simulé branché en semaine de 19:00 à 07:00, avec une cible minimale de 80 % au départ ; il est considéré absent entre 07:00 et 19:00.
 - Le week-end, le VE reste présent et peut absorber le surplus solaire, jusqu'à sa capacité.
-- L'export batterie est réservé aux tarifs dynamiques : un pic courant doit dépasser les prix d'export futurs connus et le coût d'usure. En l'absence de prévisions exploitables, aucune décharge opportuniste n'est simulée.
+- L'arbitrage réseau virtuel compare le prix d'achat au prix de revente/évitement futur connu et retranche le coût d'usure configuré. En l'absence de prix futurs exploitables, aucune transaction n'est simulée.
+- L'export batterie est réservé aux tarifs dynamiques : un pic courant doit dépasser les prix d'export futurs connus et le coût d'usure.
 
 ## Limitations
 - Le shadow suppose que les mesures réelles ne contiennent pas d'effet de batterie/VE virtuels (une éventuelle batterie réelle n'est pas déduite).
 - Aucun V2G : le VE ne fait que charger ; le planificateur est glouton (non optimal).
 - La décharge batterie vers le réseau est une décision simulée uniquement et n'émet aucune commande matérielle.
+- Le V2H matériel est une orchestration distincte, désactivée par défaut. Elle nécessite un switch, un capteur SoC réel et une configuration explicite; le seuil de réserve bloque toute décharge. Au déclenchement V2H, la chauffe de confort du boiler est suspendue.
+- Le délestage à 90 % du disjoncteur ne s'active que lorsque le module haute consommation est autorisé. Les scénarios de prix développeur ne modifient jamais les prix live ni les commandes.

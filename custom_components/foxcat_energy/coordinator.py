@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -68,6 +69,17 @@ from .const import (
     CONF_METRONOME_FALLBACK_SENSOR,
     CONF_HOUSE_SENSOR,
     CONF_INSTALLATION_NAME,
+    CONF_DEVELOPER_MODE,
+    CONF_MAIN_BREAKER_CURRENT_A,
+    CONF_MAIN_BREAKER_VOLTAGE_V,
+    CONF_EV_V2H_ENABLED,
+    CONF_EV_V2H_SWITCH,
+    CONF_EV_V2H_POWER_ENTITY,
+    CONF_EV_SOC_SENSOR,
+    CONF_EV_V2H_MAX_POWER_W,
+    CONF_EV_V2H_MIN_SOC_PCT,
+    CONF_BATTERY_DEGRADATION_COST_EUR_KWH,
+    CONF_EV_DEGRADATION_COST_EUR_KWH,
     CONF_MACHINES_V13,
     CONF_PRICE_AVG_TODAY,
     CONF_PRICE_AVG_TOMORROW,
@@ -144,7 +156,7 @@ from .engine.load_guard import (
     protected_cycle_boiler_allowed_stable,
 )
 from .engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
-from .engine.tariff import price_status, tariff_boundaries, tariff_period
+from .engine.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
 from .economic_optimizer import (
     PricePoint,
     build_hphc_points,
@@ -167,13 +179,13 @@ from .migration import (
     migrate_settings_v173,
 )
 from .tariff_model import (
-    distribution_period,
     tariff_dimensions,
     final_client_price,
     apply_final_price_components,
 )
 from .price_analyzer import analyze_price_curve
 from .flexible_load_planner import build_flexible_load_plan
+from .vpp import evaluate_trade, evaluate_v2h
 from .dashboard import dashboard_status
 
 _LOGGER = logging.getLogger(__name__)
@@ -344,6 +356,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "triggered_at": None,
             "house_w": 0.0,
         }
+        self.v2h_state: dict[str, Any] = {
+            "active": False,
+            "reason": "V2H désactivé",
+            "target_power_w": 0.0,
+            "thermal_interlock": False,
+        }
+        self.developer_simulation: dict[str, Any] = {
+            "scenario": "AUCUN",
+            "price_status": "INDISPONIBLE",
+        }
         self._loaded_existing_state = False
         self.accounting = EnergyAccounting()
         self.virtual_assets = setup_virtual_assets({**self.config, **self.settings})
@@ -499,6 +521,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raw, self._migration_notes = migrate_settings_v173(raw)
             self.settings.update(raw)
             option_settings = self._entry_option_settings()
+            for key in (CONF_MAIN_BREAKER_CURRENT_A, CONF_MAIN_BREAKER_VOLTAGE_V):
+                if key not in raw and key not in option_settings and key in self.config:
+                    self.settings[key] = self.config[key]
             if stored.get("entry_option_settings") != option_settings:
                 self.settings.update(option_settings)
             self._entry_options_snapshot = option_settings
@@ -1391,7 +1416,38 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if dims.network_policy in {NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO_INJECTION}: export_value=0.0
         elif dims.network_policy==NETWORK_POLICY_BILLED_EXPORT: export_value=inj if dims.dynamic else float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0))
         else: export_value=inj if dims.dynamic else float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0))
-        return {'current':cur,'next':nxt,'injection':inj,'hp_price':hp,'hc_price':hc,'fixed_injection_price':float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE,0)),'min_today':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TODAY)),'max_today':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TODAY)),'avg_today':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TODAY)),'min_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW)),'max_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW)),'avg_tomorrow':self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),'price_source':dims.price_source,'tariff_structure':dims.structure,'distribution_profile':dims.distribution_profile,'distribution_period':distribution_period(now,self.settings),'network_policy':dims.network_policy,'regime':regime,'period':period,'active_buy':active,'next_buy':next_buy,'active_buy_label':label,'next_buy_label':nlabel,'export_value':export_value,'dynamic_compatible':dims.dynamic,'negative_purchase':bool(active is not None and active<0)}
+        minimum = self._optional_float_state(self.config.get(CONF_PRICE_MIN_TODAY))
+        maximum = self._optional_float_state(self.config.get(CONF_PRICE_MAX_TODAY))
+        average = self._optional_float_state(self.config.get(CONF_PRICE_AVG_TODAY))
+        return {
+            "current": cur,
+            "next": nxt,
+            "injection": inj,
+            "hp_price": hp,
+            "hc_price": hc,
+            "fixed_injection_price": float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE, 0)),
+            "min_today": minimum,
+            "max_today": maximum,
+            "avg_today": average,
+            "min_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_MIN_TOMORROW)),
+            "max_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_MAX_TOMORROW)),
+            "avg_tomorrow": self._optional_float_state(self.config.get(CONF_PRICE_AVG_TOMORROW)),
+            "price_source": dims.price_source,
+            "tariff_structure": dims.structure,
+            "distribution_profile": dims.distribution_profile,
+            "distribution_period": distribution_period(now, self.settings),
+            "network_policy": dims.network_policy,
+            "regime": regime,
+            "period": period,
+            "active_buy": active,
+            "next_buy": next_buy,
+            "active_buy_label": label,
+            "next_buy_label": nlabel,
+            "export_value": export_value,
+            "dynamic_compatible": dims.dynamic,
+            "negative_purchase": bool(active is not None and active < 0),
+            "status": price_status(active, minimum, maximum, average),
+        }
 
     # MÉTHODE : FoxCatEnergyCoordinator._economic_import_points — Economic import points
     def _economic_import_points(
@@ -1766,7 +1822,6 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if day_ahead.get("active"):
             for machine_id, plan in (day_ahead.get("machines") or {}).items():
                 rec = recommendations.setdefault(machine_id, {})
-                rec["allow_start"] = bool(plan.get("allow_start_now", False))
                 rec["scheduler_decision"] = plan.get("decision")
                 rec["scheduler_reason"] = plan.get("reason")
                 rec["best_user_window_start"] = plan.get("best_start")
@@ -1775,9 +1830,47 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 rec["day_ahead_threshold_pct"] = day_ahead.get("threshold_pct")
 
         price_analysis = analyze_price_curve(now=now, import_points=import_points, export_points=export_points, settings=self.settings, tomorrow_available=tomorrow_available, current_buy=tariff.get("active_buy")) if tariff_dimensions(self.settings).dynamic else {"active":False,"mode":"INACTIF","state":"HORS_DYNAMIQUE","valid":True,"series":[]}
-        planner = build_flexible_load_plan(now=now,snapshot=snap,settings=self.settings,import_points=import_points,export_points=export_points,machines=self.controllable_machines,learning=learning,cycles=cycles,price_analysis=price_analysis,solar_forecast=self.solar_forecast,boiler_thermal=boiler_thermal,boiler_user_override=str(self.core_state.get("boiler_user_override","AUTO")))
+        peak_shaving_enabled = (
+            bool(self.settings.get("high_load_shed_enabled"))
+            and str(self.settings.get("mode")) != MODE_MANUAL
+        )
+        breaker_limit_w = self._breaker_limit_w() if peak_shaving_enabled else None
+        peak_trigger_w = breaker_limit_w * 0.9 if breaker_limit_w is not None else None
+        peak_shaving_active = bool(
+            self.settings.get("high_load_shed_enabled")
+            and str(self.settings.get("mode")) != MODE_MANUAL
+            and (
+                self.load_shed_state.get("active")
+                or (
+                    peak_trigger_w is not None
+                    and snap.house_w >= peak_trigger_w
+                )
+            )
+        )
+        planner = build_flexible_load_plan(now=now,snapshot=snap,settings=self.settings,import_points=import_points,export_points=export_points,machines=self.controllable_machines,learning=learning,cycles=cycles,price_analysis=price_analysis,solar_forecast=self.solar_forecast,boiler_thermal=boiler_thermal,boiler_user_override=str(self.core_state.get("boiler_user_override","AUTO")),peak_shaving_active=peak_shaving_active)
+        dynamic_planner_is_authoritative = bool(
+            tariff_dimensions(self.settings).dynamic
+            and str(self.settings.get("mode")) != MODE_MANUAL
+        )
         for mid,plan in (planner.get("machines") or {}).items():
-            recommendations.setdefault(mid,{})["allow_start"]=bool(plan.get("allow_start_now")); recommendations[mid]["scheduler_decision"]=plan.get("decision"); recommendations[mid]["scheduler_reason"]=plan.get("reason")
+            rec = recommendations.setdefault(mid, {})
+            if dynamic_planner_is_authoritative:
+                rec["allow_start"] = bool(plan.get("allow_start_now", False))
+            else:
+                rec["allow_start"] = bool(plan.get("allow_start_now", rec.get("allow_start", False)))
+            rec["scheduler_decision"] = plan.get("decision")
+            rec["scheduler_reason"] = plan.get("reason")
+        if dynamic_planner_is_authoritative and not planner.get("active"):
+            for machine in self.controllable_machines:
+                recommendations.setdefault(machine.machine_id, {})["allow_start"] = False
+
+        future_export_prices = [point.price for point in export_points if point.at > now]
+        vpp = evaluate_trade(
+            tariff.get("active_buy"),
+            future_export_prices,
+            battery_wear_eur_kwh=self.config.get(CONF_BATTERY_DEGRADATION_COST_EUR_KWH, 0.0),
+            vehicle_wear_eur_kwh=self.config.get(CONF_EV_DEGRADATION_COST_EUR_KWH, 0.0),
+        )
         best_export = max(export_points, key=lambda p: p.price) if export_points else None
         worst_export = min(export_points, key=lambda p: p.price) if export_points else None
         return {
@@ -1787,6 +1880,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "day_ahead": day_ahead,
             "price_analyzer": price_analysis,
             "planner": planner,
+            "vpp": vpp,
             "forecast": {
                 "import_points": len(import_points),
                 "export_points": len(export_points),
@@ -2526,39 +2620,43 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         elif user_override == "FORCE_OFF":
             intent = BoilerIntent(BOILER_STOP, "Utilisateur : arrêt Boiler forcé.", "UTILISATEUR")
         else:
-            if mode == MODE_MANUAL:
+            if self.v2h_state.get("active"):
+                intent = BoilerIntent(
+                    BOILER_STOP,
+                    "Interverrouillage V2H : chauffe de confort suspendue pour préserver l’énergie du véhicule.",
+                    "V2H_INTERLOCK",
+                )
+            elif mode == MODE_MANUAL:
                 self.reset_core("Mode Manuel : stratégies automatiques en sommeil, sécurités actives.")
                 return
-            tariff_context = self.prices()
-            solar_for_mode = self.solar_forecast
-            if (
-                tariff_dimensions(self.settings).dynamic
-                and not bool(self.settings.get("solar_forecast_arbitrage", True))
-            ):
-                # Le kill-switch neutralise uniquement l'influence de la prévision
-                # solaire sur l'arbitrage DYNAMIQUE; la télémétrie IA reste intacte.
-                solar_for_mode = SolarForecast()
-            intent = evaluate_mode(
-                mode,
-                snapshot,
-                t0,
-                self.settings,
-                dt_util.now(),
-                self._boiler_on_seconds(),
-                str(self.core_state.get("boiler_demand", BOILER_NONE)),
-                tariff_context,
-                solar_for_mode,
-            )
-            if (
-                mode != MODE_MANUAL
-                and tariff_dimensions(self.settings).dynamic
-            ):
-                # V1.6.160 : branche Boiler dédiée au Dynamique. L'ancienne
-                # stratégie ne dépend plus du comportement EMS : le Planner et
-                # le prix Day-Ahead déterminent l'arbitrage, jamais le mode Manuel.
-                intent = evaluate_dynamic_boiler_v2(
-                    snapshot, intent, self.settings, self._economic_view(snapshot, prices=tariff_context)
+            else:
+                tariff_context = self.prices()
+                solar_for_mode = self.solar_forecast
+                if (
+                    tariff_dimensions(self.settings).dynamic
+                    and not bool(self.settings.get("solar_forecast_arbitrage", True))
+                ):
+                    # Le kill-switch neutralise uniquement l'influence de la prévision
+                    # solaire sur l'arbitrage DYNAMIQUE; la télémétrie IA reste intacte.
+                    solar_for_mode = SolarForecast()
+                intent = evaluate_mode(
+                    mode,
+                    snapshot,
+                    t0,
+                    self.settings,
+                    dt_util.now(),
+                    self._boiler_on_seconds(),
+                    str(self.core_state.get("boiler_demand", BOILER_NONE)),
+                    tariff_context,
+                    solar_for_mode,
                 )
+                if tariff_dimensions(self.settings).dynamic:
+                    # V1.6.160 : branche Boiler dédiée au Dynamique. L'ancienne
+                    # stratégie ne dépend plus du comportement EMS : le Planner et
+                    # le prix Day-Ahead déterminent l'arbitrage, jamais le mode Manuel.
+                    intent = evaluate_dynamic_boiler_v2(
+                        snapshot, intent, self.settings, self._economic_view(snapshot, prices=tariff_context)
+                    )
 
         if (
             intent.origin != "UTILISATEUR"
@@ -2918,7 +3016,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         prices = self.prices()
         regime = str(self.settings.get("tariff_regime", TARIFF_TOU))
-        if not bool(self.settings.get("economic_optimizer_enabled", True)):
+        dynamic_planner_mode = bool(
+            tariff_dimensions(self.settings).dynamic
+            and str(self.settings.get("mode")) != MODE_MANUAL
+        )
+        if (
+            not bool(self.settings.get("economic_optimizer_enabled", True))
+            and not dynamic_planner_mode
+        ):
             if regime == TARIFF_DYNAMIC:
                 current = prices.get("current")
                 nxt = prices.get("next")
@@ -2934,14 +3039,61 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         view = economic_view or self._economic_view(self.snapshot(), prices=prices)
         if machine is not None:
-            if regime == TARIFF_DYNAMIC and str(self.settings.get("mode")) == MODE_DYNAMIC:
-                plan = (view.get("day_ahead", {}).get("machines", {}) or {}).get(machine.machine_id)
-                if isinstance(plan, dict):
-                    return bool(plan.get("allow_start_now", False))
+            if tariff_dimensions(self.settings).dynamic and str(self.settings.get("mode")) != MODE_MANUAL:
+                plan = (view.get("planner", {}).get("machines", {}) or {}).get(machine.machine_id)
+                if view.get("planner", {}).get("active"):
+                    return bool(plan.get("allow_start_now", False)) if isinstance(plan, dict) else False
             rec = view.get("machines", {}).get(machine.machine_id)
             if isinstance(rec, dict):
                 return bool(rec.get("allow_start", False))
         return bool(view.get("decision", {}).get("flexible_start", False))
+
+    def _breaker_limit_w(self) -> float | None:
+        """Return the configured effective breaker limit, if one was supplied."""
+        try:
+            current_a = float(
+                self.settings.get(
+                    CONF_MAIN_BREAKER_CURRENT_A,
+                    self.config.get(CONF_MAIN_BREAKER_CURRENT_A, 0.0),
+                )
+                or 0.0
+            )
+            voltage_v = float(
+                self.settings.get(
+                    CONF_MAIN_BREAKER_VOLTAGE_V,
+                    self.config.get(CONF_MAIN_BREAKER_VOLTAGE_V, 230.0),
+                )
+                or 230.0
+            )
+        except (TypeError, ValueError):
+            return None
+        if (
+            not math.isfinite(current_a)
+            or not math.isfinite(voltage_v)
+            or current_a <= 0.0
+            or voltage_v <= 0.0
+        ):
+            return None
+        return current_a * voltage_v
+
+    def set_developer_price_simulation(self, scenario: str) -> None:
+        """Record a diagnostic-only price scenario without changing live prices."""
+        if not bool(self.settings.get(CONF_DEVELOPER_MODE)):
+            return
+        if scenario == "negative":
+            simulated_status = price_status(-0.01, -0.01, 0.50, 0.20)
+            label = "PRIX NÉGATIF"
+        elif scenario == "high":
+            simulated_status = price_status(0.50, 0.10, 0.50, 0.30)
+            label = "HP / PRIX TRÈS ÉLEVÉ"
+        else:
+            return
+        self.developer_simulation = {
+            "scenario": label,
+            "price_status": simulated_status,
+            "affects_live_decisions": False,
+        }
+        self.async_set_updated_data(self._build_data())
 
     # MÉTHODE : FoxCatEnergyCoordinator._schedule_learning_save — Schedule learning save
     def _schedule_learning_save(self) -> None:
@@ -3255,6 +3407,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         2 trames hautes consécutives déclenchent. 5 trames basses réarment.
         Une mesure maison invalide gèle l'état et n'est jamais assimilée à 0 W.
         """
+        await self._evaluate_v2h(snapshot)
         if not snapshot.valid:
             self.load_shed_state["reason"] = "Bilan énergétique invalide : état de délestage conservé."
             self._high_load_high_frames = 0
@@ -3269,12 +3422,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.load_shed_state.update({"active":False,"reason":"Délestage indisponible ou mode Manuel","triggered_at":None})
                 await self.async_reconcile_machines()
             return
-        trigger=float(self.settings.get("high_load_trigger_w",5000.0))
+        breaker_limit_w = self._breaker_limit_w()
+        trigger = (
+            breaker_limit_w * 0.9
+            if breaker_limit_w is not None
+            else float(self.settings.get("high_load_trigger_w", 5000.0))
+        )
         release=min(float(self.settings.get("high_load_release_w",3500.0)),trigger)
         if not self.load_shed_state.get("active"):
             self._high_load_low_frames=0
             self._high_load_high_frames = self._high_load_high_frames + 1 if snapshot.house_w >= trigger else 0
-            if self._high_load_high_frames >= 2:
+            required_frames = 1 if breaker_limit_w is not None else 2
+            if self._high_load_high_frames >= required_frames:
                 await self._activate_high_load_shed(snapshot,trigger)
                 self._high_load_high_frames=0
         else:
@@ -3285,6 +3444,83 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._high_load_low_frames=0
                 self.reset_core("Fin délestage : 5 trames basses confirmées.")
                 await self.async_reconcile_machines()
+
+    async def _evaluate_v2h(self, snapshot: EnergySnapshot) -> None:
+        """Apply opt-in V2H demand while enforcing SoC and thermal interlocks."""
+        switch_entity = self.config.get(CONF_EV_V2H_SWITCH)
+        enabled = (
+            self.config.get(CONF_EV_V2H_ENABLED) is True
+            and bool(switch_entity)
+            and str(self.settings.get("mode")) != MODE_MANUAL
+            and snapshot.valid
+        )
+        soc_entity = self.config.get(CONF_EV_SOC_SENSOR)
+        soc_pct = self._optional_float_state(soc_entity) if soc_entity else None
+        peak_shaving_enabled = bool(self.settings.get("high_load_shed_enabled"))
+        breaker_limit_w = self._breaker_limit_w() if peak_shaving_enabled else None
+        prices = self.prices()
+        decision = evaluate_v2h(
+            enabled=enabled,
+            price_status=str(prices.get("status", "INDISPONIBLE")),
+            house_w=snapshot.house_w,
+            breaker_limit_w=breaker_limit_w,
+            max_power_w=self.config.get(CONF_EV_V2H_MAX_POWER_W, 5000.0),
+            soc_pct=soc_pct,
+            min_soc_pct=self.config.get(CONF_EV_V2H_MIN_SOC_PCT, 25.0),
+        )
+        if self.config.get(CONF_EV_V2H_ENABLED) is True and not switch_entity:
+            decision.update(
+                active=False,
+                target_power_w=0.0,
+                reason="V2H activé mais commande de chargeur non configurée",
+                thermal_interlock=False,
+            )
+        self.v2h_state.update(decision)
+
+        power_entity = self.config.get(CONF_EV_V2H_POWER_ENTITY)
+        try:
+            if decision.get("active"):
+                if power_entity:
+                   current_power = self._optional_float_state(power_entity)
+                   target_power = float(decision.get("target_power_w", 0.0))
+                   if current_power is None or abs(current_power - target_power) >= 10.0:
+                       await self.hass.services.async_call(
+                           "number",
+                           "set_value",
+                           {"entity_id": power_entity, "value": target_power},
+                           blocking=False,
+                       )
+                state = self.hass.states.get(switch_entity)
+                if state is None or state.state != STATE_ON:
+                   await self.hass.services.async_call(
+                       "switch",
+                       "turn_on",
+                       {"entity_id": switch_entity},
+                       blocking=False,
+                   )
+            else:
+                state = self.hass.states.get(switch_entity) if switch_entity else None
+                if state is not None and state.state == STATE_ON:
+                   if power_entity:
+                       await self.hass.services.async_call(
+                           "number",
+                           "set_value",
+                           {"entity_id": power_entity, "value": 0.0},
+                           blocking=False,
+                       )
+                   await self.hass.services.async_call(
+                       "switch",
+                       "turn_off",
+                       {"entity_id": switch_entity},
+                       blocking=False,
+                   )
+        except Exception as err:  # pragma: no cover - HA service integration failures
+            self.v2h_state.update(
+                active=False,
+                target_power_w=0.0,
+                thermal_interlock=False,
+                reason=f"Commande V2H en échec : {err}",
+            )
 
     # MÉTHODE : FoxCatEnergyCoordinator._activate_high_load_shed — Activate high load shed
     async def _activate_high_load_shed(self, snapshot: EnergySnapshot, trigger_w: float) -> None:
@@ -3962,6 +4198,8 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             },
             "accounting": self.accounting.view(),
             "virtual_assets": self.virtual_assets.view(),
+            "v2h": dict(self.v2h_state),
+            "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
             "machine_guard": {

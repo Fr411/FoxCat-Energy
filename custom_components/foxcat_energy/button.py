@@ -43,6 +43,24 @@ async def async_setup_entry(
             ),
             FoxCatActionButton(
                 coordinator,
+                "simuler_prix_negatif",
+                "Simuler un prix négatif (diagnostic)",
+                "mdi:cash-minus",
+                "diagnostic",
+                "simulate_negative_price",
+                enabled_default=bool(coordinator.settings.get("developer_mode", False)),
+            ),
+            FoxCatActionButton(
+                coordinator,
+                "simuler_prix_hp",
+                "Simuler un prix HP très élevé (diagnostic)",
+                "mdi:cash-clock",
+                "diagnostic",
+                "simulate_high_price",
+                enabled_default=bool(coordinator.settings.get("developer_mode", False)),
+            ),
+            FoxCatActionButton(
+                coordinator,
                 "liberer_onduleur",
                 "Libérer l'onduleur à 100 %",
                 "mdi:solar-power",
@@ -155,6 +173,8 @@ class FoxCatActionButton(FoxCatEntity, ButtonEntity):
         device: str,
         action: str,
         machine_id: str | None = None,
+        *,
+        enabled_default: bool | None = None,
     ) -> None:
         super().__init__(
             coordinator,
@@ -162,13 +182,20 @@ class FoxCatActionButton(FoxCatEntity, ButtonEntity):
             name,
             icon,
             device,
+            enabled_default=enabled_default,
         )
         self._action = action
         self._machine_id = machine_id
 
     # MÉTHODE : FoxCatActionButton.async_press — traitement asynchrone : press
     async def async_press(self) -> None:
-        if self._action == "solar":
+        if self._action == "simulate_negative_price":
+            self.coordinator.set_developer_price_simulation("negative")
+
+        elif self._action == "simulate_high_price":
+            self.coordinator.set_developer_price_simulation("high")
+
+        elif self._action == "solar":
             await self.coordinator.async_analyze_solar(
                 "RÉÉVALUATION MANUELLE"
             )

@@ -54,6 +54,17 @@ from .const import (
     CONF_METRONOME_FALLBACK_SENSOR,
     CONF_HOUSE_SENSOR,
     CONF_INSTALLATION_NAME,
+    CONF_DEVELOPER_MODE,
+    CONF_MAIN_BREAKER_CURRENT_A,
+    CONF_MAIN_BREAKER_VOLTAGE_V,
+    CONF_EV_V2H_ENABLED,
+    CONF_EV_V2H_SWITCH,
+    CONF_EV_V2H_POWER_ENTITY,
+    CONF_EV_SOC_SENSOR,
+    CONF_EV_V2H_MAX_POWER_W,
+    CONF_EV_V2H_MIN_SOC_PCT,
+    CONF_BATTERY_DEGRADATION_COST_EUR_KWH,
+    CONF_EV_DEGRADATION_COST_EUR_KWH,
     CONF_MACHINES_V13,
     CONF_PRICE_AVG_TODAY,
     CONF_PRICE_AVG_TOMORROW,
@@ -190,6 +201,14 @@ def _core_schema() -> vol.Schema:
             vol.Required(CONF_GRID_SIGN_CONVENTION, default=GRID_SIGN_IMPORT_POSITIVE): _grid_sign_selector(),
             _required(CONF_PV_SENSOR, "sensor.homefoxcat_load_solaire"): _entity("sensor"),
             _optional(CONF_METRONOME_FALLBACK_SENSOR): _entity("sensor"),
+            vol.Optional(CONF_DEVELOPER_MODE, default=False): selector.BooleanSelector(),
+            vol.Optional("high_load_shed_enabled", default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_MAIN_BREAKER_CURRENT_A, default=0.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=200, step=1, unit_of_measurement="A", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_MAIN_BREAKER_VOLTAGE_V, default=230.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=100, max=500, step=10, unit_of_measurement="V", mode=selector.NumberSelectorMode.BOX)
+            ),
         }
     )
 
@@ -469,6 +488,22 @@ def _virtual_assets_schema() -> vol.Schema:
             ),
             vol.Optional(CONF_EV_CHARGE_EFFICIENCY, default=90.0): selector.NumberSelector(
                 selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_DEGRADATION_COST_EUR_KWH, default=0.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=2, step=0.001, unit_of_measurement="€/kWh", mode=number)
+            ),
+            vol.Optional(CONF_EV_DEGRADATION_COST_EUR_KWH, default=0.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=2, step=0.001, unit_of_measurement="€/kWh", mode=number)
+            ),
+            vol.Optional(CONF_EV_V2H_ENABLED, default=False): selector.BooleanSelector(),
+            _optional(CONF_EV_V2H_SWITCH): _entity("switch"),
+            _optional(CONF_EV_V2H_POWER_ENTITY): _entity("number"),
+            _optional(CONF_EV_SOC_SENSOR): _entity("sensor"),
+            vol.Optional(CONF_EV_V2H_MAX_POWER_W, default=5000.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100000, step=100, unit_of_measurement="W", mode=number)
+            ),
+            vol.Optional(CONF_EV_V2H_MIN_SOC_PCT, default=25.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100, step=1, unit_of_measurement="%", mode=number)
             ),
         }
     )

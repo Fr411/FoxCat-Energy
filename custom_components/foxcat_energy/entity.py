@@ -11,13 +11,24 @@ class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
     _attr_has_entity_name = True
 
     # MÉTHODE : FoxCatEntity.__init__ — méthode spéciale __init__
-    def __init__(self, coordinator: FoxCatEnergyCoordinator, key: str, name: str, icon: str | None = None, device: str = "ems") -> None:
+    def __init__(
+        self,
+        coordinator: FoxCatEnergyCoordinator,
+        key: str,
+        name: str,
+        icon: str | None = None,
+        device: str = "ems",
+        *,
+        enabled_default: bool | None = None,
+    ) -> None:
         super().__init__(coordinator)
         self._key = key
         self._attr_name = name
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{key}"
         self._attr_icon = icon
         self._device = device
+        if enabled_default is not None:
+            self._attr_entity_registry_enabled_default = enabled_default
 
     # MÉTHODE : FoxCatEntity.device_info — Device info
     @property

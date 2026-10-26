@@ -4,6 +4,8 @@ from copy import deepcopy
 from datetime import datetime
 from typing import Any
 
+MAX_INTEGRATION_GAP_S = 3600.0
+
 
 ZERO = {
     "house_kwh": 0.0,
@@ -250,8 +252,9 @@ class EnergyAccounting:
 
         dt = (now - self.last_valid_ts).total_seconds()
         self.last_valid_ts = now
-        if dt <= 0 or dt > 90:
+        if dt <= 0:
             return False
+        dt = min(dt, MAX_INTEGRATION_GAP_S)
         if self.breakdown_since is None:
             self.breakdown_since = now.isoformat()
 

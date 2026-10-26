@@ -1,3 +1,12 @@
+# Changelog — FoxCat Energy V1.7.6
+
+## V1.7.6
+- Ajout du mode développeur, des scénarios tarifaires diagnostiques sans effet sur les décisions live et du calcul du seuil disjoncteur.
+- V2H physique opt-in avec commande HA configurée explicitement, réserve SoC obligatoire et interverrouillage du chauffe-eau de confort.
+- Le Flexible Load Planner V1.7.1 reste seul décideur de `allow_start`; le Day-Ahead historique est informatif.
+- Arbitrage virtuel à l'achat/revente tenant compte du spread et du coût d'usure; le ledger physique reste inchangé.
+- Tolérance des intégrateurs de télémétrie étendue à une heure et distribution/prix centralisés dans le moteur tarifaire.
+
 # Changelog — FoxCat Energy V1.7.5
 
 ## V1.7.5

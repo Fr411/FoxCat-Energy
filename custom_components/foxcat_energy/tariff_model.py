@@ -24,6 +24,11 @@ from .const import (
     TARIFF_STRUCTURE_SIMPLE,
     TARIFF_STRUCTURE_TOU,
 )
+from .engine.tariff import (
+    distribution_period as _canonical_distribution_period,
+    impact_period as _canonical_impact_period,
+    tariff_period as _canonical_tariff_period,
+)
 # Keep former public aliases for compatibility with existing imports.
 NETWORK_POLICY_TARIFFED = NETWORK_POLICY_BILLED_EXPORT
 NETWORK_POLICY_ZERO = NETWORK_POLICY_ZERO_INJECTION
@@ -77,32 +82,16 @@ def distribution_profile(settings):
     }:
         return DISTRIBUTION_PROFILE_BI
     return DISTRIBUTION_PROFILE_SIMPLE
-# FONCTION : _minute — Minute
-def _minute(v,d):
-    try: h,m=str(v or d).split(':')[:2]; return int(h)*60+int(m)
-    except Exception: h,m=d.split(':'); return int(h)*60+int(m)
-# FONCTION : _within — Within
-def _within(x,a,b): return a<=x<b if a<b else x>=a or x<b
 # FONCTION : tou_period — Tou period
 def tou_period(at,settings):
-    x=at.hour*60+at.minute
-    ranges=[(_minute(settings.get('tariff_hp_start_1'),'07:00'),_minute(settings.get('tariff_hp_end_1'),'11:00')) ,(_minute(settings.get('tariff_hp_start_2'),'17:00'),_minute(settings.get('tariff_hp_end_2'),'22:00'))]
-    return 'HP' if any(_within(x,a,b) for a,b in ranges) else 'HC'
+    return _canonical_tariff_period(at, settings)
 # FONCTION : impact_period — Impact period
 def impact_period(at,settings):
-    x=at.hour*60+at.minute
-    if _within(x,_minute(settings.get('impact_peak_start'),'17:00'),_minute(settings.get('impact_peak_end'),'22:00')): return 'PIC'
-    if _within(x,_minute(settings.get('impact_eco_start_1'),'01:00'),_minute(settings.get('impact_eco_end_1'),'07:00')) or _within(x,_minute(settings.get('impact_eco_start_2'),'11:00'),_minute(settings.get('impact_eco_end_2'),'17:00')): return 'ECO'
-    return 'MEDIUM'
+    return _canonical_impact_period(at, settings)
 
 
 def distribution_period(at, settings):
-    profile = distribution_profile(settings)
-    if profile == DISTRIBUTION_PROFILE_IMPACT:
-        return impact_period(at, settings)
-    if profile == DISTRIBUTION_PROFILE_BI:
-        return tou_period(at, settings)
-    return "ALL"
+    return _canonical_distribution_period(at, settings)
 
 
 # FONCTION : final_client_price — Final client price

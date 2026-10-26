@@ -82,24 +82,32 @@ def _ev_allocation(first: Slot, window: list[Slot], ev: VirtualEV) -> float:
 
 def _arbitrage_charge(window: list[Slot], battery: VirtualBattery, cfg: PlannerConfig,
                       wear: float) -> float:
-    """Énergie AC à charger depuis le réseau sur le premier pas (0 si non rentable)."""
+    """Energy AC charged from the grid for a profitable future resale or avoided import."""
     first = window[0]
     p0 = first.import_price
-    if p0 is None or len(window) < 2 or any(s.import_price is None for s in window[1:]):
+    if p0 is None or len(window) < 2:
         return 0.0
     eta_c, eta_d = battery.spec.charge_efficiency, battery.spec.discharge_efficiency
     cost = p0 / (eta_c * eta_d) + wear
     delivered = 0.0
     surplus_stored = 0.0
     cheaper_seen = False
+    import_curve_complete = all(s.import_price is not None for s in window[1:])
     for s in window[1:]:
         if s.import_price is not None and s.import_price < p0:
             cheaper_seen = True
         if _net(s) > 0:
             surplus_stored += _net(s) * eta_c
-        elif _net(s) < 0 and s.import_price is not None and not cheaper_seen \
+        export_profitable = (
+            cfg.allow_export_arbitrage
+            and s.export_price is not None
+            and s.export_price - cost >= cfg.min_arbitrage_margin_eur_kwh
+        )
+        if export_profitable:
+            delivered += battery.spec.max_discharge_kw * s.hours
+        elif import_curve_complete and _net(s) < 0 and s.import_price is not None and not cheaper_seen \
                 and s.import_price - cost >= cfg.min_arbitrage_margin_eur_kwh:
-            delivered += -_net(s)
+            delivered += min(-_net(s), battery.spec.max_discharge_kw * s.hours)
     if delivered <= _EPS:
         return 0.0
     have = max(battery.soc_kwh - battery.reserve_kwh, 0.0)
