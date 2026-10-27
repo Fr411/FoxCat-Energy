@@ -17,10 +17,10 @@ from .const import (
     CONF_GRID_SIGNED_SENSOR,
     CONF_PV_SENSOR,
 )
-from .coordinator import FoxCatEnergyCoordinator
+from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
-from .registry import registry_diagnostics
-from .virtual_assets.config import (
+from .runtime.registry import registry_diagnostics
+from .trading.virtual_assets.config import (
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CHARGE_EFFICIENCY,
     CONF_BATTERY_DISCHARGE_EFFICIENCY,

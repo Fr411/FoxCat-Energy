@@ -39,7 +39,7 @@ from foxcat_energy.const import (
     TARIFF_STRUCTURE_TOU,
     SWITCH_DEFINITIONS,
 )
-from foxcat_energy.dashboard_versions import (
+from foxcat_energy.dashboard.versions import (
     available_dashboard_versions,
     dashboard_template_path,
     dashboard_variant_files,
@@ -47,19 +47,19 @@ from foxcat_energy.dashboard_versions import (
     dashboard_version_label,
     recommended_dashboard_version,
 )
-from foxcat_energy.dashboard_merge import merge_dashboard_text
-from foxcat_energy.devices import apply_device_toggle, device_definitions
-from foxcat_energy.profiles import profile_path, validate_profile_settings
-from foxcat_energy.migration import migrate_settings_v173
-from foxcat_energy.tariff_model import (
+from foxcat_energy.dashboard.merge import merge_dashboard_text
+from foxcat_energy.domain.loads.devices import apply_device_toggle, device_definitions
+from foxcat_energy.runtime.profiles import profile_path, validate_profile_settings
+from foxcat_energy.runtime.migration import migrate_settings_v173
+from foxcat_energy.domain.tariff.tariff_model import (
     distribution_period,
     distribution_profile,
     final_client_price,
     tariff_dimensions,
 )
-from foxcat_energy.accounting import EnergyAccounting
-from foxcat_energy.machines import machine_from_dict
-from foxcat_energy.tariff_prices import (
+from foxcat_energy.domain.accounting import EnergyAccounting
+from foxcat_energy.domain.loads.machines import machine_from_dict
+from foxcat_energy.domain.tariff.tariff_prices import (
     CONF_TARIFF_HC_PRICE_SENSOR,
     CONF_TARIFF_HP_PRICE_SENSOR,
     apply_configured_tariff,
@@ -377,10 +377,10 @@ class DashboardAndProfileTests(unittest.TestCase):
             "homeassistant.helpers": helpers,
             "homeassistant.helpers.entity_registry": entity_registry,
         }
-        original_registry = sys.modules.pop("foxcat_energy.registry", None)
+        original_registry = sys.modules.pop("foxcat_energy.runtime.registry", None)
         try:
             with patch.dict(sys.modules, stubs):
-                registry = importlib.import_module("foxcat_energy.registry")
+                registry = importlib.import_module("foxcat_energy.runtime.registry")
                 self.assertEqual(
                     registry.BINDINGS["pricing.distribution_profile"].key,
                     "profil_distribution_belgique",
@@ -423,9 +423,9 @@ class DashboardAndProfileTests(unittest.TestCase):
                     )
                 self.assertFalse(any(role.startswith("hvac.") for role in registry.BINDINGS))
         finally:
-            sys.modules.pop("foxcat_energy.registry", None)
+            sys.modules.pop("foxcat_energy.runtime.registry", None)
             if original_registry is not None:
-                sys.modules["foxcat_energy.registry"] = original_registry
+                sys.modules["foxcat_energy.runtime.registry"] = original_registry
 
     def test_dashboard_merge_keeps_disjoint_user_and_latest_changes(self) -> None:
         base = "title: FoxCat\nviews:\n  - title: Energy\n    cards:\n      - type: entities\n"
@@ -568,20 +568,20 @@ class DashboardAndProfileTests(unittest.TestCase):
             config_entries.ConfigEntry = object
             core = types.ModuleType("homeassistant.core")
             core.HomeAssistant = object
-            registry = types.ModuleType("foxcat_energy.registry")
+            registry = types.ModuleType("foxcat_energy.runtime.registry")
             registry.resolve_registry = lambda hass, entry, config: {}
             registry.render_dashboard_template = lambda template, bindings: (template, [])
             stubs = {
                 "homeassistant": homeassistant,
                 "homeassistant.config_entries": config_entries,
                 "homeassistant.core": core,
-                "foxcat_energy.registry": registry,
+                "foxcat_energy.runtime.registry": registry,
             }
-            original_dashboard = sys.modules.pop("foxcat_energy.dashboard", None)
+            original_dashboard = sys.modules.pop("foxcat_energy.dashboard.dashboard", None)
             original_dashboard_attr = getattr(package, "dashboard", None)
             try:
                 with patch.dict(sys.modules, stubs):
-                    dashboard = importlib.import_module("foxcat_energy.dashboard")
+                    dashboard = importlib.import_module("foxcat_energy.dashboard.dashboard")
                     dashboard._dir = lambda: versions
 
                     class FakeConfig:
@@ -639,13 +639,13 @@ class DashboardAndProfileTests(unittest.TestCase):
                     self.assertTrue(mobile_path.is_file())
                     self.assertFalse(tablet_path.exists())
             finally:
-                sys.modules.pop("foxcat_energy.dashboard", None)
+                sys.modules.pop("foxcat_energy.dashboard.dashboard", None)
                 if original_dashboard_attr is None and hasattr(package, "dashboard"):
                     delattr(package, "dashboard")
                 elif original_dashboard_attr is not None:
                     package.dashboard = original_dashboard_attr
                 if original_dashboard is not None:
-                    sys.modules["foxcat_energy.dashboard"] = original_dashboard
+                    sys.modules["foxcat_energy.dashboard.dashboard"] = original_dashboard
 
     def test_repository_dashboard_versions_include_both_current_layouts(self) -> None:
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"

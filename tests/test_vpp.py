@@ -12,19 +12,19 @@ package = types.ModuleType("foxcat_energy")
 package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
-from foxcat_energy.accounting.manager import EnergyAccounting, MAX_INTEGRATION_GAP_S
-from foxcat_energy.engine.tariff import distribution_period, price_status
-from foxcat_energy.economic_optimizer import PricePoint
-from foxcat_energy.flexible_load_planner import SAFETY_OVERRIDE, build_flexible_load_plan
-from foxcat_energy.machine_learning import MachineLearningRecorder
-from foxcat_energy.machines import MachineDefinition
-from foxcat_energy.virtual_assets.config import PlannerConfig, config_from_settings
-from foxcat_energy.virtual_assets.models import DataQuality, Slot
-from foxcat_energy.virtual_assets.planner import plan_and_apply
-from foxcat_energy.virtual_assets.battery import VirtualBattery
-from foxcat_energy.virtual_assets.config import BatterySpec
-from foxcat_energy.virtual_assets.state_store import MAX_EXPECTED_GAP_SECONDS, VirtualAssetsStateStore
-from foxcat_energy.vpp import evaluate_trade, evaluate_v2h
+from foxcat_energy.domain.accounting.manager import EnergyAccounting, MAX_INTEGRATION_GAP_S
+from foxcat_energy.domain.tariff.tariff import distribution_period, price_status
+from foxcat_energy.domain.pricing.economic_optimizer import PricePoint
+from foxcat_energy.domain.loads.flexible_load_planner import SAFETY_OVERRIDE, build_flexible_load_plan
+from foxcat_energy.domain.loads.machine_learning import MachineLearningRecorder
+from foxcat_energy.domain.loads.machines import MachineDefinition
+from foxcat_energy.trading.virtual_assets.config import PlannerConfig, config_from_settings
+from foxcat_energy.trading.virtual_assets.models import DataQuality, Slot
+from foxcat_energy.trading.virtual_assets.planner import plan_and_apply
+from foxcat_energy.trading.virtual_assets.battery import VirtualBattery
+from foxcat_energy.trading.virtual_assets.config import BatterySpec
+from foxcat_energy.trading.virtual_assets.state_store import MAX_EXPECTED_GAP_SECONDS, VirtualAssetsStateStore
+from foxcat_energy.trading.vpp import evaluate_trade, evaluate_v2h
 
 
 NOW = datetime(2026, 1, 5, 12, 0, tzinfo=timezone.utc)

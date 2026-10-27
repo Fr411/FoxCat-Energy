@@ -13,18 +13,18 @@ package = types.ModuleType("foxcat_energy")
 package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
-from foxcat_energy.economic_optimizer import PricePoint
-from foxcat_energy.inverter_core import (
+from foxcat_energy.domain.pricing.economic_optimizer import PricePoint
+from foxcat_energy.runtime.inverter_core import (
     InverterCore,
     NETWORK_BILLED_EXPORT,
     NETWORK_COMPENSATION,
     NETWORK_UNVALUED_EXPORT,
     NETWORK_ZERO_INJECTION,
 )
-from foxcat_energy.engine.modes import evaluate_mode
-from foxcat_energy.engine.models import EnergySnapshot, SolarForecast
-from foxcat_energy.migration import migrate_settings_v171
-from foxcat_energy.price_analyzer import (
+from foxcat_energy.domain.engine.modes import evaluate_mode
+from foxcat_energy.domain.engine.models import EnergySnapshot, SolarForecast
+from foxcat_energy.runtime.migration import migrate_settings_v171
+from foxcat_energy.domain.pricing.price_analyzer import (
     AFTER_FAVORABLE_WINDOW,
     IN_FAVORABLE_WINDOW,
     PREDICTIVE,

@@ -12,20 +12,20 @@ package = types.ModuleType("foxcat_energy")
 package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
-from foxcat_energy.economic_optimizer import PricePoint
-from foxcat_energy.virtual_assets.accounting import account_simulation
-from foxcat_energy.virtual_assets.battery import VirtualBattery
-from foxcat_energy.virtual_assets.config import (
+from foxcat_energy.domain.pricing.economic_optimizer import PricePoint
+from foxcat_energy.trading.virtual_assets.accounting import account_simulation
+from foxcat_energy.trading.virtual_assets.battery import VirtualBattery
+from foxcat_energy.trading.virtual_assets.config import (
     BatterySpec, EVSpec, PlannerConfig, VirtualAssetsConfig, config_from_settings)
-from foxcat_energy.virtual_assets.counterfactual import run_counterfactual
-from foxcat_energy.virtual_assets.diagnostics import build_diagnostics
-from foxcat_energy.virtual_assets.ev import EVSession, VirtualEV
-from foxcat_energy.virtual_assets.ha import VirtualAssetsRuntime, read_float_state, setup_virtual_assets
-from foxcat_energy.virtual_assets.models import DataQuality, Slot, VirtualAssetsError
-from foxcat_energy.virtual_assets.planner import simulate
-from foxcat_energy.virtual_assets.profitability import ProfitabilityInputs, analyze_profitability
-from foxcat_energy.virtual_assets.shadow import ShadowSimulator
-from foxcat_energy.virtual_assets.tariff_adapter import (
+from foxcat_energy.trading.virtual_assets.counterfactual import run_counterfactual
+from foxcat_energy.trading.virtual_assets.diagnostics import build_diagnostics
+from foxcat_energy.trading.virtual_assets.ev import EVSession, VirtualEV
+from foxcat_energy.trading.virtual_assets.ha import VirtualAssetsRuntime, read_float_state, setup_virtual_assets
+from foxcat_energy.trading.virtual_assets.models import DataQuality, Slot, VirtualAssetsError
+from foxcat_energy.trading.virtual_assets.planner import simulate
+from foxcat_energy.trading.virtual_assets.profitability import ProfitabilityInputs, analyze_profitability
+from foxcat_energy.trading.virtual_assets.shadow import ShadowSimulator
+from foxcat_energy.trading.virtual_assets.tariff_adapter import (
     PriceKind, PriceRefused, TariffAdapter, make_slot)
 
 T0 = datetime(2026, 1, 5, 0, 0, tzinfo=timezone.utc)
@@ -478,7 +478,7 @@ class IsolationTests(unittest.TestCase):
             config_from_settings({"virtual_battery_charge_efficiency_pct": 0})
 
     def test_no_physical_command_in_source(self):
-        for path in (COMPONENT_PATH / "virtual_assets").glob("*.py"):
+        for path in (COMPONENT_PATH / "trading" / "virtual_assets").glob("*.py"):
             text = path.read_text(encoding="utf-8")
             for forbidden in ("async_call", "services.", "turn_on", "turn_off", "set_value"):
                 self.assertNotIn(forbidden, text, f"{path.name}: {forbidden}")

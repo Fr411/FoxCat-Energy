@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, TIME_SETTING_KEYS
-from .coordinator import FoxCatEnergyCoordinator
+from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 
 _TIME_NAMES = {

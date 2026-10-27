@@ -12,7 +12,7 @@ from .const import (
     TARIFF_REGIMES,
     TARIFF_STRUCTURES,
 )
-from .migration import compatibility_tariff_regime
+from .runtime.migration import compatibility_tariff_regime
 
 
 # FONCTION : mode_option — Mode option
