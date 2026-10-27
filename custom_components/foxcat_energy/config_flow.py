@@ -105,9 +105,15 @@ from .const import (
     DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     OFFICIAL_MENU_STEPS,
 )
-from .machines import records_for_options
-from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
-from .virtual_assets.config import (
+from .domain.loads.machines import records_for_options
+from .domain.tariff.tariff_prices import (
+    CONF_TARIFF_MONO_PRICE_SENSOR,
+    active_tariff,
+    TARIFF_HPHC_BI,
+    TARIFF_HPHC_MONO,
+    TARIFF_DYNAMIQUE,
+)
+from .trading.virtual_assets.config import (
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CHARGE_EFFICIENCY,
     CONF_BATTERY_DISCHARGE_EFFICIENCY,
