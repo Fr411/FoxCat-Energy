@@ -210,7 +210,10 @@
   },
   "options": {
     "error": {
-      "invalid_machine_config": "Configuration invalide : un Switch doit avoir une commande, un CVC doit avoir un capteur de puissance."
+      "invalid_machine_config": "Configuration invalide : un Switch doit avoir une commande, un CVC doit avoir un capteur de puissance.",
+      "peak_release_ratio_too_high": "Le seuil de réarmement (%) doit être inférieur au seuil de déclenchement (%).",
+      "peak_release_not_below_trigger": "Le seuil de réarmement absolu doit être inférieur au seuil de déclenchement absolu.",
+      "peak_trigger_missing": "Renseignez un disjoncteur ou un seuil de déclenchement absolu."
     },
     "step": {
       "init": {
@@ -459,6 +462,7 @@
         "menu_options": {
           "ems_core": "EMS • Fonctionnement et réglages",
           "ia": "IA • Prévisions et analyse",
+          "peak_shaving": "Écrêtage de pointe • Délestage",
           "init": "← Retour au menu principal"
         }
       },
@@ -554,6 +558,42 @@
           "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
           "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
           "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+        }
+      },
+      "peak_shaving": {
+        "title": "Écrêtage de pointe • Délestage",
+        "description": "Protège le raccordement : quand la puissance dépasse le seuil, FoxCat suspend les charges non essentielles puis les rétablit après un retour durable sous le seuil de réarmement. Les valeurs par défaut reproduisent le comportement historique. Les champs « Disjoncteur » et « Délestage » sont les mêmes que dans « Sources énergétiques ».",
+        "data": {
+          "high_load_shed_enabled": "Activer le délestage haute consommation",
+          "main_breaker_current_a": "Calibre du disjoncteur principal (A, 0 = non renseigné)",
+          "main_breaker_voltage_v": "Tension nominale (V)",
+          "peak_phases": "Nombre de phases prises en compte (1 à 3)",
+          "peak_measure_basis": "Puissance comparée aux seuils",
+          "peak_trigger_ratio_pct": "Seuil de déclenchement (% du disjoncteur)",
+          "high_load_trigger_w": "Seuil de déclenchement absolu (W, sans disjoncteur)",
+          "peak_release_ratio_pct": "Seuil de réarmement (% du disjoncteur, 0 = seuil absolu)",
+          "high_load_release_w": "Seuil de réarmement absolu (W)",
+          "peak_confirm_frames": "Trames hautes avant déclenchement (0 = auto)",
+          "peak_release_frames": "Trames basses avant réarmement",
+          "peak_shed_boiler": "Couper le chauffe-eau pendant le délestage",
+          "peak_shed_machines": "Couper les machines délestables",
+          "peak_release_inverter": "Libérer l'onduleur à 100 % pendant le délestage",
+          "peak_block_flexible_starts": "Bloquer les nouveaux démarrages flexibles",
+          "peak_v2h_assist": "Autoriser le V2H à écrêter la pointe",
+          "peak_v2h_target_ratio_pct": "Cible V2H (% du disjoncteur à ne pas dépasser)"
+        },
+        "data_description": {
+          "main_breaker_current_a": "Si renseigné, le seuil de déclenchement est calculé à partir du disjoncteur (A × V × phases × %). Sinon le seuil absolu est utilisé.",
+          "peak_phases": "Multiplie la capacité (hypothèse de charge équilibrée). Laissez 1 pour le calcul historique monophasé.",
+          "peak_measure_basis": "Avec production solaire, « Import réseau » évite de délester quand le solaire couvre la charge. La consommation maison est le comportement historique.",
+          "peak_trigger_ratio_pct": "Défaut 90 %. Utilisé seulement si un disjoncteur est renseigné.",
+          "high_load_trigger_w": "Utilisé seulement si aucun disjoncteur n'est renseigné.",
+          "peak_release_ratio_pct": "Doit rester inférieur au seuil de déclenchement. 0 utilise le seuil absolu de réarmement.",
+          "high_load_release_w": "Le réarmement est toujours au moins 5 % sous le déclenchement pour éviter les oscillations.",
+          "peak_confirm_frames": "0 = automatique : 1 trame avec disjoncteur, 2 sans. Une trame correspond à une publication de la mesure réseau.",
+          "peak_release_frames": "Défaut 5 trames consécutives sous le seuil de réarmement.",
+          "peak_shed_machines": "Seules les machines marquées « délestables » sont coupées, et jamais en plein cycle.",
+          "peak_v2h_target_ratio_pct": "Défaut 80 %. Sans effet si le V2H physique n'est pas activé."
         }
       }
     },

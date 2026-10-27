@@ -105,9 +105,9 @@ from .const import (
     DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     OFFICIAL_MENU_STEPS,
 )
-from .domain.loads.machines import records_for_options
-from .domain.tariff.tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
-from .trading.virtual_assets.config import (
+from .machines import records_for_options
+from .tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, active_tariff, TARIFF_HPHC_BI, TARIFF_HPHC_MONO, TARIFF_DYNAMIQUE
+from .virtual_assets.config import (
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_CHARGE_EFFICIENCY,
     CONF_BATTERY_DISCHARGE_EFFICIENCY,
@@ -122,6 +122,9 @@ from .trading.virtual_assets.config import (
     CONF_SHADOW as CONF_VIRTUAL_ASSETS_SHADOW,
 )
 
+
+
+from . import peak_shaving as peak
 
 
 # FONCTION : _entity — Entity
@@ -509,6 +512,48 @@ def _virtual_assets_schema() -> vol.Schema:
     )
 
 
+def _peak_shaving_schema() -> vol.Schema:
+    """Écrêtage de pointe : toute la logique de délestage haute consommation."""
+    box = selector.NumberSelectorMode.BOX
+
+    def number(low: float, high: float, step: float, unit: str | None = None) -> selector.NumberSelector:
+        cfg: dict[str, Any] = {"min": low, "max": high, "step": step, "mode": box}
+        if unit:
+            cfg["unit_of_measurement"] = unit
+        return selector.NumberSelector(selector.NumberSelectorConfig(**cfg))
+
+    basis = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                {"value": peak.BASIS_HOUSE, "label": "Consommation maison (comportement historique)"},
+                {"value": peak.BASIS_GRID_IMPORT, "label": "Import réseau (recommandé avec production solaire)"},
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+    return vol.Schema(
+        {
+            vol.Optional(peak.CONF_PEAK_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_MAIN_BREAKER_CURRENT_A, default=0.0): number(0, 200, 1, "A"),
+            vol.Optional(CONF_MAIN_BREAKER_VOLTAGE_V, default=230.0): number(100, 500, 10, "V"),
+            vol.Optional(peak.CONF_PEAK_PHASES, default=1): number(1, 3, 1),
+            vol.Optional(peak.CONF_PEAK_MEASURE_BASIS, default=peak.BASIS_HOUSE): basis,
+            vol.Optional(peak.CONF_PEAK_TRIGGER_RATIO_PCT, default=90): number(50, 100, 1, "%"),
+            vol.Optional(peak.CONF_PEAK_TRIGGER_W, default=5000): number(1000, 20000, 100, "W"),
+            vol.Optional(peak.CONF_PEAK_RELEASE_RATIO_PCT, default=0): number(0, 99, 1, "%"),
+            vol.Optional(peak.CONF_PEAK_RELEASE_W, default=3500): number(500, 19000, 100, "W"),
+            vol.Optional(peak.CONF_PEAK_CONFIRM_FRAMES, default=0): number(0, 10, 1),
+            vol.Optional(peak.CONF_PEAK_RELEASE_FRAMES, default=5): number(1, 30, 1),
+            vol.Optional(peak.CONF_PEAK_SHED_BOILER, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_SHED_MACHINES, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_RELEASE_INVERTER, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_BLOCK_FLEXIBLE, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_V2H_ASSIST, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_V2H_TARGET_RATIO_PCT, default=80): number(30, 100, 1, "%"),
+        }
+    )
+
+
 _SCHEMA_BUILDERS = {
     "core": _core_schema,
     "metronome": _metronome_schema,
@@ -522,6 +567,7 @@ _SCHEMA_BUILDERS = {
     "ia": _solar_schema,
     "pricing_dynamic": _pricing_schema,
     "battery_ev": _virtual_assets_schema,
+    "peak_shaving": _peak_shaving_schema,
 }
 
 
@@ -766,7 +812,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     async def async_step_ems(self, user_input=None):
         return self.async_show_menu(
             step_id="ems",
-            menu_options=["ems_core", "ia", "init"],
+            menu_options=["ems_core", "ia", "peak_shaving", "init"],
         )
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_ems_core — traitement asynchrone : step ems core
@@ -797,6 +843,20 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_boiler — traitement asynchrone : step boiler
     async def async_step_boiler(self, user_input=None):
         return await self._section("boiler", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_peak_shaving — Écrêtage de pointe (délestage)
+    async def async_step_peak_shaving(self, user_input=None):
+        """Configure toute la logique d'écrêtage ; refuse les combinaisons incohérentes."""
+        if user_input is not None:
+            merged = {**self._effective(), **_normalise_input(user_input)}
+            errors = peak.validate(peak.PeakShavingConfig.from_settings(merged))
+            if errors:
+                return self.async_show_form(
+                    step_id="peak_shaving",
+                    data_schema=_schema_with_current(_peak_shaving_schema(), merged),
+                    errors={"base": errors[0]},
+                )
+        return await self._section("peak_shaving", user_input, return_step="ems")
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_battery_ev — Configuration batterie et VE virtuels
     async def async_step_battery_ev(self, user_input=None):

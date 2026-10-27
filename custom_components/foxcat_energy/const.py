@@ -334,6 +334,20 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "high_load_restore_s": 120.0,
     CONF_MAIN_BREAKER_CURRENT_A: 0.0,
     CONF_MAIN_BREAKER_VOLTAGE_V: 230.0,
+    # Écrêtage de pointe configurable (menu EMS > Écrêtage de pointe).
+    # Les défauts reproduisent le comportement historique ; voir peak_shaving.py.
+    "peak_phases": 1.0,
+    "peak_measure_basis": "house",
+    "peak_trigger_ratio_pct": 90.0,
+    "peak_release_ratio_pct": 0.0,
+    "peak_confirm_frames": 0.0,
+    "peak_release_frames": 5.0,
+    "peak_shed_boiler": True,
+    "peak_shed_machines": True,
+    "peak_release_inverter": True,
+    "peak_block_flexible_starts": True,
+    "peak_v2h_assist": True,
+    "peak_v2h_target_ratio_pct": 80.0,
 }
 
 NUMBER_DEFINITIONS = {
