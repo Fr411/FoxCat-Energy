@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, NUMBER_DEFINITIONS
-from .coordinator import FoxCatEnergyCoordinator
+from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 
 

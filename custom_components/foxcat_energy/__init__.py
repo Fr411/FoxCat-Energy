@@ -9,9 +9,9 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DEFAULT_SETTINGS, DOMAIN, NUMBER_DEFINITIONS, PLATFORMS, SWITCH_DEFINITIONS, TIME_SETTING_KEYS
-from .coordinator import FoxCatEnergyCoordinator
-from .dashboard import async_ensure_dashboards
-from .profiles import read_settings_profile, write_settings_profile
+from .runtime.coordinator import FoxCatEnergyCoordinator
+from .dashboard.dashboard import async_ensure_dashboards
+from .runtime.profiles import read_settings_profile, write_settings_profile
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -6,8 +6,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .coordinator import FoxCatEnergyCoordinator
-from .dashboard import (
+from .runtime.coordinator import FoxCatEnergyCoordinator
+from .dashboard.dashboard import (
     async_apply_user_dashboard_to_latest,
     async_regenerate_dashboard,
     async_save_user_dashboard,

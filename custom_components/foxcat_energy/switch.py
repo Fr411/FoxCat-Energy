@@ -6,10 +6,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, SWITCH_DEFINITIONS
-from .coordinator import FoxCatEnergyCoordinator
+from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
-from .devices import DeviceDefinition, device_definitions
-from .machines import MachineDefinition
+from .domain.loads.devices import DeviceDefinition, device_definitions
+from .domain.loads.machines import MachineDefinition
 
 
 # FONCTION : _device_for — Device for

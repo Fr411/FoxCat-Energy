@@ -19,8 +19,8 @@ from .const import (
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
 )
-from .tariff_model import distribution_profile, tariff_dimensions
-from .coordinator import FoxCatEnergyCoordinator
+from .domain.tariff.tariff_model import distribution_profile, tariff_dimensions
+from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .select_options import (
     constrained_option,
@@ -278,7 +278,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     # MÉTHODE : FoxCatDashboardVersionSelect.options — Options
     @property
     def options(self) -> list[str]:
-        from .dashboard import dashboard_select_options, dashboard_version_label
+        from .dashboard.dashboard import dashboard_select_options, dashboard_version_label
 
         return [
             dashboard_version_label(option)
@@ -292,7 +292,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     # MÉTHODE : FoxCatDashboardVersionSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
-        from .dashboard import dashboard_status, dashboard_version_label
+        from .dashboard.dashboard import dashboard_status, dashboard_version_label
 
         active = dashboard_status(self.coordinator.hass).get("active_version")
         active = dashboard_version_label(active) if active else active
@@ -302,7 +302,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         if option not in self.options:
             return
-        from .dashboard import (
+        from .dashboard.dashboard import (
             CUSTOM_DASHBOARD_OPTION,
             async_switch_dashboard,
             dashboard_version_for_label,
