@@ -130,6 +130,7 @@ from .trading.virtual_assets.config import (
 
 
 
+from . import grid_load
 from . import peak_shaving as peak
 
 
@@ -537,11 +538,27 @@ def _peak_shaving_schema() -> vol.Schema:
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
     )
+    regime = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                {"value": grid_load.GRID_REGIME_MONO, "label": "MONO • Monophasé"},
+                {"value": grid_load.GRID_REGIME_TRI, "label": "TRI • Triphasé"},
+                {"value": grid_load.GRID_REGIME_TETRA, "label": "TETRA • Tétraphasé"},
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
     return vol.Schema(
         {
             vol.Optional(peak.CONF_PEAK_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(grid_load.CONF_GRID_REGIME, default=grid_load.GRID_REGIME_MONO): regime,
             vol.Optional(CONF_MAIN_BREAKER_CURRENT_A, default=0.0): number(0, 200, 1, "A"),
             vol.Optional(CONF_MAIN_BREAKER_VOLTAGE_V, default=230.0): number(100, 500, 10, "V"),
+            vol.Optional(grid_load.CONF_INVERTER_COS_PHI, default=1.0): number(0.1, 1, 0.01),
+            _optional(grid_load.CONF_GRID_VOLTAGE_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_CURRENT_L1_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_CURRENT_L2_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_CURRENT_L3_SENSOR): _entity("sensor"),
             vol.Optional(peak.CONF_PEAK_PHASES, default=1): number(1, 3, 1),
             vol.Optional(peak.CONF_PEAK_MEASURE_BASIS, default=peak.BASIS_HOUSE): basis,
             vol.Optional(peak.CONF_PEAK_TRIGGER_RATIO_PCT, default=90): number(50, 100, 1, "%"),
