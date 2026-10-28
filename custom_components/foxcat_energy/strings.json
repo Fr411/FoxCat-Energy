@@ -574,7 +574,13 @@
           "peak_release_inverter": "Libérer l'onduleur à 100 % pendant le délestage",
           "peak_block_flexible_starts": "Bloquer les nouveaux démarrages flexibles",
           "peak_v2h_assist": "Autoriser le V2H à écrêter la pointe",
-          "peak_v2h_target_ratio_pct": "Cible V2H (% du disjoncteur à ne pas dépasser)"
+          "peak_v2h_target_ratio_pct": "Cible V2H (% du disjoncteur à ne pas dépasser)",
+          "grid_regime": "Régime réseau (MONO / TRI / TETRA)",
+          "inverter_cos_phi": "Facteur de puissance onduleur (cos φ)",
+          "grid_voltage_sensor": "Capteur de tension réseau (V, optionnel)",
+          "grid_current_l1_sensor": "Intensité mesurée phase L1 (A, optionnel)",
+          "grid_current_l2_sensor": "Intensité mesurée phase L2 (A, optionnel)",
+          "grid_current_l3_sensor": "Intensité mesurée phase L3 (A, optionnel)"
         },
         "data_description": {
           "main_breaker_current_a": "Si renseigné, le seuil de déclenchement est calculé à partir du disjoncteur (A × V × phases × %). Sinon le seuil absolu est utilisé.",
@@ -587,7 +593,9 @@
           "peak_confirm_frames": "0 = automatique : 1 trame avec disjoncteur, 2 sans. Une trame correspond à une publication de la mesure réseau.",
           "peak_release_frames": "Défaut 5 trames consécutives sous le seuil de réarmement.",
           "peak_shed_machines": "Seules les machines marquées « délestables » sont coupées, et jamais en plein cycle.",
-          "peak_v2h_target_ratio_pct": "Défaut 80 %. Sans effet si le V2H physique n'est pas activé."
+          "peak_v2h_target_ratio_pct": "Défaut 80 %. Sans effet si le V2H physique n'est pas activé.",
+          "grid_regime": "MONO : I = P / (U × cos φ). TRI/TETRA : intensités L1-L3 mesurées si disponibles, sinon I = P / (√3 × U composée × cos φ).",
+          "grid_voltage_sensor": "Sinon la tension nominale du disjoncteur est utilisée. Une valeur < 300 V est traitée comme tension simple."
         }
       }
     },

@@ -16,6 +16,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
+from .. import grid_load
 from ..const import (
     ACK_IDLE,
     ACK_NOK,
@@ -3054,6 +3055,39 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 return bool(rec.get("allow_start", False))
         return bool(view.get("decision", {}).get("flexible_start", False))
 
+    def _grid_load_view(self, snapshot: EnergySnapshot) -> dict[str, Any]:
+        """Intensité réseau, charge du disjoncteur et décharge demandée (calcul seul, aucune commande)."""
+        def pick(key: str, default: Any = None) -> Any:
+            return self.settings.get(key, self.config.get(key, default))
+
+        def number(key: str, default: float) -> float:
+            try:
+                value = float(pick(key, default) or default)
+            except (TypeError, ValueError):
+                return default
+            return value if math.isfinite(value) else default
+
+        regime = grid_load.normalize_regime(pick(grid_load.CONF_GRID_REGIME))
+        breaker_a = number(CONF_MAIN_BREAKER_CURRENT_A, 0.0)
+        nominal_v = number(CONF_MAIN_BREAKER_VOLTAGE_V, 230.0)
+        measured_v = self._optional_float_state(pick(grid_load.CONF_GRID_VOLTAGE_SENSOR))
+        phases = (
+            [self._optional_float_state(pick(key)) for key in grid_load.PHASE_CURRENT_KEYS]
+            if regime != grid_load.GRID_REGIME_MONO
+            else []
+        )
+        result = grid_load.evaluate(
+            regime,
+            power_w=snapshot.house_w,
+            voltage_v=measured_v if measured_v and measured_v > 0.0 else nominal_v,
+            cos_phi=pick(grid_load.CONF_INVERTER_COS_PHI, 1.0),
+            breaker_a=breaker_a,
+            limit_pct=number("peak_trigger_ratio_pct", 90.0),
+            enabled=bool(self.settings.get("high_load_shed_enabled")),
+            phase_currents_a=phases,
+        )
+        return dict(grid_load.as_dict(result))
+
     def _breaker_limit_w(self) -> float | None:
         """Return the configured effective breaker limit, if one was supplied."""
         try:
@@ -4223,6 +4257,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
+            "grid_load": self._grid_load_view(snap),
             "machine_guard": {
                 "active": snap.machine_active,
                 "boiler_surplus_available_w": boiler_surplus_before_load_w(snap),
