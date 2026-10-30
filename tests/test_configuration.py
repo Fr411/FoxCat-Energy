@@ -29,7 +29,7 @@ from foxcat_energy.const import (
     MODES,
     NETWORK_POLICIES,
     NUMBER_DEFINITIONS,
-    OFFICIAL_MENU_STEPS,
+    EQUIPMENT_MENU_STEPS,
     PRICE_SOURCE_INTEGRATION,
     PRICE_SOURCE_VARIABLE,
     PRICE_SOURCES,
@@ -658,7 +658,7 @@ class DashboardAndProfileTests(unittest.TestCase):
         )
 
     def test_battery_ev_menu_and_dashboard_view_exist_for_both_layouts(self) -> None:
-        self.assertIn("battery_ev", OFFICIAL_MENU_STEPS)
+        self.assertIn("battery_ev", EQUIPMENT_MENU_STEPS)
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         for filename in ("dashboard_v1.7.4.yaml", "dashboard_mobile_v1.7.4.yaml"):
             dashboard = yaml.safe_load(

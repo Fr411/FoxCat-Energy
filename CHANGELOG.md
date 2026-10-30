@@ -1,5 +1,16 @@
 # Changelog — FoxCat Energy V1.7.6
 
+## Non publié
+- Menu de configuration réorganisé : 7 entrées par tâche, sous-menu Équipements, résumé de l'état en tête de menu et avertissement tant que des modifications ne sont pas enregistrées.
+- Formulaires longs regroupés en sections repliables, dans les options et à l'installation; les réglages restent stockés à plat, sans migration.
+- Vider un champ d'entité est désormais enregistré; auparavant l'ancienne valeur restait active.
+- Modifier ou supprimer sans machine configurée ne ferme plus le menu, ce qui faisait perdre les modifications en attente.
+- Une machine refusée conserve les valeurs saisies; libellés manquants ajoutés (détection de cycle, stratégie dynamique, source de réinjection).
+- Écrêtage de pointe : tous les réglages du menu sont appliqués par le moteur (phases, base de mesure, seuils, trames, actions, assistance V2H). Les valeurs par défaut conservent le comportement précédent, sauf les deux points ci-dessous.
+- Le réarmement reste au moins 5 % sous le déclenchement, ce qui évite les oscillations avec un petit disjoncteur.
+- Pendant un délestage, seules les machines marquées délestables sont coupées; les autres restent dans leur état.
+- Suppression de `coordinator.py` et `vpp.py` à la racine du composant : ces copies n'étaient chargées par aucun module.
+
 ## V1.7.6
 - Ajout du mode développeur, des scénarios tarifaires diagnostiques sans effet sur les décisions live et du calcul du seuil disjoncteur.
 - V2H physique opt-in avec commande HA configurée explicitement, réserve SoC obligatoire et interverrouillage du chauffe-eau de confort.

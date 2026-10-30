@@ -11,7 +11,7 @@ from foxcat_energy.const import (
     CONF_MAIN_BREAKER_VOLTAGE_V,
     DEFAULT_SETTINGS,
 )
-from foxcat_energy.vpp import evaluate_v2h
+from foxcat_energy.trading.vpp import evaluate_v2h
 
 COMPONENT = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
 
@@ -33,6 +33,14 @@ PEAK_FORM_KEYS = {
     peak.CONF_PEAK_BLOCK_FLEXIBLE,
     peak.CONF_PEAK_V2H_ASSIST,
     peak.CONF_PEAK_V2H_TARGET_RATIO_PCT,
+}
+GRID_FORM_KEYS = {
+    "grid_regime",
+    "inverter_cos_phi",
+    "grid_voltage_sensor",
+    "grid_current_l1_sensor",
+    "grid_current_l2_sensor",
+    "grid_current_l3_sensor",
 }
 
 
@@ -200,6 +208,19 @@ class V2HRatiosTests(unittest.TestCase):
         self.assertTrue(shield["tariff_shield"])
         self.assertTrue(shield["active"])
 
+    def test_disarmed_shed_keeps_the_vehicle_idle_above_the_trigger(self) -> None:
+        decision = evaluate_v2h(house_w=5600.0, peak_shaving_armed=False, **self.BASE)
+        self.assertFalse(decision["peak_shaving"])
+        self.assertFalse(decision["active"])
+
+    def test_grid_import_basis_sizes_discharge_on_the_imported_power(self) -> None:
+        # Maison 8000 W, dont 2000 W couverts par le solaire : import 6000 W.
+        decision = evaluate_v2h(house_w=8000.0, peak_power_w=6000.0, **self.BASE)
+        self.assertTrue(decision["peak_shaving"])
+        self.assertAlmostEqual(decision["target_power_w"], 6000.0 - 5750.0 * 0.8)
+        covered = evaluate_v2h(house_w=8000.0, peak_power_w=1000.0, **self.BASE)
+        self.assertFalse(covered["peak_shaving"])
+
 
 class TranslationTests(unittest.TestCase):
     def _step(self, relative: str) -> dict:
@@ -210,9 +231,12 @@ class TranslationTests(unittest.TestCase):
         for relative in ("strings.json", "translations/fr.json"):
             options = self._step(relative)
             step = options["step"]["peak_shaving"]
-            self.assertEqual(set(step["data"]), PEAK_FORM_KEYS, relative)
-            self.assertTrue(set(step["data_description"]) <= set(step["data"]), relative)
-            self.assertIn("peak_shaving", options["step"]["ems"]["menu_options"], relative)
+            groups = [step, *step["sections"].values()]
+            labels = {key for group in groups for key in group.get("data", {})}
+            help_texts = {key for group in groups for key in group.get("data_description", {})}
+            self.assertEqual(labels, PEAK_FORM_KEYS | GRID_FORM_KEYS, relative)
+            self.assertTrue(help_texts <= labels, relative)
+            self.assertIn("peak_shaving", options["step"]["init"]["menu_options"], relative)
             for code in peak.validate(_cfg(**{peak.CONF_PEAK_TRIGGER_W: 3000, peak.CONF_PEAK_RELEASE_W: 4000})):
                 self.assertIn(code, options["error"], relative)
             for code in ("peak_release_ratio_too_high", "peak_release_not_below_trigger", "peak_trigger_missing"):
@@ -222,7 +246,8 @@ class TranslationTests(unittest.TestCase):
         source = (COMPONENT / "config_flow.py").read_text(encoding="utf-8")
         self.assertIn("async def async_step_peak_shaving", source)
         self.assertIn('"peak_shaving": _peak_shaving_schema', source)
-        self.assertIn('menu_options=["ems_core", "ia", "peak_shaving", "init"]', source)
+        constants = (COMPONENT / "const.py").read_text(encoding="utf-8")
+        self.assertIn('"peak_shaving",', constants)
 
 
 if __name__ == "__main__":
