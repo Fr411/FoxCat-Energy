@@ -15,29 +15,46 @@
         }
       },
       "core": {
-        "title": "FoxCat Energy – 1/7 • Sources énergétiques",
+        "title": "FoxCat Energy – Sources énergétiques",
         "description": "Sélectionnez les deux mesures physiques souveraines de FoxCat. La puissance réseau signée cadence l’EMS; la production photovoltaïque complète chaque snapshot énergétique.",
         "data": {
           "installation_name": "Nom de l'installation",
           "grid_signed_sensor": "Puissance réseau signée",
           "grid_sign_convention": "Convention du signe réseau",
-          "pv_sensor": "Production photovoltaïque",
-          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)",
-          "developer_mode": "Mode développeur",
-          "high_load_shed_enabled": "Activer le peak shaving",
-          "main_breaker_current_a": "Calibre du disjoncteur principal",
-          "main_breaker_voltage_v": "Tension nominale utilisée pour le seuil"
+          "pv_sensor": "Production photovoltaïque"
         },
         "data_description": {
           "installation_name": "Nom visible de votre installation FoxCat Energy.",
           "grid_signed_sensor": "Puissance instantanée au point de raccordement. Convention recommandée : positif = prélèvement, négatif = réinjection.",
           "grid_sign_convention": "Permet d’adapter FoxCat au signe utilisé par votre compteur ou votre intégration.",
-          "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison.",
-          "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale.",
-          "developer_mode": "Active les diagnostics avancés, les compteurs ML et les scénarios de simulation. Désactivé par défaut.",
-          "high_load_shed_enabled": "Autorise le délestage de charges et le V2H à partir du seuil configuré; les champs d’entités restent toujours accessibles.",
-          "main_breaker_current_a": "Utilisé pour calculer le seuil de délestage et de V2H à 90 % du calibre. Laissez à 0 pour conserver le seuil manuel.",
-          "main_breaker_voltage_v": "Tension effective utilisée avec le calibre (ex. 230 V pour 40 A = 9 200 W)."
+          "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison."
+        },
+        "sections": {
+          "protection": {
+            "name": "Protection du raccordement",
+            "description": "Facultatif. Tout peut être réglé plus tard dans les options.",
+            "data": {
+              "high_load_shed_enabled": "Activer le peak shaving",
+              "main_breaker_current_a": "Calibre du disjoncteur principal",
+              "main_breaker_voltage_v": "Tension nominale utilisée pour le seuil"
+            },
+            "data_description": {
+              "high_load_shed_enabled": "Autorise le délestage de charges et le V2H à partir du seuil configuré; les champs d’entités restent toujours accessibles.",
+              "main_breaker_current_a": "Utilisé pour calculer le seuil de délestage et de V2H à 90 % du calibre. Laissez à 0 pour conserver le seuil manuel.",
+              "main_breaker_voltage_v": "Tension effective utilisée avec le calibre (ex. 230 V pour 40 A = 9 200 W)."
+            }
+          },
+          "advanced": {
+            "name": "Avancé",
+            "data": {
+              "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)",
+              "developer_mode": "Mode développeur"
+            },
+            "data_description": {
+              "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale.",
+              "developer_mode": "Active les diagnostics avancés, les compteurs ML et les scénarios de simulation. Désactivé par défaut."
+            }
+          }
         }
       },
       "hphc": {
@@ -51,7 +68,8 @@
         "title": "HP/HC – Mono-horaire",
         "description": "Sélectionnez l’entité source du tarif global.",
         "data": {
-          "tariff_mono_price_sensor": "Source tarif global"
+          "tariff_mono_price_sensor": "Source tarif global",
+          "tariff_fixed_injection_price_sensor": "Source prix de réinjection (optionnel)"
         }
       },
       "hphc_bi": {
@@ -59,7 +77,8 @@
         "description": "Sélectionnez les entités sources des tarifs.",
         "data": {
           "tariff_hp_price_sensor": "Source Tarif HP",
-          "tariff_hc_price_sensor": "Source Tarif HC"
+          "tariff_hc_price_sensor": "Source Tarif HC",
+          "tariff_fixed_injection_price_sensor": "Source prix de réinjection (optionnel)"
         }
       },
       "dynamique": {
@@ -70,31 +89,41 @@
         }
       },
       "boiler": {
-        "title": "FoxCat Energy – 2/7 • Boiler",
+        "title": "FoxCat Energy – Boiler",
         "description": "Configuration physique et sécurité du Boiler. Les paramètres volume/puissance/eau froide calibrent uniquement l’arbitrage tarifaire DYNAMIQUE. La sécurité Résistance à 68 °C reste souveraine.",
         "data": {
           "boiler_climate": "Thermostat du boiler",
           "boiler_temp_sensor": "Température de référence du boiler",
           "boiler_power_sensor": "Puissance du boiler",
           "boiler_binary": "État physique du boiler",
-          "boiler_resistance_temp_sensor": "Température Résistance / sécurité",
-          "boiler_volume": "Volume du Boiler (L)",
-          "boiler_element_power": "Puissance nominale de la résistance (W)",
-          "boiler_cold_water_temp": "Température eau froide réseau (°C)"
+          "boiler_resistance_temp_sensor": "Température Résistance / sécurité"
         },
         "data_description": {
           "boiler_climate": "Entité climate réellement commandée par FoxCat.",
           "boiler_temp_sensor": "Température d’eau de référence utilisée pour la régulation normale du Boiler.",
           "boiler_resistance_temp_sensor": "Sonde placée sur ou au plus près de la résistance. Au-delà du seuil de sécurité FoxCat (68 °C par défaut), toute chauffe est interdite et un arrêt est demandé.",
           "boiler_power_sensor": "Puissance électrique instantanée du Boiler, utilisée pour confirmer son état physique et la comptabilité énergétique.",
-          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible.",
-          "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
-          "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
-          "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
+          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible."
+        },
+        "sections": {
+          "thermal_model": {
+            "name": "Modèle thermique",
+            "description": "Utilisé uniquement par l’arbitrage en tarification dynamique.",
+            "data": {
+              "boiler_volume": "Volume du Boiler (L)",
+              "boiler_element_power": "Puissance nominale de la résistance (W)",
+              "boiler_cold_water_temp": "Température eau froide réseau (°C)"
+            },
+            "data_description": {
+              "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
+              "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
+              "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
+            }
+          }
         }
       },
       "pri": {
-        "title": "FoxCat Energy – 3/7 • Onduleur",
+        "title": "FoxCat Energy – Onduleur",
         "description": "Configurez les quatre entrées RRCR et, si disponible, la puissance physique live de l’onduleur. Cette mesure live est informative : elle ne devient pas une seconde horloge de décision.",
         "data": {
           "pri_l1": "Relais PRI L1",
@@ -112,98 +141,124 @@
         }
       },
       "machines": {
-        "title": "FoxCat Energy – 4/7 • Machines",
+        "title": "FoxCat Energy – Machines",
         "description": "Déclarez les appareils historiques et leurs plages. Les machines extensibles et leur apprentissage se gèrent ensuite dans Configuration → Machines.",
-        "data": {
-          "washer_socket": "Prise lave-linge",
-          "washer_cycle": "Cycle lave-linge en cours",
-          "dryer_socket": "Prise sèche-linge",
-          "dryer_cycle": "Cycle sèche-linge en cours",
-          "dishwasher_socket": "Prise lave-vaisselle",
-          "dishwasher_cycle": "Cycle lave-vaisselle en cours",
-          "washer_on_1": "Lave-linge – allumer plage 1",
-          "washer_off_1": "Lave-linge – éteindre plage 1",
-          "washer_on_2": "Lave-linge – allumer plage 2",
-          "washer_off_2": "Lave-linge – éteindre plage 2",
-          "dryer_on_1": "Sèche-linge – allumer plage 1",
-          "dryer_off_1": "Sèche-linge – éteindre plage 1",
-          "dryer_on_2": "Sèche-linge – allumer plage 2",
-          "dryer_off_2": "Sèche-linge – éteindre plage 2",
-          "dishwasher_on_1": "Lave-vaisselle – allumer plage 1",
-          "dishwasher_off_1": "Lave-vaisselle – éteindre plage 1",
-          "dishwasher_on_2": "Lave-vaisselle – allumer plage 2",
-          "dishwasher_off_2": "Lave-vaisselle – éteindre plage 2"
+        "data": {},
+        "sections": {
+          "washer": {
+            "name": "Lave-linge",
+            "data": {
+              "washer_socket": "Prise lave-linge",
+              "washer_cycle": "Cycle lave-linge en cours",
+              "washer_on_1": "Lave-linge – allumer plage 1",
+              "washer_off_1": "Lave-linge – éteindre plage 1",
+              "washer_on_2": "Lave-linge – allumer plage 2",
+              "washer_off_2": "Lave-linge – éteindre plage 2"
+            }
+          },
+          "dryer": {
+            "name": "Sèche-linge",
+            "data": {
+              "dryer_socket": "Prise sèche-linge",
+              "dryer_cycle": "Cycle sèche-linge en cours",
+              "dryer_on_1": "Sèche-linge – allumer plage 1",
+              "dryer_off_1": "Sèche-linge – éteindre plage 1",
+              "dryer_on_2": "Sèche-linge – allumer plage 2",
+              "dryer_off_2": "Sèche-linge – éteindre plage 2"
+            }
+          },
+          "dishwasher": {
+            "name": "Lave-vaisselle",
+            "data": {
+              "dishwasher_socket": "Prise lave-vaisselle",
+              "dishwasher_cycle": "Cycle lave-vaisselle en cours",
+              "dishwasher_on_1": "Lave-vaisselle – allumer plage 1",
+              "dishwasher_off_1": "Lave-vaisselle – éteindre plage 1",
+              "dishwasher_on_2": "Lave-vaisselle – allumer plage 2",
+              "dishwasher_off_2": "Lave-vaisselle – éteindre plage 2"
+            }
+          }
         }
       },
       "pricing": {
-        "title": "FoxCat Energy – 5/7 • Tarification dynamique",
+        "title": "FoxCat Energy – Tarification dynamique",
         "description": "Luminus Dynamic est la référence financière du régime dynamique. FoxCat lit la courbe all-in aujourd’hui/demain et la valeur de réinjection ; Nord Pool/ENTSO-E restent des indicateurs temporels externes.",
         "data": {
           "price_current": "Luminus Dynamic • Prix actuel",
           "price_next": "Luminus Dynamic • Prix heure suivante",
           "price_injection": "Luminus Dynamic • Prix de réinjection",
-          "price_min_today": "Prix minimum aujourd’hui",
-          "price_max_today": "Prix maximum aujourd’hui",
-          "price_avg_today": "Prix moyen aujourd’hui",
-          "price_min_tomorrow": "Prix minimum demain",
-          "price_max_tomorrow": "Prix maximum demain",
-          "price_avg_tomorrow": "Prix moyen demain",
-          "price_tomorrow_available": "Disponibilité des prix de demain",
-          "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
-          "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
-          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)",
-          "dynamic_favorable_position_pct": "Seuil favorable Day-Ahead",
-          "dynamic_high_position_pct": "Plafond acceptable / zone de pic"
-        }
-      },
-      "solar": {
-        "title": "FoxCat Energy – IA (compatibilité)",
-        "description": "Ancien nom de l’étape IA conservé uniquement pour compatibilité.",
-        "data": {
-          "ai_task": "Agent AI Task",
-          "forecast_now": "Prévision maintenant",
-          "forecast_this_hour": "Prévision cette heure",
-          "forecast_next_hour": "Prévision heure suivante",
-          "forecast_today": "Prévision aujourd'hui",
-          "forecast_remaining_today": "Prévision restante aujourd'hui",
-          "forecast_1h": "Prévision dans 1 heure",
-          "forecast_12h": "Prévision dans 12 heures",
-          "forecast_24h": "Prévision dans 24 heures",
-          "forecast_peak_today": "Heure du pic aujourd'hui",
-          "forecast_tomorrow": "Prévision demain",
-          "forecast_peak_tomorrow": "Heure du pic demain"
+          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+        },
+        "sections": {
+          "daily_stats": {
+            "name": "Statistiques journalières",
+            "data": {
+              "price_min_today": "Prix minimum aujourd’hui",
+              "price_max_today": "Prix maximum aujourd’hui",
+              "price_avg_today": "Prix moyen aujourd’hui",
+              "price_min_tomorrow": "Prix minimum demain",
+              "price_max_tomorrow": "Prix maximum demain",
+              "price_avg_tomorrow": "Prix moyen demain",
+              "price_tomorrow_available": "Disponibilité des prix de demain"
+            }
+          },
+          "forecast_series": {
+            "name": "Séries de prix futurs",
+            "data": {
+              "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
+              "price_forecast_export": "Série de prix futurs de réinjection (optionnel)"
+            }
+          },
+          "strategy": {
+            "name": "Stratégie",
+            "data": {
+              "dynamic_favorable_position_pct": "Seuil favorable Day-Ahead",
+              "dynamic_high_position_pct": "Plafond acceptable / zone de pic",
+              "dynamic_favorable_max_hours": "Durée maximale de la zone favorable",
+              "dynamic_preferred_network_max_eur_kwh": "Prix réseau maximal préféré"
+            }
+          }
         }
       },
       "ia": {
-        "title": "FoxCat Energy – 7/7 • IA",
+        "title": "FoxCat Energy – IA",
         "description": "Configurez le module prédictif IA. Il analyse les prévisions solaires et reste consultatif : les décisions opérationnelles restent prises par l’EMS FoxCat.",
         "data": {
-          "ai_task": "Agent IA (AI Task)",
-          "forecast_now": "Prévision maintenant",
-          "forecast_this_hour": "Prévision cette heure",
-          "forecast_next_hour": "Prévision heure suivante",
-          "forecast_today": "Prévision aujourd'hui",
-          "forecast_remaining_today": "Prévision restante aujourd'hui",
-          "forecast_1h": "Prévision dans 1 heure",
-          "forecast_12h": "Prévision dans 12 heures",
-          "forecast_24h": "Prévision dans 24 heures",
-          "forecast_peak_today": "Heure du pic aujourd'hui",
-          "forecast_tomorrow": "Prévision demain",
-          "forecast_peak_tomorrow": "Heure du pic demain"
+          "ai_task": "Agent IA (AI Task)"
         },
         "data_description": {
-          "ai_task": "Agent IA Home Assistant utilisé pour enrichir l’analyse. Si indisponible, FoxCat conserve son fallback déterministe.",
-          "forecast_now": "Prévision de production photovoltaïque à l’instant présent.",
-          "forecast_this_hour": "Énergie solaire estimée pour l’heure en cours.",
-          "forecast_next_hour": "Énergie solaire estimée pour l’heure suivante.",
-          "forecast_today": "Production solaire estimée pour aujourd’hui.",
-          "forecast_remaining_today": "Production solaire encore attendue aujourd’hui.",
-          "forecast_1h": "Prévision solaire à une heure.",
-          "forecast_12h": "Prévision solaire à douze heures.",
-          "forecast_24h": "Prévision solaire à vingt-quatre heures.",
-          "forecast_peak_today": "Heure prévue du pic solaire aujourd’hui.",
-          "forecast_tomorrow": "Production solaire estimée demain.",
-          "forecast_peak_tomorrow": "Heure prévue du pic solaire demain."
+          "ai_task": "Agent IA Home Assistant utilisé pour enrichir l’analyse. Si indisponible, FoxCat conserve son fallback déterministe."
+        },
+        "sections": {
+          "forecasts": {
+            "name": "Capteurs de prévision solaire",
+            "data": {
+              "forecast_now": "Prévision maintenant",
+              "forecast_this_hour": "Prévision cette heure",
+              "forecast_next_hour": "Prévision heure suivante",
+              "forecast_today": "Prévision aujourd'hui",
+              "forecast_remaining_today": "Prévision restante aujourd'hui",
+              "forecast_1h": "Prévision dans 1 heure",
+              "forecast_12h": "Prévision dans 12 heures",
+              "forecast_24h": "Prévision dans 24 heures",
+              "forecast_peak_today": "Heure du pic aujourd'hui",
+              "forecast_tomorrow": "Prévision demain",
+              "forecast_peak_tomorrow": "Heure du pic demain"
+            },
+            "data_description": {
+              "forecast_now": "Prévision de production photovoltaïque à l’instant présent.",
+              "forecast_this_hour": "Énergie solaire estimée pour l’heure en cours.",
+              "forecast_next_hour": "Énergie solaire estimée pour l’heure suivante.",
+              "forecast_today": "Production solaire estimée pour aujourd’hui.",
+              "forecast_remaining_today": "Production solaire encore attendue aujourd’hui.",
+              "forecast_1h": "Prévision solaire à une heure.",
+              "forecast_12h": "Prévision solaire à douze heures.",
+              "forecast_24h": "Prévision solaire à vingt-quatre heures.",
+              "forecast_peak_today": "Heure prévue du pic solaire aujourd’hui.",
+              "forecast_tomorrow": "Production solaire estimée demain.",
+              "forecast_peak_tomorrow": "Heure prévue du pic solaire demain."
+            }
+          }
         }
       }
     }
@@ -218,46 +273,15 @@
     "step": {
       "init": {
         "title": "Configuration FoxCat Energy",
-        "description": "Configuration organisée par fonction. Les changements restent en mémoire jusqu’à « Enregistrer et quitter ». Les sous-menus contiennent un retour explicite vers le niveau précédent.",
+        "description": "{status}\n\nLes changements restent en mémoire jusqu’à « Enregistrer et quitter » : fermer cette fenêtre avant les annule.",
         "menu_options": {
-          "sources": "1 • Sources énergétiques",
-          "energy": "2 • Énergie",
-          "inverter": "3 • Onduleur",
-          "ems": "4 • EMS",
-          "energy_bus": "5 • Energy Bus",
-          "machines": "6 • Machines",
-          "boiler": "7 • Boiler",
-          "battery_ev": "8 • Batterie + VE",
-          "pricing": "9 • Tarification",
-          "metronome": "10 • Métronome",
-          "diagnostic": "11 • Diagnostic",
+          "sources": "Sources de mesure",
+          "pricing": "Tarification",
+          "equipment": "Équipements",
+          "peak_shaving": "Protection du raccordement",
+          "ia": "IA et prévisions solaires",
+          "about": "À propos du fonctionnement",
           "finish": "✓ Enregistrer et quitter"
-        }
-      },
-      "core": {
-        "title": "Sources énergétiques",
-        "description": "FoxCat utilise la puissance réseau signée et la production PV comme deux sources obligatoires. Les autres grandeurs réseau/maison sont calculées en interne.",
-        "data": {
-          "installation_name": "Nom de l'installation",
-          "grid_signed_sensor": "Puissance réseau signée",
-          "grid_sign_convention": "Convention du signe réseau",
-          "pv_sensor": "Production photovoltaïque",
-          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)",
-          "developer_mode": "Mode développeur",
-          "high_load_shed_enabled": "Activer le peak shaving",
-          "main_breaker_current_a": "Calibre du disjoncteur principal",
-          "main_breaker_voltage_v": "Tension nominale utilisée pour le seuil"
-        },
-        "data_description": {
-          "installation_name": "Nom visible de votre installation FoxCat Energy.",
-          "grid_signed_sensor": "Puissance instantanée au point de raccordement. Convention recommandée : positif = prélèvement, négatif = réinjection.",
-          "grid_sign_convention": "Permet d’adapter FoxCat au signe utilisé par votre compteur ou votre intégration.",
-          "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison.",
-          "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale.",
-          "developer_mode": "Active les diagnostics avancés, les compteurs ML et les scénarios de simulation. Désactivé par défaut.",
-          "high_load_shed_enabled": "Autorise le délestage de charges et le V2H à partir du seuil configuré; les champs d’entités restent toujours accessibles.",
-          "main_breaker_current_a": "Utilisé pour calculer le seuil de délestage et de V2H à 90 % du calibre. Laissez à 0 pour conserver le seuil manuel.",
-          "main_breaker_voltage_v": "Tension effective utilisée avec le calibre (ex. 230 V pour 40 A = 9 200 W)."
         }
       },
       "boiler": {
@@ -268,20 +292,30 @@
           "boiler_temp_sensor": "Température de référence du boiler",
           "boiler_power_sensor": "Puissance du boiler",
           "boiler_binary": "État physique du boiler",
-          "boiler_resistance_temp_sensor": "Température Résistance / sécurité",
-          "boiler_volume": "Volume du Boiler (L)",
-          "boiler_element_power": "Puissance nominale de la résistance (W)",
-          "boiler_cold_water_temp": "Température eau froide réseau (°C)"
+          "boiler_resistance_temp_sensor": "Température Résistance / sécurité"
         },
         "data_description": {
           "boiler_climate": "Entité climate réellement commandée par FoxCat.",
           "boiler_temp_sensor": "Température d’eau de référence utilisée pour la régulation normale du Boiler.",
           "boiler_resistance_temp_sensor": "Sonde placée sur ou au plus près de la résistance. Au-delà du seuil de sécurité FoxCat (68 °C par défaut), toute chauffe est interdite et un arrêt est demandé.",
           "boiler_power_sensor": "Puissance électrique instantanée du Boiler, utilisée pour confirmer son état physique et la comptabilité énergétique.",
-          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible.",
-          "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
-          "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
-          "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
+          "boiler_binary": "État physique du Boiler. Il reste la référence de cycle lorsque disponible."
+        },
+        "sections": {
+          "thermal_model": {
+            "name": "Modèle thermique",
+            "description": "Utilisé uniquement par l’arbitrage en tarification dynamique.",
+            "data": {
+              "boiler_volume": "Volume du Boiler (L)",
+              "boiler_element_power": "Puissance nominale de la résistance (W)",
+              "boiler_cold_water_temp": "Température eau froide réseau (°C)"
+            },
+            "data_description": {
+              "boiler_volume": "Volume utile du réservoir. Utilisé uniquement par le modèle thermique d’arbitrage en tarification dynamique; n’altère pas HP/HC.",
+              "boiler_element_power": "Puissance nominale de la résistance électrique. Sert à estimer la durée de chauffe nécessaire dans l’arbitrage dynamique.",
+              "boiler_cold_water_temp": "Température moyenne d’arrivée d’eau froide. Valeur par défaut 15 °C, utilisée pour estimer la capacité thermique du réservoir."
+            }
+          }
         }
       },
       "battery_ev": {
@@ -289,25 +323,48 @@
         "description": "La simulation batterie/VE reste isolée du ledger réel. Le V2H physique est une fonction opt-in distincte et nécessite des entités de commande explicitement configurées.",
         "data": {
           "virtual_assets_enabled": "Activer la simulation",
-          "virtual_assets_shadow": "Mode shadow",
-          "virtual_battery_capacity_kwh": "Capacité batterie (kWh)",
-          "virtual_battery_max_charge_kw": "Puissance max. de charge batterie (kW)",
-          "virtual_battery_max_discharge_kw": "Puissance max. de décharge batterie (kW)",
-          "virtual_battery_charge_efficiency_pct": "Rendement de charge batterie (%)",
-          "virtual_battery_discharge_efficiency_pct": "Rendement de décharge batterie (%)",
-          "virtual_battery_reserve_soc_pct": "Réserve batterie (%)",
-          "virtual_ev_enabled": "Configurer un véhicule électrique virtuel",
-          "virtual_ev_capacity_kwh": "Capacité batterie VE (kWh)",
-          "virtual_ev_max_charge_kw": "Puissance max. de charge VE (kW)",
-          "virtual_ev_charge_efficiency_pct": "Rendement de charge VE (%)",
-          "battery_degradation_cost_eur_kwh": "Coût d’usure batterie (€/kWh)",
-          "ev_degradation_cost_eur_kwh": "Coût d’usure véhicule (€/kWh)",
-          "ev_v2h_enabled": "Activer le V2H physique",
-          "ev_v2h_switch": "Commande V2H du chargeur",
-          "ev_v2h_power_entity": "Consigne de puissance V2H (optionnelle)",
-          "ev_soc_sensor": "État de charge réel du véhicule (%)",
-          "ev_v2h_max_power_w": "Puissance maximale V2H (W)",
-          "ev_v2h_min_soc_pct": "Réserve minimale de mobilité (%)"
+          "virtual_assets_shadow": "Mode shadow"
+        },
+        "sections": {
+          "virtual_battery": {
+            "name": "Batterie virtuelle",
+            "data": {
+              "virtual_battery_capacity_kwh": "Capacité batterie (kWh)",
+              "virtual_battery_max_charge_kw": "Puissance max. de charge batterie (kW)",
+              "virtual_battery_max_discharge_kw": "Puissance max. de décharge batterie (kW)",
+              "virtual_battery_charge_efficiency_pct": "Rendement de charge batterie (%)",
+              "virtual_battery_discharge_efficiency_pct": "Rendement de décharge batterie (%)",
+              "virtual_battery_reserve_soc_pct": "Réserve batterie (%)"
+            }
+          },
+          "virtual_ev": {
+            "name": "Véhicule électrique virtuel",
+            "data": {
+              "virtual_ev_enabled": "Configurer un véhicule électrique virtuel",
+              "virtual_ev_capacity_kwh": "Capacité batterie VE (kWh)",
+              "virtual_ev_max_charge_kw": "Puissance max. de charge VE (kW)",
+              "virtual_ev_charge_efficiency_pct": "Rendement de charge VE (%)"
+            }
+          },
+          "wear_costs": {
+            "name": "Coûts d’usure",
+            "data": {
+              "battery_degradation_cost_eur_kwh": "Coût d’usure batterie (€/kWh)",
+              "ev_degradation_cost_eur_kwh": "Coût d’usure véhicule (€/kWh)"
+            }
+          },
+          "v2h": {
+            "name": "V2H physique",
+            "description": "Fonction opt-in : nécessite des entités de commande explicitement configurées.",
+            "data": {
+              "ev_v2h_enabled": "Activer le V2H physique",
+              "ev_v2h_switch": "Commande V2H du chargeur",
+              "ev_v2h_power_entity": "Consigne de puissance V2H (optionnelle)",
+              "ev_soc_sensor": "État de charge réel du véhicule (%)",
+              "ev_v2h_max_power_w": "Puissance maximale V2H (W)",
+              "ev_v2h_min_soc_pct": "Réserve minimale de mobilité (%)"
+            }
+          }
         }
       },
       "pri": {
@@ -330,41 +387,21 @@
       },
       "machines": {
         "title": "Machines",
-        "description": "Gestion des appareils pilotables. L’apprentissage passif est séparé dans son propre menu Machine Learning.",
+        "description": "Machines configurées : {machines}. FoxCat apprend passivement jusqu’à 30 cycles récents par machine mesurée, sans influencer les décisions de l’EMS.",
         "menu_options": {
           "machine_add": "＋ Ajouter une machine",
           "machine_edit": "✎ Modifier une machine",
           "machine_remove": "− Supprimer une machine",
-          "machine_learning": "Machine Learning",
-          "init": "← Retour au menu principal"
+          "equipment": "← Retour aux équipements"
         }
       },
       "pricing": {
         "title": "Tarification",
-        "description": "Sépare clairement tarification dynamique et HP/HC. Le comparateur économique reste distinct d’Energy Bus.",
+        "description": "Réglages de chaque tarif. Le tarif actif se choisit avec le sélecteur « Régime tarifaire » de FoxCat.",
         "menu_options": {
-          "pricing_switch": "Choisir le type de tarif (HP/HC ou dynamique)",
           "pricing_dynamic": "Tarification dynamique",
           "hphc": "Tarification HP/HC",
           "init": "← Retour au menu principal"
-        }
-      },
-      "solar": {
-        "title": "IA (ancien nom)",
-        "description": "Compatibilité avec l’ancien menu EMS 2 solaire.",
-        "data": {
-          "ai_task": "Agent IA (AI Task)",
-          "forecast_now": "Prévision maintenant",
-          "forecast_this_hour": "Prévision cette heure",
-          "forecast_next_hour": "Prévision heure suivante",
-          "forecast_today": "Prévision aujourd'hui",
-          "forecast_remaining_today": "Prévision restante aujourd'hui",
-          "forecast_1h": "Prévision dans 1 heure",
-          "forecast_12h": "Prévision dans 12 heures",
-          "forecast_24h": "Prévision dans 24 heures",
-          "forecast_peak_today": "Heure du pic aujourd'hui",
-          "forecast_tomorrow": "Prévision demain",
-          "forecast_peak_tomorrow": "Heure du pic demain"
         }
       },
       "finish": {
@@ -372,16 +409,27 @@
       },
       "hphc": {
         "title": "Tarification HP/HC",
-        "description": "Prix d’achat HP/HC, prix de réinjection et plages horaires. Enregistrer ramène au menu Tarification.",
+        "description": "Prix d’achat et de réinjection. Le tarif actif se choisit avec le sélecteur « Régime tarifaire » de FoxCat ; ces réglages peuvent être préparés à l’avance.",
         "data": {
           "tariff_hp_price_sensor": "Capteur prix heures pleines (HP)",
           "tariff_hc_price_sensor": "Capteur prix heures creuses (HC)",
           "tariff_fixed_injection_price_sensor": "Capteur prix fixe de réinjection",
           "tariff_fixed_injection_eur_kwh": "Prix fixe de réinjection de secours",
-          "tariff_hp_start_1": "Début HP 1",
-          "tariff_hp_end_1": "Fin HP 1",
-          "tariff_hp_start_2": "Début HP 2",
-          "tariff_hp_end_2": "Fin HP 2"
+          "tariff_mono_price_sensor": "Capteur prix tarif global (Mono-horaire)"
+        },
+        "data_description": {
+          "tariff_mono_price_sensor": "Utilisé en Mono-horaire. Les capteurs HP et HC sont utilisés en Bi-horaire."
+        },
+        "sections": {
+          "schedule": {
+            "name": "Plages heures pleines",
+            "data": {
+              "tariff_hp_start_1": "Début HP 1",
+              "tariff_hp_end_1": "Fin HP 1",
+              "tariff_hp_start_2": "Début HP 2",
+              "tariff_hp_end_2": "Fin HP 2"
+            }
+          }
         }
       },
       "machine_add": {
@@ -391,16 +439,39 @@
           "name": "Nom de la machine",
           "machine_type": "Type de machine",
           "switch": "Prise / relais de commande (Switch)",
-          "cycle": "Cycle protégé (optionnel)",
-          "power_sensor": "Capteur de puissance (obligatoire pour CVC)",
-          "current_sensor": "Capteur de courant (optionnel)",
-          "voltage_sensor": "Capteur de tension (optionnel)",
-          "automatic": "Gestion automatique",
-          "sheddable": "Charge délestable en haute consommation",
-          "on_1": "Allumer plage 1",
-          "off_1": "Éteindre plage 1",
-          "on_2": "Allumer plage 2",
-          "off_2": "Éteindre plage 2"
+          "power_sensor": "Capteur de puissance (obligatoire pour CVC)"
+        },
+        "sections": {
+          "automation": {
+            "name": "Automatisation et plages",
+            "data": {
+              "automatic": "Gestion automatique",
+              "sheddable": "Charge délestable en haute consommation",
+              "on_1": "Allumer plage 1",
+              "off_1": "Éteindre plage 1",
+              "on_2": "Allumer plage 2",
+              "off_2": "Éteindre plage 2"
+            }
+          },
+          "cycle": {
+            "name": "Détection de cycle",
+            "data": {
+              "cycle": "Cycle protégé (optionnel)",
+              "cycle_start_w": "Puissance de début de cycle",
+              "cycle_start_confirm_s": "Confirmation du début de cycle",
+              "cycle_duration_minutes": "Durée typique du cycle",
+              "cycle_margin_minutes": "Marge de fin de cycle",
+              "cycle_end_w": "Puissance de fin de cycle",
+              "cycle_end_confirm_minutes": "Confirmation de fin de cycle"
+            }
+          },
+          "measurements": {
+            "name": "Mesures",
+            "data": {
+              "current_sensor": "Capteur de courant (optionnel)",
+              "voltage_sensor": "Capteur de tension (optionnel)"
+            }
+          }
         }
       },
       "machine_edit": {
@@ -416,16 +487,39 @@
           "name": "Nom de la machine",
           "machine_type": "Type de machine",
           "switch": "Prise / relais de commande (Switch)",
-          "cycle": "Cycle protégé (optionnel)",
-          "power_sensor": "Capteur de puissance (obligatoire pour CVC)",
-          "current_sensor": "Capteur de courant (optionnel)",
-          "voltage_sensor": "Capteur de tension (optionnel)",
-          "automatic": "Gestion automatique",
-          "sheddable": "Charge délestable en haute consommation",
-          "on_1": "Allumer plage 1",
-          "off_1": "Éteindre plage 1",
-          "on_2": "Allumer plage 2",
-          "off_2": "Éteindre plage 2"
+          "power_sensor": "Capteur de puissance (obligatoire pour CVC)"
+        },
+        "sections": {
+          "automation": {
+            "name": "Automatisation et plages",
+            "data": {
+              "automatic": "Gestion automatique",
+              "sheddable": "Charge délestable en haute consommation",
+              "on_1": "Allumer plage 1",
+              "off_1": "Éteindre plage 1",
+              "on_2": "Allumer plage 2",
+              "off_2": "Éteindre plage 2"
+            }
+          },
+          "cycle": {
+            "name": "Détection de cycle",
+            "data": {
+              "cycle": "Cycle protégé (optionnel)",
+              "cycle_start_w": "Puissance de début de cycle",
+              "cycle_start_confirm_s": "Confirmation du début de cycle",
+              "cycle_duration_minutes": "Durée typique du cycle",
+              "cycle_margin_minutes": "Marge de fin de cycle",
+              "cycle_end_w": "Puissance de fin de cycle",
+              "cycle_end_confirm_minutes": "Confirmation de fin de cycle"
+            }
+          },
+          "measurements": {
+            "name": "Mesures",
+            "data": {
+              "current_sensor": "Capteur de courant (optionnel)",
+              "voltage_sensor": "Capteur de tension (optionnel)"
+            }
+          }
         }
       },
       "machine_remove": {
@@ -442,167 +536,198 @@
           "installation_name": "Nom de l'installation",
           "grid_signed_sensor": "Puissance réseau signée",
           "grid_sign_convention": "Convention du signe réseau",
-          "pv_sensor": "Production photovoltaïque",
-          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)"
+          "pv_sensor": "Production photovoltaïque"
+        },
+        "data_description": {
+          "installation_name": "Nom visible de votre installation FoxCat Energy.",
+          "grid_signed_sensor": "Puissance instantanée au point de raccordement. Convention recommandée : positif = prélèvement, négatif = réinjection.",
+          "grid_sign_convention": "Permet d’adapter FoxCat au signe utilisé par votre compteur ou votre intégration.",
+          "pv_sensor": "Puissance photovoltaïque instantanée utilisée pour calculer la consommation réelle de la maison."
+        },
+        "sections": {
+          "advanced": {
+            "name": "Avancé",
+            "data": {
+              "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)",
+              "developer_mode": "Mode développeur"
+            },
+            "data_description": {
+              "metronome_fallback_sensor": "Source réseau signée de secours. Elle n’est utilisée qu’en cas de perte de fraîcheur de la source principale.",
+              "developer_mode": "Active les diagnostics avancés, les compteurs ML et les scénarios de simulation. Désactivé par défaut."
+            }
+          }
         }
-      },
-      "energy": {
-        "title": "Énergie",
-        "description": "Capteurs calculés par FoxCat : puissance maison, prélèvement, réinjection, production, autoconsommation, autonomie et bilans journaliers. Aucun capteur physique supplémentaire n’est requis.",
-        "data": {}
-      },
-      "inverter": {
-        "title": "Onduleur",
-        "description": "Configuration physique RRCR et moteur PRI interne.",
-        "data": {}
-      },
-      "ems": {
-        "title": "EMS",
-        "description": "Réglages et modules liés au cœur décisionnel FoxCat. Le module prédictif est désormais présenté sous le nom « IA ».",
-        "menu_options": {
-          "ems_core": "EMS • Fonctionnement et réglages",
-          "ia": "IA • Prévisions et analyse",
-          "peak_shaving": "Écrêtage de pointe • Délestage",
-          "init": "← Retour au menu principal"
-        }
-      },
-      "energy_bus": {
-        "title": "Energy Bus",
-        "description": "Bus opérationnel interne entre modules FoxCat : trames, commandes, événements et ACK/NOK. L’IA et le comparateur économique n’y publient pas de recommandations.",
-        "data": {}
-      },
-      "metronome": {
-        "title": "Métronome",
-        "description": "Surveille la fraîcheur de la source réseau souveraine et active le secours si nécessaire. Il ne constitue pas une horloge périodique de décision.",
-        "data": {
-          "metronome_fallback_sensor": "Puissance réseau signée de secours (optionnel)"
-        }
-      },
-      "diagnostic": {
-        "title": "Diagnostic",
-        "description": "État du registre, sources, trames, erreurs, watchdog et outils de maintenance. Les capteurs techniques sont classés dans l’appareil FoxCat Energy – Diagnostic.",
-        "data": {}
-      },
-      "ems_core": {
-        "title": "EMS • Fonctionnement et réglages",
-        "description": "L’EMS Core reste le décideur souverain : modes, sécurité, arbitrage Boiler/machines et décisions opérationnelles. Les paramètres ajustables sont exposés sous forme d’entités FoxCat. Validez pour revenir au menu EMS.",
-        "data": {}
       },
       "ia": {
         "title": "IA • Prévisions solaires",
         "description": "Module prédictif consultatif. Il exploite Forecast.Solar et, si configuré, un agent IA Home Assistant. Il ne commande directement aucun équipement. Enregistrer ramène au menu EMS.",
         "data": {
-          "ai_task": "Agent IA (AI Task)",
-          "forecast_now": "Prévision maintenant",
-          "forecast_this_hour": "Prévision cette heure",
-          "forecast_next_hour": "Prévision heure suivante",
-          "forecast_today": "Prévision aujourd'hui",
-          "forecast_remaining_today": "Prévision restante aujourd'hui",
-          "forecast_1h": "Prévision dans 1 heure",
-          "forecast_12h": "Prévision dans 12 heures",
-          "forecast_24h": "Prévision dans 24 heures",
-          "forecast_peak_today": "Heure du pic aujourd'hui",
-          "forecast_tomorrow": "Prévision demain",
-          "forecast_peak_tomorrow": "Heure du pic demain"
+          "ai_task": "Agent IA (AI Task)"
         },
         "data_description": {
-          "ai_task": "Agent IA Home Assistant utilisé pour enrichir l’analyse. Si indisponible, FoxCat conserve son fallback déterministe.",
-          "forecast_now": "Prévision de production photovoltaïque à l’instant présent.",
-          "forecast_this_hour": "Énergie solaire estimée pour l’heure en cours.",
-          "forecast_next_hour": "Énergie solaire estimée pour l’heure suivante.",
-          "forecast_today": "Production solaire estimée pour aujourd’hui.",
-          "forecast_remaining_today": "Production solaire encore attendue aujourd’hui.",
-          "forecast_1h": "Prévision solaire à une heure.",
-          "forecast_12h": "Prévision solaire à douze heures.",
-          "forecast_24h": "Prévision solaire à vingt-quatre heures.",
-          "forecast_peak_today": "Heure prévue du pic solaire aujourd’hui.",
-          "forecast_tomorrow": "Production solaire estimée demain.",
-          "forecast_peak_tomorrow": "Heure prévue du pic solaire demain."
-        }
-      },
-      "machine_learning": {
-        "title": "Machine Learning",
-        "description": "Espace dédié à l’apprentissage passif des cycles machines. Les modèles apprennent durée, énergie et signatures de puissance sans modifier les décisions de l’EMS.",
-        "menu_options": {
-          "machine_learning_info": "Présentation et état du modèle",
-          "machines": "← Retour aux Machines"
-        }
-      },
-      "machine_learning_info": {
-        "title": "Machine Learning • Présentation",
-        "description": "FoxCat enregistre localement jusqu’à 30 cycles récents par machine mesurée. Les données observées comprennent puissance, courant, tension, durée, énergie, tarif et contexte solaire/réseau. Cette collecte reste strictement passive et n’influence pas l’EMS.",
-        "data": {}
-      },
-      "pricing_switch": {
-        "title": "Type de tarif",
-        "description": "Basculez entre tarification HP/HC et dynamique, puis choisissez la structure (Mono-horaire/Bi-horaire pour HP/HC, Simple/Impact pour dynamique).",
-        "data": {
-          "tariff_family": "Famille de tarif (hphc ou dynamique)",
-          "tariff_structure": "Structure tarifaire"
+          "ai_task": "Agent IA Home Assistant utilisé pour enrichir l’analyse. Si indisponible, FoxCat conserve son fallback déterministe."
+        },
+        "sections": {
+          "forecasts": {
+            "name": "Capteurs de prévision solaire",
+            "data": {
+              "forecast_now": "Prévision maintenant",
+              "forecast_this_hour": "Prévision cette heure",
+              "forecast_next_hour": "Prévision heure suivante",
+              "forecast_today": "Prévision aujourd'hui",
+              "forecast_remaining_today": "Prévision restante aujourd'hui",
+              "forecast_1h": "Prévision dans 1 heure",
+              "forecast_12h": "Prévision dans 12 heures",
+              "forecast_24h": "Prévision dans 24 heures",
+              "forecast_peak_today": "Heure du pic aujourd'hui",
+              "forecast_tomorrow": "Prévision demain",
+              "forecast_peak_tomorrow": "Heure du pic demain"
+            },
+            "data_description": {
+              "forecast_now": "Prévision de production photovoltaïque à l’instant présent.",
+              "forecast_this_hour": "Énergie solaire estimée pour l’heure en cours.",
+              "forecast_next_hour": "Énergie solaire estimée pour l’heure suivante.",
+              "forecast_today": "Production solaire estimée pour aujourd’hui.",
+              "forecast_remaining_today": "Production solaire encore attendue aujourd’hui.",
+              "forecast_1h": "Prévision solaire à une heure.",
+              "forecast_12h": "Prévision solaire à douze heures.",
+              "forecast_24h": "Prévision solaire à vingt-quatre heures.",
+              "forecast_peak_today": "Heure prévue du pic solaire aujourd’hui.",
+              "forecast_tomorrow": "Production solaire estimée demain.",
+              "forecast_peak_tomorrow": "Heure prévue du pic solaire demain."
+            }
+          }
         }
       },
       "pricing_dynamic": {
         "title": "Tarification dynamique",
-        "description": "Tarification dynamique Day-Ahead. FoxCat positionne le prix actuel sur l’horizon 24 h et réserve les blocs les moins chers pour les besoins thermiques du Boiler.",
+        "description": "Tarification dynamique Day-Ahead. FoxCat positionne le prix actuel sur l’horizon 24 h et réserve les blocs les moins chers pour les besoins thermiques du Boiler. Le tarif actif se choisit avec le sélecteur « Régime tarifaire » de FoxCat.",
         "data": {
           "price_current": "Luminus Dynamic • Prix actuel",
           "price_next": "Luminus Dynamic • Prix heure suivante",
           "price_injection": "Luminus Dynamic • Prix de réinjection",
-          "price_min_today": "Prix minimum aujourd’hui",
-          "price_max_today": "Prix maximum aujourd’hui",
-          "price_avg_today": "Prix moyen aujourd’hui",
-          "price_min_tomorrow": "Prix minimum demain",
-          "price_max_tomorrow": "Prix maximum demain",
-          "price_avg_tomorrow": "Prix moyen demain",
-          "price_tomorrow_available": "Disponibilité des prix de demain",
-          "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
-          "price_forecast_export": "Série de prix futurs de réinjection (optionnel)",
           "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+        },
+        "sections": {
+          "daily_stats": {
+            "name": "Statistiques journalières",
+            "data": {
+              "price_min_today": "Prix minimum aujourd’hui",
+              "price_max_today": "Prix maximum aujourd’hui",
+              "price_avg_today": "Prix moyen aujourd’hui",
+              "price_min_tomorrow": "Prix minimum demain",
+              "price_max_tomorrow": "Prix maximum demain",
+              "price_avg_tomorrow": "Prix moyen demain",
+              "price_tomorrow_available": "Disponibilité des prix de demain"
+            }
+          },
+          "forecast_series": {
+            "name": "Séries de prix futurs",
+            "data": {
+              "price_forecast_import": "Série de prix futurs d’achat (optionnel)",
+              "price_forecast_export": "Série de prix futurs de réinjection (optionnel)"
+            }
+          },
+          "strategy": {
+            "name": "Stratégie",
+            "data": {
+              "dynamic_favorable_position_pct": "Seuil favorable Day-Ahead",
+              "dynamic_high_position_pct": "Plafond acceptable / zone de pic",
+              "dynamic_favorable_max_hours": "Durée maximale de la zone favorable",
+              "dynamic_preferred_network_max_eur_kwh": "Prix réseau maximal préféré"
+            }
+          }
         }
       },
       "peak_shaving": {
-        "title": "Écrêtage de pointe • Délestage",
-        "description": "Protège le raccordement : quand la puissance dépasse le seuil, FoxCat suspend les charges non essentielles puis les rétablit après un retour durable sous le seuil de réarmement. Les valeurs par défaut reproduisent le comportement historique. Les champs « Disjoncteur » et « Délestage » sont les mêmes que dans « Sources énergétiques ».",
+        "title": "Protection du raccordement",
+        "description": "Quand la puissance dépasse le seuil, FoxCat suspend les charges non essentielles puis les rétablit après un retour sous le seuil de réarmement.",
         "data": {
-          "high_load_shed_enabled": "Activer le délestage haute consommation",
-          "main_breaker_current_a": "Calibre du disjoncteur principal (A, 0 = non renseigné)",
-          "main_breaker_voltage_v": "Tension nominale (V)",
-          "peak_phases": "Nombre de phases prises en compte (1 à 3)",
-          "peak_measure_basis": "Puissance comparée aux seuils",
-          "peak_trigger_ratio_pct": "Seuil de déclenchement (% du disjoncteur)",
-          "high_load_trigger_w": "Seuil de déclenchement absolu (W, sans disjoncteur)",
-          "peak_release_ratio_pct": "Seuil de réarmement (% du disjoncteur, 0 = seuil absolu)",
-          "high_load_release_w": "Seuil de réarmement absolu (W)",
-          "peak_confirm_frames": "Trames hautes avant déclenchement (0 = auto)",
-          "peak_release_frames": "Trames basses avant réarmement",
-          "peak_shed_boiler": "Couper le chauffe-eau pendant le délestage",
-          "peak_shed_machines": "Couper les machines délestables",
-          "peak_release_inverter": "Libérer l'onduleur à 100 % pendant le délestage",
-          "peak_block_flexible_starts": "Bloquer les nouveaux démarrages flexibles",
-          "peak_v2h_assist": "Autoriser le V2H à écrêter la pointe",
-          "peak_v2h_target_ratio_pct": "Cible V2H (% du disjoncteur à ne pas dépasser)",
-          "grid_regime": "Régime réseau (MONO / TRI / TETRA)",
-          "inverter_cos_phi": "Facteur de puissance onduleur (cos φ)",
-          "grid_voltage_sensor": "Capteur de tension réseau (V, optionnel)",
-          "grid_current_l1_sensor": "Intensité mesurée phase L1 (A, optionnel)",
-          "grid_current_l2_sensor": "Intensité mesurée phase L2 (A, optionnel)",
-          "grid_current_l3_sensor": "Intensité mesurée phase L3 (A, optionnel)"
+          "high_load_shed_enabled": "Activer le délestage haute consommation"
         },
-        "data_description": {
-          "main_breaker_current_a": "Si renseigné, le seuil de déclenchement est calculé à partir du disjoncteur (A × V × phases × %). Sinon le seuil absolu est utilisé.",
-          "peak_phases": "Multiplie la capacité (hypothèse de charge équilibrée). Laissez 1 pour le calcul historique monophasé.",
-          "peak_measure_basis": "Avec production solaire, « Import réseau » évite de délester quand le solaire couvre la charge. La consommation maison est le comportement historique.",
-          "peak_trigger_ratio_pct": "Défaut 90 %. Utilisé seulement si un disjoncteur est renseigné.",
-          "high_load_trigger_w": "Utilisé seulement si aucun disjoncteur n'est renseigné.",
-          "peak_release_ratio_pct": "Doit rester inférieur au seuil de déclenchement. 0 utilise le seuil absolu de réarmement.",
-          "high_load_release_w": "Le réarmement est toujours au moins 5 % sous le déclenchement pour éviter les oscillations.",
-          "peak_confirm_frames": "0 = automatique : 1 trame avec disjoncteur, 2 sans. Une trame correspond à une publication de la mesure réseau.",
-          "peak_release_frames": "Défaut 5 trames consécutives sous le seuil de réarmement.",
-          "peak_shed_machines": "Seules les machines marquées « délestables » sont coupées, et jamais en plein cycle.",
-          "peak_v2h_target_ratio_pct": "Défaut 80 %. Sans effet si le V2H physique n'est pas activé.",
-          "grid_regime": "MONO : I = P / (U × cos φ). TRI/TETRA : intensités L1-L3 mesurées si disponibles, sinon I = P / (√3 × U composée × cos φ).",
-          "grid_voltage_sensor": "Sinon la tension nominale du disjoncteur est utilisée. Une valeur < 300 V est traitée comme tension simple."
+        "data_description": {},
+        "sections": {
+          "connection": {
+            "name": "Raccordement",
+            "data": {
+              "grid_regime": "Régime réseau (MONO / TRI / TETRA)",
+              "main_breaker_current_a": "Calibre du disjoncteur principal (A, 0 = non renseigné)",
+              "main_breaker_voltage_v": "Tension nominale (V)",
+              "inverter_cos_phi": "Facteur de puissance onduleur (cos φ)",
+              "peak_phases": "Nombre de phases prises en compte (1 à 3)"
+            },
+            "data_description": {
+              "grid_regime": "MONO : I = P / (U × cos φ). TRI/TETRA : intensités L1-L3 mesurées si disponibles, sinon I = P / (√3 × U composée × cos φ).",
+              "main_breaker_current_a": "Si renseigné, le déclenchement est calculé à partir du disjoncteur (A × V × phases × %). Sinon le seuil absolu est utilisé.",
+              "peak_phases": "Multiplie la capacité (hypothèse de charge équilibrée). Laissez 1 en monophasé ; en tétraphasé 400 V avec une tension de 230 V, indiquez 3."
+            }
+          },
+          "thresholds": {
+            "name": "Seuils",
+            "data": {
+              "peak_trigger_ratio_pct": "Seuil de déclenchement (% du disjoncteur)",
+              "high_load_trigger_w": "Seuil de déclenchement absolu (W, sans disjoncteur)",
+              "high_load_release_w": "Seuil de réarmement absolu (W)",
+              "peak_measure_basis": "Puissance comparée aux seuils",
+              "peak_release_ratio_pct": "Seuil de réarmement (% du disjoncteur, 0 = seuil absolu)",
+              "peak_confirm_frames": "Trames hautes avant déclenchement (0 = auto)",
+              "peak_release_frames": "Trames basses avant réarmement"
+            },
+            "data_description": {
+              "peak_trigger_ratio_pct": "Défaut 90 %. Utilisé seulement si un disjoncteur est renseigné.",
+              "high_load_trigger_w": "Utilisé seulement si aucun disjoncteur n'est renseigné.",
+              "high_load_release_w": "Le réarmement est toujours au moins 5 % sous le déclenchement pour éviter les oscillations.",
+              "peak_measure_basis": "Avec production solaire, « Import réseau » évite de délester quand le solaire couvre la charge. La consommation maison est le comportement historique.",
+              "peak_release_ratio_pct": "Doit rester inférieur au seuil de déclenchement. 0 utilise le seuil absolu de réarmement.",
+              "peak_confirm_frames": "0 = automatique : 1 trame avec disjoncteur, 2 sans. Une trame correspond à une publication de la mesure réseau.",
+              "peak_release_frames": "Défaut 5 trames consécutives sous le seuil de réarmement."
+            }
+          },
+          "actions": {
+            "name": "Actions pendant le délestage",
+            "data": {
+              "peak_shed_boiler": "Couper le chauffe-eau pendant le délestage",
+              "peak_shed_machines": "Couper les machines délestables",
+              "peak_release_inverter": "Libérer l'onduleur à 100 % pendant le délestage",
+              "peak_block_flexible_starts": "Bloquer les nouveaux démarrages flexibles",
+              "peak_v2h_assist": "Autoriser le V2H à écrêter la pointe",
+              "peak_v2h_target_ratio_pct": "Cible V2H (% du disjoncteur à ne pas dépasser)"
+            },
+            "data_description": {
+              "peak_shed_machines": "Seules les machines marquées « délestables » sont coupées, et jamais en plein cycle.",
+              "peak_v2h_target_ratio_pct": "Défaut 80 %. Sans effet si le V2H physique n'est pas activé.",
+              "peak_block_flexible_starts": "Interdit tout nouveau démarrage automatique de machine pendant le délestage."
+            }
+          },
+          "measurements": {
+            "name": "Mesures",
+            "data": {
+              "grid_voltage_sensor": "Capteur de tension réseau (V, optionnel)",
+              "grid_current_l1_sensor": "Intensité mesurée phase L1 (A, optionnel)",
+              "grid_current_l2_sensor": "Intensité mesurée phase L2 (A, optionnel)",
+              "grid_current_l3_sensor": "Intensité mesurée phase L3 (A, optionnel)"
+            },
+            "data_description": {
+              "grid_voltage_sensor": "Sinon la tension nominale du disjoncteur est utilisée. Une valeur < 300 V est traitée comme tension simple."
+            }
+          }
         }
+      },
+      "equipment": {
+        "title": "Équipements",
+        "description": "Appareils pilotés ou observés par FoxCat.",
+        "menu_options": {
+          "pri": "Onduleur",
+          "boiler": "Boiler",
+          "machines": "Machines",
+          "battery_ev": "Batterie + VE",
+          "init": "← Retour au menu principal"
+        }
+      },
+      "about": {
+        "title": "À propos du fonctionnement",
+        "description": "**Énergie** : puissance maison, prélèvement, réinjection, production, autoconsommation et bilans sont calculés par FoxCat, sans capteur supplémentaire.\n\n**EMS** : l’EMS Core reste le décideur souverain. Ses paramètres ajustables sont exposés sous forme d’entités FoxCat.\n\n**Energy Bus** : bus interne entre modules (trames, commandes, événements, ACK/NOK).\n\n**Métronome** : surveille la fraîcheur de la source réseau et active le secours si nécessaire. Ce n’est pas une horloge périodique.\n\n**Diagnostic** : les capteurs techniques sont dans l’appareil FoxCat Energy – Diagnostic.\n\n**Machine Learning** : apprentissage strictement passif, stocké localement.",
+        "data": {}
       }
     },
     "entity": {

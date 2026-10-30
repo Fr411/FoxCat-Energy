@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .. import grid_load
+from .. import peak_shaving as peak_logic
 from ..const import (
     ACK_IDLE,
     ACK_NOK,
@@ -1831,20 +1832,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 rec["day_ahead_threshold_pct"] = day_ahead.get("threshold_pct")
 
         price_analysis = analyze_price_curve(now=now, import_points=import_points, export_points=export_points, settings=self.settings, tomorrow_available=tomorrow_available, current_buy=tariff.get("active_buy")) if tariff_dimensions(self.settings).dynamic else {"active":False,"mode":"INACTIF","state":"HORS_DYNAMIQUE","valid":True,"series":[]}
-        peak_shaving_enabled = (
-            bool(self.settings.get("high_load_shed_enabled"))
-            and str(self.settings.get("mode")) != MODE_MANUAL
-        )
-        breaker_limit_w = self._breaker_limit_w() if peak_shaving_enabled else None
-        peak_trigger_w = breaker_limit_w * 0.9 if breaker_limit_w is not None else None
+        peak_cfg = self._peak_config()
+        peak_measured_w = peak_logic.measured_power_w(peak_cfg, house_w=snap.house_w, import_w=snap.import_w)
         peak_shaving_active = bool(
-            self.settings.get("high_load_shed_enabled")
+            peak_cfg.enabled
+            and peak_cfg.block_flexible_starts
             and str(self.settings.get("mode")) != MODE_MANUAL
             and (
                 self.load_shed_state.get("active")
                 or (
-                    peak_trigger_w is not None
-                    and snap.house_w >= peak_trigger_w
+                    peak_logic.breaker_limit_w(peak_cfg) is not None
+                    and peak_logic.peak_signal(peak_cfg, peak_measured_w)
                 )
             )
         )
@@ -2539,7 +2537,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         # Le délestage haute consommation est prioritaire sur les stratégies
         # énergétiques normales, mais reste inactif en mode Manuel.
-        if self.load_shed_state.get("active") and str(self.settings.get("mode")) != MODE_MANUAL:
+        if (
+            self.load_shed_state.get("active")
+            and str(self.settings.get("mode")) != MODE_MANUAL
+            and self._peak_config().shed_boiler
+        ):
             if snapshot.boiler_on:
                 await self.async_command_boiler(
                     BOILER_STOP,
@@ -2613,7 +2615,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         mode = str(self.settings.get("mode"))
         user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
-        if self.load_shed_state.get("active"):
+        if self.load_shed_state.get("active") and self._peak_config().shed_boiler:
             intent = BoilerIntent(
                 BOILER_STOP,
                 "Urgence capacitaire : chauffe du Boiler suspendue.",
@@ -3088,33 +3090,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         return dict(grid_load.as_dict(result))
 
-    def _breaker_limit_w(self) -> float | None:
-        """Return the configured effective breaker limit, if one was supplied."""
-        try:
-            current_a = float(
-                self.settings.get(
-                    CONF_MAIN_BREAKER_CURRENT_A,
-                    self.config.get(CONF_MAIN_BREAKER_CURRENT_A, 0.0),
-                )
-                or 0.0
-            )
-            voltage_v = float(
-                self.settings.get(
-                    CONF_MAIN_BREAKER_VOLTAGE_V,
-                    self.config.get(CONF_MAIN_BREAKER_VOLTAGE_V, 230.0),
-                )
-                or 230.0
-            )
-        except (TypeError, ValueError):
-            return None
-        if (
-            not math.isfinite(current_a)
-            or not math.isfinite(voltage_v)
-            or current_a <= 0.0
-            or voltage_v <= 0.0
-        ):
-            return None
-        return current_a * voltage_v
+    def _peak_config(self) -> "peak_logic.PeakShavingConfig":
+        """Configuration validée de l'écrêtage de pointe (réglages > options)."""
+        return peak_logic.PeakShavingConfig.from_settings(self.settings, self.config)
 
     def set_developer_price_simulation(self, scenario: str) -> None:
         """Record a diagnostic-only price scenario without changing live prices."""
@@ -3414,6 +3392,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now = dt_util.now()
         self._refresh_machine_cycles()
         high_load_active = bool(self.load_shed_state.get("active"))
+        shed_machines = self._peak_config().shed_machines
         economic_view = (
             self._economic_view(self.snapshot(), prices=self.prices(), now=now)
             if high_load_active or bool(self.settings.get("economic_optimizer_enabled", True))
@@ -3440,9 +3419,21 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if high_load_active and isinstance(peak_plan, dict)
                 else self._tariff_start_favorable(machine, economic_view=economic_view)
             )
+            # Pendant un délestage, seules les machines délestables sont coupées ;
+            # les autres gardent leur état, sans nouveau démarrage si le planificateur le bloque.
+            high_load_block = high_load_active and shed_machines and machine.sheddable and not cycle_active
+            socket_state = self.hass.states.get(socket)
+            keep_running = (
+                high_load_active
+                and not high_load_block
+                and socket_state is not None
+                and socket_state.state == STATE_ON
+            )
             # Un cycle utilisateur/protégé reste prioritaire. Seul un NOUVEAU
             # démarrage automatique est bloqué en période défavorable.
-            should_on = cycle_active or (management and allowed and tariff_ok)
+            should_on = cycle_active or keep_running or (
+                management and allowed and tariff_ok and not high_load_block
+            )
             service = "turn_on" if should_on else "turn_off"
             try:
                 await self.hass.services.async_call("switch", service, {"entity_id": socket}, blocking=False)
@@ -3453,7 +3444,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
         """Délestage synchronisé sur chaque publication réseau.
 
-        2 trames hautes consécutives déclenchent. 5 trames basses réarment.
+        Le nombre de trames et les seuils viennent de la configuration d'écrêtage.
         Une mesure maison invalide gèle l'état et n'est jamais assimilée à 0 W.
         """
         await self._evaluate_v2h(snapshot)
@@ -3463,43 +3454,44 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._high_load_low_frames = 0
             return
         self.load_shed_state["house_w"] = snapshot.house_w
-        enabled=bool(self.settings.get("high_load_shed_enabled"))
+        cfg = self._peak_config()
         automatic=str(self.settings.get("mode")) != MODE_MANUAL
-        if not enabled or not automatic:
+        if not cfg.enabled or not automatic:
             self._high_load_high_frames=self._high_load_low_frames=0
             if self.load_shed_state.get("active"):
                 self.load_shed_state.update({"active":False,"reason":"Délestage indisponible ou mode Manuel","triggered_at":None})
                 await self.async_reconcile_machines()
             return
-        breaker_limit_w = self._breaker_limit_w()
-        trigger = (
-            breaker_limit_w * 0.9
-            if breaker_limit_w is not None
-            else float(self.settings.get("high_load_trigger_w", 5000.0))
+        measured_w = peak_logic.measured_power_w(cfg, house_w=snapshot.house_w, import_w=snapshot.import_w)
+        step = peak_logic.evaluate_step(
+            cfg,
+            active=bool(self.load_shed_state.get("active")),
+            measured_w=measured_w,
+            high_frames=self._high_load_high_frames,
+            low_frames=self._high_load_low_frames,
         )
-        release=min(float(self.settings.get("high_load_release_w",3500.0)),trigger)
-        if not self.load_shed_state.get("active"):
-            self._high_load_low_frames=0
-            self._high_load_high_frames = self._high_load_high_frames + 1 if snapshot.house_w >= trigger else 0
-            required_frames = 1 if breaker_limit_w is not None else 2
-            if self._high_load_high_frames >= required_frames:
-                await self._activate_high_load_shed(snapshot,trigger)
-                self._high_load_high_frames=0
-        else:
-            self._high_load_high_frames=0
-            self._high_load_low_frames = self._high_load_low_frames + 1 if snapshot.house_w <= release else 0
-            if self._high_load_low_frames >= 5:
-                self.load_shed_state.update({"active":False,"reason":f"Urgence capacitaire levée : 5 trames sous {release:.0f} W","triggered_at":None})
-                self._high_load_low_frames=0
-                self.reset_core("Fin délestage : 5 trames basses confirmées.")
-                await self.async_reconcile_machines()
+        self._high_load_high_frames = step.high_frames
+        self._high_load_low_frames = step.low_frames
+        self.load_shed_state.update(
+            measured_w=measured_w,
+            trigger_w=step.trigger_w,
+            release_w=step.release_w,
+            basis=cfg.measure_basis,
+        )
+        if step.event == peak_logic.EVENT_TRIGGER:
+            await self._activate_high_load_shed(snapshot, f"Urgence capacitaire : {step.reason}")
+        elif step.event == peak_logic.EVENT_RELEASE:
+            self.load_shed_state.update({"active":False,"reason":f"Urgence capacitaire levée : {step.reason}","triggered_at":None})
+            self.reset_core(f"Fin délestage : {cfg.release_frames} trames basses confirmées.")
+            await self.async_reconcile_machines()
 
     async def _evaluate_v2h(self, snapshot: EnergySnapshot) -> None:
         """Apply opt-in V2H demand while enforcing SoC and thermal interlocks."""
         switch_entity = self.config.get(CONF_EV_V2H_SWITCH)
+        peak_cfg = self._peak_config()
         peak_shaving_armed = bool(
             self.load_shed_state.get("active")
-            and self.settings.get("high_load_shed_enabled")
+            and peak_cfg.enabled
             and str(self.settings.get("mode")) != MODE_MANUAL
         )
         enabled = (
@@ -3510,8 +3502,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         soc_entity = self.config.get(CONF_EV_SOC_SENSOR)
         soc_pct = self._optional_float_state(soc_entity) if soc_entity else None
-        peak_shaving_enabled = bool(self.settings.get("high_load_shed_enabled"))
-        breaker_limit_w = self._breaker_limit_w() if peak_shaving_enabled else None
+        breaker_limit_w = peak_logic.breaker_limit_w(peak_cfg) if peak_cfg.enabled else None
         prices = self.prices()
         decision = evaluate_v2h(
             enabled=enabled,
@@ -3522,6 +3513,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             soc_pct=soc_pct,
             min_soc_pct=self.config.get(CONF_EV_V2H_MIN_SOC_PCT, 25.0),
             peak_shaving_armed=peak_shaving_armed,
+            peak_power_w=peak_logic.measured_power_w(
+                peak_cfg, house_w=snapshot.house_w, import_w=snapshot.import_w
+            ),
+            trigger_ratio=peak_cfg.trigger_ratio,
+            target_ratio=peak_cfg.v2h_target_ratio,
+            peak_assist=peak_cfg.v2h_assist,
         )
         if self.config.get(CONF_EV_V2H_ENABLED) is True and not switch_entity:
             decision.update(
@@ -3578,10 +3575,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     # MÉTHODE : FoxCatEnergyCoordinator._activate_high_load_shed — Activate high load shed
-    async def _activate_high_load_shed(self, snapshot: EnergySnapshot, trigger_w: float) -> None:
+    async def _activate_high_load_shed(self, snapshot: EnergySnapshot, reason: str) -> None:
+        cfg = self._peak_config()
         self.load_shed_state.update({
             "active": True,
-            "reason": f"Urgence capacitaire : maison {snapshot.house_w:.0f} W >= {trigger_w:.0f} W",
+            "reason": reason,
             "triggered_at": dt_util.now(),
             "house_w": snapshot.house_w,
         })
@@ -3589,21 +3587,22 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._high_load_below_since = None
         self.reset_core("Délestage haute consommation déclenché.")
 
-        if self._pri_task and not self._pri_task.done():
-            self._pri_task.cancel()
-        # En forte demande, EMS informe Onduleur Core via Energy Bus et pousse
-        # une cible 100 % au worker physique sans bloquer la trame EMS.
-        self.energy_bus.publish_message(
-            source="EMS", target="ONDULEUR", action="DELESTAGE_LIBERATION_100", delta_w=0.0,
-            now=dt_util.now(), frame_id=self._frame_id,
-            reason="Délestage haute consommation : libération onduleur demandée.",
-        )
-        self._queue_pri_target(
-            100, frame_id=self._frame_id, frame_serial=self._frame_serial,
-            pv_before=snapshot.pv_w, reason="Délestage haute consommation.",
-        )
+        if cfg.release_inverter:
+            if self._pri_task and not self._pri_task.done():
+                self._pri_task.cancel()
+            # En forte demande, EMS informe Onduleur Core via Energy Bus et pousse
+            # une cible 100 % au worker physique sans bloquer la trame EMS.
+            self.energy_bus.publish_message(
+                source="EMS", target="ONDULEUR", action="DELESTAGE_LIBERATION_100", delta_w=0.0,
+                now=dt_util.now(), frame_id=self._frame_id,
+                reason="Délestage haute consommation : libération onduleur demandée.",
+            )
+            self._queue_pri_target(
+                100, frame_id=self._frame_id, frame_serial=self._frame_serial,
+                pv_before=snapshot.pv_w, reason="Délestage haute consommation.",
+            )
 
-        if snapshot.boiler_on:
+        if cfg.shed_boiler and snapshot.boiler_on:
             await self.async_command_boiler(
                 BOILER_STOP,
                 "Délestage haute consommation : arrêt temporaire du chauffe-eau.",

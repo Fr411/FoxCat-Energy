@@ -58,22 +58,34 @@ def evaluate_v2h(
     soc_pct: float | None,
     min_soc_pct: float,
     peak_shaving_armed: bool = True,
+    peak_power_w: float | None = None,
+    trigger_ratio: float = 0.9,
+    target_ratio: float = 0.8,
+    peak_assist: bool = True,
 ) -> dict[str, Any]:
-    """Return a V2H request without issuing a hardware command."""
+    """Return a V2H request without issuing a hardware command.
+
+    ``peak_power_w`` est la puissance comparée aux seuils (``house_w`` par défaut).
+    ``trigger_ratio`` et ``target_ratio`` sont des parts du disjoncteur.
+    ``peak_assist=False`` désactive l'écrêtage ; le bouclier tarifaire reste actif.
+    """
+    trigger_ratio = min(max(_finite_number(trigger_ratio, 0.9) or 0.9, 0.0), 1.0)
+    target_ratio = min(max(_finite_number(target_ratio, 0.8) or 0.8, 0.0), 1.0)
     breaker_limit_w = _finite_number(breaker_limit_w)
     max_power_w = max(_finite_number(max_power_w, 0.0) or 0.0, 0.0)
     soc_pct = _finite_number(soc_pct)
     min_soc_pct = _finite_number(min_soc_pct, 25.0) or 25.0
     house_w = max(_finite_number(house_w, 0.0) or 0.0, 0.0)
+    peak_power_w = max(_finite_number(peak_power_w, house_w) or 0.0, 0.0)
     peak_trigger_w = (
-        max(breaker_limit_w, 0.0) * 0.9
-        if breaker_limit_w is not None and breaker_limit_w > 0
+        max(breaker_limit_w, 0.0) * trigger_ratio
+        if peak_assist and breaker_limit_w is not None and breaker_limit_w > 0
         else None
     )
     peak_shaving = (
         peak_shaving_armed
         and peak_trigger_w is not None
-        and house_w >= peak_trigger_w
+        and peak_power_w >= peak_trigger_w
     )
     tariff_shield = price_status == "TRÈS ÉLEVÉ"
     allowed = enabled and (peak_shaving or tariff_shield)
@@ -94,7 +106,7 @@ def evaluate_v2h(
     target_w = 0.0
     if allowed:
         if peak_shaving and breaker_limit_w is not None:
-            target_w = max(house_w - breaker_limit_w * 0.8, 0.0)
+            target_w = max(peak_power_w - breaker_limit_w * target_ratio, 0.0)
         else:
             target_w = max(house_w, 0.0)
         target_w = min(target_w, max_power_w)

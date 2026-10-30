@@ -22,17 +22,19 @@ OFFICIAL_SECTION_ORDER = (
 )
 OFFICIAL_MENU_STEPS = (
     "sources",
-    "energy",
-    "inverter",
-    "ems",
-    "energy_bus",
-    "machines",
-    "boiler",
-    "battery_ev",
     "pricing",
-    "metronome",
-    "diagnostic",
+    "equipment",
+    "peak_shaving",
+    "ia",
+    "about",
     "finish",
+)
+EQUIPMENT_MENU_STEPS = (
+    "pri",
+    "boiler",
+    "machines",
+    "battery_ev",
+    "init",
 )
 
 # Configuration keys
