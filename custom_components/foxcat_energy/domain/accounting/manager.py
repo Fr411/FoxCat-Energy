@@ -21,6 +21,15 @@ ZERO = {
     "solar_avoided_cost_eur": 0.0,
 }
 
+# Économies attribuables au pilotage FoxCat (appareils gérés uniquement).
+# Séparé de ZERO : la simulation virtuelle réutilise ZERO.
+FOXCAT_ZERO = {
+    "foxcat_solar_kwh": 0.0,
+    "foxcat_solar_gain_eur": 0.0,
+    "foxcat_shift_kwh": 0.0,
+    "foxcat_shift_gain_eur": 0.0,
+}
+
 RATE_ZERO = {
     "import_kwh": 0.0,
     "export_kwh": 0.0,
@@ -46,7 +55,7 @@ def _tariff_bucket() -> dict[str, Any]:
 
 # FONCTION : _bucket — Bucket
 def _bucket() -> dict[str, Any]:
-    return {**ZERO, "appliances": {}, "tariff": _tariff_bucket()}
+    return {**ZERO, **FOXCAT_ZERO, "appliances": {}, "tariff": _tariff_bucket()}
 
 
 class EnergyAccounting:
@@ -88,7 +97,7 @@ class EnergyAccounting:
         result = _bucket()
         if not isinstance(raw, dict):
             return result
-        for key in ZERO:
+        for key in (*ZERO, *FOXCAT_ZERO):
             try:
                 result[key] = float(raw.get(key, result[key]) or 0.0)
             except (TypeError, ValueError):
@@ -238,6 +247,26 @@ class EnergyAccounting:
             key = "other_kwh"
         a[key] = float(a.get(key, 0.0)) + max(energy, 0.0)
 
+    # MÉTHODE : EnergyAccounting._add_saving — Cumule l'économie d'un appareil géré par FoxCat
+    @staticmethod
+    def _add_saving(
+        bucket: dict[str, Any],
+        aid: str,
+        solar_kwh: float,
+        solar_gain: float,
+        shift_kwh: float,
+        shift_gain: float,
+    ) -> None:
+        # Gains signés : un décalage vers un prix plus cher doit se voir.
+        bucket["foxcat_solar_kwh"] = float(bucket.get("foxcat_solar_kwh", 0.0)) + max(solar_kwh, 0.0)
+        bucket["foxcat_solar_gain_eur"] = float(bucket.get("foxcat_solar_gain_eur", 0.0)) + solar_gain
+        bucket["foxcat_shift_kwh"] = float(bucket.get("foxcat_shift_kwh", 0.0)) + max(shift_kwh, 0.0)
+        bucket["foxcat_shift_gain_eur"] = float(bucket.get("foxcat_shift_gain_eur", 0.0)) + shift_gain
+        app = bucket.setdefault("appliances", {}).get(aid)
+        if app is not None:
+            app["saving_solar_eur"] = float(app.get("saving_solar_eur", 0.0)) + solar_gain
+            app["saving_shift_eur"] = float(app.get("saving_shift_eur", 0.0)) + shift_gain
+
     # MÉTHODE : EnergyAccounting.process — Intègre une vraie trame valide et sa valeur tarifaire au même instant.
     def process(self, snapshot: Any, prices: dict[str, Any], appliances: list[dict[str, Any]]) -> bool:
         """Intègre une vraie trame valide et sa valeur tarifaire au même instant."""
@@ -303,6 +332,8 @@ class EnergyAccounting:
             )
 
         solar_fraction = min(max(self_used / house if house > 0 else 0.0, 0.0), 1.0)
+        reference = prices.get("reference_buy")
+        reference = float(reference) if isinstance(reference, (int, float)) else None
         for app in appliances:
             power = app.get("power_w")
             if not isinstance(power, (int, float)) or power < 0:
@@ -315,6 +346,15 @@ class EnergyAccounting:
             name = str(app["name"])
             for bucket in (self.today, self.month, self.year, self.lifetime):
                 self._add_appliance(bucket, aid, name, energy, solar, grid, cost, regime, period)
+
+            if app.get("managed") and buy is not None:
+                # Solaire absorbé par un appareil géré : acheté au réseau sinon,
+                # et non revendu. Vaut (prix d'achat - valeur de réinjection).
+                solar_gain = solar * (buy - (sell or 0.0))
+                # Réseau consommé à un prix inférieur au prix de référence.
+                shift_gain = grid * (reference - buy) if reference is not None else 0.0
+                for bucket in (self.today, self.month, self.year, self.lifetime):
+                    self._add_saving(bucket, aid, solar, solar_gain, grid if reference is not None else 0.0, shift_gain)
 
         if self.last_save_ts is None or (now - self.last_save_ts).total_seconds() >= 300:
             self.last_save_ts = now
@@ -374,6 +414,8 @@ class EnergyAccounting:
             "net_grid_cost_eur": cost + export_cost - revenue,
             "net_export_value_eur": revenue - export_cost,
             "solar_gain_eur": avoided + revenue - export_cost,
+            "foxcat_saving_eur": float(bucket.get("foxcat_solar_gain_eur", 0.0) or 0.0)
+            + float(bucket.get("foxcat_shift_gain_eur", 0.0) or 0.0),
         }
 
     # MÉTHODE : EnergyAccounting.view — View

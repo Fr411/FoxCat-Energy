@@ -1446,6 +1446,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "active_buy_label": label,
             "next_buy_label": nlabel,
             "export_value": export_value,
+            # Prix « sans FoxCat » : HP en bi-horaire, moyenne du jour en dynamique.
+            "reference_buy": (
+                final_client_price(average, now, self.settings) if dims.dynamic and average is not None
+                else hp if dims.structure == TARIFF_STRUCTURE_TOU and not dims.dynamic
+                else None
+            ),
             "dynamic_compatible": dims.dynamic,
             "negative_purchase": bool(active is not None and active < 0),
             "status": price_status(active, minimum, maximum, average),
@@ -2472,10 +2478,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
             # Comptabilité énergétique : observe la trame, sans influencer le CORE.
             accounting_appliances = self.machine_states()
+            for item in accounting_appliances:
+                item["managed"] = bool(item.get("automatic"))
             accounting_appliances.append({
                 "id": "boiler",
                 "name": "Chauffe-eau",
                 "power_w": snapshot.boiler_power_w,
+                "managed": bool(self.settings.get("regulation_active")),
             })
             virtual_prices = self.prices()
             import_points = export_points = ()

@@ -176,6 +176,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "bilan_cout_injection_jour", "☀️ PV • Coût réinjection aujourd’hui", "mdi:cash-minus", "accounting", lambda d: d["accounting"]["today"]["export_cost_eur"], "€"),
         FoxCatNumericSensor(c, "bilan_cout_net_jour", "🏠 Maison • Coût net aujourd’hui", "mdi:cash-sync", "accounting", lambda d: d["accounting"]["today"]["net_grid_cost_eur"], "€"),
         FoxCatNumericSensor(c, "bilan_gain_solaire_jour", "☀️ PV • Gain solaire estimé aujourd’hui", "mdi:solar-power-variant", "accounting", lambda d: d["accounting"]["today"]["solar_gain_eur"], "€"),
+        FoxCatSavingsSensor(c, "economiser_foxcat_jour", "💰 Économiser avec FoxCat Energy • Aujourd’hui", "today"),
+        FoxCatSavingsSensor(c, "economiser_foxcat_mois", "💰 Économiser avec FoxCat Energy • Ce mois", "month"),
+        FoxCatSavingsSensor(c, "economiser_foxcat_annee", "💰 Économiser avec FoxCat Energy • Cette année", "year"),
         # Accounting V2 — ventilation tarifaire sans netting énergétique.
         FoxCatNumericSensor(c, "bilan_dynamic_import_jour", "Dynamic • Prélèvement réseau aujourd’hui", "mdi:transmission-tower-import", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["import_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_dynamic_export_jour", "Dynamic • Réinjection aujourd’hui", "mdi:transmission-tower-export", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["export_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
@@ -517,6 +520,53 @@ class FoxCatValueSensor(FoxCatEntity, SensorEntity):
             return value
         except Exception:
             return "Indisponible"
+
+
+class FoxCatSavingsSensor(FoxCatEntity, SensorEntity):
+    """Économie attribuable au pilotage FoxCat sur une période, avec le détail du « en quoi ».
+
+    Seuls les appareils pilotés par FoxCat comptent (chauffe-eau, machines en automatique).
+    Deux sources : solaire absorbé au lieu d'être revendu, et réseau consommé sous le prix de référence.
+    """
+
+    _attr_native_unit_of_measurement = "€"
+
+    # MÉTHODE : FoxCatSavingsSensor.__init__ — méthode spéciale __init__
+    def __init__(self, coordinator, key: str, name: str, period: str):
+        super().__init__(coordinator, key, name, "mdi:piggy-bank", "accounting")
+        self._period = period
+
+    def _bucket(self) -> dict[str, Any]:
+        return (self.coordinator.data or {}).get("accounting", {}).get(self._period, {}) or {}
+
+    # MÉTHODE : FoxCatSavingsSensor.native_value — Native value
+    @property
+    def native_value(self) -> float | None:
+        bucket = self._bucket()
+        return round(float(bucket["foxcat_saving_eur"]), 2) if "foxcat_saving_eur" in bucket else None
+
+    # MÉTHODE : FoxCatSavingsSensor.extra_state_attributes — Extra state attributes
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        b = self._bucket()
+        appliances = {
+            (a.get("name") or aid): round(float(a.get("saving_solar_eur", 0.0)) + float(a.get("saving_shift_eur", 0.0)), 2)
+            for aid, a in (b.get("appliances") or {}).items()
+            if "saving_solar_eur" in a or "saving_shift_eur" in a
+        }
+        return {
+            "solaire_absorbe_eur": round(float(b.get("foxcat_solar_gain_eur", 0.0)), 2),
+            "solaire_absorbe_kwh": round(float(b.get("foxcat_solar_kwh", 0.0)), 2),
+            "decalage_tarifaire_eur": round(float(b.get("foxcat_shift_gain_eur", 0.0)), 2),
+            "decalage_tarifaire_kwh": round(float(b.get("foxcat_shift_kwh", 0.0)), 2),
+            "par_appareil_eur": appliances,
+            "methode": (
+                "Appareils pilotés par FoxCat uniquement. Solaire absorbé = kWh solaires × "
+                "(prix d'achat − valeur de réinjection). Décalage = kWh réseau × (prix de référence "
+                "− prix payé), référence = HP en bi-horaire, moyenne du jour en dynamique. "
+                "Part solaire estimée au niveau de la maison. Batterie, VE et peak shaving non inclus."
+            ),
+        }
 
 
 class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
