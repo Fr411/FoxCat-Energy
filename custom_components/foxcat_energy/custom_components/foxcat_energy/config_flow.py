@@ -1,0 +1,1134 @@
+from __future__ import annotations
+
+from datetime import time
+from uuid import uuid4
+from typing import Any
+
+import voluptuous as vol
+from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
+from homeassistant.helpers import selector
+
+from .const import (
+    CONF_AI_TASK,
+    CONF_BOILER_BINARY,
+    CONF_BOILER_CLIMATE,
+    CONF_BOILER_CONTACTOR,
+    CONF_BOILER_POWER_SENSOR,
+    CONF_BOILER_VOLUME,
+    CONF_BOILER_ELEMENT_POWER,
+    CONF_BOILER_COLD_WATER_TEMP,
+    CONF_BOILER_RESISTANCE_TEMP_SENSOR,
+    CONF_BOILER_TEMP_SENSOR,
+    CONF_DISHWASHER_CYCLE,
+    CONF_DISHWASHER_OFF_1,
+    CONF_DISHWASHER_OFF_2,
+    CONF_DISHWASHER_ON_1,
+    CONF_DISHWASHER_ON_2,
+    CONF_DISHWASHER_SOCKET,
+    CONF_DRYER_CYCLE,
+    CONF_DRYER_OFF_1,
+    CONF_DRYER_OFF_2,
+    CONF_DRYER_ON_1,
+    CONF_DRYER_ON_2,
+    CONF_DRYER_SOCKET,
+    CONF_FORECAST_12H,
+    CONF_FORECAST_1H,
+    CONF_FORECAST_24H,
+    CONF_FORECAST_NEXT_HOUR,
+    CONF_FORECAST_NOW,
+    CONF_FORECAST_PEAK_TODAY,
+    CONF_FORECAST_PEAK_TOMORROW,
+    CONF_FORECAST_REMAINING_TODAY,
+    CONF_FORECAST_THIS_HOUR,
+    CONF_FORECAST_TODAY,
+    CONF_FORECAST_TOMORROW,
+    CONF_GRID_EXPORT_SENSOR,
+    CONF_GRID_IMPORT_SENSOR,
+    CONF_GRID_LEGACY_SENSOR,
+    CONF_GRID_SIGNED_SENSOR,
+    CONF_GRID_SIGN_CONVENTION,
+    GRID_SIGN_IMPORT_POSITIVE,
+    GRID_SIGN_EXPORT_POSITIVE,
+    CONF_METRONOME_SENSOR,
+    CONF_METRONOME_FALLBACK_SENSOR,
+    CONF_HOUSE_SENSOR,
+    CONF_INSTALLATION_NAME,
+    CONF_DEVELOPER_MODE,
+    CONF_MAIN_BREAKER_CURRENT_A,
+    CONF_MAIN_BREAKER_VOLTAGE_V,
+    CONF_EV_V2H_ENABLED,
+    CONF_EV_V2H_SWITCH,
+    CONF_EV_V2H_POWER_ENTITY,
+    CONF_EV_SOC_SENSOR,
+    CONF_EV_V2H_MAX_POWER_W,
+    CONF_EV_V2H_MIN_SOC_PCT,
+    CONF_BATTERY_DEGRADATION_COST_EUR_KWH,
+    CONF_EV_DEGRADATION_COST_EUR_KWH,
+    CONF_MACHINES_V13,
+    CONF_PRICE_AVG_TODAY,
+    CONF_PRICE_AVG_TOMORROW,
+    CONF_PRICE_CURRENT,
+    CONF_PRICE_INJECTION,
+    CONF_PRICE_MAX_TODAY,
+    CONF_PRICE_MAX_TOMORROW,
+    CONF_PRICE_MIN_TODAY,
+    CONF_PRICE_MIN_TOMORROW,
+    CONF_PRICE_NEXT,
+    CONF_PRICE_TOMORROW_AVAILABLE,
+    CONF_PRICE_FORECAST_IMPORT,
+    CONF_PRICE_FORECAST_EXPORT,
+    CONF_DYNAMIC_EXPORT_SIGN_CONVENTION,
+    DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE,
+    DYNAMIC_EXPORT_POSITIVE_IS_REVENUE,
+    CONF_PRI_L1,
+    CONF_PRI_L2,
+    CONF_PRI_L3,
+    CONF_PRI_L4,
+    CONF_INVERTER_POWER_SENSOR,
+    CONF_PV_SENSOR,
+    CONF_TARIFF_HP_END_1,
+    CONF_TARIFF_HP_END_2,
+    CONF_TARIFF_HP_START_1,
+    CONF_TARIFF_HP_START_2,
+    CONF_TARIFF_FIXED_INJECTION_PRICE,
+    CONF_TARIFF_HP_PRICE_SENSOR,
+    CONF_TARIFF_HC_PRICE_SENSOR,
+    CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR,
+    CONF_WASHER_CYCLE,
+    CONF_WASHER_OFF_1,
+    CONF_WASHER_OFF_2,
+    CONF_WASHER_ON_1,
+    CONF_WASHER_ON_2,
+    CONF_WASHER_SOCKET,
+    DOMAIN,
+    DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
+    EQUIPMENT_MENU_STEPS,
+    OFFICIAL_MENU_STEPS,
+)
+from .domain.loads.machines import records_for_options
+from .domain.tariff.tariff_prices import (
+    CONF_TARIFF_MONO_PRICE_SENSOR,
+    TARIFF_HPHC_BI,
+    TARIFF_DYNAMIQUE,
+)
+from .trading.virtual_assets.config import (
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_CHARGE_EFFICIENCY,
+    CONF_BATTERY_DISCHARGE_EFFICIENCY,
+    CONF_BATTERY_MAX_CHARGE,
+    CONF_BATTERY_MAX_DISCHARGE,
+    CONF_BATTERY_RESERVE,
+    CONF_ENABLED as CONF_VIRTUAL_ASSETS_ENABLED,
+    CONF_EV_CAPACITY,
+    CONF_EV_CHARGE_EFFICIENCY,
+    CONF_EV_ENABLED,
+    CONF_EV_MAX_CHARGE,
+    CONF_SHADOW as CONF_VIRTUAL_ASSETS_SHADOW,
+)
+
+
+
+from . import grid_load
+from . import peak_shaving as peak
+
+
+# FONCTION : _entity — Entity
+def _entity(domain: str | list[str], device_class: str | None = None) -> selector.EntitySelector:
+    cfg: dict[str, Any] = {"domain": domain}
+    if device_class:
+        cfg["device_class"] = device_class
+    return selector.EntitySelector(selector.EntitySelectorConfig(**cfg))
+
+
+# FONCTION : _required — Required
+def _required(key: str, default: str) -> vol.Required:
+    return vol.Required(key, default=default)
+
+
+# FONCTION : _optional — Optional
+def _optional(key: str, default: str | None = None) -> vol.Optional:
+    return vol.Optional(key, default=default) if default is not None else vol.Optional(key)
+
+
+# FONCTION : _normalise_value — Return values that ConfigEntry storage can serialise reliably.
+def _normalise_value(value: Any) -> Any:
+    """Return values that ConfigEntry storage can serialise reliably."""
+    if isinstance(value, time):
+        return value.isoformat()
+    return value
+
+
+# FONCTION : _normalise_input — Normalise input
+def _normalise_input(user_input: dict[str, Any]) -> dict[str, Any]:
+    return {key: _normalise_value(value) for key, value in user_input.items()}
+
+
+# FONCTION : _flatten_sections — Sections only organise the form: settings stay flat in storage.
+def _flatten_sections(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Sections only organise the form: settings stay flat in storage."""
+    flat: dict[str, Any] = {}
+    for key, value in user_input.items():
+        if isinstance(value, dict):
+            flat.update(value)
+        else:
+            flat[key] = value
+    return flat
+
+
+# IMPORTANT: schemas are built lazily.  Home Assistant first imports this module
+# to register the ConfigFlow handler.  Building all selectors at import time made
+# a single selector/API incompatibility capable of preventing the handler from
+# being registered, which surfaced in the UI as "Invalid handler specified".
+# FONCTION : _grid_sign_selector — Grid sign selector
+def _grid_sign_selector() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                {"value": GRID_SIGN_IMPORT_POSITIVE, "label": "+ prélèvement / − réinjection"},
+                {"value": GRID_SIGN_EXPORT_POSITIVE, "label": "+ réinjection / − prélèvement"},
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+HPHC_MONO = "Mono-horaire"
+HPHC_BI = "Bi-horaire"
+HPHC_STRUCTURES = [HPHC_MONO, HPHC_BI]
+DYNAMIQUE_STRUCTURES = ["Simple", "Impact"]
+
+
+# FONCTION : _structure_schema — Structure schema
+def _structure_schema(options: list[str], default: str) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required("tariff_structure", default=default): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options, mode=selector.SelectSelectorMode.LIST
+                )
+            )
+        }
+    )
+
+
+# FONCTION : _core_schema — FoxCat 1.6 sources: only grid signed power + PV are mandatory.
+def _core_schema() -> vol.Schema:
+    """FoxCat 1.6 sources: only grid signed power + PV are mandatory."""
+    return vol.Schema(
+        {
+            vol.Required(CONF_INSTALLATION_NAME, default="FoxCat Energy"): selector.TextSelector(),
+            _required(CONF_GRID_SIGNED_SENSOR, "sensor.consommation_instantanee_0"): _entity("sensor"),
+            vol.Required(CONF_GRID_SIGN_CONVENTION, default=GRID_SIGN_IMPORT_POSITIVE): _grid_sign_selector(),
+            _required(CONF_PV_SENSOR, "sensor.homefoxcat_load_solaire"): _entity("sensor"),
+            _optional(CONF_METRONOME_FALLBACK_SENSOR): _entity("sensor"),
+            vol.Optional(CONF_DEVELOPER_MODE, default=False): selector.BooleanSelector(),
+            vol.Optional("high_load_shed_enabled", default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_MAIN_BREAKER_CURRENT_A, default=0.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=200, step=1, unit_of_measurement="A", mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Optional(CONF_MAIN_BREAKER_VOLTAGE_V, default=230.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=100, max=500, step=10, unit_of_measurement="V", mode=selector.NumberSelectorMode.BOX)
+            ),
+        }
+    )
+
+
+# FONCTION : _sources_schema — Options version of the sources: protection settings live in their own page.
+def _sources_schema() -> vol.Schema:
+    protection = {"high_load_shed_enabled", CONF_MAIN_BREAKER_CURRENT_A, CONF_MAIN_BREAKER_VOLTAGE_V}
+    return vol.Schema(
+        {marker: value for marker, value in _core_schema().schema.items() if marker.schema not in protection}
+    )
+
+
+# FONCTION : _boiler_schema — Boiler schema
+def _boiler_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            _required(CONF_BOILER_CLIMATE, "climate.buanderie_boiler_chauffe_eau"): _entity("climate"),
+            _required(CONF_BOILER_TEMP_SENSOR, "sensor.garage_boiler_sonde_temperature_temperature"): _entity("sensor"),
+            _optional(CONF_BOILER_RESISTANCE_TEMP_SENSOR): _entity("sensor"),
+            _required(CONF_BOILER_POWER_SENSOR, "sensor.boiler_puissance"): _entity("sensor"),
+            vol.Optional(CONF_BOILER_VOLUME, default=250.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=20, max=2000, step=10, unit_of_measurement="L",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(CONF_BOILER_ELEMENT_POWER, default=1800.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=100, max=15000, step=50, unit_of_measurement="W",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Optional(CONF_BOILER_COLD_WATER_TEMP, default=15.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=35, step=0.5, unit_of_measurement="°C",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            _required(CONF_BOILER_BINARY, "binary_sensor.boiler"): _entity("binary_sensor"),
+            _optional(CONF_BOILER_CONTACTOR): _entity("switch"),
+        }
+    )
+
+
+# FONCTION : _pri_schema — Pri schema
+def _pri_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            _required(CONF_PRI_L1, "switch.l1_pri"): _entity("switch"),
+            _required(CONF_PRI_L2, "switch.l2_pri"): _entity("switch"),
+            _required(CONF_PRI_L3, "switch.l3_pri"): _entity("switch"),
+            _required(CONF_PRI_L4, "switch.l4_pri"): _entity("switch"),
+            _optional(CONF_INVERTER_POWER_SENSOR): _entity("sensor"),
+        }
+    )
+
+
+# FONCTION : _machines_schema — Machines schema
+def _machines_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            _optional(CONF_WASHER_SOCKET, "switch.lave_linge_prise_1"): _entity("switch"),
+            _optional(CONF_WASHER_CYCLE, "input_boolean.lave_linge_en_cours"): _entity(["binary_sensor", "input_boolean"]),
+            vol.Optional(CONF_WASHER_ON_1, default="21:30:00"): selector.TimeSelector(),
+            vol.Optional(CONF_WASHER_OFF_1, default="07:00:00"): selector.TimeSelector(),
+            vol.Optional(CONF_WASHER_ON_2, default="10:30:00"): selector.TimeSelector(),
+            vol.Optional(CONF_WASHER_OFF_2, default="17:00:00"): selector.TimeSelector(),
+            _optional(CONF_DRYER_SOCKET, "switch.seche_linge_prise_1"): _entity("switch"),
+            _optional(CONF_DRYER_CYCLE, "input_boolean.seche_linge_en_cours"): _entity(["binary_sensor", "input_boolean"]),
+            vol.Optional(CONF_DRYER_ON_1, default="21:30:00"): selector.TimeSelector(),
+            vol.Optional(CONF_DRYER_OFF_1, default="07:00:00"): selector.TimeSelector(),
+            vol.Optional(CONF_DRYER_ON_2, default="10:30:00"): selector.TimeSelector(),
+            vol.Optional(CONF_DRYER_OFF_2, default="17:00:00"): selector.TimeSelector(),
+            _optional(CONF_DISHWASHER_SOCKET, "switch.lave_vaisselle_prise_1"): _entity("switch"),
+            _optional(CONF_DISHWASHER_CYCLE, "input_boolean.lave_vaisselle_en_cours"): _entity(["binary_sensor", "input_boolean"]),
+            vol.Optional(CONF_DISHWASHER_ON_1, default="21:30:00"): selector.TimeSelector(),
+            vol.Optional(CONF_DISHWASHER_OFF_1, default="07:00:00"): selector.TimeSelector(),
+            vol.Optional(CONF_DISHWASHER_ON_2, default="10:30:00"): selector.TimeSelector(),
+            vol.Optional(CONF_DISHWASHER_OFF_2, default="17:00:00"): selector.TimeSelector(),
+        }
+    )
+
+
+
+# FONCTION : _machine_record_schema — Machine record schema
+def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
+    current = current or {}
+    # FONCTION : opt_entity — Opt entity
+    def opt_entity(key: str, domains: str | list[str]):
+        value = str(current.get(key, "") or "")
+        marker = vol.Optional(key, description={"suggested_value": value}) if value else vol.Optional(key)
+        return marker, _entity(domains)
+
+    cycle_marker, cycle_selector = opt_entity("cycle", ["binary_sensor", "input_boolean"])
+    switch_marker, switch_selector = opt_entity("switch", "switch")
+    power_marker, power_selector = opt_entity("power_sensor", "sensor")
+    current_marker, current_selector = opt_entity("current_sensor", "sensor")
+    voltage_marker, voltage_selector = opt_entity("voltage_sensor", "sensor")
+    return vol.Schema({
+        vol.Required("name", default=str(current.get("name", ""))): selector.TextSelector(),
+        vol.Required("machine_type", default=str(current.get("machine_type", "switch"))): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    {"value": "switch", "label": "Switch"},
+                    {"value": "cvc", "label": "CVC"},
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        switch_marker: switch_selector,
+        cycle_marker: cycle_selector,
+        power_marker: power_selector,
+        current_marker: current_selector,
+        voltage_marker: voltage_selector,
+        vol.Optional("automatic", default=bool(current.get("automatic", True))): selector.BooleanSelector(),
+        vol.Optional("sheddable", default=bool(current.get("sheddable", True))): selector.BooleanSelector(),
+        vol.Optional("cycle_start_w", default=float(current.get("cycle_start_w", 10.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=1,max=500,step=1,unit_of_measurement="W",mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional("cycle_start_confirm_s", default=float(current.get("cycle_start_confirm_s", 20.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=5,max=120,step=5,unit_of_measurement="s",mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional("cycle_duration_minutes", default=float(current.get("cycle_duration_minutes", 120.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=15,max=480,step=5,unit_of_measurement="min",mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional("cycle_margin_minutes", default=float(current.get("cycle_margin_minutes", 45.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=5,max=180,step=5,unit_of_measurement="min",mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional("cycle_end_w", default=float(current.get("cycle_end_w", 5.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=0,max=100,step=1,unit_of_measurement="W",mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional("cycle_end_confirm_minutes", default=float(current.get("cycle_end_confirm_minutes", 10.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=1,max=60,step=1,unit_of_measurement="min",mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional("on_1", default=str(current.get("on_1", "21:30:00"))): selector.TimeSelector(),
+        vol.Optional("off_1", default=str(current.get("off_1", "07:00:00"))): selector.TimeSelector(),
+        vol.Optional("on_2", default=str(current.get("on_2", "10:30:00"))): selector.TimeSelector(),
+        vol.Optional("off_2", default=str(current.get("off_2", "17:00:00"))): selector.TimeSelector(),
+    })
+
+
+def _normalise_machine_record(user_input: dict[str, Any], machine_id: str) -> dict[str, Any] | None:
+    record = _normalise_input(user_input)
+    machine_type = str(record.get("machine_type") or "switch").strip().lower()
+    name = str(record.get("name") or "").strip()
+    switch = str(record.get("switch") or "").strip()
+    power_sensor = str(record.get("power_sensor") or "").strip()
+    if not name or machine_type not in {"switch", "cvc"}:
+        return None
+    if machine_type == "switch" and not switch:
+        return None
+    if machine_type == "cvc" and not power_sensor:
+        return None
+    record.update({"id": machine_id, "name": name, "machine_type": machine_type})
+    if machine_type == "cvc":
+        record.update({
+            "switch": "",
+            "cycle": "",
+            "automatic": False,
+            "sheddable": False,
+        })
+    return record
+
+
+# FONCTION : _machine_choice_schema — Machine choice schema
+def _machine_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
+    choices = {str(item.get("id")): str(item.get("name") or item.get("id")) for item in records if item.get("id")}
+    return vol.Schema({vol.Required("machine_id"): vol.In(choices)})
+
+
+# FONCTION : _dynamic_export_sign_selector — Dynamic export sign selector
+def _dynamic_export_sign_selector() -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                {"value": DYNAMIC_EXPORT_POSITIVE_IS_REVENUE, "label": "Luminus Dynamic : positif = rémunération"},
+                {"value": DYNAMIC_EXPORT_NEGATIVE_IS_REVENUE, "label": "Autre source : négatif = rémunération"},
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+# FONCTION : _pricing_schema — Pricing schema
+def _pricing_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            _optional(CONF_PRICE_CURRENT, "sensor.luminus_luminus_dynamic_wallonia_prix_actuel"): _entity("sensor"),
+            _optional(CONF_PRICE_NEXT, "sensor.luminus_luminus_dynamic_wallonia_prix_heure_suivante"): _entity("sensor"),
+            _optional(CONF_PRICE_INJECTION, "sensor.luminus_luminus_dynamic_wallonia_prix_d_injection"): _entity("sensor"),
+            _optional(CONF_PRICE_MIN_TODAY, "sensor.luminus_luminus_dynamic_wallonia_minimum_aujourd_hui"): _entity("sensor"),
+            _optional(CONF_PRICE_MAX_TODAY, "sensor.luminus_luminus_dynamic_wallonia_maximum_aujourd_hui"): _entity("sensor"),
+            _optional(CONF_PRICE_AVG_TODAY, "sensor.luminus_luminus_dynamic_wallonia_moyenne_aujourd_hui"): _entity("sensor"),
+            _optional(CONF_PRICE_MIN_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_minimum_demain"): _entity("sensor"),
+            _optional(CONF_PRICE_MAX_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_maximum_demain"): _entity("sensor"),
+            _optional(CONF_PRICE_AVG_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_moyenne_demain"): _entity("sensor"),
+            _optional(CONF_PRICE_TOMORROW_AVAILABLE, "binary_sensor.luminus_luminus_dynamic_wallonia_prix_de_demain_disponibles"): _entity("binary_sensor"),
+            _optional(CONF_PRICE_FORECAST_IMPORT): _entity("sensor"),
+            _optional(CONF_PRICE_FORECAST_EXPORT): _entity("sensor"),
+            vol.Required(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, default=DYNAMIC_EXPORT_POSITIVE_IS_REVENUE): _dynamic_export_sign_selector(),
+            vol.Optional("dynamic_favorable_position_pct", default=30.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5,max=60,step=1,unit_of_measurement="%",mode=selector.NumberSelectorMode.SLIDER)),
+            vol.Optional("dynamic_high_position_pct", default=DEFAULT_DYNAMIC_HIGH_POSITION_PCT): selector.NumberSelector(selector.NumberSelectorConfig(min=60,max=95,step=1,unit_of_measurement="%",mode=selector.NumberSelectorMode.SLIDER)),
+            vol.Optional("dynamic_favorable_max_hours", default=4.0): selector.NumberSelector(selector.NumberSelectorConfig(min=.25,max=12,step=.25,unit_of_measurement="h",mode=selector.NumberSelectorMode.SLIDER)),
+            vol.Optional("dynamic_preferred_network_max_eur_kwh", default=.30): _price_number(.30,-1,2),
+        }
+    )
+
+
+# FONCTION : _price_number — Price number
+def _price_number(default: float, minimum: float = 0.0, maximum: float = 2.0) -> selector.NumberSelector:
+    return selector.NumberSelector(
+        selector.NumberSelectorConfig(
+            min=minimum,
+            max=maximum,
+            step=0.001,
+            mode=selector.NumberSelectorMode.BOX,
+            unit_of_measurement="€/kWh",
+        )
+    )
+
+
+# FONCTION : _hphc_schema — Fixed / dual-rate tariff values configured by the installer/user.
+def _hphc_schema() -> vol.Schema:
+    """Fixed / dual-rate tariff values configured by the installer/user."""
+    return vol.Schema(
+        {
+            _optional(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor"),
+            _optional(CONF_TARIFF_HP_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_pleines_jour"): _entity("sensor"),
+            _optional(CONF_TARIFF_HC_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_creuses_nuit"): _entity("sensor"),
+            _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_d_injection"): _entity("sensor"),
+            vol.Optional(CONF_TARIFF_FIXED_INJECTION_PRICE, default=0.0): _price_number(0.0, -1.0, 2.0),
+            vol.Optional(CONF_TARIFF_HP_START_1, default="07:00:00"): selector.TimeSelector(),
+            vol.Optional(CONF_TARIFF_HP_END_1, default="11:00:00"): selector.TimeSelector(),
+            vol.Optional(CONF_TARIFF_HP_START_2, default="17:00:00"): selector.TimeSelector(),
+            vol.Optional(CONF_TARIFF_HP_END_2, default="22:00:00"): selector.TimeSelector(),
+        }
+    )
+
+
+# FONCTION : _solar_schema — Solar schema
+def _solar_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            _optional(CONF_AI_TASK, "ai_task.google_ai_task"): _entity("ai_task"),
+            _optional(CONF_FORECAST_NOW, "sensor.solar_production_forecast_production_d_electricite_estimee_maintenant"): _entity("sensor"),
+            _optional(CONF_FORECAST_THIS_HOUR, "sensor.solar_production_forecast_production_d_energie_estimee_cette_heure"): _entity("sensor"),
+            _optional(CONF_FORECAST_NEXT_HOUR, "sensor.solar_production_forecast_production_d_energie_estimee_heure_suivante"): _entity("sensor"),
+            _optional(CONF_FORECAST_TODAY, "sensor.solar_production_forecast_production_d_energie_estimee_aujourd_hui"): _entity("sensor"),
+            _optional(CONF_FORECAST_REMAINING_TODAY, "sensor.solar_production_forecast_production_d_energie_estimee_restante_aujourd_hui"): _entity("sensor"),
+            _optional(CONF_FORECAST_1H, "sensor.solar_production_forecast_production_d_energie_estimee_en_1_heure"): _entity("sensor"),
+            _optional(CONF_FORECAST_12H, "sensor.solar_production_forecast_production_d_energie_estimee_en_12_heures"): _entity("sensor"),
+            _optional(CONF_FORECAST_24H, "sensor.solar_production_forecast_production_d_energie_estimee_en_24_heures"): _entity("sensor"),
+            _optional(CONF_FORECAST_PEAK_TODAY, "sensor.solar_production_forecast_heure_de_pointe_de_puissance_la_plus_elevee_aujourd_hui"): _entity("sensor"),
+            _optional(CONF_FORECAST_TOMORROW, "sensor.solar_production_forecast_estimation_de_la_production_d_energie_demain"): _entity("sensor"),
+            _optional(CONF_FORECAST_PEAK_TOMORROW, "sensor.solar_production_forecast_heure_de_pointe_de_puissance_la_plus_elevee_demain"): _entity("sensor"),
+        }
+    )
+
+
+def _virtual_assets_schema() -> vol.Schema:
+    number = selector.NumberSelectorMode.BOX
+    return vol.Schema(
+        {
+            vol.Optional(CONF_VIRTUAL_ASSETS_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_VIRTUAL_ASSETS_SHADOW, default=True): selector.BooleanSelector(),
+            vol.Optional(CONF_BATTERY_CAPACITY, default=10.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=1000, step=0.1, unit_of_measurement="kWh", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_MAX_CHARGE, default=5.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_MAX_DISCHARGE, default=5.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_CHARGE_EFFICIENCY, default=95.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_DISCHARGE_EFFICIENCY, default=95.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_RESERVE, default=20.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_EV_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(CONF_EV_CAPACITY, default=50.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=300, step=1, unit_of_measurement="kWh", mode=number)
+            ),
+            vol.Optional(CONF_EV_MAX_CHARGE, default=7.4): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0.1, max=100, step=0.1, unit_of_measurement="kW", mode=number)
+            ),
+            vol.Optional(CONF_EV_CHARGE_EFFICIENCY, default=90.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=1, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+            vol.Optional(CONF_BATTERY_DEGRADATION_COST_EUR_KWH, default=0.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=2, step=0.001, unit_of_measurement="€/kWh", mode=number)
+            ),
+            vol.Optional(CONF_EV_DEGRADATION_COST_EUR_KWH, default=0.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=2, step=0.001, unit_of_measurement="€/kWh", mode=number)
+            ),
+            vol.Optional(CONF_EV_V2H_ENABLED, default=False): selector.BooleanSelector(),
+            _optional(CONF_EV_V2H_SWITCH): _entity("switch"),
+            _optional(CONF_EV_V2H_POWER_ENTITY): _entity("number"),
+            _optional(CONF_EV_SOC_SENSOR): _entity("sensor"),
+            vol.Optional(CONF_EV_V2H_MAX_POWER_W, default=5000.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100000, step=100, unit_of_measurement="W", mode=number)
+            ),
+            vol.Optional(CONF_EV_V2H_MIN_SOC_PCT, default=25.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=0, max=100, step=1, unit_of_measurement="%", mode=number)
+            ),
+        }
+    )
+
+
+def _peak_shaving_schema() -> vol.Schema:
+    """Écrêtage de pointe : toute la logique de délestage haute consommation."""
+    box = selector.NumberSelectorMode.BOX
+
+    def number(low: float, high: float, step: float, unit: str | None = None) -> selector.NumberSelector:
+        cfg: dict[str, Any] = {"min": low, "max": high, "step": step, "mode": box}
+        if unit:
+            cfg["unit_of_measurement"] = unit
+        return selector.NumberSelector(selector.NumberSelectorConfig(**cfg))
+
+    basis = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                {"value": peak.BASIS_HOUSE, "label": "Consommation maison (comportement historique)"},
+                {"value": peak.BASIS_GRID_IMPORT, "label": "Import réseau (recommandé avec production solaire)"},
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+    regime = selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=[
+                {"value": grid_load.GRID_REGIME_MONO, "label": "MONO • Monophasé"},
+                {"value": grid_load.GRID_REGIME_TRI, "label": "TRI • Triphasé"},
+                {"value": grid_load.GRID_REGIME_TETRA, "label": "TETRA • Tétraphasé"},
+            ],
+            mode=selector.SelectSelectorMode.DROPDOWN,
+        )
+    )
+    return vol.Schema(
+        {
+            vol.Optional(peak.CONF_PEAK_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(grid_load.CONF_GRID_REGIME, default=grid_load.GRID_REGIME_MONO): regime,
+            vol.Optional(CONF_MAIN_BREAKER_CURRENT_A, default=0.0): number(0, 200, 1, "A"),
+            vol.Optional(CONF_MAIN_BREAKER_VOLTAGE_V, default=230.0): number(100, 500, 10, "V"),
+            vol.Optional(grid_load.CONF_INVERTER_COS_PHI, default=1.0): number(0.1, 1, 0.01),
+            _optional(grid_load.CONF_GRID_VOLTAGE_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_CURRENT_L1_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_CURRENT_L2_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_CURRENT_L3_SENSOR): _entity("sensor"),
+            vol.Optional(peak.CONF_PEAK_PHASES, default=1): number(1, 3, 1),
+            vol.Optional(peak.CONF_PEAK_MEASURE_BASIS, default=peak.BASIS_HOUSE): basis,
+            vol.Optional(peak.CONF_PEAK_TRIGGER_RATIO_PCT, default=90): number(50, 100, 1, "%"),
+            vol.Optional(peak.CONF_PEAK_TRIGGER_W, default=5000): number(1000, 20000, 100, "W"),
+            vol.Optional(peak.CONF_PEAK_RELEASE_RATIO_PCT, default=0): number(0, 99, 1, "%"),
+            vol.Optional(peak.CONF_PEAK_RELEASE_W, default=3500): number(500, 19000, 100, "W"),
+            vol.Optional(peak.CONF_PEAK_CONFIRM_FRAMES, default=0): number(0, 10, 1),
+            vol.Optional(peak.CONF_PEAK_RELEASE_FRAMES, default=5): number(1, 30, 1),
+            vol.Optional(peak.CONF_PEAK_SHED_BOILER, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_SHED_MACHINES, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_RELEASE_INVERTER, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_BLOCK_FLEXIBLE, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_V2H_ASSIST, default=True): selector.BooleanSelector(),
+            vol.Optional(peak.CONF_PEAK_V2H_TARGET_RATIO_PCT, default=80): number(30, 100, 1, "%"),
+        }
+    )
+
+
+_SCHEMA_BUILDERS = {
+    "sources": _sources_schema,
+    "boiler": _boiler_schema,
+    "pri": _pri_schema,
+    "hphc": _hphc_schema,
+    "ia": _solar_schema,
+    "pricing_dynamic": _pricing_schema,
+    "battery_ev": _virtual_assets_schema,
+    "peak_shaving": _peak_shaving_schema,
+}
+
+
+_BOILER_SECTIONS = {
+    "thermal_model": (CONF_BOILER_VOLUME, CONF_BOILER_ELEMENT_POWER, CONF_BOILER_COLD_WATER_TEMP),
+}
+_PRICING_SECTIONS = {
+    "daily_stats": (
+        CONF_PRICE_MIN_TODAY, CONF_PRICE_MAX_TODAY, CONF_PRICE_AVG_TODAY,
+        CONF_PRICE_MIN_TOMORROW, CONF_PRICE_MAX_TOMORROW, CONF_PRICE_AVG_TOMORROW,
+        CONF_PRICE_TOMORROW_AVAILABLE,
+    ),
+    "forecast_series": (CONF_PRICE_FORECAST_IMPORT, CONF_PRICE_FORECAST_EXPORT),
+    "strategy": (
+        "dynamic_favorable_position_pct", "dynamic_high_position_pct",
+        "dynamic_favorable_max_hours", "dynamic_preferred_network_max_eur_kwh",
+    ),
+}
+_IA_SECTIONS = {
+    "forecasts": (
+        CONF_FORECAST_NOW, CONF_FORECAST_THIS_HOUR, CONF_FORECAST_NEXT_HOUR,
+        CONF_FORECAST_TODAY, CONF_FORECAST_REMAINING_TODAY, CONF_FORECAST_1H,
+        CONF_FORECAST_12H, CONF_FORECAST_24H, CONF_FORECAST_PEAK_TODAY,
+        CONF_FORECAST_TOMORROW, CONF_FORECAST_PEAK_TOMORROW,
+    ),
+}
+
+# Étape → sections repliables. Les champs absents de la table restent en tête du formulaire.
+_FORM_SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
+    "core": {
+        "protection": ("high_load_shed_enabled", CONF_MAIN_BREAKER_CURRENT_A, CONF_MAIN_BREAKER_VOLTAGE_V),
+        "advanced": (CONF_METRONOME_FALLBACK_SENSOR, CONF_DEVELOPER_MODE),
+    },
+    "sources": {
+        "advanced": (CONF_METRONOME_FALLBACK_SENSOR, CONF_DEVELOPER_MODE),
+    },
+    "boiler": _BOILER_SECTIONS,
+    "machines": {
+        "washer": (
+            CONF_WASHER_SOCKET, CONF_WASHER_CYCLE, CONF_WASHER_ON_1,
+            CONF_WASHER_OFF_1, CONF_WASHER_ON_2, CONF_WASHER_OFF_2,
+        ),
+        "dryer": (
+            CONF_DRYER_SOCKET, CONF_DRYER_CYCLE, CONF_DRYER_ON_1,
+            CONF_DRYER_OFF_1, CONF_DRYER_ON_2, CONF_DRYER_OFF_2,
+        ),
+        "dishwasher": (
+            CONF_DISHWASHER_SOCKET, CONF_DISHWASHER_CYCLE, CONF_DISHWASHER_ON_1,
+            CONF_DISHWASHER_OFF_1, CONF_DISHWASHER_ON_2, CONF_DISHWASHER_OFF_2,
+        ),
+    },
+    "pricing": _PRICING_SECTIONS,
+    "pricing_dynamic": _PRICING_SECTIONS,
+    "hphc": {
+        "schedule": (
+            CONF_TARIFF_HP_START_1, CONF_TARIFF_HP_END_1,
+            CONF_TARIFF_HP_START_2, CONF_TARIFF_HP_END_2,
+        ),
+    },
+    "ia": _IA_SECTIONS,
+    "battery_ev": {
+        "virtual_battery": (
+            CONF_BATTERY_CAPACITY, CONF_BATTERY_MAX_CHARGE, CONF_BATTERY_MAX_DISCHARGE,
+            CONF_BATTERY_CHARGE_EFFICIENCY, CONF_BATTERY_DISCHARGE_EFFICIENCY, CONF_BATTERY_RESERVE,
+        ),
+        "virtual_ev": (CONF_EV_ENABLED, CONF_EV_CAPACITY, CONF_EV_MAX_CHARGE, CONF_EV_CHARGE_EFFICIENCY),
+        "wear_costs": (CONF_BATTERY_DEGRADATION_COST_EUR_KWH, CONF_EV_DEGRADATION_COST_EUR_KWH),
+        "v2h": (
+            CONF_EV_V2H_ENABLED, CONF_EV_V2H_SWITCH, CONF_EV_V2H_POWER_ENTITY,
+            CONF_EV_SOC_SENSOR, CONF_EV_V2H_MAX_POWER_W, CONF_EV_V2H_MIN_SOC_PCT,
+        ),
+    },
+    "peak_shaving": {
+        "connection": (
+            grid_load.CONF_GRID_REGIME, CONF_MAIN_BREAKER_CURRENT_A, CONF_MAIN_BREAKER_VOLTAGE_V,
+            peak.CONF_PEAK_PHASES, grid_load.CONF_INVERTER_COS_PHI,
+        ),
+        "thresholds": (
+            peak.CONF_PEAK_MEASURE_BASIS, peak.CONF_PEAK_TRIGGER_RATIO_PCT, peak.CONF_PEAK_TRIGGER_W,
+            peak.CONF_PEAK_RELEASE_RATIO_PCT, peak.CONF_PEAK_RELEASE_W,
+            peak.CONF_PEAK_CONFIRM_FRAMES, peak.CONF_PEAK_RELEASE_FRAMES,
+        ),
+        "actions": (
+            peak.CONF_PEAK_SHED_BOILER, peak.CONF_PEAK_SHED_MACHINES, peak.CONF_PEAK_RELEASE_INVERTER,
+            peak.CONF_PEAK_BLOCK_FLEXIBLE, peak.CONF_PEAK_V2H_ASSIST, peak.CONF_PEAK_V2H_TARGET_RATIO_PCT,
+        ),
+        "measurements": (
+            grid_load.CONF_GRID_VOLTAGE_SENSOR, grid_load.CONF_GRID_CURRENT_L1_SENSOR,
+            grid_load.CONF_GRID_CURRENT_L2_SENSOR, grid_load.CONF_GRID_CURRENT_L3_SENSOR,
+        ),
+    },
+}
+_MACHINE_SECTIONS: dict[str, tuple[str, ...]] = {
+    "automation": ("automatic", "sheddable", "on_1", "off_1", "on_2", "off_2"),
+    "cycle": (
+        "cycle", "cycle_start_w", "cycle_start_confirm_s", "cycle_duration_minutes",
+        "cycle_margin_minutes", "cycle_end_w", "cycle_end_confirm_minutes",
+    ),
+    "measurements": ("current_sensor", "voltage_sensor"),
+}
+_OPEN_SECTIONS = frozenset({"connection"})
+
+
+# FONCTION : _with_sections — Move fields into collapsible sections, keeping their order.
+def _with_sections(schema: vol.Schema, layout: dict[str, tuple[str, ...]]) -> vol.Schema:
+    """Move fields into collapsible sections, keeping their order."""
+    grouped = {key for keys in layout.values() for key in keys}
+    fields: dict[Any, Any] = {
+        marker: value for marker, value in schema.schema.items() if marker.schema not in grouped
+    }
+    for name, keys in layout.items():
+        inner = {marker: value for marker, value in schema.schema.items() if marker.schema in keys}
+        if inner:
+            fields[vol.Required(name)] = section(vol.Schema(inner), {"collapsed": name not in _OPEN_SECTIONS})
+    return vol.Schema(fields)
+
+
+# FONCTION : _cleared_entities — An emptied entity picker is simply absent from the submitted data.
+def _cleared_entities(
+    schema: vol.Schema, submitted: dict[str, Any], current: dict[str, Any]
+) -> dict[str, str]:
+    """An emptied entity picker is simply absent from the submitted data."""
+    return {
+        marker.schema: ""
+        for marker, value in schema.schema.items()
+        if isinstance(value, selector.EntitySelector)
+        and marker.schema not in submitted
+        and current.get(marker.schema)
+    }
+
+
+# FONCTION : _schema_with_current — Schema with current
+def _schema_with_current(schema: vol.Schema, current: dict[str, Any]) -> vol.Schema:
+    fields: dict[Any, Any] = {}
+    for marker, validator in schema.schema.items():
+        key = marker.schema
+        if key in current:
+            value = _normalise_value(current[key])
+            if isinstance(marker, vol.Required):
+                new_marker = vol.Required(key, default=value)
+            else:
+                new_marker = vol.Optional(key, description={"suggested_value": value})
+        else:
+            new_marker = marker
+        fields[new_marker] = validator
+    return vol.Schema(fields)
+
+
+class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Initial installation flow for FoxCat Energy."""
+
+    VERSION = 1
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.__init__ — méthode spéciale __init__
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {}
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_user — Root menu: choose the contract family.
+    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+        """Root menu: choose the contract family."""
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
+        return self.async_show_menu(step_id="user", menu_options=["hphc", "dynamique"])
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc — Branch A: HP/HC family, choose Mono-horaire or Bi-horaire.
+    async def async_step_hphc(self, user_input: dict[str, Any] | None = None):
+        """Branch A: HP/HC family, choose Mono-horaire or Bi-horaire."""
+        if user_input is not None:
+            self._data["tariff_family"] = "hphc"
+            self._data["tariff_structure"] = user_input["tariff_structure"]
+            if user_input["tariff_structure"] == HPHC_MONO:
+                return await self.async_step_hphc_mono()
+            return await self.async_step_hphc_bi()
+        return self.async_show_form(
+            step_id="hphc", data_schema=_structure_schema(HPHC_STRUCTURES, HPHC_MONO)
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_mono — traitement asynchrone : step hphc mono
+    async def async_step_hphc_mono(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data.update(_normalise_input(user_input))
+            return await self.async_step_core()
+        return self.async_show_form(
+            step_id="hphc_mono",
+            data_schema=vol.Schema({vol.Required(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor"), _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor")}),
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_bi — traitement asynchrone : step hphc bi
+    async def async_step_hphc_bi(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data.update(_normalise_input(user_input))
+            return await self.async_step_core()
+        return self.async_show_form(
+            step_id="hphc_bi",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_TARIFF_HP_PRICE_SENSOR): _entity("sensor"),
+                    vol.Required(CONF_TARIFF_HC_PRICE_SENSOR): _entity("sensor"),
+                    _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor"),
+                }
+            ),
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_dynamique — Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique.
+    async def async_step_dynamique(self, user_input: dict[str, Any] | None = None):
+        """Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique."""
+        if user_input is not None:
+            self._data["tariff_family"] = "dynamique"
+            self._data["tariff_structure"] = user_input["tariff_structure"]
+            return await self.async_step_core()
+        return self.async_show_form(
+            step_id="dynamique",
+            data_schema=_structure_schema(DYNAMIQUE_STRUCTURES, DYNAMIQUE_STRUCTURES[0]),
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_core — traitement asynchrone : step core
+    async def async_step_core(self, user_input: dict[str, Any] | None = None):
+        if user_input is not None:
+            self._data.update(_normalise_input(_flatten_sections(user_input)))
+            return await self.async_step_boiler()
+        return self.async_show_form(
+            step_id="core", data_schema=_with_sections(_core_schema(), _FORM_SECTIONS["core"])
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_boiler — traitement asynchrone : step boiler
+    async def async_step_boiler(self, user_input=None):
+        if user_input is not None:
+            self._data.update(_normalise_input(_flatten_sections(user_input)))
+            return await self.async_step_pri()
+        return self.async_show_form(
+            step_id="boiler", data_schema=_with_sections(_boiler_schema(), _FORM_SECTIONS["boiler"])
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_pri — traitement asynchrone : step pri
+    async def async_step_pri(self, user_input=None):
+        if user_input is not None:
+            self._data.update(_normalise_input(user_input))
+            return await self.async_step_machines()
+        return self.async_show_form(step_id="pri", data_schema=_pri_schema())
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_machines — traitement asynchrone : step machines
+    async def async_step_machines(self, user_input=None):
+        if user_input is not None:
+            self._data.update(_normalise_input(_flatten_sections(user_input)))
+            if self._data.get("tariff_family") == "dynamique":
+                return await self.async_step_pricing()
+            return await self.async_step_ia()
+        return self.async_show_form(
+            step_id="machines", data_schema=_with_sections(_machines_schema(), _FORM_SECTIONS["machines"])
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_pricing — traitement asynchrone : step pricing
+    async def async_step_pricing(self, user_input=None):
+        if user_input is not None:
+            self._data.update(_normalise_input(_flatten_sections(user_input)))
+            return await self.async_step_ia()
+        return self.async_show_form(
+            step_id="pricing", data_schema=_with_sections(_pricing_schema(), _FORM_SECTIONS["pricing"])
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_ia — traitement asynchrone : step ia
+    async def async_step_ia(self, user_input=None):
+        if user_input is not None:
+            self._data.update(_normalise_input(_flatten_sections(user_input)))
+            title = str(self._data.get(CONF_INSTALLATION_NAME, "FoxCat Energy"))
+            await self.async_set_unique_id("foxcat_energy_main")
+            self._abort_if_unique_id_configured()
+            return self.async_create_entry(title=title, data=self._data)
+        return self.async_show_form(
+            step_id="ia", data_schema=_with_sections(_solar_schema(), _FORM_SECTIONS["ia"])
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_solar — Compatibilité avec l'ancien nom de l'étape EMS 2 solaire.
+    async def async_step_solar(self, user_input=None):
+        """Compatibilité avec l'ancien nom de l'étape EMS 2 solaire."""
+        return await self.async_step_ia(user_input)
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_get_options_flow — Return the transactional options flow
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry):
+        """Return the transactional options flow.
+
+        Home Assistant attaches config_entry to the OptionsFlow instance.
+        """
+        return FoxCatEnergyOptionsFlow()
+
+
+class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
+    """Transactional options flow.
+
+    No ConfigEntry mutation occurs while the menu is open.  Changes are kept in
+    memory and committed once with async_create_entry() at "finish".  The
+    ConfigEntry update listener can therefore reload FoxCat only after the flow
+    is complete instead of destroying an active flow.
+    """
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.__init__ — méthode spéciale __init__
+    def __init__(self) -> None:
+        super().__init__()
+        self._pending_options: dict[str, Any] | None = None
+        self._selected_machine_id: str | None = None
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._ensure_pending — Ensure pending
+    def _ensure_pending(self) -> dict[str, Any]:
+        if self._pending_options is None:
+            self._pending_options = dict(self.config_entry.options)
+        return self._pending_options
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._effective — Effective
+    def _effective(self) -> dict[str, Any]:
+        data = dict(self.config_entry.data)
+        data.update(self._ensure_pending())
+
+        # V1.2.2 migration: V1.2.0/1.2.1 stored HP/HC prices in the
+        # coordinator store because they were exposed only as number entities.
+        # If the ConfigEntry does not contain them yet, pre-fill the new page
+        # with the live values so existing user tuning is not lost.
+        # Migration 1.5.x -> 1.6.0: l'ancien fallback pouvait être un capteur
+        # d'export positif uniquement. Il ne doit pas être réutilisé par défaut
+        # comme puissance réseau signée de secours.
+        if CONF_GRID_SIGNED_SENSOR not in data:
+            data[CONF_METRONOME_FALLBACK_SENSOR] = ""
+
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        if coordinator is not None:
+            for key in (CONF_TARIFF_FIXED_INJECTION_PRICE,):
+                if key not in data and key in coordinator.settings:
+                    data[key] = coordinator.settings[key]
+        return data
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_init — traitement asynchrone : step init
+    async def async_step_init(self, user_input=None):
+        self._ensure_pending()
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=list(OFFICIAL_MENU_STEPS),
+            description_placeholders={"status": self._menu_status()},
+        )
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._menu_status — One-glance summary shown above the main menu.
+    def _menu_status(self) -> str:
+        """One-glance summary shown above the main menu."""
+        effective = self._effective()
+        pending = self._ensure_pending()
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        settings = coordinator.settings if coordinator is not None else {}
+        tariff = settings.get("tariff_regime") or "non défini"
+        shed = pending.get(
+            "high_load_shed_enabled",
+            settings.get("high_load_shed_enabled", effective.get("high_load_shed_enabled", False)),
+        )
+        status = (
+            f"Tarif : {tariff} • Machines : {len(self._machine_records())} "
+            f"• Écrêtage : {'activé' if shed else 'désactivé'}"
+        )
+        if pending != dict(self.config_entry.options):
+            status += "\n\n⚠️ Modifications en attente : choisissez « Enregistrer et quitter » pour les appliquer."
+        return status
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._section — Section
+    async def _section(self, step_id: str, user_input, return_step: str = "init"):
+        schema = _SCHEMA_BUILDERS[step_id]()
+        if user_input is not None:
+            normalised = _normalise_input(_flatten_sections(user_input))
+            pending = self._ensure_pending()
+            pending.update(_cleared_entities(schema, normalised, self._effective()))
+            pending.update(normalised)
+            if step_id == "sources" and CONF_METRONOME_FALLBACK_SENSOR not in normalised:
+                # Empty option explicitly shadows a pre-1.6 fallback stored in entry.data.
+                pending[CONF_METRONOME_FALLBACK_SENSOR] = ""
+            return await getattr(self, f"async_step_{return_step}")()
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=_with_sections(
+                _schema_with_current(schema, self._effective()),
+                _FORM_SECTIONS.get(step_id, {}),
+            ),
+        )
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_sources — traitement asynchrone : step sources
+    async def async_step_sources(self, user_input=None):
+        return await self._section("sources", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._info_section — Info section
+    async def _info_section(self, step_id: str, user_input=None, return_step: str = "init"):
+        if user_input is not None:
+            return await getattr(self, f"async_step_{return_step}")()
+        return self.async_show_form(step_id=step_id, data_schema=vol.Schema({}))
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_about — Pure information page: nothing to configure.
+    async def async_step_about(self, user_input=None):
+        return await self._info_section("about", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_equipment — Sous-menu des équipements pilotés
+    async def async_step_equipment(self, user_input=None):
+        return self.async_show_menu(step_id="equipment", menu_options=list(EQUIPMENT_MENU_STEPS))
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_ia — traitement asynchrone : step ia
+    async def async_step_ia(self, user_input=None):
+        return await self._section("ia", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_boiler — traitement asynchrone : step boiler
+    async def async_step_boiler(self, user_input=None):
+        return await self._section("boiler", user_input, return_step="equipment")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_peak_shaving — Écrêtage de pointe (délestage)
+    async def async_step_peak_shaving(self, user_input=None):
+        """Configure toute la logique d'écrêtage ; refuse les combinaisons incohérentes."""
+        if user_input is not None:
+            merged = {**self._effective(), **_normalise_input(_flatten_sections(user_input))}
+            errors = peak.validate(peak.PeakShavingConfig.from_settings(merged))
+            if errors:
+                return self.async_show_form(
+                    step_id="peak_shaving",
+                    data_schema=_with_sections(
+                        _schema_with_current(_peak_shaving_schema(), merged),
+                        _FORM_SECTIONS["peak_shaving"],
+                    ),
+                    errors={"base": errors[0]},
+                )
+        return await self._section("peak_shaving", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_battery_ev — Configuration batterie et VE virtuels
+    async def async_step_battery_ev(self, user_input=None):
+        return await self._section("battery_ev", user_input, return_step="equipment")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pri — traitement asynchrone : step pri
+    async def async_step_pri(self, user_input=None):
+        return await self._section("pri", user_input, return_step="equipment")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._machine_records — Machine records
+    def _machine_records(self) -> list[dict[str, Any]]:
+        effective = self._effective()
+        return records_for_options(effective)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._store_machine_records — Store machine records
+    def _store_machine_records(self, records: list[dict[str, Any]]) -> None:
+        self._ensure_pending()[CONF_MACHINES_V13] = records
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machines — traitement asynchrone : step machines
+    async def async_step_machines(self, user_input=None):
+        records = self._machine_records()
+        names = ", ".join(str(item.get("name") or item.get("id")) for item in records)
+        options = ["machine_add", "machine_edit", "machine_remove"] if records else ["machine_add"]
+        return self.async_show_menu(
+            step_id="machines",
+            menu_options=[*options, "equipment"],
+            description_placeholders={"machines": names or "aucune"},
+        )
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_add — traitement asynchrone : step machine add
+    async def async_step_machine_add(self, user_input=None):
+        if user_input is None:
+            return self.async_show_form(
+                step_id="machine_add",
+                data_schema=_with_sections(_machine_record_schema(), _MACHINE_SECTIONS),
+            )
+        submitted = _flatten_sections(user_input)
+        record = _normalise_machine_record(submitted, uuid4().hex[:12])
+        if record is None:
+            return self.async_show_form(
+                step_id="machine_add",
+                data_schema=_with_sections(_machine_record_schema(submitted), _MACHINE_SECTIONS),
+                errors={"base": "invalid_machine_config"},
+            )
+        records = self._machine_records()
+        records.append(record)
+        self._store_machine_records(records)
+        return await self.async_step_machines()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_edit — traitement asynchrone : step machine edit
+    async def async_step_machine_edit(self, user_input=None):
+        records = self._machine_records()
+        if not records:
+            return await self.async_step_machines()
+        if user_input is None:
+            return self.async_show_form(step_id="machine_edit", data_schema=_machine_choice_schema(records))
+        self._selected_machine_id = str(user_input["machine_id"])
+        return await self.async_step_machine_edit_form()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_edit_form — traitement asynchrone : step machine edit form
+    async def async_step_machine_edit_form(self, user_input=None):
+        records = self._machine_records()
+        current = next((item for item in records if str(item.get("id")) == self._selected_machine_id), None)
+        if current is None:
+            return await self.async_step_machines()
+        if user_input is None:
+            return self.async_show_form(
+                step_id="machine_edit_form",
+                data_schema=_with_sections(_machine_record_schema(current), _MACHINE_SECTIONS),
+            )
+        submitted = _flatten_sections(user_input)
+        updated = _normalise_machine_record(submitted, self._selected_machine_id or "")
+        if updated is None:
+            return self.async_show_form(
+                step_id="machine_edit_form",
+                data_schema=_with_sections(_machine_record_schema(submitted), _MACHINE_SECTIONS),
+                errors={"base": "invalid_machine_config"},
+            )
+        records = [updated if str(item.get("id")) == self._selected_machine_id else item for item in records]
+        self._store_machine_records(records)
+        self._selected_machine_id = None
+        return await self.async_step_machines()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_machine_remove — traitement asynchrone : step machine remove
+    async def async_step_machine_remove(self, user_input=None):
+        records = self._machine_records()
+        if not records:
+            return await self.async_step_machines()
+        if user_input is None:
+            return self.async_show_form(step_id="machine_remove", data_schema=_machine_choice_schema(records))
+        machine_id = str(user_input["machine_id"])
+        self._store_machine_records([item for item in records if str(item.get("id")) != machine_id])
+        return await self.async_step_machines()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing — traitement asynchrone : step pricing
+    async def async_step_pricing(self, user_input=None):
+        options = ["pricing_dynamic", "hphc", "init"]
+        return self.async_show_menu(step_id="pricing", menu_options=options)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_dynamic — traitement asynchrone : step pricing dynamic
+    async def async_step_pricing_dynamic(self, user_input=None):
+        return await self._section("pricing_dynamic", user_input, return_step="pricing")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_hphc — traitement asynchrone : step hphc
+    async def async_step_hphc(self, user_input=None):
+        return await self._section("hphc", user_input, return_step="pricing")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_finish — traitement asynchrone : step finish
+    async def async_step_finish(self, user_input=None):
+        return self.async_create_entry(title="", data=self._ensure_pending())
