@@ -1,6 +1,8 @@
 # Changelog — FoxCat Energy V1.7.6
 
 ## Non publié
+- README entièrement réécrit à partir du comportement réel du code (modes, tarification, politique réseau, boiler, PRI, machines, écrêtage, services, valeurs par défaut). Les anciens README et `INSTALLATION.txt` (1.2.0) sont déplacés dans `docs/archive/`.
+- Nettoyage : suppression de la copie imbriquée `custom_components/foxcat_energy/custom_components/`, de `domain/engine/flexible_boiler.py` (jamais appelé, import cassé), des scripts et copies obsolètes à la racine du dépôt (`flexible_load_planner.py`, `machine_learning.py`, `tariff_model.py`, `patch_coordinator.py`, `dashboard.yaml.yaml`) et des fichiers `__pycache__` suivis par git.
 - Boiler en heures creuses : il attend désormais le dernier failback avant de chauffer sur le réseau, pour laisser la priorité au solaire (Éco, Confort, Bihoraire). Nouvel interrupteur « Boiler : attendre le dernier failback en HC » (actif par défaut) et réglage « Marge de sécurité failback boiler » (30 min par défaut). Interrupteur coupé = ancien comportement. Le mode Dynamique est inchangé.
 - Menu de configuration réorganisé : 7 entrées par tâche, sous-menu Équipements, résumé de l'état en tête de menu et avertissement tant que des modifications ne sont pas enregistrées.
 - Formulaires longs regroupés en sections repliables, dans les options et à l'installation; les réglages restent stockés à plat, sans migration.

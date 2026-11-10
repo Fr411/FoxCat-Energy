@@ -1,20 +1,5 @@
 # FoxCat Energy - Dashboard généré automatiquement
 
-## Fichiers GitHub
-
-Copier dans le dépôt :
-
-```text
-custom_components/foxcat_energy/
-├── __init__.py
-├── button.py
-├── dashboard.py
-└── dashboard/
-    └── dashboard.yaml
-```
-
-Le reste du composant FoxCat Energy reste inchangé.
-
 ## Fonctionnement
 
 Au chargement de FoxCat Energy :
