@@ -5,7 +5,7 @@ from datetime import datetime
 from ....const import BOILER_BOOST_65, BOILER_HEAT_45, BOILER_NONE, BOILER_STOP
 from ..models import BoilerIntent, EnergySnapshot
 from ...tariff.tariff import is_offpeak_day, is_offpeak_night, is_peak, minute_of_day
-from .common import coverage, ecs_last_departure
+from .common import coverage, ecs_last_departure, hc_grid_start_allowed
 
 
 # FONCTION : evaluate_ecs_solar — ECS solaire V1.2.0
@@ -58,8 +58,10 @@ def evaluate_ecs_solar(
                 return BoilerIntent(BOILER_HEAT_45, "Nuit observation : failback atteint.", "ECS_HC_45")
             return BoilerIntent(BOILER_NONE, "22h00-23h00 : observation thermique.", "HC_NUIT")
         if 1380 <= m < 1400:  # 23:00-23:20
-            if snapshot.boiler_temp_c < normal:
+            if snapshot.boiler_temp_c < normal and hc_grid_start_allowed(snapshot, settings, now):
                 return BoilerIntent(BOILER_HEAT_45, "23h00-23h20 : charge initiale nocturne.", "ECS_HC_45")
+            if snapshot.boiler_temp_c < normal:
+                return BoilerIntent(BOILER_NONE, "23h00-23h20 : attente du dernier failback.", "HC_NUIT")
             return BoilerIntent(BOILER_STOP, "Charge initiale : 45 °C déjà atteint.", "HC_NUIT")
         if 1400 <= m < 1430:  # 23:20-23:50
             if snapshot.boiler_temp_c < normal and last_departure:
@@ -108,7 +110,7 @@ def evaluate_ecs_solar(
             return BoilerIntent(BOILER_HEAT_45, "HC jour : couverture solaire stable suffisante.", "ECS_HC_45")
         if snapshot.boiler_temp_c < normal and last_departure:
             return BoilerIntent(BOILER_HEAT_45, "HC jour : failback atteint.", "ECS_HC_45")
-        if 960 <= minute_of_day(now) < 1020 and snapshot.boiler_temp_c < normal:
+        if (not bool(settings.get("boiler_hc_wait_failback", True))) and 960 <= minute_of_day(now) < 1020 and snapshot.boiler_temp_c < normal:
             return BoilerIntent(BOILER_HEAT_45, "16h00-17h00 : rattrapage HC vers 45 °C.", "ECS_HC_45")
         return BoilerIntent(BOILER_NONE, "HC jour : attente, aucune chauffe nécessaire.", "HC_JOUR")
 

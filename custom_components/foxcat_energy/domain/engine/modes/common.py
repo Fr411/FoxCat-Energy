@@ -35,6 +35,21 @@ def ecs_last_departure(snapshot: EnergySnapshot, settings: dict[str, Any], now: 
     else: return False
     
     normal = float(settings.get("boiler_temp_normal_c", 45.0))
+    margin = max(float(settings.get("boiler_failback_margin_min", 30.0)), 0.0)
     projected_end = snapshot.boiler_temp_c - 0.5 * (minutes_end / 60.0)
     heating_minutes = max(0.0, (normal - projected_end) / 10.0 * 60.0)
-    return minutes_end - heating_minutes - 30.0 <= 0
+    return minutes_end - heating_minutes - margin <= 0
+
+
+# FONCTION : hc_grid_start_allowed — Autorise le démarrage réseau en HC (immédiat ou au dernier failback)
+def hc_grid_start_allowed(snapshot: EnergySnapshot, settings: dict[str, Any], now: datetime) -> bool:
+    """Retourne True si le boiler peut démarrer sur le réseau en heures creuses.
+
+    Option ``boiler_hc_wait_failback`` active (défaut) : on attend le dernier
+    moment possible pour laisser une chance au solaire ; le démarrage réseau
+    n'est autorisé qu'au failback. Option désactivée : ancien comportement
+    (démarrage immédiat dès que la HC est ouverte).
+    """
+    if not bool(settings.get("boiler_hc_wait_failback", True)):
+        return True
+    return ecs_last_departure(snapshot, settings, now)

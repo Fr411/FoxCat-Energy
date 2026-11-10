@@ -1,6 +1,7 @@
 # Changelog — FoxCat Energy V1.7.6
 
 ## Non publié
+- Boiler en heures creuses : il attend désormais le dernier failback avant de chauffer sur le réseau, pour laisser la priorité au solaire (Éco, Confort, Bihoraire). Nouvel interrupteur « Boiler : attendre le dernier failback en HC » (actif par défaut) et réglage « Marge de sécurité failback boiler » (30 min par défaut). Interrupteur coupé = ancien comportement. Le mode Dynamique est inchangé.
 - Menu de configuration réorganisé : 7 entrées par tâche, sous-menu Équipements, résumé de l'état en tête de menu et avertissement tant que des modifications ne sont pas enregistrées.
 - Formulaires longs regroupés en sections repliables, dans les options et à l'installation; les réglages restent stockés à plat, sans migration.
 - Vider un champ d'entité est désormais enregistré; auparavant l'ancienne valeur restait active.

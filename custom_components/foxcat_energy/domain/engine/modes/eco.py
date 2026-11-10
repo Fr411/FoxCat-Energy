@@ -5,7 +5,7 @@ from datetime import datetime
 from ....const import BOILER_BOOST_65, BOILER_HEAT_45, BOILER_NONE, BOILER_STOP
 from ..models import BoilerIntent, EnergySnapshot
 from ...tariff.tariff import is_offpeak, is_peak
-from .common import coverage
+from .common import coverage, hc_grid_start_allowed
 
 
 # FONCTION : evaluate_eco — Mode Économie énergie hybride boiler + PRI
@@ -74,7 +74,9 @@ def evaluate_eco(
         return BoilerIntent(BOILER_NONE, "Économie énergie : chauffe en cours surveillée.", "ECO")
 
     if is_offpeak(now, settings) and bool(settings["boiler_allow_hc"]) and not snapshot.boiler_on and snapshot.boiler_temp_c < start:
-        return BoilerIntent(BOILER_HEAT_45, "Économie énergie : seuil HC atteint, chauffe à 45 °C.", "HC_RESEAU")
+        if hc_grid_start_allowed(snapshot, settings, now):
+            return BoilerIntent(BOILER_HEAT_45, "Économie énergie : seuil HC atteint, chauffe à 45 °C.", "HC_RESEAU")
+        return BoilerIntent(BOILER_NONE, "Économie énergie : HC, attente du dernier failback (le solaire peut encore chauffer).", "ECO_HC_WAIT")
 
     if snapshot.boiler_on and snapshot.boiler_temp_c >= normal:
         return BoilerIntent(BOILER_STOP, "Économie énergie : 45 °C atteint sans surplus à stocker.", "ECO")
