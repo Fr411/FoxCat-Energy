@@ -18,6 +18,7 @@ from .const import (
     CONF_PV_SENSOR,
 )
 from .runtime.coordinator import FoxCatEnergyCoordinator
+from .devices_layout import HUB_DEVICE
 from .entity import FoxCatEntity
 from .runtime.registry import registry_diagnostics
 from .trading.virtual_assets.config import (
@@ -67,10 +68,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "intensite_reseau", "Intensité réseau", "mdi:current-ac", "ems", lambda d: d["grid_load"].get("current_a"), "A", SensorDeviceClass.CURRENT),
         FoxCatNumericSensor(c, "charge_disjoncteur_pct", "Charge du disjoncteur principal", "mdi:gauge", "ems", lambda d: d["grid_load"].get("load_pct"), PERCENTAGE),
         FoxCatNumericSensor(c, "peak_shaving_decharge_w", "Peak shaving • Décharge batterie demandée", "mdi:battery-arrow-down", "ems", lambda d: d["grid_load"].get("discharge_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
-        FoxCatNumericSensor(c, "chauffage_decalage_consigne", "Chauffage • Décalage de consigne", "mdi:thermometer-plus", "ems", lambda d: d["heating_boost"].get("offset_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, suggested_object_id="foxcat_chauffage_decalage_consigne"),
-        FoxCatNumericSensor(c, "chauffage_pas_accordes", "Chauffage • Pas accordés", "mdi:stairs-up", "ems", lambda d: d["heating_boost"].get("steps")),
-        FoxCatNumericSensor(c, "chauffage_surplus_calcule", "Chauffage • Surplus calculé", "mdi:solar-power-variant", "ems", lambda d: d["heating_boost"].get("surplus_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
-        FoxCatValueSensor(c, "chauffage_statut", "Chauffage • Statut", "mdi:radiator", "ems", lambda d: d["heating_boost"].get("reason")),
+        FoxCatNumericSensor(c, "chauffage_decalage_consigne", "Décalage de consigne", "mdi:thermometer-plus", "ems", lambda d: d["heating_boost"].get("offset_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, suggested_object_id="foxcat_chauffage_decalage_consigne"),
+        FoxCatNumericSensor(c, "chauffage_pas_accordes", "Pas accordés", "mdi:stairs-up", "ems", lambda d: d["heating_boost"].get("steps")),
+        FoxCatNumericSensor(c, "chauffage_surplus_calcule", "Surplus calculé", "mdi:solar-power-variant", "ems", lambda d: d["heating_boost"].get("surplus_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
+        FoxCatValueSensor(c, "chauffage_statut", "Statut", "mdi:radiator", "ems", lambda d: d["heating_boost"].get("reason")),
         FoxCatValueSensor(c, "statut_delestage", "Statut délestage haute consommation", "mdi:home-lightning-bolt-outline", "ems", lambda d: d["load_shed"].get("reason")),
         FoxCatNumericSensor(c, "reinjection_reseau", "Puissance réinjectée au réseau", "mdi:transmission-tower-export", "energy", lambda d: d["snapshot"].export_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "prelevement_reseau", "Puissance prélevée au réseau", "mdi:transmission-tower-import", "energy", lambda d: d["snapshot"].import_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
@@ -613,6 +614,6 @@ class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
                 "name": self._foxcat_device_name or self._foxcat_device_identifier,
                 "manufacturer": "FoxCat Energy",
                 "model": "Coûts & Bilan",
-                "via_device": (DOMAIN, f"{self.coordinator.entry.entry_id}:ems"),
+                "via_device": (DOMAIN, f"{self.coordinator.entry.entry_id}:{HUB_DEVICE}"),
             }
         return super().device_info

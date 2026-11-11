@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 
+from .device_cleanup import async_remove_obsolete_devices
 from .const import DEFAULT_SETTINGS, DOMAIN, NUMBER_DEFINITIONS, PLATFORMS, SWITCH_DEFINITIONS, TIME_SETTING_KEYS
 from .runtime.coordinator import FoxCatEnergyCoordinator
 from .dashboard.dashboard import async_ensure_dashboards
@@ -118,6 +119,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Les plateformes sont chargées avant la génération du dashboard afin que
     # le registre Home Assistant connaisse déjà les unique_id FoxCat.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    async_remove_obsolete_devices(hass, entry)
 
     # Génère le dashboard officiel uniquement s'il n'existe pas encore.
     # Un dashboard déjà personnalisé n'est jamais écrasé au démarrage.

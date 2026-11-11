@@ -4,6 +4,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, VERSION
+from .devices_layout import HUB_DEVICE, device_name, resolve_device
 from .runtime.coordinator import FoxCatEnergyCoordinator
 
 
@@ -33,29 +34,14 @@ class FoxCatEntity(CoordinatorEntity[FoxCatEnergyCoordinator]):
     # MÉTHODE : FoxCatEntity.device_info — Device info
     @property
     def device_info(self) -> DeviceInfo:
-        names = {
-            "sources": "FoxCat Energy – Sources énergétiques",
-            "energy": "FoxCat Energy – Énergie",
-            "pri": "FoxCat Energy – Onduleur",
-            "inverter": "FoxCat Energy – Onduleur",
-            "ems": "FoxCat Energy – EMS",
-            "energy_bus": "FoxCat Energy – Energy Bus",
-            "machines": "FoxCat Energy – Machines",
-            "machine_learning": "FoxCat Energy – Machine Learning",
-            "ai": "FoxCat Energy – IA",
-            "boiler": "FoxCat Energy – Boiler",
-            "pricing": "FoxCat Energy – Tarification",
-            "metronome": "FoxCat Energy – Métronome",
-            "diagnostic": "FoxCat Energy – Diagnostic",
-            "user_functions": "FoxCat Energy – Fonctions utilisateur",
-            "solar": "FoxCat Energy – IA",
-            "accounting": "FoxCat Energy – Énergie",
-        }
+        # Le classement est résolu ici (et non à la construction) car certains
+        # modules réassignent ``_device`` après coup.
+        device = resolve_device(self._key, self._device)
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self.coordinator.entry.entry_id}:{self._device}")},
-            name=names.get(self._device, "FoxCat Energy"),
+            identifiers={(DOMAIN, f"{self.coordinator.entry.entry_id}:{device}")},
+            name=device_name(device),
             manufacturer="FoxCat Energy",
             model="EMS Python",
             sw_version=VERSION,
-            via_device=(DOMAIN, f"{self.coordinator.entry.entry_id}:ems") if self._device != "ems" else None,
+            via_device=(DOMAIN, f"{self.coordinator.entry.entry_id}:{HUB_DEVICE}") if device != HUB_DEVICE else None,
         )

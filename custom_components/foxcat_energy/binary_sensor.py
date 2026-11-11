@@ -17,7 +17,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         [
             FoxCatBinary(c, "donnees_valides", "Données énergétiques valides", "mdi:database-check-outline", "energy", lambda d: d["snapshot"].valid, BinarySensorDeviceClass.CONNECTIVITY),
             FoxCatBinary(c, "machine_protegee_active", "Machine protégée active", "mdi:shield-home-outline", "machines", lambda d: d["snapshot"].machine_active),
-            FoxCatBinary(c, "chauffage_decalage_actif", "Chauffage • Décalage actif", "mdi:radiator", "ems", lambda d: float(d["heating_boost"].get("offset_c") or 0.0) > 0.0),
+            FoxCatBinary(c, "chauffage_decalage_actif", "Décalage actif", "mdi:radiator", "ems", lambda d: float(d["heating_boost"].get("offset_c") or 0.0) > 0.0),
             FoxCatBinary(c, "haute_consommation_active", "Délestage haute consommation actif", "mdi:flash-alert", "ems", lambda d: d["load_shed"].get("active"), BinarySensorDeviceClass.PROBLEM),
             FoxCatBinary(c, "boiler_autorise_cycle_protege", "Chauffe-eau autorisé pendant cycle protégé", "mdi:shield-check-outline", "machines", lambda d: d["machine_guard"].get("boiler_allowed")),
             FoxCatBinary(c, "boiler_physique", "Boiler physique", "mdi:water-boiler", "boiler", lambda d: d["snapshot"].boiler_on, BinarySensorDeviceClass.POWER),

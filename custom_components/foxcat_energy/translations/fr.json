@@ -275,11 +275,11 @@
         "title": "Configuration FoxCat Energy",
         "description": "{status}\n\nLes changements restent en mémoire jusqu’à « Enregistrer et quitter » : fermer cette fenêtre avant les annule.",
         "menu_options": {
-          "sources": "Sources de mesure",
+          "sources": "Mesures et sources",
           "pricing": "Tarification",
           "equipment": "Équipements",
-          "peak_shaving": "Protection du raccordement",
-          "ia": "IA et prévisions solaires",
+          "peak_shaving": "Protection",
+          "ia": "Prévisions et IA",
           "about": "À propos du fonctionnement",
           "finish": "✓ Enregistrer et quitter"
         }
@@ -781,7 +781,7 @@
           "boiler": "Boiler",
           "heating": "Chauffage",
           "machines": "Machines",
-          "battery_ev": "Batterie + VE",
+          "battery_ev": "Batterie et VE",
           "init": "← Retour au menu principal"
         }
       },
