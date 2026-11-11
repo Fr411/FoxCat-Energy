@@ -362,6 +362,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Décalage de consigne chauffage : état en mémoire uniquement (repart à 0
         # au redémarrage, c'est voulu). FoxCat ne commande aucun thermostat.
         self._heating_boost_state = heating_logic.HeatingBoostState()
+        # Décalage actuellement inclus dans les presets du thermostat. Écrit par
+        # l'automatisation Home Assistant via l'entité number FoxCat, conservé
+        # au redémarrage (contrairement au calcul, qui repart à 0).
+        self.heating_applied_c: float = 0.0
         self.heating_boost_view: dict[str, Any] = {
             "offset_c": 0.0,
             "steps": 0,
@@ -543,6 +547,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.virtual_assets.reconfigure({**self.config, **self.settings})
             self.virtual_assets.restore_state(stored.get("virtual_assets"))
             self.machine_learning.restore(stored.get("machine_learning"))
+            self.heating_applied_c = heating_logic.clamp_applied(stored.get("heating_applied_c"))
             price_backup = stored.get("price_backup", {})
             self.price_backup = (
                 {
@@ -665,6 +670,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "virtual_assets": self.virtual_assets.dump_state(),
                 "machine_learning": self.machine_learning.dump(),
                 "price_backup": self.price_backup,
+                "heating_applied_c": self.heating_applied_c,
                 "solar_forecast": {
                     "available": self.solar_forecast.available,
                     "start": self.solar_forecast.start,
@@ -1202,6 +1208,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self._evaluate_high_load(self.snapshot())
         self._evaluate_heating_boost(self.snapshot())
         return self._build_data()
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_heating_applied — Mémorise le décalage inclus dans les presets
+    async def async_set_heating_applied(self, value: Any) -> None:
+        """Enregistre le décalage inclus dans les presets (écrit par l'automatisation HA)."""
+        self.heating_applied_c = heating_logic.clamp_applied(value)
+        await self._async_save()
+        self.async_set_updated_data(self._build_data())
 
     # MÉTHODE : FoxCatEnergyCoordinator._heating_presence — Nombre de personnes présentes (None = inconnu)
     def _heating_presence(self, entity_id: str) -> int | None:
@@ -4316,7 +4329,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
-            "heating_boost": dict(self.heating_boost_view),
+            "heating_boost": {**self.heating_boost_view, "applied_c": self.heating_applied_c},
             "grid_load": self._grid_load_view(snap),
             "machine_guard": {
                 "active": snap.machine_active,

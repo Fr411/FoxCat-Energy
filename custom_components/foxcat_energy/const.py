@@ -29,6 +29,22 @@ OFFICIAL_MENU_STEPS = (
     "about",
     "finish",
 )
+# Sous-menu Équipements → Chauffage.
+HEATING_MENU_STEPS = (
+    "heating_settings",
+    "heating_entities",
+    "equipment",
+)
+HEATING_SWITCH_KEYS = ("heating_boost_enabled", "heating_only_when_empty")
+HEATING_NUMBER_KEYS = (
+    "heating_boost_max_c",
+    "heating_boost_step_c",
+    "heating_surplus_per_step_w",
+    "heating_surplus_reserve_w",
+    "heating_hold_s",
+    "heating_import_max_w",
+    "heating_group_limit_w",
+)
 EQUIPMENT_MENU_STEPS = (
     "pri",
     "boiler",

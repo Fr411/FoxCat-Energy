@@ -158,6 +158,10 @@ _native("ems.last_action", "EMS", "derniere_action")
 _native("ems.load_shed", "EMS", "statut_delestage")
 _native("ems.heating_boost_offset", "EMS", "chauffage_decalage_consigne")
 _native("ems.heating_boost_status", "EMS", "chauffage_statut")
+_native("ems.heating_boost_steps", "EMS", "chauffage_pas_accordes")
+_native("ems.heating_boost_surplus", "EMS", "chauffage_surplus_calcule")
+_native("ems.heating_boost_active", "EMS", "chauffage_decalage_actif")
+_native("ems.heating_applied", "EMS", "heating_applied_c")
 _native("ems.persistent_status_notification", "EMS", "persistent_status_notification_enabled")
 
 # Appareils
