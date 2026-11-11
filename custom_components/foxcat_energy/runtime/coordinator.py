@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .. import grid_load
+from .. import heating_boost as heating_logic
 from .. import peak_shaving as peak_logic
 from ..const import (
     ACK_IDLE,
@@ -357,6 +358,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "reason": "Inactif",
             "triggered_at": None,
             "house_w": 0.0,
+        }
+        # Décalage de consigne chauffage : état en mémoire uniquement (repart à 0
+        # au redémarrage, c'est voulu). FoxCat ne commande aucun thermostat.
+        self._heating_boost_state = heating_logic.HeatingBoostState()
+        self.heating_boost_view: dict[str, Any] = {
+            "offset_c": 0.0,
+            "steps": 0,
+            "reason": "Fonction désactivée.",
+            "surplus_w": None,
         }
         self.v2h_state: dict[str, Any] = {
             "active": False,
@@ -1190,7 +1200,48 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._check_end_solar()
         if bool(self.settings.get("regulation_active")):
             await self._evaluate_high_load(self.snapshot())
+        self._evaluate_heating_boost(self.snapshot())
         return self._build_data()
+
+    # MÉTHODE : FoxCatEnergyCoordinator._heating_presence — Nombre de personnes présentes (None = inconnu)
+    def _heating_presence(self, entity_id: str) -> int | None:
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return None
+        return heating_logic.parse_presence(state.state)
+
+    # MÉTHODE : FoxCatEnergyCoordinator._evaluate_heating_boost — Décalage de consigne chauffage (lecture seule)
+    def _evaluate_heating_boost(self, snapshot: EnergySnapshot) -> None:
+        """Calcule le décalage de consigne et le publie dans ``heating_boost_view``.
+
+        Aucune écriture dans les ``climate.*`` ni dans les ``number.*`` : une
+        automatisation Home Assistant applique le décalage aux presets du
+        thermostat.
+        """
+        cfg = heating_logic.HeatingBoostConfig.from_settings(self.settings, self.config)
+        group_power = (
+            self._optional_float_state(cfg.group_power_sensor) if cfg.group_power_sensor else None
+        )
+        result = heating_logic.evaluate(
+            cfg,
+            self._heating_boost_state,
+            heating_logic.HeatingBoostInputs(
+                regulation_active=bool(self.settings.get("regulation_active")),
+                snapshot_valid=bool(snapshot.valid),
+                export_w=snapshot.export_w,
+                import_w=snapshot.import_w,
+                presence=self._heating_presence(cfg.presence_entity) if cfg.only_when_empty else None,
+                group_power_w=group_power,
+            ),
+            dt_util.utcnow().timestamp(),
+        )
+        self._heating_boost_state = result.state
+        self.heating_boost_view = {
+            "offset_c": result.offset_c,
+            "steps": result.steps,
+            "reason": result.reason,
+            "surplus_w": result.surplus_w,
+        }
 
     # MÉTHODE : FoxCatEnergyCoordinator._float_state — Float state
     def _float_state(self, entity_id: str | None, default: float = 0.0) -> float:
@@ -4265,6 +4316,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
+            "heating_boost": dict(self.heating_boost_view),
             "grid_load": self._grid_load_view(snap),
             "machine_guard": {
                 "active": snap.machine_active,
