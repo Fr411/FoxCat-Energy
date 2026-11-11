@@ -1,9 +1,0 @@
-# Les prises et commandes physiques restent configurées dans le flux d'intégration.
-device:
-  id: boiler
-  name: Boiler ECS
-  category: boiler
-  enabled_setting: device_boiler_enabled
-  climate_entity: ""
-  power_sensor: ""
-  disable_strategy: stop_heating
