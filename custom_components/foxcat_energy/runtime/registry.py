@@ -156,6 +156,8 @@ _native("ems.pending_action", "EMS", "action_en_attente", "sensor.foxcat_energy_
 _native("ems.last_frame", "EMS", "derniere_trame")
 _native("ems.last_action", "EMS", "derniere_action")
 _native("ems.load_shed", "EMS", "statut_delestage")
+_native("ems.heating_boost_offset", "EMS", "chauffage_decalage_consigne")
+_native("ems.heating_boost_status", "EMS", "chauffage_statut")
 _native("ems.persistent_status_notification", "EMS", "persistent_status_notification_enabled")
 
 # Appareils

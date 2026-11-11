@@ -67,6 +67,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "intensite_reseau", "Intensité réseau", "mdi:current-ac", "ems", lambda d: d["grid_load"].get("current_a"), "A", SensorDeviceClass.CURRENT),
         FoxCatNumericSensor(c, "charge_disjoncteur_pct", "Charge du disjoncteur principal", "mdi:gauge", "ems", lambda d: d["grid_load"].get("load_pct"), PERCENTAGE),
         FoxCatNumericSensor(c, "peak_shaving_decharge_w", "Peak shaving • Décharge batterie demandée", "mdi:battery-arrow-down", "ems", lambda d: d["grid_load"].get("discharge_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
+        FoxCatNumericSensor(c, "chauffage_decalage_consigne", "Chauffage • Décalage de consigne", "mdi:thermometer-plus", "ems", lambda d: d["heating_boost"].get("offset_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, suggested_object_id="foxcat_chauffage_decalage_consigne"),
+        FoxCatValueSensor(c, "chauffage_statut", "Chauffage • Statut", "mdi:radiator", "ems", lambda d: d["heating_boost"].get("reason")),
         FoxCatValueSensor(c, "statut_delestage", "Statut délestage haute consommation", "mdi:home-lightning-bolt-outline", "ems", lambda d: d["load_shed"].get("reason")),
         FoxCatNumericSensor(c, "reinjection_reseau", "Puissance réinjectée au réseau", "mdi:transmission-tower-export", "energy", lambda d: d["snapshot"].export_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "prelevement_reseau", "Puissance prélevée au réseau", "mdi:transmission-tower-import", "energy", lambda d: d["snapshot"].import_w, UnitOfPower.WATT, SensorDeviceClass.POWER),

@@ -1,6 +1,7 @@
 # Changelog — FoxCat Energy V1.7.6
 
 ## Non publié
+- Nouveau : décalage de consigne chauffage (désactivé par défaut). FoxCat calcule un décalage en °C (0 à 2 °C par défaut, par pas de 0,5 °C) selon le surplus solaire et la présence, et le publie dans le capteur « Chauffage • Décalage de consigne » (`foxcat_chauffage_decalage_consigne`), avec un capteur « Chauffage • Statut » qui donne la raison. Une automatisation Home Assistant l'applique aux presets Versatile Thermostat : FoxCat n'écrit jamais dans les `climate.*` ni dans les `number.*`. Anti-yoyo (300 s avant toute augmentation), hystérésis à 60 % du seuil, baisse immédiate si l'import dépasse 300 W, garde sur la puissance du groupe de clim. Réglages dans Équipements → Chauffage. L'état est en mémoire et repart à 0 au redémarrage.
 - Boiler en heures creuses : il attend désormais le dernier failback avant de chauffer sur le réseau, pour laisser la priorité au solaire (Éco, Confort, Bihoraire). Nouvel interrupteur « Boiler : attendre le dernier failback en HC » (actif par défaut) et réglage « Marge de sécurité failback boiler » (30 min par défaut). Interrupteur coupé = ancien comportement. Le mode Dynamique est inchangé.
 - Menu de configuration réorganisé : 7 entrées par tâche, sous-menu Équipements, résumé de l'état en tête de menu et avertissement tant que des modifications ne sont pas enregistrées.
 - Formulaires longs regroupés en sections repliables, dans les options et à l'installation; les réglages restent stockés à plat, sans migration.

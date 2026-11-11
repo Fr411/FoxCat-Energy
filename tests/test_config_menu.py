@@ -92,10 +92,46 @@ class OptionsMenuTests(unittest.TestCase):
     def test_every_form_field_is_labelled_and_serialisable(self) -> None:
         steps = self.translations["translations/fr.json"]["options"]["step"]
         flow = self.flow(options={"grid_signed_sensor": "sensor.grid"})
-        for name in ("sources", "boiler", "pri", "hphc", "ia", "pricing_dynamic", "battery_ev", "peak_shaving"):
+        for name in ("sources", "boiler", "heating", "pri", "hphc", "ia", "pricing_dynamic", "battery_ev", "peak_shaving"):
             result = run(getattr(flow, f"async_step_{name}")())
             self.check_form(name, result, steps[name])
         self.check_form("machine_add", run(flow.async_step_machine_add()), steps["machine_add"])
+
+    def test_equipment_menu_lists_heating_and_every_entry_has_a_step(self) -> None:
+        flow = self.flow()
+        result = run(flow.async_step_equipment())
+        self.assertEqual(result["type"], FlowResultType.MENU)
+        self.assertEqual(list(result["menu_options"]), list(EQUIPMENT_MENU_STEPS))
+        self.assertIn("heating", result["menu_options"])
+        for option in result["menu_options"]:
+            self.assertTrue(hasattr(flow, f"async_step_{option}"), option)
+
+    def test_heating_step_is_stored_flat_and_returns_to_equipment(self) -> None:
+        flow = self.flow()
+        result = run(flow.async_step_heating({
+            "heating_boost_enabled": True,
+            "heating_only_when_empty": False,
+            "detection": {
+                "heating_presence_entity": "person.moi",
+                "heating_group_power_sensor": "sensor.clim_w",
+                "heating_group_limit_w": 3000,
+            },
+            "rules": {"heating_boost_max_c": 1.5, "heating_hold_s": 120},
+        }))
+        pending = flow._pending_options
+        self.assertEqual(pending["heating_presence_entity"], "person.moi")
+        self.assertEqual(pending["heating_group_power_sensor"], "sensor.clim_w")
+        self.assertEqual(pending["heating_boost_max_c"], 1.5)
+        self.assertTrue(pending["heating_boost_enabled"])
+        self.assertNotIn("detection", pending)
+        self.assertNotIn("rules", pending)
+        self.assertEqual(result["type"], FlowResultType.MENU)
+        self.assertEqual(result["step_id"], "equipment")
+
+    def test_emptied_heating_group_sensor_is_really_cleared(self) -> None:
+        flow = self.flow(data={"heating_group_power_sensor": "sensor.clim_w"})
+        run(flow.async_step_heating({"heating_boost_enabled": True}))
+        self.assertEqual(flow._pending_options["heating_group_power_sensor"], "")
 
     def test_wizard_forms_are_labelled_and_serialisable(self) -> None:
         steps = self.translations["translations/fr.json"]["config"]["step"]

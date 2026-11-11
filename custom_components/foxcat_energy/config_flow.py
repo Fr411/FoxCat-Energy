@@ -131,6 +131,7 @@ from .trading.virtual_assets.config import (
 
 
 from . import grid_load
+from . import heating_boost as heating
 from . import peak_shaving as peak
 
 
@@ -589,6 +590,35 @@ def _peak_shaving_schema() -> vol.Schema:
     )
 
 
+def _heating_schema() -> vol.Schema:
+    """Décalage de consigne chauffage : FoxCat publie un décalage, HA l'applique."""
+    box = selector.NumberSelectorMode.BOX
+
+    def number(low: float, high: float, step: float, unit: str | None = None) -> selector.NumberSelector:
+        cfg: dict[str, Any] = {"min": low, "max": high, "step": step, "mode": box}
+        if unit:
+            cfg["unit_of_measurement"] = unit
+        return selector.NumberSelector(selector.NumberSelectorConfig(**cfg))
+
+    return vol.Schema(
+        {
+            vol.Optional(heating.CONF_HEATING_ENABLED, default=False): selector.BooleanSelector(),
+            vol.Optional(heating.CONF_HEATING_ONLY_WHEN_EMPTY, default=True): selector.BooleanSelector(),
+            _optional(heating.CONF_HEATING_PRESENCE_ENTITY, heating.DEFAULT_PRESENCE_ENTITY): _entity(
+                ["zone", "person", "group", "binary_sensor", "input_boolean"]
+            ),
+            _optional(heating.CONF_HEATING_GROUP_POWER_SENSOR): _entity("sensor"),
+            vol.Optional(heating.CONF_HEATING_GROUP_LIMIT_W, default=2500): number(500, 10000, 100, "W"),
+            vol.Optional(heating.CONF_HEATING_MAX_C, default=2.0): number(0, 5, 0.1, "°C"),
+            vol.Optional(heating.CONF_HEATING_STEP_C, default=0.5): number(0.1, 2, 0.1, "°C"),
+            vol.Optional(heating.CONF_HEATING_SURPLUS_PER_STEP_W, default=500): number(100, 5000, 50, "W"),
+            vol.Optional(heating.CONF_HEATING_RESERVE_W, default=100): number(0, 1000, 10, "W"),
+            vol.Optional(heating.CONF_HEATING_HOLD_S, default=300): number(0, 1800, 30, "s"),
+            vol.Optional(heating.CONF_HEATING_IMPORT_MAX_W, default=300): number(0, 2000, 10, "W"),
+        }
+    )
+
+
 _SCHEMA_BUILDERS = {
     "sources": _sources_schema,
     "boiler": _boiler_schema,
@@ -598,6 +628,7 @@ _SCHEMA_BUILDERS = {
     "pricing_dynamic": _pricing_schema,
     "battery_ev": _virtual_assets_schema,
     "peak_shaving": _peak_shaving_schema,
+    "heating": _heating_schema,
 }
 
 
@@ -668,6 +699,16 @@ _FORM_SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "v2h": (
             CONF_EV_V2H_ENABLED, CONF_EV_V2H_SWITCH, CONF_EV_V2H_POWER_ENTITY,
             CONF_EV_SOC_SENSOR, CONF_EV_V2H_MAX_POWER_W, CONF_EV_V2H_MIN_SOC_PCT,
+        ),
+    },
+    "heating": {
+        "detection": (
+            heating.CONF_HEATING_PRESENCE_ENTITY, heating.CONF_HEATING_GROUP_POWER_SENSOR,
+            heating.CONF_HEATING_GROUP_LIMIT_W,
+        ),
+        "rules": (
+            heating.CONF_HEATING_MAX_C, heating.CONF_HEATING_STEP_C, heating.CONF_HEATING_SURPLUS_PER_STEP_W,
+            heating.CONF_HEATING_RESERVE_W, heating.CONF_HEATING_HOLD_S, heating.CONF_HEATING_IMPORT_MAX_W,
         ),
     },
     "peak_shaving": {
@@ -1020,6 +1061,10 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
                     errors={"base": errors[0]},
                 )
         return await self._section("peak_shaving", user_input)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating — Décalage de consigne chauffage
+    async def async_step_heating(self, user_input=None):
+        return await self._section("heating", user_input, return_step="equipment")
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_battery_ev — Configuration batterie et VE virtuels
     async def async_step_battery_ev(self, user_input=None):

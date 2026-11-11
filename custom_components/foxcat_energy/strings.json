@@ -318,6 +318,52 @@
           }
         }
       },
+      "heating": {
+        "title": "Chauffage • Décalage de consigne",
+        "description": "FoxCat calcule un décalage de consigne (°C) selon le surplus solaire et la présence, et le publie dans un capteur. Une automatisation Home Assistant l'applique à vos presets Versatile Thermostat : FoxCat n'écrit jamais lui-même dans vos thermostats. Fonction désactivée par défaut ; la régulation FoxCat doit être active.",
+        "data": {
+          "heating_boost_enabled": "Activer le décalage de consigne",
+          "heating_only_when_empty": "Uniquement quand la maison est vide"
+        },
+        "data_description": {
+          "heating_boost_enabled": "Si désactivé, le décalage reste à 0 °C.",
+          "heating_only_when_empty": "Aucun décalage tant que la présence indique quelqu'un à la maison. Une présence inconnue ou indisponible compte comme « quelqu'un est là »."
+        },
+        "sections": {
+          "detection": {
+            "name": "Présence et groupe de climatisation",
+            "data": {
+              "heating_presence_entity": "Entité de présence",
+              "heating_group_power_sensor": "Puissance du groupe de climatisation (optionnel)",
+              "heating_group_limit_w": "Limite de puissance du groupe (W)"
+            },
+            "data_description": {
+              "heating_presence_entity": "Par défaut zone.home : son état est le nombre de personnes présentes (> 0 = quelqu'un est là).",
+              "heating_group_power_sensor": "Puissance actuelle du chauffage / de la climatisation. Elle est ajoutée au surplus, car le chauffage consomme déjà une partie du surplus qu'il utilise.",
+              "heating_group_limit_w": "Aucune augmentation du décalage quand la puissance du groupe atteint 90 % de cette limite."
+            }
+          },
+          "rules": {
+            "name": "Règles de calcul",
+            "data": {
+              "heating_boost_max_c": "Décalage maximal (°C)",
+              "heating_boost_step_c": "Pas de décalage (°C)",
+              "heating_surplus_per_step_w": "Surplus requis par pas (W)",
+              "heating_surplus_reserve_w": "Marge de réserve (W)",
+              "heating_hold_s": "Délai avant augmentation (s)",
+              "heating_import_max_w": "Import maximal avant baisse immédiate (W)"
+            },
+            "data_description": {
+              "heating_boost_max_c": "Plafond du décalage publié.",
+              "heating_boost_step_c": "Incrément du décalage : le décalage est toujours un multiple du pas.",
+              "heating_surplus_per_step_w": "Surplus nécessaire pour accorder un pas. Un pas accordé est conservé tant que le surplus reste au moins à 60 % de son seuil.",
+              "heating_surplus_reserve_w": "Puissance retranchée du surplus avant le calcul.",
+              "heating_hold_s": "Toute augmentation attend ce délai après le dernier changement (anti-yoyo).",
+              "heating_import_max_w": "Au-delà de cet import réseau, le décalage baisse sans attendre."
+            }
+          }
+        }
+      },
       "battery_ev": {
         "title": "Batterie + véhicule électrique virtuels",
         "description": "La simulation batterie/VE reste isolée du ledger réel. Le V2H physique est une fonction opt-in distincte et nécessite des entités de commande explicitement configurées.",
@@ -719,6 +765,7 @@
         "menu_options": {
           "pri": "Onduleur",
           "boiler": "Boiler",
+          "heating": "Chauffage",
           "machines": "Machines",
           "battery_ev": "Batterie + VE",
           "init": "← Retour au menu principal"
