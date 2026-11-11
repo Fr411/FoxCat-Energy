@@ -43,6 +43,10 @@ GROUP_GUARD_RATIO = 0.90
 
 _EPSILON = 1e-9
 
+# Plafond du décalage appliqué aux presets (même plafond que le réglage « max »).
+APPLIED_MAX_C = 5.0
+APPLIED_STEP_C = 0.05
+
 DEFAULTS: dict[str, Any] = {
     CONF_HEATING_ENABLED: False,
     CONF_HEATING_ONLY_WHEN_EMPTY: True,
@@ -85,6 +89,11 @@ def _optional_number(value: Any) -> float | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return result if math.isfinite(result) else None
+
+
+def clamp_applied(value: Any) -> float:
+    """Valide le décalage appliqué aux presets : fini, entre 0 et le plafond."""
+    return round(_number(value, 0.0, 0.0, APPLIED_MAX_C), 2)
 
 
 def parse_presence(state: Any) -> int | None:

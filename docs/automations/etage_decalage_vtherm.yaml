@@ -1,0 +1,119 @@
+alias: Étage - Décalage FoxCat sur presets Versatile Thermostat
+description: >
+  FoxCat calcule un décalage de consigne (°C) et le publie dans
+  sensor.foxcat_energy_ems_chauffage_decalage_de_consigne. Cette automatisation
+  l'ajoute aux presets "absence" de la configuration centrale Versatile
+  Thermostat ; VTherm applique lui-même ces presets quand la maison est vide.
+  FoxCat n'écrit jamais dans les thermostats : seule cette automatisation le
+  fait.
+
+  Aucun helper à créer : le décalage inclus dans les presets est conservé par
+  FoxCat (number.foxcat_energy_ems_chauffage_decalage_applique_aux_presets),
+  et le décalage maximal, le pas et la limite du groupe sont lus dans les
+  réglages FoxCat (Équipements → Chauffage), sans les recopier ici. À chaque
+  changement, on ajoute la différence (cible - appliqué) à chaque preset. Ne
+  modifiez pas ces presets à la main tant que le décalage appliqué n'est pas
+  à 0.
+
+  Sécurités : capteur FoxCat indisponible = décalage 0 ; aucune modification si
+  un preset ou le décalage appliqué est indisponible (sinon le décalage
+  mémorisé dériverait) ; pas d'augmentation si le groupe extérieur atteint 90 %
+  de sa limite (FoxCat applique la même garde de son côté).
+
+triggers:
+  # FoxCat applique déjà son propre délai avant toute augmentation : inutile
+  # d'en ajouter un ici, une baisse doit rester immédiate.
+  - trigger: state
+    entity_id: sensor.foxcat_energy_ems_chauffage_decalage_de_consigne
+    id: decalage
+  - trigger: time_pattern
+    minutes: /5
+    id: periodique
+  - trigger: homeassistant
+    event: start
+    id: demarrage
+
+actions:
+  # 1) Entités. Seuls les presets du thermostat et la mesure du groupe sont à vous.
+  - variables:
+      bonus_entity: sensor.foxcat_energy_ems_chauffage_decalage_de_consigne
+      applique_entity: number.foxcat_energy_ems_chauffage_decalage_applique_aux_presets
+      max_entity: number.foxcat_energy_ems_chauffage_decalage_maximal
+      pas_entity: number.foxcat_energy_ems_chauffage_pas_de_decalage
+      limite_entity: number.foxcat_energy_ems_chauffage_limite_de_puissance_du_groupe
+      puissance_groupe: sensor.homefoxcat_load_autre
+      indisponible: ['unavailable', 'unknown', 'none', '']
+      cibles:
+        - number.central_configuration_preset_boost_away_temp
+        - number.central_configuration_preset_comfort_away_temp
+        - number.central_configuration_preset_eco_away_temp
+
+  # 2) Rien n'est modifié si une entité à écrire est indisponible : le décalage
+  #    mémorisé ne correspondrait plus aux presets.
+  - variables:
+      entites_ok: >-
+        {% set ns = namespace(ok=true) %}
+        {% for e in cibles + [applique_entity] %}
+          {% if states(e) in indisponible %}{% set ns.ok = false %}{% endif %}
+        {% endfor %}
+        {{ ns.ok }}
+  - if:
+      - condition: template
+        value_template: '{{ not entites_ok }}'
+    then:
+      - stop: Preset ou décalage appliqué indisponible, aucune modification.
+
+  # 3) Réglages lus dans FoxCat (valeurs par défaut FoxCat si indisponibles).
+  - variables:
+      bonus_max: '{{ states(max_entity) | float(2.0) }}'
+      pas: '{{ [states(pas_entity) | float(0.5), 0.1] | max }}'
+      puissance_max_bonus: '{{ 0.9 * (states(limite_entity) | float(2500)) }}'
+
+  # 4) Calcul. Capteur FoxCat indisponible = 0 : le plus sûr, un décalage ne
+  #    fait que monter la consigne.
+  - variables:
+      applique: '{{ states(applique_entity) | float(0) }}'
+      demande: >-
+        {{ (([[states(bonus_entity) | float(0), 0] | max, bonus_max] | min) / pas)
+           | round(0) * pas }}
+      groupe_charge: '{{ states(puissance_groupe) | float(0) >= puissance_max_bonus }}'
+  - variables:
+      # Garde puissance : on peut baisser, jamais augmenter si le groupe est chargé.
+      cible: '{{ applique if (groupe_charge and demande > applique) else demande }}'
+  - variables:
+      delta: '{{ (cible - applique) | round(2) }}'
+
+  # 5) Application
+  - if:
+      - condition: template
+        value_template: '{{ delta | abs >= 0.05 }}'
+    then:
+      - repeat:
+          for_each: '{{ cibles }}'
+          sequence:
+            - variables:
+                actuel: '{{ states(repeat.item) | float(0) }}'
+                mini: '{{ state_attr(repeat.item, ''min'') | float(5) }}'
+                maxi: '{{ state_attr(repeat.item, ''max'') | float(35) }}'
+            - action: number.set_value
+              target:
+                entity_id: '{{ repeat.item }}'
+              data:
+                value: '{{ [[actuel + delta, mini] | max, maxi] | min }}'
+      - action: number.set_value
+        target:
+          entity_id: '{{ applique_entity }}'
+        data:
+          value: '{{ cible }}'
+      - action: logbook.log
+        data:
+          name: Décalage FoxCat - presets VTherm
+          message: >-
+            Décalage {{ applique }} → {{ cible }} °C sur {{ cibles | length }}
+            presets (Δ {{ delta }}), groupe {{ states(puissance_groupe) }} W
+            {{ '(augmentation retenue)' if (groupe_charge and demande > applique) else '' }}
+
+# Chaque exécution relit l'état au départ : on peut les mettre en file sans risque.
+mode: queued
+max: 5
+max_exceeded: silent

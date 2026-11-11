@@ -7,7 +7,7 @@ import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 COMPONENT = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
 HAS_HOME_ASSISTANT = importlib.util.find_spec("homeassistant") is not None
@@ -21,7 +21,7 @@ if HAS_HOME_ASSISTANT:
     from homeassistant.helpers import config_validation as cv
 
     from foxcat_energy import config_flow as cf
-    from foxcat_energy.const import EQUIPMENT_MENU_STEPS, OFFICIAL_MENU_STEPS
+    from foxcat_energy.const import EQUIPMENT_MENU_STEPS, HEATING_MENU_STEPS, OFFICIAL_MENU_STEPS
 
 
 def run(coroutine):
@@ -85,14 +85,15 @@ class OptionsMenuTests(unittest.TestCase):
             steps = translations["options"]["step"]
             self.assertEqual(set(steps["init"]["menu_options"]), set(OFFICIAL_MENU_STEPS), name)
             self.assertEqual(set(steps["equipment"]["menu_options"]), set(EQUIPMENT_MENU_STEPS), name)
-            for menu in ("init", "equipment", "pricing"):
+            self.assertEqual(set(steps["heating"]["menu_options"]), set(HEATING_MENU_STEPS), name)
+            for menu in ("init", "equipment", "heating", "pricing"):
                 for option in steps[menu]["menu_options"]:
                     self.assertTrue(hasattr(flow, f"async_step_{option}"), option)
 
     def test_every_form_field_is_labelled_and_serialisable(self) -> None:
         steps = self.translations["translations/fr.json"]["options"]["step"]
         flow = self.flow(options={"grid_signed_sensor": "sensor.grid"})
-        for name in ("sources", "boiler", "heating", "pri", "hphc", "ia", "pricing_dynamic", "battery_ev", "peak_shaving"):
+        for name in ("sources", "boiler", "heating_settings", "heating_entities", "pri", "hphc", "ia", "pricing_dynamic", "battery_ev", "peak_shaving"):
             result = run(getattr(flow, f"async_step_{name}")())
             self.check_form(name, result, steps[name])
         self.check_form("machine_add", run(flow.async_step_machine_add()), steps["machine_add"])
@@ -106,9 +107,18 @@ class OptionsMenuTests(unittest.TestCase):
         for option in result["menu_options"]:
             self.assertTrue(hasattr(flow, f"async_step_{option}"), option)
 
-    def test_heating_step_is_stored_flat_and_returns_to_equipment(self) -> None:
+    def test_heating_menu_lists_its_entries_and_each_has_a_step(self) -> None:
         flow = self.flow()
-        result = run(flow.async_step_heating({
+        result = run(flow.async_step_heating())
+        self.assertEqual(result["type"], FlowResultType.MENU)
+        self.assertEqual(result["step_id"], "heating")
+        self.assertEqual(list(result["menu_options"]), list(HEATING_MENU_STEPS))
+        for option in result["menu_options"]:
+            self.assertTrue(hasattr(flow, f"async_step_{option}"), option)
+
+    def test_heating_settings_are_stored_flat_and_return_to_the_heating_menu(self) -> None:
+        flow = self.flow()
+        result = run(flow.async_step_heating_settings({
             "heating_boost_enabled": True,
             "heating_only_when_empty": False,
             "detection": {
@@ -126,12 +136,40 @@ class OptionsMenuTests(unittest.TestCase):
         self.assertNotIn("detection", pending)
         self.assertNotIn("rules", pending)
         self.assertEqual(result["type"], FlowResultType.MENU)
-        self.assertEqual(result["step_id"], "equipment")
+        self.assertEqual(result["step_id"], "heating")
 
     def test_emptied_heating_group_sensor_is_really_cleared(self) -> None:
         flow = self.flow(data={"heating_group_power_sensor": "sensor.clim_w"})
-        run(flow.async_step_heating({"heating_boost_enabled": True}))
+        run(flow.async_step_heating_settings({"heating_boost_enabled": True}))
         self.assertEqual(flow._pending_options["heating_group_power_sensor"], "")
+
+    def test_heating_entities_page_shows_the_real_entity_ids(self) -> None:
+        flow = self.flow()
+        found = {
+            "chauffage_decalage_consigne": "sensor.foxcat_energy_ems_chauffage_decalage_de_consigne",
+            "heating_applied_c": "number.foxcat_energy_ems_chauffage_decalage_applique_aux_presets",
+        }
+        with patch("foxcat_energy.runtime.registry._native_entities_by_key", return_value=found):
+            result = run(flow.async_step_heating_entities())
+        self.assertEqual(result["type"], FlowResultType.FORM)
+        text = result["description_placeholders"]["entities"]
+        self.assertIn("sensor.foxcat_energy_ems_chauffage_decalage_de_consigne", text)
+        self.assertIn("number.foxcat_energy_ems_chauffage_decalage_applique_aux_presets", text)
+        # Une entité encore absente du registre est signalée, jamais inventée.
+        self.assertIn("créée au prochain démarrage", text)
+        for title in ("À lire dans vos automatisations", "À écrire par votre automatisation", "Interrupteurs", "Réglages"):
+            self.assertIn(title, text)
+
+    def test_heating_entities_page_survives_an_unavailable_registry(self) -> None:
+        flow = self.flow()
+        with patch("foxcat_energy.runtime.registry._native_entities_by_key", side_effect=RuntimeError("registre")):
+            result = run(flow.async_step_heating_entities())
+        self.assertIn("créée au prochain démarrage", result["description_placeholders"]["entities"])
+
+    def test_heating_entities_page_returns_to_the_heating_menu(self) -> None:
+        flow = self.flow()
+        result = run(flow.async_step_heating_entities({}))
+        self.assertEqual((result["type"], result["step_id"]), (FlowResultType.MENU, "heating"))
 
     def test_wizard_forms_are_labelled_and_serialisable(self) -> None:
         steps = self.translations["translations/fr.json"]["config"]["step"]

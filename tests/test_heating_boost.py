@@ -1,11 +1,12 @@
 """Décalage de consigne chauffage : logique pure + branchement du coordinateur."""
+import asyncio
 import importlib.util
 import sys
 import types
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 COMPONENT = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
 HAS_HOME_ASSISTANT = importlib.util.find_spec("homeassistant") is not None
@@ -328,6 +329,118 @@ class CoordinatorWiringTests(unittest.TestCase):
         self.fake.hass.services.async_call.assert_not_called()
         self.fake.hass.states.async_set.assert_not_called()
         self.fake.hass.async_create_task.assert_not_called()
+
+
+class AppliedOffsetTests(unittest.TestCase):
+    def test_clamp_applied(self):
+        for raw, expected in ((None, 0.0), ("abc", 0.0), (-1, 0.0), (1.234, 1.23), (9, 5.0), (float("nan"), 0.0), (True, 0.0)):
+            self.assertEqual(hb.clamp_applied(raw), expected, repr(raw))
+
+    def test_applied_offset_is_not_a_setting(self):
+        """Profils et « Réinitialiser » ne doivent jamais toucher le décalage appliqué."""
+        from foxcat_energy.const import DEFAULT_SETTINGS, NUMBER_DEFINITIONS, SWITCH_DEFINITIONS
+
+        for definitions in (DEFAULT_SETTINGS, NUMBER_DEFINITIONS, SWITCH_DEFINITIONS):
+            self.assertNotIn("heating_applied_c", definitions)
+
+
+@unittest.skipUnless(HAS_HOME_ASSISTANT, "Home Assistant non installé")
+class HeatingEntitiesTests(unittest.TestCase):
+    def setUp(self):
+        from foxcat_energy.runtime import coordinator as rc
+
+        self.rc = rc
+
+    def fake(self, applied=0.0):
+        fake = MagicMock()
+        fake.heating_applied_c = applied
+        fake.entry.entry_id = "abc"
+        fake.settings = {}
+        fake.config = {}
+        fake._async_save = AsyncMock()
+        fake._build_data = lambda *a: {}
+        return fake
+
+    def test_setting_the_applied_offset_clamps_saves_and_refreshes(self):
+        fake = self.fake()
+        asyncio.run(self.rc.FoxCatEnergyCoordinator.async_set_heating_applied(fake, 9))
+        self.assertEqual(fake.heating_applied_c, 5.0)
+        fake._async_save.assert_awaited_once()
+        fake.async_set_updated_data.assert_called_once()
+
+    def test_applied_offset_is_part_of_the_saved_state_and_the_published_data(self):
+        import inspect
+
+        source = inspect.getsource(self.rc.FoxCatEnergyCoordinator)
+        self.assertIn('"heating_applied_c": self.heating_applied_c', source)
+        self.assertIn('stored.get("heating_applied_c")', source)
+        self.assertIn('"applied_c": self.heating_applied_c', source)
+
+    def test_applied_number_entity_reads_and_writes_through_the_coordinator(self):
+        from foxcat_energy.number import FoxCatHeatingAppliedNumber
+
+        fake = self.fake(applied=1.5)
+        entity = FoxCatHeatingAppliedNumber(fake)
+        self.assertEqual(entity.native_value, 1.5)
+        self.assertEqual(entity.unique_id, "abc_heating_applied_c")
+        self.assertEqual((entity.native_min_value, entity.native_max_value), (0.0, 5.0))
+        fake.async_set_heating_applied = AsyncMock()
+        asyncio.run(entity.async_set_native_value(1.0))
+        fake.async_set_heating_applied.assert_awaited_once_with(1.0)
+
+    def test_every_heating_entity_listed_in_the_menu_is_really_created(self):
+        """La liste affichée à l'utilisateur ne doit jamais citer une entité qui n'existe pas."""
+        from foxcat_energy import binary_sensor, config_flow, number, sensor
+
+        created = {}
+
+        class Capture:
+            def __init__(self, domain):
+                self.domain = domain
+
+            def __call__(self, entities):
+                for entity in list(entities):
+                    created[entity.unique_id.split("_", 1)[1]] = self.domain
+
+        fake = self.fake()
+        fake.data = {}
+        fake.settings = {"developer_mode": False}
+        hass = MagicMock()
+        hass.data = {"foxcat_energy": {"abc": fake}}
+        for module, domain in ((sensor, "sensor"), (binary_sensor, "binary_sensor"), (number, "number")):
+            asyncio.run(module.async_setup_entry(hass, SimpleNamespace(entry_id="abc"), Capture(domain)))
+        from foxcat_energy import switch
+
+        asyncio.run(switch.async_setup_entry(hass, SimpleNamespace(entry_id="abc"), Capture("switch")))
+        for _title, items in config_flow._heating_entity_groups():
+            for key, label in items:
+                self.assertIn(key, created, f"{label} ({key}) n'est créée par aucune plateforme")
+
+    def test_binary_sensor_and_sensors_read_the_published_view(self):
+        from foxcat_energy import binary_sensor, sensor
+
+        found = {}
+
+        class Capture:
+            def __call__(self, entities):
+                for entity in list(entities):
+                    found[entity.unique_id.split("_", 1)[1]] = entity
+
+        fake = self.fake()
+        fake.settings = {"developer_mode": False}
+        hass = MagicMock()
+        hass.data = {"foxcat_energy": {"abc": fake}}
+        asyncio.run(sensor.async_setup_entry(hass, SimpleNamespace(entry_id="abc"), Capture()))
+        asyncio.run(binary_sensor.async_setup_entry(hass, SimpleNamespace(entry_id="abc"), Capture()))
+        fake.data = {"heating_boost": {"offset_c": 1.5, "steps": 3, "surplus_w": 1650.0, "reason": "ok"}}
+        self.assertEqual(found["chauffage_decalage_consigne"].native_value, 1.5)
+        self.assertEqual(found["chauffage_pas_accordes"].native_value, 3)
+        self.assertEqual(found["chauffage_surplus_calcule"].native_value, 1650.0)
+        self.assertEqual(found["chauffage_statut"].native_value, "ok")
+        self.assertTrue(found["chauffage_decalage_actif"].is_on)
+        fake.data = {"heating_boost": {"offset_c": 0.0, "steps": 0, "surplus_w": None, "reason": "off"}}
+        self.assertFalse(found["chauffage_decalage_actif"].is_on)
+        self.assertIsNone(found["chauffage_surplus_calcule"].native_value)
 
 
 if __name__ == "__main__":

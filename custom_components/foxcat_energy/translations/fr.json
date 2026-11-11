@@ -319,6 +319,15 @@
         }
       },
       "heating": {
+        "title": "Chauffage",
+        "description": "FoxCat calcule un décalage de consigne (°C) selon le surplus solaire et la présence, et le publie dans des capteurs. Votre automatisation Home Assistant l'applique aux presets du thermostat : FoxCat n'écrit jamais dans vos thermostats.",
+        "menu_options": {
+          "heating_settings": "Réglages du décalage de consigne",
+          "heating_entities": "Entités créées par FoxCat",
+          "equipment": "← Retour aux équipements"
+        }
+      },
+      "heating_settings": {
         "title": "Chauffage • Décalage de consigne",
         "description": "FoxCat calcule un décalage de consigne (°C) selon le surplus solaire et la présence, et le publie dans un capteur. Une automatisation Home Assistant l'applique à vos presets Versatile Thermostat : FoxCat n'écrit jamais lui-même dans vos thermostats. Fonction désactivée par défaut ; la régulation FoxCat doit être active.",
         "data": {
@@ -363,6 +372,11 @@
             }
           }
         }
+      },
+      "heating_entities": {
+        "title": "Chauffage • Entités FoxCat",
+        "description": "Toutes les entités nécessaires sont créées par FoxCat : aucun helper à créer à la main. Voici leur identifiant réel dans Home Assistant.\n\n{entities}",
+        "data": {}
       },
       "battery_ev": {
         "title": "Batterie + véhicule électrique virtuels",

@@ -105,7 +105,12 @@ from .const import (
     DOMAIN,
     DEFAULT_DYNAMIC_HIGH_POSITION_PCT,
     EQUIPMENT_MENU_STEPS,
+    HEATING_MENU_STEPS,
+    HEATING_NUMBER_KEYS,
+    HEATING_SWITCH_KEYS,
+    NUMBER_DEFINITIONS,
     OFFICIAL_MENU_STEPS,
+    SWITCH_DEFINITIONS,
 )
 from .domain.loads.machines import records_for_options
 from .domain.tariff.tariff_prices import (
@@ -590,6 +595,34 @@ def _peak_shaving_schema() -> vol.Schema:
     )
 
 
+def _heating_entity_groups() -> list[tuple[str, list[tuple[str, str]]]]:
+    """Entités du chauffage regroupées par usage : (clé d'unique_id, libellé)."""
+    return [
+        (
+            "À lire dans vos automatisations",
+            [
+                ("chauffage_decalage_consigne", "Décalage de consigne (°C)"),
+                ("chauffage_decalage_actif", "Décalage actif"),
+                ("chauffage_statut", "Statut et raison du calcul"),
+                ("chauffage_pas_accordes", "Pas accordés"),
+                ("chauffage_surplus_calcule", "Surplus calculé (W)"),
+            ],
+        ),
+        (
+            "À écrire par votre automatisation",
+            [("heating_applied_c", "Décalage appliqué aux presets (°C), conservé au redémarrage")],
+        ),
+        (
+            "Interrupteurs",
+            [(key, SWITCH_DEFINITIONS[key][0]) for key in HEATING_SWITCH_KEYS],
+        ),
+        (
+            "Réglages",
+            [(key, NUMBER_DEFINITIONS[key][0]) for key in HEATING_NUMBER_KEYS],
+        ),
+    ]
+
+
 def _heating_schema() -> vol.Schema:
     """Décalage de consigne chauffage : FoxCat publie un décalage, HA l'applique."""
     box = selector.NumberSelectorMode.BOX
@@ -628,7 +661,7 @@ _SCHEMA_BUILDERS = {
     "pricing_dynamic": _pricing_schema,
     "battery_ev": _virtual_assets_schema,
     "peak_shaving": _peak_shaving_schema,
-    "heating": _heating_schema,
+    "heating_settings": _heating_schema,
 }
 
 
@@ -701,7 +734,7 @@ _FORM_SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
             CONF_EV_SOC_SENSOR, CONF_EV_V2H_MAX_POWER_W, CONF_EV_V2H_MIN_SOC_PCT,
         ),
     },
-    "heating": {
+    "heating_settings": {
         "detection": (
             heating.CONF_HEATING_PRESENCE_ENTITY, heating.CONF_HEATING_GROUP_POWER_SENSOR,
             heating.CONF_HEATING_GROUP_LIMIT_W,
@@ -1062,9 +1095,43 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
                 )
         return await self._section("peak_shaving", user_input)
 
-    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating — Décalage de consigne chauffage
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating — Sous-menu Chauffage
     async def async_step_heating(self, user_input=None):
-        return await self._section("heating", user_input, return_step="equipment")
+        """Sous-menu : réglages du décalage de consigne et liste des entités FoxCat."""
+        return self.async_show_menu(step_id="heating", menu_options=list(HEATING_MENU_STEPS))
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_settings — Réglages du décalage de consigne
+    async def async_step_heating_settings(self, user_input=None):
+        return await self._section("heating_settings", user_input, return_step="heating")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_entities — Entités FoxCat du chauffage
+    async def async_step_heating_entities(self, user_input=None):
+        """Page d'information : les entités créées par FoxCat, avec leur identifiant réel."""
+        if user_input is not None:
+            return await self.async_step_heating()
+        return self.async_show_form(
+            step_id="heating_entities",
+            data_schema=vol.Schema({}),
+            description_placeholders={"entities": self._heating_entities_text()},
+        )
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._heating_entities_text — Liste lisible des entités du chauffage
+    def _heating_entities_text(self) -> str:
+        """Retourne les entités chauffage avec leur ``entity_id`` réel dans Home Assistant."""
+        try:
+            # Import tardif : le flux d'options ne doit jamais dépendre du runtime au chargement.
+            from .runtime.registry import _native_entities_by_key
+
+            found = _native_entities_by_key(self.hass, self.config_entry)
+        except Exception:  # pragma: no cover - registre indisponible
+            found = {}
+        pending = "(créée au prochain démarrage de FoxCat)"
+        lines: list[str] = []
+        for title, items in _heating_entity_groups():
+            lines.append(f"**{title}**")
+            lines.extend(f"- {label} : `{found.get(key) or pending}`" for key, label in items)
+            lines.append("")
+        return "\n".join(lines).strip()
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_battery_ev — Configuration batterie et VE virtuels
     async def async_step_battery_ev(self, user_input=None):
