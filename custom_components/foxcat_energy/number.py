@@ -52,7 +52,7 @@ class FoxCatHeatingAppliedNumber(FoxCatEntity, NumberEntity):
     # MÉTHODE : FoxCatHeatingAppliedNumber.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(
-            coordinator, "heating_applied_c", "Chauffage • Décalage appliqué aux presets", "mdi:thermometer-check", "ems"
+            coordinator, "heating_applied_c", "Décalage appliqué aux presets", "mdi:thermometer-check", "ems"
         )
 
     # MÉTHODE : FoxCatHeatingAppliedNumber.native_value — Native value
