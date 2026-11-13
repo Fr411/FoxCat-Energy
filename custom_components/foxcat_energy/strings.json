@@ -266,6 +266,7 @@
   "options": {
     "error": {
       "invalid_machine_config": "Configuration invalide : un Switch doit avoir une commande, un CVC doit avoir un capteur de puissance.",
+      "invalid_tariff_json": "Tarifs invalides : JSON illisible, tarif incomplet, identifiant en double ou réservé.",
       "peak_release_ratio_too_high": "Le seuil de réarmement (%) doit être inférieur au seuil de déclenchement (%).",
       "peak_release_not_below_trigger": "Le seuil de réarmement absolu doit être inférieur au seuil de déclenchement absolu.",
       "peak_trigger_missing": "Renseignez un disjoncteur ou un seuil de déclenchement absolu."
@@ -461,7 +462,20 @@
         "menu_options": {
           "pricing_dynamic": "Tarification dynamique",
           "hphc": "Tarification HP/HC",
+          "tariff_compare": "Comparateur de tarifs",
           "init": "← Retour au menu principal"
+        }
+      },
+      "tariff_compare": {
+        "title": "Comparateur de tarifs",
+        "description": "FoxCat rejoue chaque tarif sur votre consommation mesurée. Les tarifs « actuel » et « contrat saisi » sont ajoutés automatiquement. Tarifs configurés : {current}. Comparaison à comportement constant. Pour supprimer un tarif, retirez-le de la liste ET du JSON.",
+        "data": {
+          "templates": "Ajouter des modèles de tarif",
+          "tariff_json": "Tarifs (JSON, modifiable et copiable d'une installation à l'autre)"
+        },
+        "data_description": {
+          "templates": "Un modèle ajoute un tarif avec des prix de départ : modifiez-les ensuite dans le JSON.",
+          "tariff_json": "Liste de tarifs. Un tarif présent ici l'emporte sur le modèle de même identifiant. Identifiants « active » et « contract » réservés."
         }
       },
       "finish": {

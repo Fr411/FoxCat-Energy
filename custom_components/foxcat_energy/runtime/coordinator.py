@@ -174,6 +174,10 @@ from ..domain.loads.machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
 from .inverter_core import InverterCore
 from ..domain.accounting import EnergyAccounting
+from ..domain.accounting.series import ConsumptionSeries
+from ..domain.tariff.compare import compare_tariffs, window_bounds
+from ..domain.tariff.legacy import ACTIVE_TARIFF_ID, observed_tariff, tariff_from_settings
+from ..domain.tariff.models import Tariff, TariffError
 from ..trading.virtual_assets.ha import setup_virtual_assets
 from ..domain.pricing.dynamic_scheduler import build_dynamic_schedule
 from .migration import (
@@ -192,6 +196,8 @@ from ..trading.vpp import evaluate_trade, evaluate_v2h
 from ..dashboard.dashboard import dashboard_status
 
 _LOGGER = logging.getLogger(__name__)
+SERIES_SAVE_DELAY_S = 1800
+COMPARISON_REFRESH_S = 60
 
 from ..domain.tariff.tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, apply_configured_tariff, scoped_config
 
@@ -207,6 +213,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.config = scoped_config(self.config)
         self._entry_options_snapshot: dict[str, Any] = {}
         self._store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}")
+        # Série au quart d'heure du comparateur de tarifs : stockage séparé,
+        # écriture différée, afin de ne jamais alourdir la sauvegarde principale.
+        self._series_store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.series")
+        self._comparison_cache: tuple[datetime, dict[str, Any]] | None = None
         self.machines: list[MachineDefinition] = machine_definitions(self.config)
         self.controllable_machines = [machine for machine in self.machines if machine.controllable]
         # FoxCat 1.5.0 : deux cœurs, communication immédiate par EnergyBus.
@@ -384,6 +394,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         }
         self._loaded_existing_state = False
         self.accounting = EnergyAccounting()
+        self.series = ConsumptionSeries()
         self.virtual_assets = setup_virtual_assets({**self.config, **self.settings})
 
         super().__init__(
@@ -530,6 +541,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # MÉTHODE : FoxCatEnergyCoordinator.async_initialize — traitement asynchrone : initialize
     async def async_initialize(self) -> None:
         stored = await self._store.async_load()
+        try:
+            self.series.restore(await self._series_store.async_load())
+        except Exception:  # pragma: no cover - la série ne doit jamais bloquer le démarrage
+            _LOGGER.warning("Série de consommation illisible : elle repart à vide.", exc_info=True)
+            self.series.restore(None)
         self._migration_notes = []
         if isinstance(stored, dict):
             raw = dict(stored.get("settings", {}) or {})
@@ -634,6 +650,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._status_notification_task and not self._status_notification_task.done():
             self._status_notification_task.cancel()
         await self._async_save()
+        await self._series_store.async_save(self.series.dump())
 
     # MÉTHODE : FoxCatEnergyCoordinator._migrate_legacy_defaults — Migrate legacy defaults
     def _migrate_legacy_defaults(self) -> None:
@@ -2566,6 +2583,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             if self.accounting.process(snapshot, self.prices(), accounting_appliances):
                 self.hass.async_create_task(self._async_save())
+            if self.series.process(snapshot, virtual_prices):
+                self._series_store.async_delay_save(self.series.dump, SERIES_SAVE_DELAY_S)
 
             if bool(self.settings.get("regulation_active")):
                 # CORE EMS uniquement. Le corps Onduleur traite le même snapshot
@@ -4287,6 +4306,57 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
     def _legacy_conflict(self) -> bool:
         return any(self._is_on(eid) for eid in KNOWN_LEGACY_AUTOMATIONS)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._comparison_tariffs — Tarifs à comparer
+    def _comparison_tariffs(self) -> list[Tariff]:
+        """Tarif actuel (prix lus), contrat saisi, puis tarifs de comparaison de l'utilisateur."""
+        tariffs: list[Tariff] = [observed_tariff()]
+        contract = tariff_from_settings(self.settings)
+        if contract is not None:
+            tariffs.append(contract)
+        raw = self.entry.options.get("tariff_comparison")
+        for item in raw if isinstance(raw, list) else []:
+            try:
+                tariff = Tariff.from_dict(item)
+            except TariffError:
+                _LOGGER.warning("Tarif de comparaison ignoré (définition invalide) : %s", item)
+                continue
+            if all(tariff.id != known.id for known in tariffs):
+                tariffs.append(tariff)
+        return tariffs
+
+    # MÉTHODE : FoxCatEnergyCoordinator._tariff_comparison — Comparateur : rejoue chaque tarif sur la consommation mesurée
+    def _tariff_comparison(self) -> dict[str, Any]:
+        """Rejoue chaque tarif sur la consommation mesurée (aujourd'hui, ce mois).
+
+        Le résultat est mis en cache COMPARISON_REFRESH_S secondes : la valorisation
+        parcourt au plus un mois de créneaux et n'a pas à tourner à chaque trame.
+        """
+        now = dt_util.now()
+        cache = self._comparison_cache
+        if cache is not None and (now - cache[0]).total_seconds() < COMPARISON_REFRESH_S:
+            return cache[1]
+        try:
+            tariffs = self._comparison_tariffs()
+            month_start, _ = window_bounds(now, "month")
+            horizon = now + timedelta(minutes=1)
+            month_slots = self.series.slots(month_start, horizon)
+            result: dict[str, Any] = {
+                "reference": ACTIVE_TARIFF_ID,
+                "tariffs": {t.id: t.name for t in tariffs},
+                "generated_at": now.isoformat(),
+            }
+            for period in ("today", "month"):
+                start, _ = window_bounds(now, period)
+                window = [slot for slot in month_slots if slot.at >= start]
+                result[period] = compare_tariffs(
+                    window, tariffs, month_slots=month_slots, reference_id=ACTIVE_TARIFF_ID,
+                )
+        except Exception:  # pragma: no cover - le comparateur ne doit jamais casser la trame
+            _LOGGER.warning("Comparateur de tarifs indisponible.", exc_info=True)
+            result = {"error": True, "tariffs": {}, "today": {}, "month": {}}
+        self._comparison_cache = (now, result)
+        return result
+
     # MÉTHODE : FoxCatEnergyCoordinator._build_data — Build data
     def _build_data(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
         snap = snapshot or self.snapshot()
@@ -4324,6 +4394,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "economic_decision": economic.get("decision", {}).get("label", "Indisponible"),
             },
             "accounting": self.accounting.view(),
+            "tariff_comparison": self._tariff_comparison(),
             "virtual_assets": self.virtual_assets.view(),
             "v2h": dict(self.v2h_state),
             "developer_simulation": dict(self.developer_simulation),

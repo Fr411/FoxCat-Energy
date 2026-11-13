@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import time
 from uuid import uuid4
 from typing import Any
@@ -113,6 +114,9 @@ from .const import (
     SWITCH_DEFINITIONS,
 )
 from .domain.loads.machines import records_for_options
+from .domain.tariff import templates as tariff_templates
+from .domain.tariff.legacy import ACTIVE_TARIFF_ID, CONTRACT_TARIFF_ID
+from .domain.tariff.models import TariffError, tariffs_from_json_value
 from .domain.tariff.tariff_prices import (
     CONF_TARIFF_MONO_PRICE_SENSOR,
     TARIFF_HPHC_BI,
@@ -164,6 +168,10 @@ def _normalise_value(value: Any) -> Any:
     if isinstance(value, time):
         return value.isoformat()
     return value
+
+
+# Clé des options : tarifs de comparaison (liste de dictionnaires, voir domain/tariff/models.py).
+CONF_TARIFF_COMPARISON = "tariff_comparison"
 
 
 # FONCTION : _normalise_input — Normalise input
@@ -1228,7 +1236,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing — traitement asynchrone : step pricing
     async def async_step_pricing(self, user_input=None):
-        options = ["pricing_dynamic", "hphc", "init"]
+        options = ["pricing_dynamic", "hphc", "tariff_compare", "init"]
         return self.async_show_menu(step_id="pricing", menu_options=options)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_dynamic — traitement asynchrone : step pricing dynamic
@@ -1238,6 +1246,63 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_hphc — traitement asynchrone : step hphc
     async def async_step_hphc(self, user_input=None):
         return await self._section("hphc", user_input, return_step="pricing")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._configured_tariffs — Tarifs de comparaison enregistrés
+    def _configured_tariffs(self) -> list[dict[str, Any]]:
+        raw = self._ensure_pending().get(CONF_TARIFF_COMPARISON)
+        return [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_tariff_compare — Comparateur : modèles et tarifs au format JSON
+    async def async_step_tariff_compare(self, user_input=None):
+        """Choisit les tarifs à comparer : modèles prédéfinis et/ou JSON libre.
+
+        Le JSON est la forme complète et copiable d'une installation à l'autre. Un
+        tarif présent dans le JSON l'emporte sur le modèle de même identifiant.
+        """
+        catalog = tariff_templates.template_catalog()
+        current = self._configured_tariffs()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            try:
+                text = str(user_input.get("tariff_json") or "").strip()
+                tariffs = tariffs_from_json_value(json.loads(text)) if text else []
+                chosen = [str(tid) for tid in user_input.get("templates") or [] if str(tid) in catalog]
+                present = {t.id for t in tariffs}
+                tariffs += [catalog[tid] for tid in chosen if tid not in present]
+                reserved = {ACTIVE_TARIFF_ID, CONTRACT_TARIFF_ID}
+                if any(t.id in reserved for t in tariffs):
+                    raise TariffError("identifiant réservé")
+            except (ValueError, TypeError):  # TariffError et JSONDecodeError sont des ValueError
+                errors["base"] = "invalid_tariff_json"
+            else:
+                self._ensure_pending()[CONF_TARIFF_COMPARISON] = [t.to_dict() for t in tariffs]
+                return await self.async_step_pricing()
+        selected = [str(item.get("id")) for item in current if str(item.get("id")) in catalog]
+        text_default = (
+            user_input.get("tariff_json") if user_input is not None and "tariff_json" in user_input
+            else (json.dumps(current, ensure_ascii=False, indent=1) if current else "")
+        )
+        schema = vol.Schema(
+            {
+                vol.Optional("templates", default=selected): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[{"value": tid, "label": name} for tid, name in tariff_templates.template_labels().items()],
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Optional("tariff_json", default=text_default or ""): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True)
+                ),
+            }
+        )
+        names = ", ".join(str(item.get("name") or item.get("id")) for item in current) or "aucun"
+        return self.async_show_form(
+            step_id="tariff_compare",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={"current": names},
+        )
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_finish — traitement asynchrone : step finish
     async def async_step_finish(self, user_input=None):
