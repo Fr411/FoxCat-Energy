@@ -184,6 +184,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatSavingsSensor(c, "economiser_foxcat_jour", "💰 Économiser avec FoxCat Energy • Aujourd’hui", "today"),
         FoxCatSavingsSensor(c, "economiser_foxcat_mois", "💰 Économiser avec FoxCat Energy • Ce mois", "month"),
         FoxCatSavingsSensor(c, "economiser_foxcat_annee", "💰 Économiser avec FoxCat Energy • Cette année", "year"),
+        FoxCatTariffComparisonSensor(c, "comparateur_tarifs_jour", "⚖️ Comparateur de tarifs • Aujourd’hui", "today"),
+        FoxCatTariffComparisonSensor(c, "comparateur_tarifs_mois", "⚖️ Comparateur de tarifs • Ce mois", "month"),
         # Accounting V2 — ventilation tarifaire sans netting énergétique.
         FoxCatNumericSensor(c, "bilan_dynamic_import_jour", "Dynamic • Prélèvement réseau aujourd’hui", "mdi:transmission-tower-import", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["import_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_dynamic_export_jour", "Dynamic • Réinjection aujourd’hui", "mdi:transmission-tower-export", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["export_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
@@ -571,6 +573,56 @@ class FoxCatSavingsSensor(FoxCatEntity, SensorEntity):
                 "− prix payé), référence = HP en bi-horaire, moyenne du jour en dynamique. "
                 "Part solaire estimée au niveau de la maison. Batterie, VE et peak shaving non inclus."
             ),
+        }
+
+
+class FoxCatTariffComparisonSensor(FoxCatEntity, SensorEntity):
+    """Compare plusieurs tarifs sur la consommation réellement mesurée.
+
+    L'état est le tarif le moins cher de la période ; les attributs donnent le coût
+    net de chaque tarif et son écart par rapport au tarif actuel (négatif = moins cher).
+    Comparaison à comportement constant : voir ``methode``.
+    """
+
+    # MÉTHODE : FoxCatTariffComparisonSensor.__init__ — méthode spéciale __init__
+    def __init__(self, coordinator, key: str, name: str, period: str):
+        super().__init__(coordinator, key, name, "mdi:scale-balance", "accounting")
+        self._period = period
+
+    def _view(self) -> dict[str, Any]:
+        return ((self.coordinator.data or {}).get("tariff_comparison") or {}).get(self._period) or {}
+
+    # MÉTHODE : FoxCatTariffComparisonSensor.native_value — Native value
+    @property
+    def native_value(self) -> str:
+        view = self._view()
+        if not view.get("slots"):
+            return "Pas encore de données"
+        return view.get("cheapest_name") or "Indisponible"
+
+    # MÉTHODE : FoxCatTariffComparisonSensor.extra_state_attributes — Extra state attributes
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        view = self._view()
+        tariffs = view.get("tariffs") or {}
+        return {
+            "tarifs": {
+                entry.get("name", tid): {
+                    "total_eur": entry.get("total_eur"),
+                    "ecart_vs_actuel_eur": entry.get("ecart_vs_reference_eur"),
+                    "energie_eur": entry.get("energie_eur"),
+                    "reseau_eur": entry.get("reseau_eur"),
+                    "capacitaire_eur": entry.get("capacitaire_eur"),
+                    "frais_fixes_eur": entry.get("frais_fixes_eur"),
+                    "reinjection_eur": entry.get("reinjection_eur"),
+                    "import_sans_prix_kwh": entry.get("import_sans_prix_kwh"),
+                }
+                for tid, entry in tariffs.items()
+            },
+            "import_kwh": view.get("import_kwh"),
+            "export_kwh": view.get("export_kwh"),
+            "creneaux": view.get("slots", 0),
+            "methode": view.get("method"),
         }
 
 
