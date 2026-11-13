@@ -24,6 +24,7 @@ Source de référence : « Guide des Tarifs et Contrats d'Énergie en Belgique �
 4. **Aucune notion de région ni de gestionnaire de réseau.**
 5. **Le ledger ne permet pas de comparer des tarifs.** `domain/accounting/manager.py` calcule le coût à l'instant avec le prix du tarif actif, puis l'additionne dans des totaux jour/mois/année. Rien ne permet de rejouer un autre tarif.
 6. **Pas de coût capacitaire** (Flandre, Bruxelles) ni de redevance prosumer (Wallonie).
+7. **Risque de double comptage avec une source tout compris** : `final_client_price` ajoute les compléments de distribution même sur une courbe déjà finale (détail en section 5.3).
 
 ## 3. Proposition : un configurateur de tarifs
 
@@ -31,9 +32,9 @@ Source de référence : « Guide des Tarifs et Contrats d'Énergie en Belgique �
 
 | Composante | Options |
 |---|---|
-| Prix d'énergie | fixe ; par plages horaires ; entité Home Assistant au choix ; Day-Ahead + marge |
+| Prix d'énergie | fixe ; par plages horaires ; entité Home Assistant au choix, éventuellement marquée « tout compris » (voir section 5) ; Day-Ahead + marge |
 | Plages horaires | tableau (début, fin, jours, prix ou complément) : mono, bi-horaire, Impact, jour/nuit sont des tableaux différents, pas des modes différents |
-| Terme capacitaire | moyenne mensuelle des pointes 1/4 h avec minimum (Flandre) ; forfait selon la puissance (Bruxelles) |
+| Terme capacitaire | calculé par FoxCat (moyenne mensuelle des pointes 1/4 h avec minimum en Flandre ; forfait selon la puissance à Bruxelles) ou lu depuis l'intégration de prix si elle le fournit |
 | Frais fixes | abonnement, redevance prosumer |
 | Réinjection | prix fixe, entité, ou nul |
 
@@ -68,46 +69,59 @@ Coût par tarif sur jour / mois / année et écart par rapport au tarif actif, e
 - Le comparateur est **à comportement constant** : FoxCat décale le ballon et les machines selon le tarif actif. Ce que l'utilisateur aurait consommé sous un autre tarif serait différent. Le résultat compare la consommation réellement mesurée, il ne simule pas un autre mode de vie.
 - Les tarifs comparés doivent être saisis avec les mêmes composantes (taxes, marge, réseau) pour que l'écart soit honnête.
 
-## 5. Sources de prix : ENTSO-E et Nord Pool
+## 5. Sources de prix et signaux de publication
 
-FoxCat a déjà des champs pour le prix courant, le suivant, min/max/moyenne du jour et du lendemain, et un indicateur « prix de demain disponible » (`CONF_PRICE_*` dans `const.py`). Le configurateur doit permettre de **charger la liste des entités ENTSO-E et Nord Pool** détectées dans Home Assistant et de proposer l'association automatique ci-dessous.
+Principe : **prix** et **publication** viennent de deux sources différentes.
 
-Les identifiants contiennent un préfixe propre à chaque installation (`<préfixe>`), jamais à coder en dur.
+- **ENTSO-E et Nord Pool sont des prix de gros** (spot) : ni réseau, ni taxes, ni marge. Ils ne doivent jamais être utilisés comme prix payé. Dans le configurateur, ils ne remplissent pas les champs de prix.
+- **Le prix payé vient d'une intégration de prix tout compris**, ici `homeassistant_be_electricity_prices` (renaudallard). ENTSO-E / Nord Pool servent uniquement à savoir **quand** les prix du lendemain sont publiés.
 
-### 5.1 ENTSO-E (à retenir)
+### 5.1 L'intégration de prix tout compris (faits relevés dans sa documentation)
 
-| Entité | Usage dans FoxCat |
+| Élément | Détail |
 |---|---|
-| `sensor.<préfixe>_current_electricity_market_price` | Prix courant et, selon l'intégration, source de la courbe (attributs) |
-| `sensor.<préfixe>_next_hour_electricity_market_price` | Prix suivant (`price_next`) |
-| `sensor.<préfixe>_average_electricity_price` | Moyenne du jour (`price_avg_today`) |
-| `sensor.<préfixe>_lowest_energy_price` | Minimum du jour (`price_min_today`) |
-| `sensor.<préfixe>_highest_energy_price` | Maximum du jour (`price_max_today`) |
-| `sensor.<préfixe>_current_percentage_in_electricity_price_range` | Position dans la plage du jour : alimente directement le seuil de position de l'optimiseur dynamique |
-| `sensor.<préfixe>_time_of_lowest_price` / `..._time_of_highest_price` | Heures des extrêmes, pour planifier les chauffes |
+| Prix | `current_price`, `next_hour_price`, min/max/moyenne du jour et du lendemain, en EUR/kWh, **tout compris** (énergie + distribution + transport + taxes + TVA) |
+| Décomposition | `energy_component`, `network_component`, `taxes_component` |
+| Courbe | attributs `today` et `tomorrow` de `current_price` : lignes `{start, energy, network, taxes, all_in}` (96 lignes/jour pour un contrat au quart d'heure) |
+| Injection | `injection_price` (attributs `today` / `tomorrow`), et variantes pointe / creuse |
+| Bi-horaire | `price_peak`, `price_offpeak` (non créés pour le tarif Impact wallon) |
+| Publication | binaire `tomorrow_prices_available` ; mise à jour **horaire** ; courbe du lendemain attendue vers 13h CET |
+| Coûts calculés | `capacity_cost` et `monthly_peak_kw` (Flandre), `prosumer_cost` (Wallonie), `current_month_cost`, `current_year_cost`, `potential_saving` |
+| Services | `refresh`, `cheapest_window`, `most_expensive_window` |
+| Couverture | fournisseurs belges des trois régions, contrats fixes, variables, dynamiques, bi-horaires et Impact |
 
-À ignorer : `current_percentage_of_highest_electricity_price` (redondant avec la position dans la plage).
+Source : README et `docs/entities.md` du dépôt. La fin de ces deux documents n'a été lue que par résumé : les noms exacts des attributs d'injection et le détail du binaire sont à confirmer sur l'installation réelle.
 
-### 5.2 Nord Pool (à retenir)
+### 5.2 Compatibilité avec FoxCat
 
-| Entité | Usage dans FoxCat |
+- Le lecteur de courbe de FoxCat (`extract_price_points`) lit déjà `today` / `tomorrow`, la clé de temps `start`, et la clé de prix `all_in` (utilisée à l'origine pour Luminus). La courbe de `current_price` devrait donc être lisible telle quelle.
+- FoxCat a déjà un champ « prix de demain disponible » (`price_tomorrow_available`) : on peut y associer `tomorrow_prices_available`.
+
+### 5.3 Piège : double comptage de la distribution
+
+Avec une source tout compris, le réseau et les taxes sont **déjà dans le prix**. Or `final_client_price` (`domain/tariff/tariff_model.py`) ajoute encore les compléments `tariff_tou_hp/hc_adder` et `impact_*_adder` selon la période, même quand `price_curve_is_final` est vrai. Si ces compléments ne sont pas à zéro, la distribution est comptée deux fois.
+
+Règle du configurateur : une composante de prix marquée « tout compris » désactive automatiquement les compléments réseau, taxes et marge de ce tarif.
+
+### 5.4 Rôle d'ENTSO-E et Nord Pool : signaux de publication
+
+Le délai actuel peut atteindre une heure : l'intégration de prix ne relit qu'à chaque tick horaire. Les signaux de gros sont plus rapides.
+
+| Entité | Rôle |
 |---|---|
-| `sensor.nord_pool_be_prix_actuel` | Prix courant |
-| `sensor.nord_pool_be_prochain_prix` | Prix suivant |
-| `sensor.nord_pool_be_prix_le_plus_bas` / `..._le_plus_eleve` | Min / max du jour |
-| `sensor.nord_pool_be_moyenne_journaliere` | Moyenne du jour |
-| `binary_sensor.nord_pool_be_prix_de_demain_disponible` | **Déclencheur de publication** : indique que les prix du lendemain sont publiés (`price_tomorrow_available`) |
-| `sensor.nord_pool_be_derniere_mise_a_jour` | Fraîcheur des données : sert de garde-fou si la publication est en retard |
-| `sensor.nord_pool_be_devise` et `sensor.nord_pool_be_taux_de_change` | Contrôle d'unité (€/MWh ou €/kWh) avant toute valorisation |
+| `binary_sensor.nord_pool_be_prix_de_demain_disponible` | Déclencheur : les prix de gros du lendemain sont publiés |
+| `sensor.nord_pool_be_derniere_mise_a_jour` | Horodatage de la dernière publication, garde-fou de retard |
+| ENTSO-E : prix de l'heure suivante, moyenne, min, max, heures des extrêmes | Contrôle de cohérence (le tout compris doit suivre le spot) et affichage, pas de valorisation |
 
-Secondaires (non préassociés) : `prix_precedent`, les blocs peak / off-peak (`moyenne_peak`, `off_peak_1/2_*`, `debut/fin_heure_creuse/pleine`). Utiles pour un affichage, pas pour le calcul.
+Flux proposé : le signal de publication passe à « disponible » → FoxCat appelle le service `refresh` de l'intégration de prix (nom exact du domaine de service à confirmer) → attend `tomorrow_prices_available` → relit la courbe du lendemain → relance la planification. Si le signal n'arrive pas, le tick horaire de l'intégration reste le filet de sécurité.
 
-### 5.3 Points à vérifier avant de coder
+Les entités ENTSO-E / Nord Pool sont donc **optionnelles** dans le configurateur, présentées comme « signal de publication », jamais comme « prix ».
 
-- **Les séries horaires.** Les capteurs Nord Pool listés donnent des valeurs ponctuelles, pas la courbe complète. Pour la courbe du lendemain, il faut soit les attributs de l'entité ENTSO-E, soit l'action de l'intégration Nord Pool. Il faut lire les attributs réels dans Outils de développement > États.
-- **Clés d'attributs.** Le lecteur de courbe (`extract_price_points`) accepte `prices`, `forecast`, `raw_today`, `raw_tomorrow`, `today`, `tomorrow`, etc. Si ENTSO-E nomme ses séries autrement (par exemple `prices_today`), il faudra ajouter ces clés.
-- **Prix spot ≠ prix payé.** Les prix de marché n'incluent ni marge du fournisseur, ni réseau, ni taxes : ces composantes viennent du tarif configuré (section 3).
-- **Moment de publication.** Les prix du lendemain sont publiés dans l'après-midi (vers 13h). Le déclencheur est `prix_de_demain_disponible`, pas une heure fixe.
+### 5.5 Conséquences sur le reste de la proposition
+
+- **Moins de calcul dans FoxCat.** Pour un utilisateur de cette intégration, le coût capacitaire flamand et la redevance prosumer wallonne sont fournis par ses capteurs. FoxCat les lit au lieu de les recalculer. Le calcul interne (section 3.1) reste pour les installations sans cette intégration.
+- **Deux sources de vérité pour les coûts.** `current_month_cost` de l'intégration et le ledger FoxCat ne mesurent pas forcément la même chose. Le tableau de bord doit indiquer laquelle est affichée.
+- **Comparateur.** L'intégration donne le prix du contrat configuré, et son propre `potential_saving`. Pour comparer plusieurs tarifs dans FoxCat, il faut soit plusieurs instances de l'intégration (à vérifier), soit des tarifs saisis manuellement dans le configurateur. Le comparateur FoxCat reste utile car il applique la comparaison à la consommation réelle mesurée par FoxCat.
 
 ## 6. Migration
 
@@ -118,7 +132,7 @@ Les réglages actuels (`price_source`, `tariff_structure`, `distribution_profile
 1. Modèle de données « tarif » + fonction de valorisation, avec tests (aucun changement visible).
 2. Série par quart d'heure + historique spot ; migration vers un tarif actif.
 3. Flux de configuration, modèles prédéfinis, import/export JSON, suppression des défauts Luminus.
-4. Détection des entités ENTSO-E / Nord Pool et association automatique (section 5).
+4. Association de l'intégration de prix tout compris, marquage « tout compris » (fin du double comptage) et signal de publication ENTSO-E / Nord Pool (section 5).
 5. Comparateur : capteurs et carte dashboard.
 6. Coûts capacitaire (Flandre), forfait (Bruxelles), redevance prosumer (Wallonie).
 
