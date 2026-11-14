@@ -1,28 +1,34 @@
 # FoxCat Energy
 
-**FoxCat Energy** est une intégration Home Assistant de gestion énergétique résidentielle (EMS). Elle coordonne l’autoconsommation photovoltaïque, le chauffe-eau, les machines configurées et le pilotage d’onduleur, selon les sources disponibles, le mode EMS, le tarif et la politique réseau choisis.
+**FoxCat Energy** est une intégration Home Assistant de gestion énergétique résidentielle (EMS). Elle coordonne l'autoconsommation photovoltaïque, le chauffe-eau, les machines, la batterie et le pilotage d'onduleur, selon les sources disponibles, le mode EMS, le tarif et la politique réseau choisis.
 
 | | |
 |---|---|
-| Version de l’intégration | **1.7.5** |
+| Version de l'intégration | **1.7.6** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
 
-La version de l’intégration est définie dans [`manifest.json`](custom_components/foxcat_energy/manifest.json). Consultez le [journal des versions](CHANGELOG.md) pour le détail des changements.
+La version est définie dans [`manifest.json`](custom_components/foxcat_energy/manifest.json). Le détail des changements est dans le [journal des versions](CHANGELOG.md).
 
 ## Fonctions
 
-- **Modes EMS** : Éco, Confort et Manuel.
-- **Tarification** : mono-horaire, HP/HC ou dynamique Day-Ahead, avec une structure de distribution configurable.
+- **Modes EMS** : Éco, Confort et Manuel (le mode Manuel coupe le pilotage automatique, la sécurité thermique reste active).
+- **Tarification** : le **contrat** (prix saisis, capteurs ou dynamique) et la **structure du réseau** (mono-horaire, bi-horaire, Impact) sont deux choix indépendants ; toutes les combinaisons sont possibles. Option « Mes prix sont tout compris » pour ne pas compter deux fois réseau, taxes et marge.
+- **Comparateur de tarifs** : FoxCat enregistre consommation et prix au quart d'heure (62 jours) et rejoue chaque tarif configuré dessus. Modèles belges prédéfinis (Wallonie, Flandre, Bruxelles) ou tarifs personnalisés en JSON. Comparaison à comportement constant.
+- **Coûts réseau et prosumer** : terme capacitaire (forfait bruxellois, pointe mensuelle flamande) et redevance prosumer, appliqués à tous les tarifs comparés.
+- **Publication des prix** : une entité (par exemple « prix de demain disponible ») déclenche la relecture des prix, avec un service de relecture optionnel. Les prix de gros ne servent jamais de prix payé.
 - **Politique réseau** : compensation, injection tarifée, injection non valorisée ou zéro injection.
-- **Énergie solaire et onduleur** : suivi des mesures et pilotage PRI/RRCR lorsque l’installation et les entités nécessaires sont configurées.
-- **Chauffe-eau et machines** : stratégies du boiler et gestion de machines ON/OFF extensibles, avec horaires et protection des cycles.
-- **Charges élevées** : délestage configurable pour suspendre certaines charges, dans le respect des cycles protégés.
-- **Analyse et planification** : analyse des prix et planification des charges flexibles selon les paramètres disponibles.
-- **Diagnostics et dashboards** : entités de suivi, diagnostics de l’intégration et dashboards FoxCat générés à l’installation.
+- **Solaire et onduleur** : suivi des mesures et pilotage PRI/RRCR lorsque les entités nécessaires sont configurées.
+- **Chauffe-eau** : stratégies Éco, Confort, Bihoraire et Dynamique, avec attente du dernier failback en heures creuses.
+- **Machines** : gestion de machines ON/OFF extensibles, fenêtres horaires, protection des cycles, phase du réseau par machine.
+- **Chauffage** : décalage de consigne selon le surplus solaire et la présence (désactivé par défaut), appliqué à Versatile Thermostat par une automatisation. FoxCat n'écrit jamais dans les `climate.*`.
+- **Protection du raccordement** : écrêtage de pointe, délestage des charges élevées, seuil de disjoncteur.
+- **Batterie et véhicule électrique** : simulateur désactivé par défaut et sans commande physique ; V2H opt-in.
+- **Prévisions et IA** : analyse des prix (Price Analyzer V2), Day-Ahead, planificateur de charges flexibles.
+- **Économies** : suivi de ce que FoxCat fait économiser, par jour, mois et année.
 
-Le mode EMS, le régime tarifaire et la politique réseau sont des réglages distincts. Les commandes disponibles dépendent des équipements, entités et paramètres configurés.
+Le mode EMS, le régime tarifaire et la politique réseau sont des réglages distincts. Les commandes disponibles dépendent des équipements configurés.
 
 ## Installation
 
@@ -31,40 +37,63 @@ Le mode EMS, le régime tarifaire et la politique réseau sont des réglages dis
 1. Dans HACS, ouvrez **Intégrations** puis le menu **Dépôts personnalisés**.
 2. Ajoutez `https://github.com/Fr411/FoxCat-Energy` avec la catégorie **Intégration**.
 3. Installez FoxCat Energy et redémarrez Home Assistant.
-4. Dans **Paramètres → Appareils et services → Ajouter une intégration**, recherchez **FoxCat Energy**.
+4. **Paramètres → Appareils et services → Ajouter une intégration**, puis **FoxCat Energy**.
 
-### Installation manuelle
+### Manuelle
 
-Copiez le dossier `custom_components/foxcat_energy` dans `/config/custom_components/foxcat_energy`, puis redémarrez Home Assistant. Ajoutez ensuite l’intégration depuis **Paramètres → Appareils et services**.
+Copiez `custom_components/foxcat_energy` dans `/config/custom_components/foxcat_energy`, redémarrez, puis ajoutez l'intégration.
 
-## Configuration initiale
+## Configuration
 
-Le flux de configuration demande d’abord la famille tarifaire et sa structure, puis les sources énergétiques et les équipements. Prévoyez notamment :
+L'installation pose trois questions : **contrat et région**, **réseau**, **prix**. Prévoyez :
 
 - un capteur de puissance réseau signée et sa convention de signe ;
 - un capteur de production photovoltaïque ;
-- les entités du chauffe-eau, des machines et de l’onduleur que vous souhaitez gérer ;
-- les entités tarifaires correspondant au régime sélectionné.
+- les entités du chauffe-eau, des machines et de l'onduleur à gérer ;
+- les prix de votre contrat, saisis à la main ou lus depuis vos capteurs (Luminus, Nord Pool, ENTSO-E, `be_electricity_prices`…).
 
-Les détails tarifaires et les réglages peuvent être ajustés dans les options de l’intégration. Vérifiez les mesures et les diagnostics avant d’autoriser le pilotage automatique. Désactivez les automatisations existantes qui commanderaient les mêmes équipements afin d’éviter des commandes concurrentes.
+Tout se règle ensuite dans **Configurer** : le menu compte 7 entrées par tâche, avec un résumé de l'état en tête. Pour la tarification : *Contrat et réseau*, *Coûts réseau et prosumer*, *Publication des prix*. Un avertissement apparaît tant que des modifications ne sont pas enregistrées.
 
-## Batterie et véhicule électrique virtuels
+Les entités sont rangées en 10 appareils : Mesures et sources, Tarification, Onduleur, Boiler, Chauffage, Machines, Batterie et VE, Protection, Prévisions et IA, Système.
 
-La simulation de batterie domestique et de véhicule électrique est **désactivée par défaut**. Lorsqu’elle est activée, elle reste en lecture seule : les équipements virtuels ne commandent aucun appareil physique. Les valeurs simulées doivent être distinguées des mesures réelles ; elles ne remplacent pas le suivi d’une batterie ou d’un véhicule réels.
+Avant d'autoriser le pilotage, vérifiez les mesures et les diagnostics, et désactivez les automatisations existantes qui commandent les mêmes équipements.
 
 ## Dashboards
 
-FoxCat peut générer ses dashboards YAML dans le dossier `/config/foxcat_energy/`. Les dashboards existants ne sont pas remplacés automatiquement au démarrage. Leur déclaration comme dashboards Lovelace YAML dans Home Assistant peut nécessiter une configuration dédiée ; voir [`configuration.yaml.snippet`](configuration.yaml.snippet).
+FoxCat génère ses dashboards YAML dans `/config/foxcat_energy/` :
+
+- `dashboard.yaml` (tablette / PC) et `dashboardmob1.yaml` (mobile), créés s'ils n'existent pas ; les fichiers existants ne sont jamais écrasés au démarrage ;
+- le bouton **Régénérer le dashboard FoxCat** force la régénération, avec sauvegarde `.bak` ;
+- les sélecteurs de version tablette et mobile sont indépendants ; les versions sont lues dans `custom_components/foxcat_energy/dashboard/versions/` ;
+- la fusion à trois sources conserve vos personnalisations non conflictuelles.
+
+Pour les déclarer dans Home Assistant, fusionnez une fois [`configuration.yaml.snippet`](configuration.yaml.snippet) dans `configuration.yaml` (dashboards `foxcat-energy` et `foxcat-energy2`), puis redémarrez. Ne modifiez pas `.storage/lovelace_dashboards`. Les cartes nécessitent `custom:button-card`, `custom:apexcharts-card` et `card-mod`.
+
+## Cartes et exemples
+
+| Fichier | Contenu |
+|---|---|
+| [`docs/cartes/vue_couts.yaml`](docs/cartes/vue_couts.yaml) | Vue « Coûts » tablette : tarification, comparateur, coûts réseau, graphiques |
+| [`docs/mobile/cartes/vue_couts_mobile.yaml`](docs/mobile/cartes/vue_couts_mobile.yaml) | Même vue, version mobile compacte |
+| [`docs/cartes/comparateur_tarifs.yaml`](docs/cartes/comparateur_tarifs.yaml) | Carte markdown simple du comparateur |
+| [`docs/automations/etage_decalage_vtherm.yaml`](docs/automations/etage_decalage_vtherm.yaml) | Automatisation du décalage de consigne chauffage |
 
 ## Sécurité et limites
 
-FoxCat Energy pilote potentiellement des équipements électriques. Validez les capteurs, polarités, actionneurs et limites physiques de votre installation avant d’activer la régulation. Les protections matérielles et sécurités Home Assistant doivent rester en place ; ne considérez pas le logiciel comme un dispositif de sécurité certifié.
+FoxCat Energy peut piloter des équipements électriques. Validez capteurs, polarités, actionneurs et limites physiques avant d'activer la régulation, et gardez les protections matérielles en place : le logiciel n'est pas un dispositif de sécurité certifié. Pour revenir en arrière : coupez « Régulation FoxCat active », libérez l'onduleur à 100 %, puis restaurez la version précédente.
 
-Le dépôt est en développement actif. Les résultats de simulation ou les tests logiciels ne remplacent pas une validation sur l’installation réelle.
+Le dépôt est en développement actif. Les tests et simulations ne remplacent pas une validation sur l'installation réelle.
 
-## Documentation
+## Dépôt
 
-- [Journal des versions](CHANGELOG.md)
-- [Installation et options des dashboards](README-INSTALL.md)
-- [Installation de l’interface Premium](PREMIUM_UI_INSTALL.md)
-- [Code de l’intégration](custom_components/foxcat_energy/)
+```text
+custom_components/foxcat_energy/   intégration (domain/, runtime/, trading/, dashboard/…)
+tests/                             tests unitaires
+docs/                              plans, cartes, automatisations, archives par version
+trash/                             fichiers obsolètes mis de côté (voir trash/LISEZMOI.md)
+CHANGELOG.md                       journal des versions
+```
+
+## Licence
+
+Voir [`Licence.md.txt`](Licence.md.txt).
