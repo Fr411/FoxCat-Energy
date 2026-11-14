@@ -32,6 +32,7 @@ OFFICIAL_MENU_STEPS = (
 # Sous-menu Équipements → Chauffage.
 HEATING_MENU_STEPS = (
     "heating_settings",
+    "heating_systems",
     "heating_entities",
     "equipment",
 )

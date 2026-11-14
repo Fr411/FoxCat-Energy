@@ -292,7 +292,9 @@
       "peak_release_not_below_trigger": "Le seuil de réarmement absolu doit être inférieur au seuil de déclenchement absolu.",
       "peak_trigger_missing": "Renseignez un disjoncteur ou un seuil de déclenchement absolu.",
       "invalid_service_name": "Nom de service invalide : utilisez le format domaine.service (minuscules, chiffres et _).",
-      "invalid_grid_costs": "Coûts réseau incomplets : un forfait annuel ou un prix par kW est nécessaire pour le terme capacitaire choisi."
+      "invalid_grid_costs": "Coûts réseau incomplets : un forfait annuel ou un prix par kW est nécessaire pour le terme capacitaire choisi.",
+      "invalid_heating_system": "Nom, type et capteur de puissance sont obligatoires.",
+      "heating_too_many_indoor_units": "Une PAC air/air accepte 5 unités intérieures au maximum."
     },
     "step": {
       "init": {
@@ -347,6 +349,7 @@
         "description": "FoxCat calcule un décalage de consigne (°C) selon le surplus solaire et la présence, et le publie dans des capteurs. Votre automatisation Home Assistant l'applique aux presets du thermostat : FoxCat n'écrit jamais dans vos thermostats.",
         "menu_options": {
           "heating_settings": "Réglages du décalage de consigne",
+          "heating_systems": "Systèmes de chauffage (pompes à chaleur)",
           "heating_entities": "Entités créées par FoxCat",
           "equipment": "← Retour aux équipements"
         }
@@ -395,6 +398,67 @@
               "heating_import_max_w": "Au-delà de cet import réseau, le décalage baisse sans attendre."
             }
           }
+        }
+      },
+      "heating_systems": {
+        "title": "Chauffage • Systèmes de chauffage",
+        "description": "Pompes à chaleur : chaque système possède un groupe extérieur (puissance, tension, phase) et, pour une PAC air/air, jusqu'à 5 unités intérieures.\n\nSystèmes configurés :\n{systems}",
+        "menu_options": {
+          "heating_system_add": "＋ Ajouter un système",
+          "heating_system_edit": "✎ Modifier un système",
+          "heating_system_remove": "− Supprimer un système",
+          "heating": "← Retour au chauffage"
+        }
+      },
+      "heating_system_add": {
+        "title": "Ajouter un système de chauffage",
+        "description": "Renseignez le groupe extérieur de la pompe à chaleur. Pour une PAC air/air, liez jusqu'à 5 unités intérieures.",
+        "data": {
+          "name": "Nom du système",
+          "system_type": "Type de pompe à chaleur",
+          "power_sensor": "Capteur de puissance du groupe extérieur (W)",
+          "voltage_sensor": "Capteur de tension du groupe extérieur (V, optionnel)",
+          "phase": "Phase du groupe extérieur (optionnel)",
+          "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)",
+          "apply_setpoint": "FoxCat applique la rehausse de consigne (air/air)"
+        },
+        "data_description": {
+          "power_sensor": "Obligatoire : consommation du groupe extérieur, comptabilisée séparément.",
+          "phase": "Phase du réseau sur laquelle le groupe extérieur est raccordé.",
+          "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé.",
+          "apply_setpoint": "Si activé, FoxCat règle lui-même la consigne des unités intérieures en mode chauffage (consigne d'origine + décalage) et la restaure quand le décalage retombe à 0. Si une consigne est modifiée à la main, elle devient la nouvelle consigne d'origine. Si désactivé, FoxCat publie seulement le décalage de ce système dans un capteur : une automatisation Home Assistant l'applique. Ignoré sans unité intérieure ni en eau/eau et air/eau."
+        }
+      },
+      "heating_system_edit": {
+        "title": "Modifier un système de chauffage",
+        "data": {
+          "system_id": "Système"
+        }
+      },
+      "heating_system_edit_form": {
+        "title": "Modifier le système de chauffage",
+        "description": "Modifiez le groupe extérieur et ses unités intérieures.",
+        "data": {
+          "name": "Nom du système",
+          "system_type": "Type de pompe à chaleur",
+          "power_sensor": "Capteur de puissance du groupe extérieur (W)",
+          "voltage_sensor": "Capteur de tension du groupe extérieur (V, optionnel)",
+          "phase": "Phase du groupe extérieur (optionnel)",
+          "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)",
+          "apply_setpoint": "FoxCat applique la rehausse de consigne (air/air)"
+        },
+        "data_description": {
+          "power_sensor": "Obligatoire : consommation du groupe extérieur, comptabilisée séparément.",
+          "phase": "Phase du réseau sur laquelle le groupe extérieur est raccordé.",
+          "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé.",
+          "apply_setpoint": "Si activé, FoxCat règle lui-même la consigne des unités intérieures en mode chauffage (consigne d'origine + décalage) et la restaure quand le décalage retombe à 0. Si une consigne est modifiée à la main, elle devient la nouvelle consigne d'origine. Si désactivé, FoxCat publie seulement le décalage de ce système dans un capteur : une automatisation Home Assistant l'applique. Ignoré sans unité intérieure ni en eau/eau et air/eau."
+        }
+      },
+      "heating_system_remove": {
+        "title": "Supprimer un système de chauffage",
+        "description": "Le système sera retiré de FoxCat sans supprimer aucune entité Home Assistant.",
+        "data": {
+          "system_id": "Système"
         }
       },
       "heating_entities": {

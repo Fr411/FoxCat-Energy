@@ -20,6 +20,11 @@ from foxcat_energy import heating_boost as hb  # noqa: E402
 T0 = 10_000.0
 
 
+def heating_boost_with_guard(base, guard_w):
+    from dataclasses import replace
+    return replace(base, guard_power_w=guard_w)
+
+
 def cfg(**overrides):
     base = {"heating_boost_enabled": True, "heating_only_when_empty": False}
     base.update(overrides)
@@ -172,6 +177,14 @@ class AntiYoyoTests(unittest.TestCase):
 
 
 class GroupGuardTests(unittest.TestCase):
+    def test_guard_power_of_one_group_is_independent_from_the_shared_surplus(self) -> None:
+        # Surplus partagé (3 groupes), mais seul le groupe concerné compte pour la garde.
+        shared = inputs(export_w=5000.0, group_power_w=3000.0)
+        free = run(cfg(), state(1, T0 - 1000), heating_boost_with_guard(shared, 400.0))
+        blocked = run(cfg(), state(1, T0 - 1000), heating_boost_with_guard(shared, 2300.0))
+        self.assertGreater(free.steps, 1)
+        self.assertEqual(blocked.steps, 1)
+
     def test_no_increase_when_group_is_at_ninety_percent_of_limit(self):
         # 90 % de 2500 W = 2250 W.
         blocked = run(cfg(), state(1, T0 - 1000), inputs(export_w=5000.0, group_power_w=2250.0))

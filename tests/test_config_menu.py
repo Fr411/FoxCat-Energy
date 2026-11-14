@@ -97,6 +97,7 @@ class OptionsMenuTests(unittest.TestCase):
             result = run(getattr(flow, f"async_step_{name}")())
             self.check_form(name, result, steps[name])
         self.check_form("machine_add", run(flow.async_step_machine_add()), steps["machine_add"])
+        self.check_form("heating_system_add", run(flow.async_step_heating_system_add()), steps["heating_system_add"])
 
     def test_equipment_menu_lists_heating_and_every_entry_has_a_step(self) -> None:
         flow = self.flow()
@@ -137,6 +138,40 @@ class OptionsMenuTests(unittest.TestCase):
         self.assertNotIn("rules", pending)
         self.assertEqual(result["type"], FlowResultType.MENU)
         self.assertEqual(result["step_id"], "heating")
+
+    def test_heating_system_can_be_added_edited_and_removed(self) -> None:
+        flow = self.flow()
+        result = run(flow.async_step_heating_system_add({
+            "name": "Salon", "system_type": "air_air", "power_sensor": "sensor.pac_w",
+            "voltage_sensor": "sensor.pac_v", "phase": "L2",
+            "indoor_units": ["climate.a", "climate.b"],
+        }))
+        self.assertEqual((result["type"], result["step_id"]), (FlowResultType.MENU, "heating_systems"))
+        self.assertIn("heating_system_edit", result["menu_options"])
+        record = flow._pending_options["heating_systems_v1"][0]
+        self.assertEqual((record["phase"], record["indoor_units"]), ("L2", ["climate.a", "climate.b"]))
+
+        run(flow.async_step_heating_system_edit({"system_id": record["id"]}))
+        form = run(flow.async_step_heating_system_edit_form())
+        self.assertEqual(form["step_id"], "heating_system_edit_form")
+        run(flow.async_step_heating_system_edit_form({
+            "name": "Salon", "system_type": "water_water", "power_sensor": "sensor.pac_w",
+        }))
+        edited = flow._pending_options["heating_systems_v1"][0]
+        self.assertEqual((edited["id"], edited["indoor_units"], edited["voltage_sensor"]), (record["id"], [], ""))
+
+        result = run(flow.async_step_heating_system_remove({"system_id": record["id"]}))
+        self.assertEqual(flow._pending_options["heating_systems_v1"], [])
+        self.assertNotIn("heating_system_edit", result["menu_options"])
+
+    def test_heating_system_refuses_more_than_five_indoor_units(self) -> None:
+        flow = self.flow()
+        result = run(flow.async_step_heating_system_add({
+            "name": "Salon", "system_type": "air_air", "power_sensor": "sensor.pac_w",
+            "indoor_units": [f"climate.u{i}" for i in range(6)],
+        }))
+        self.assertEqual(result["type"], FlowResultType.FORM)
+        self.assertEqual(result["errors"], {"base": "heating_too_many_indoor_units"})
 
     def test_emptied_heating_group_sensor_is_really_cleared(self) -> None:
         flow = self.flow(data={"heating_group_power_sensor": "sensor.clim_w"})
