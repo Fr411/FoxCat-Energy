@@ -419,12 +419,14 @@
           "power_sensor": "Capteur de puissance du groupe extérieur (W)",
           "voltage_sensor": "Capteur de tension du groupe extérieur (V, optionnel)",
           "phase": "Phase du groupe extérieur (optionnel)",
-          "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)"
+          "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)",
+          "apply_setpoint": "FoxCat applique la rehausse de consigne (air/air)"
         },
         "data_description": {
           "power_sensor": "Obligatoire : consommation du groupe extérieur, comptabilisée séparément.",
           "phase": "Phase du réseau sur laquelle le groupe extérieur est raccordé.",
-          "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé."
+          "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé.",
+          "apply_setpoint": "Si activé, FoxCat règle lui-même la consigne des unités intérieures en mode chauffage (consigne d'origine + décalage) et la restaure quand le décalage retombe à 0. Si une consigne est modifiée à la main, elle devient la nouvelle consigne d'origine. Si désactivé, FoxCat publie seulement le décalage de ce système dans un capteur : une automatisation Home Assistant l'applique. Ignoré sans unité intérieure ni en eau/eau et air/eau."
         }
       },
       "heating_system_edit": {
@@ -442,12 +444,14 @@
           "power_sensor": "Capteur de puissance du groupe extérieur (W)",
           "voltage_sensor": "Capteur de tension du groupe extérieur (V, optionnel)",
           "phase": "Phase du groupe extérieur (optionnel)",
-          "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)"
+          "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)",
+          "apply_setpoint": "FoxCat applique la rehausse de consigne (air/air)"
         },
         "data_description": {
           "power_sensor": "Obligatoire : consommation du groupe extérieur, comptabilisée séparément.",
           "phase": "Phase du réseau sur laquelle le groupe extérieur est raccordé.",
-          "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé."
+          "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé.",
+          "apply_setpoint": "Si activé, FoxCat règle lui-même la consigne des unités intérieures en mode chauffage (consigne d'origine + décalage) et la restaure quand le décalage retombe à 0. Si une consigne est modifiée à la main, elle devient la nouvelle consigne d'origine. Si désactivé, FoxCat publie seulement le décalage de ce système dans un capteur : une automatisation Home Assistant l'applique. Ignoré sans unité intérieure ni en eau/eau et air/eau."
         }
       },
       "heating_system_remove": {

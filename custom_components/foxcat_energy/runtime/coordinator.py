@@ -18,6 +18,7 @@ from homeassistant.util import dt as dt_util
 
 from .. import grid_load
 from .. import heating_boost as heating_logic
+from .. import heating_systems as heating_systems_logic
 from .. import peak_shaving as peak_logic
 from ..const import (
     ACK_IDLE,
@@ -386,11 +387,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # l'automatisation Home Assistant via l'entité number FoxCat, conservé
         # au redémarrage (contrairement au calcul, qui repart à 0).
         self.heating_applied_c: float = 0.0
+        # Systèmes de chauffage (PAC) : un état de calcul par système (en mémoire)
+        # et, pour les unités dont FoxCat règle la consigne, la consigne d'origine
+        # (conservée au redémarrage pour pouvoir la restaurer).
+        self._heating_system_states: dict[str, heating_logic.HeatingBoostState] = {}
+        self.heating_setpoint_tracks: dict[str, dict[str, float]] = {}
         self.heating_boost_view: dict[str, Any] = {
             "offset_c": 0.0,
             "steps": 0,
             "reason": "Fonction désactivée.",
             "surplus_w": None,
+            "systems": {},
         }
         self.v2h_state: dict[str, Any] = {
             "active": False,
@@ -574,6 +581,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.virtual_assets.restore_state(stored.get("virtual_assets"))
             self.machine_learning.restore(stored.get("machine_learning"))
             self.heating_applied_c = heating_logic.clamp_applied(stored.get("heating_applied_c"))
+            self.heating_setpoint_tracks = {
+                str(entity_id): {"base": float(track["base"]), "target": float(track["target"])}
+                for entity_id, track in (stored.get("heating_setpoint_tracks") or {}).items()
+                if isinstance(track, dict)
+                and heating_systems_logic._finite(track.get("base")) is not None
+                and heating_systems_logic._finite(track.get("target")) is not None
+            }
             price_backup = stored.get("price_backup", {})
             self.price_backup = (
                 {
@@ -698,6 +712,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "machine_learning": self.machine_learning.dump(),
                 "price_backup": self.price_backup,
                 "heating_applied_c": self.heating_applied_c,
+                "heating_setpoint_tracks": self.heating_setpoint_tracks,
                 "solar_forecast": {
                     "available": self.solar_forecast.available,
                     "start": self.solar_forecast.start,
@@ -1281,6 +1296,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if bool(self.settings.get("regulation_active")):
             await self._evaluate_high_load(self.snapshot())
         self._evaluate_heating_boost(self.snapshot())
+        await self._async_apply_heating_setpoints()
         return self._build_data()
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_set_heating_applied — Mémorise le décalage inclus dans les presets
@@ -1297,38 +1313,123 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
         return heating_logic.parse_presence(state.state)
 
-    # MÉTHODE : FoxCatEnergyCoordinator._evaluate_heating_boost — Décalage de consigne chauffage (lecture seule)
+    # MÉTHODE : FoxCatEnergyCoordinator._evaluate_heating_boost — Décalage de consigne chauffage (calcul seul)
     def _evaluate_heating_boost(self, snapshot: EnergySnapshot) -> None:
         """Calcule le décalage de consigne et le publie dans ``heating_boost_view``.
 
-        Aucune écriture dans les ``climate.*`` ni dans les ``number.*`` : une
-        automatisation Home Assistant applique le décalage aux presets du
-        thermostat.
+        Cette méthode n'écrit rien. Par défaut, une automatisation Home Assistant
+        applique le décalage aux presets du thermostat ; seuls les systèmes air/air
+        dont « FoxCat applique la consigne » est actif sont réglés par
+        :meth:`_async_apply_heating_setpoints`.
         """
         cfg = heating_logic.HeatingBoostConfig.from_settings(self.settings, self.config)
-        group_power = (
-            self._optional_float_state(cfg.group_power_sensor) if cfg.group_power_sensor else None
-        )
-        result = heating_logic.evaluate(
-            cfg,
-            self._heating_boost_state,
-            heating_logic.HeatingBoostInputs(
+        systems = heating_systems_logic.records_from(self.config)
+        powers = {
+            record["id"]: self._optional_float_state(record["power_sensor"]) for record in systems
+        }
+        measured = [value for value in powers.values() if value is not None]
+        if cfg.group_power_sensor:
+            group_power = self._optional_float_state(cfg.group_power_sensor)
+        else:
+            group_power = sum(max(value, 0.0) for value in measured) if measured else None
+        now_ts = dt_util.utcnow().timestamp()
+        presence = self._heating_presence(cfg.presence_entity) if cfg.only_when_empty else None
+
+        def inputs(guard_power_w: float | None = None) -> heating_logic.HeatingBoostInputs:
+            return heating_logic.HeatingBoostInputs(
                 regulation_active=bool(self.settings.get("regulation_active")),
                 snapshot_valid=bool(snapshot.valid),
                 export_w=snapshot.export_w,
                 import_w=snapshot.import_w,
-                presence=self._heating_presence(cfg.presence_entity) if cfg.only_when_empty else None,
+                presence=presence,
                 group_power_w=group_power,
-            ),
-            dt_util.utcnow().timestamp(),
-        )
+                guard_power_w=guard_power_w,
+            )
+
+        result = heating_logic.evaluate(cfg, self._heating_boost_state, inputs(), now_ts)
         self._heating_boost_state = result.state
+
+        # Un calcul par système : le surplus est partagé (somme des groupes), mais la
+        # garde de puissance et l'anti-yoyo sont propres à chaque groupe.
+        systems_view: dict[str, Any] = {}
+        known = {record["id"] for record in systems}
+        self._heating_system_states = {
+            key: value for key, value in self._heating_system_states.items() if key in known
+        }
+        for record in systems:
+            system_result = heating_logic.evaluate(
+                cfg,
+                self._heating_system_states.get(record["id"], heating_logic.HeatingBoostState()),
+                inputs(powers[record["id"]]),
+                now_ts,
+            )
+            self._heating_system_states[record["id"]] = system_result.state
+            systems_view[record["id"]] = {
+                "name": record["name"],
+                "offset_c": system_result.offset_c,
+                "steps": system_result.steps,
+                "reason": system_result.reason,
+                "power_w": powers[record["id"]],
+                "apply_setpoint": bool(record.get("apply_setpoint")),
+            }
         self.heating_boost_view = {
             "offset_c": result.offset_c,
             "steps": result.steps,
             "reason": result.reason,
             "surplus_w": result.surplus_w,
+            "systems": systems_view,
         }
+
+    # MÉTHODE : FoxCatEnergyCoordinator._async_apply_heating_setpoints — Rehausse de consigne des PAC air/air
+    async def _async_apply_heating_setpoints(self) -> None:
+        """Règle la consigne des unités intérieures des systèmes qui l'ont demandé.
+
+        Seuls les systèmes air/air dont « FoxCat applique la consigne » est actif
+        sont pilotés. Une unité qui n'est plus pilotée (réglage coupé, système
+        supprimé, décalage retombé à 0) retrouve sa consigne d'origine.
+        """
+        wanted: dict[str, float] = {}
+        view = self.heating_boost_view.get("systems", {})
+        for record in heating_systems_logic.records_from(self.config):
+            if record.get("apply_setpoint"):
+                offset = float(view.get(record["id"], {}).get("offset_c") or 0.0)
+                for entity_id in record["indoor_units"]:
+                    wanted[entity_id] = offset
+        changed = False
+        for entity_id in sorted({*wanted, *self.heating_setpoint_tracks}):
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in {"unavailable", "unknown", "none", ""}:
+                continue  # on garde le suivi : la consigne d'origine sera restaurée plus tard
+            attrs = state.attributes
+            track = self.heating_setpoint_tracks.get(entity_id)
+            plan = heating_systems_logic.plan_setpoint(
+                track,
+                hvac_mode=state.state,
+                current_c=attrs.get("temperature"),
+                offset_c=wanted.get(entity_id, 0.0),
+                min_c=attrs.get("min_temp"),
+                max_c=attrs.get("max_temp"),
+                step_c=attrs.get("target_temp_step"),
+            )
+            if plan.set_to is not None:
+                try:
+                    await self.hass.services.async_call(
+                        "climate",
+                        "set_temperature",
+                        {"entity_id": entity_id, "temperature": plan.set_to},
+                        blocking=True,
+                    )
+                except Exception as err:  # noqa: BLE001 - l'unité peut refuser ou être hors ligne
+                    _LOGGER.warning("Consigne %s non appliquée à %s : %s", plan.set_to, entity_id, err)
+                    continue  # suivi inchangé : nouvel essai au prochain cycle
+            if plan.track != track:
+                changed = True
+                if plan.track is None:
+                    self.heating_setpoint_tracks.pop(entity_id, None)
+                else:
+                    self.heating_setpoint_tracks[entity_id] = plan.track
+        if changed:
+            await self._async_save()
 
     # MÉTHODE : FoxCatEnergyCoordinator._float_state — Float state
     def _float_state(self, entity_id: str | None, default: float = 0.0) -> float:

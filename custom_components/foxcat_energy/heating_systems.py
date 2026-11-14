@@ -11,6 +11,8 @@ Un système = un groupe extérieur de pompe à chaleur, avec :
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+import math
 from typing import Any, Iterable
 
 # Clé de stockage dans les options de l'entrée de configuration.
@@ -77,6 +79,8 @@ def normalise_system(user_input: dict[str, Any], system_id: str) -> tuple[dict[s
         "voltage_sensor": _text(user_input.get("voltage_sensor")),
         "phase": phase,
         "indoor_units": units,
+        # Air/air seulement : FoxCat règle lui-même la consigne des unités intérieures.
+        "apply_setpoint": system_type == TYPE_AIR_AIR and bool(units) and user_input.get("apply_setpoint") is True,
     }, None
 
 
@@ -101,3 +105,90 @@ def summary(record: dict[str, Any]) -> str:
     units = len(record.get("indoor_units") or [])
     extra = f" ({units} unité{'s' if units > 1 else ''})" if record.get("system_type") == TYPE_AIR_AIR and units else ""
     return f"{record.get('name')} — {label}{extra}"
+
+
+# --- Application de la rehausse de consigne aux unités intérieures (air/air) ---
+
+# Seul le mode chauffage est piloté : en froid, en auto ou à l'arrêt, FoxCat n'y touche pas.
+HEAT_MODE = "heat"
+# Écart (°C) en dessous duquel on considère que deux consignes sont identiques.
+SETPOINT_TOLERANCE_C = 0.05
+# Écart toléré entre la consigne lue et la dernière consigne écrite (arrondis de l'unité) :
+# au-delà, c'est une modification manuelle.
+USER_CHANGE_TOLERANCE_C = 0.25
+DEFAULT_STEP_C = 0.5
+
+
+def _finite(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if math.isfinite(result) else None
+
+
+@dataclass(frozen=True, slots=True)
+class SetpointPlan:
+    """Décision pour une unité : ``set_to`` (°C) à écrire ou ``None``, et le suivi à conserver.
+
+    ``track`` vaut ``None`` quand l'unité n'a plus de rehausse en cours, sinon
+    ``{"base": consigne d'origine, "target": dernière consigne écrite}``.
+    """
+
+    set_to: float | None
+    track: dict[str, float] | None
+
+
+def plan_setpoint(
+    track: dict[str, Any] | None,
+    *,
+    hvac_mode: Any,
+    current_c: Any,
+    offset_c: float,
+    min_c: Any = None,
+    max_c: Any = None,
+    step_c: Any = None,
+) -> SetpointPlan:
+    """Calcule la consigne à écrire pour une unité : consigne d'origine + décalage.
+
+    - Hors mode chauffage ou consigne illisible : aucune écriture, le suivi est
+      abandonné (on ne sait pas restaurer sans risque une unité qui n'est pas en chauffe).
+    - Si la consigne actuelle n'est pas celle que FoxCat a écrite, l'utilisateur
+      l'a changée : elle devient la nouvelle consigne d'origine.
+    - Décalage nul : la consigne d'origine est restaurée puis le suivi est abandonné.
+    - Le résultat respecte le pas et les bornes de l'unité.
+    """
+    current = _finite(current_c)
+    if str(hvac_mode or "").lower() != HEAT_MODE or current is None:
+        return SetpointPlan(None, None)
+
+    base = _finite((track or {}).get("base"))
+    target = _finite((track or {}).get("target"))
+    if base is None or target is None or abs(current - target) > USER_CHANGE_TOLERANCE_C:
+        base = current  # première rehausse, ou consigne modifiée à la main
+
+    offset = max(_finite(offset_c) or 0.0, 0.0)
+    desired = base + offset
+    step = _finite(step_c)
+    step = step if step and step > 0 else DEFAULT_STEP_C
+    if offset > 0:
+        desired = math.floor(desired / step + 0.5) * step  # arrondi classique, pas bancaire
+    low, high = _finite(min_c), _finite(max_c)
+    if low is not None:
+        desired = max(desired, low)
+    if high is not None:
+        desired = min(desired, high)
+    desired = round(desired, 2)
+
+    if offset <= 0:
+        # Restauration exacte de la consigne d'origine, sans arrondi au pas.
+        desired = round(base, 2)
+        new_track = None
+    else:
+        new_track = {"base": round(base, 2), "target": desired}
+
+    if track is None and offset <= 0:
+        return SetpointPlan(None, None)
+    return SetpointPlan(None if abs(desired - current) <= SETPOINT_TOLERANCE_C else desired, new_track)

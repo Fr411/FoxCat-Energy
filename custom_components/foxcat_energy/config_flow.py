@@ -468,6 +468,7 @@ def _heating_system_schema(current: dict[str, Any] | None = None) -> vol.Schema:
         opt("indoor_units"): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="climate", multiple=True)
         ),
+        vol.Optional("apply_setpoint", default=bool(current.get("apply_setpoint", False))): selector.BooleanSelector(),
     })
 
 

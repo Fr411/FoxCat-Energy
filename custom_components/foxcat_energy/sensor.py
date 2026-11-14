@@ -314,6 +314,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 entity._foxcat_device_identifier = None
                 entity._foxcat_device_name = None
 
+    # Un capteur de décalage par système de chauffage (les options rechargent l'entrée).
+    from . import heating_systems as heating_systems_logic
+
+    for record in heating_systems_logic.records_from(c.config):
+        system_id = record["id"]
+        entities.append(
+            FoxCatNumericSensor(
+                c, f"chauffage_systeme_{system_id}_decalage", f"Décalage de consigne • {record['name']}",
+                "mdi:thermometer-plus", "ems",
+                lambda d, sid=system_id: d["heating_boost"]["systems"][sid]["offset_c"],
+                UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE,
+            )
+        )
     async_add_entities(entities)
 
 

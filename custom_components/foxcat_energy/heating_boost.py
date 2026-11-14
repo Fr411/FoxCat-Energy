@@ -198,6 +198,9 @@ class HeatingBoostInputs:
     import_w: float
     presence: int | None = None
     group_power_w: float | None = None
+    # Puissance du seul groupe concerné pour la garde de puissance ; ``None`` :
+    # on utilise ``group_power_w`` (cas d'un groupe unique).
+    guard_power_w: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,6 +264,8 @@ def evaluate(
     import_w = max(_optional_number(inputs.import_w) or 0.0, 0.0)
     group_w = _optional_number(inputs.group_power_w)
     group_w = max(group_w, 0.0) if group_w is not None else None
+    guard_w = _optional_number(inputs.guard_power_w)
+    guard_w = max(guard_w, 0.0) if guard_w is not None else group_w
 
     # 2) Surplus disponible : le chauffage déjà en cours fait partie du surplus.
     surplus = export_w + (group_w or 0.0) - cfg.reserve_w
@@ -284,9 +289,9 @@ def evaluate(
         # 5) Anti-yoyo et 6) garde de puissance : seules les augmentations sont freinées.
         if elapsed is not None and elapsed < cfg.hold_s:
             why = f"augmentation retenue ({max(cfg.hold_s - elapsed, 0.0):.0f} s d'attente)"
-        elif group_w is not None and group_w >= GROUP_GUARD_RATIO * cfg.group_limit_w:
+        elif guard_w is not None and guard_w >= GROUP_GUARD_RATIO * cfg.group_limit_w:
             why = (
-                f"augmentation bloquée : groupe à {group_w:.0f} W "
+                f"augmentation bloquée : groupe à {guard_w:.0f} W "
                 f"(≥ {GROUP_GUARD_RATIO * 100:.0f} % de {cfg.group_limit_w:.0f} W)"
             )
         else:
