@@ -164,6 +164,7 @@ from .trading.virtual_assets.config import (
 
 from . import grid_load
 from . import heating_boost as heating
+from . import heating_systems as hsys
 from . import peak_shaving as peak
 
 
@@ -438,6 +439,42 @@ def _normalise_machine_record(user_input: dict[str, Any], machine_id: str) -> di
 def _machine_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
     choices = {str(item.get("id")): str(item.get("name") or item.get("id")) for item in records if item.get("id")}
     return vol.Schema({vol.Required("machine_id"): vol.In(choices)})
+
+
+# FONCTION : _heating_system_schema — Formulaire d'un système de chauffage (PAC)
+def _heating_system_schema(current: dict[str, Any] | None = None) -> vol.Schema:
+    current = current or {}
+
+    # FONCTION : opt — champ optionnel pré-rempli avec la valeur courante
+    def opt(key: str):
+        value = current.get(key)
+        return vol.Optional(key, description={"suggested_value": value}) if value else vol.Optional(key)
+
+    return vol.Schema({
+        vol.Required("name", default=str(current.get("name", ""))): selector.TextSelector(),
+        vol.Required("system_type", default=str(current.get("system_type", hsys.TYPE_AIR_AIR))): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[{"value": t, "label": hsys.SYSTEM_TYPE_LABELS[t]} for t in hsys.SYSTEM_TYPES],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        vol.Required("power_sensor", description={"suggested_value": current.get("power_sensor") or None}): _entity("sensor"),
+        opt("voltage_sensor"): _entity("sensor"),
+        opt("phase"): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=list(hsys.PHASES), mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+        opt("indoor_units"): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="climate", multiple=True)
+        ),
+    })
+
+
+# FONCTION : _heating_system_choice_schema — Choix d'un système de chauffage
+def _heating_system_choice_schema(records: list[dict[str, Any]]) -> vol.Schema:
+    choices = {str(item["id"]): hsys.summary(item) for item in records}
+    return vol.Schema({vol.Required("system_id"): vol.In(choices)})
 
 
 # FONCTION : _dynamic_export_sign_selector — Dynamic export sign selector
@@ -1113,6 +1150,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
         super().__init__()
         self._pending_options: dict[str, Any] | None = None
         self._selected_machine_id: str | None = None
+        self._selected_heating_system_id: str | None = None
 
     # MÉTHODE : FoxCatEnergyOptionsFlow._ensure_pending — Ensure pending
     def _ensure_pending(self) -> dict[str, Any]:
@@ -1242,6 +1280,87 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_settings — Réglages du décalage de consigne
     async def async_step_heating_settings(self, user_input=None):
         return await self._section("heating_settings", user_input, return_step="heating")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._heating_system_records — Systèmes de chauffage enregistrés
+    def _heating_system_records(self) -> list[dict[str, Any]]:
+        return hsys.records_from(self._effective())
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._store_heating_systems — Enregistre la liste (en attente)
+    def _store_heating_systems(self, records: list[dict[str, Any]]) -> None:
+        self._ensure_pending()[hsys.CONF_HEATING_SYSTEMS] = records
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_systems — Sous-menu des systèmes de chauffage
+    async def async_step_heating_systems(self, user_input=None):
+        records = self._heating_system_records()
+        options = ["heating_system_add"]
+        if records:
+            options += ["heating_system_edit", "heating_system_remove"]
+        return self.async_show_menu(
+            step_id="heating_systems",
+            menu_options=[*options, "heating"],
+            description_placeholders={
+                "systems": "\n".join(f"- {hsys.summary(item)}" for item in records) or "aucun",
+            },
+        )
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow._heating_system_form — Formulaire ajout / modification
+    def _heating_system_form(self, step_id: str, current=None, error: str | None = None):
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=_heating_system_schema(current),
+            errors={"base": error} if error else None,
+        )
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_system_add — Ajout d'un système de chauffage
+    async def async_step_heating_system_add(self, user_input=None):
+        if user_input is None:
+            return self._heating_system_form("heating_system_add")
+        record, error = hsys.normalise_system(_normalise_input(user_input), uuid4().hex[:12])
+        if record is None:
+            return self._heating_system_form("heating_system_add", user_input, error)
+        self._store_heating_systems([*self._heating_system_records(), record])
+        return await self.async_step_heating_systems()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_system_edit — Choix du système à modifier
+    async def async_step_heating_system_edit(self, user_input=None):
+        records = self._heating_system_records()
+        if not records:
+            return await self.async_step_heating_systems()
+        if user_input is None:
+            return self.async_show_form(
+                step_id="heating_system_edit", data_schema=_heating_system_choice_schema(records)
+            )
+        self._selected_heating_system_id = str(user_input["system_id"])
+        return await self.async_step_heating_system_edit_form()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_system_edit_form — Modification d'un système
+    async def async_step_heating_system_edit_form(self, user_input=None):
+        records = self._heating_system_records()
+        system_id = self._selected_heating_system_id
+        current = next((item for item in records if item["id"] == system_id), None)
+        if current is None:
+            return await self.async_step_heating_systems()
+        if user_input is None:
+            return self._heating_system_form("heating_system_edit_form", current)
+        updated, error = hsys.normalise_system(_normalise_input(user_input), system_id or "")
+        if updated is None:
+            return self._heating_system_form("heating_system_edit_form", user_input, error)
+        self._store_heating_systems([updated if item["id"] == system_id else item for item in records])
+        self._selected_heating_system_id = None
+        return await self.async_step_heating_systems()
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_system_remove — Suppression d'un système
+    async def async_step_heating_system_remove(self, user_input=None):
+        records = self._heating_system_records()
+        if not records:
+            return await self.async_step_heating_systems()
+        if user_input is None:
+            return self.async_show_form(
+                step_id="heating_system_remove", data_schema=_heating_system_choice_schema(records)
+            )
+        system_id = str(user_input["system_id"])
+        self._store_heating_systems([item for item in records if item["id"] != system_id])
+        return await self.async_step_heating_systems()
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_heating_entities — Entités FoxCat du chauffage
     async def async_step_heating_entities(self, user_input=None):
