@@ -291,7 +291,8 @@
       "peak_release_ratio_too_high": "Le seuil de réarmement (%) doit être inférieur au seuil de déclenchement (%).",
       "peak_release_not_below_trigger": "Le seuil de réarmement absolu doit être inférieur au seuil de déclenchement absolu.",
       "peak_trigger_missing": "Renseignez un disjoncteur ou un seuil de déclenchement absolu.",
-      "invalid_service_name": "Nom de service invalide : utilisez le format domaine.service (minuscules, chiffres et _)."
+      "invalid_service_name": "Nom de service invalide : utilisez le format domaine.service (minuscules, chiffres et _).",
+      "invalid_grid_costs": "Coûts réseau incomplets : un forfait annuel ou un prix par kW est nécessaire pour le terme capacitaire choisi."
     },
     "step": {
       "init": {
@@ -485,6 +486,7 @@
           "tariff_contract": "Contrat et réseau",
           "pricing_dynamic": "Entités de prix dynamiques",
           "hphc": "Prix et plages HP/HC",
+          "grid_costs": "Coûts réseau et prosumer",
           "price_publication": "Publication des prix",
           "tariff_compare": "Comparateur de tarifs",
           "init": "← Retour au menu principal"
@@ -858,6 +860,26 @@
         "data_description": {
           "price_publication_entity": "Capteur binaire (déclenche en passant à « on ») ou capteur d'horodatage (déclenche à chaque changement).",
           "price_refresh_service": "Au format domaine.service, par exemple be_electricity_prices.refresh. Appelé au plus une fois toutes les 10 minutes."
+        }
+      },
+      "grid_costs": {
+        "title": "Coûts réseau et prosumer",
+        "description": "Ces coûts dépendent de votre gestionnaire de réseau, pas de votre fournisseur : ils sont ajoutés de la même façon à tous les tarifs comparés. Reprenez les montants de votre facture ; les valeurs proposées à l'installation sont des moyennes du guide des tarifs. Les entités de l'intégration de prix sont facultatives : elles ne servent qu'à contrôler les calculs de FoxCat.",
+        "data": {
+          "grid_capacity_kind": "Terme capacitaire",
+          "grid_capacity_eur_per_year": "Forfait capacitaire annuel",
+          "grid_capacity_eur_per_kw_year": "Prix par kW de pointe",
+          "grid_capacity_min_kw": "Puissance minimale facturée",
+          "grid_prosumer_eur_per_year": "Redevance prosumer annuelle",
+          "grid_capacity_cost_entity": "Contrôle : coût capacitaire de l'intégration",
+          "grid_peak_kw_entity": "Contrôle : pointe mensuelle de l'intégration",
+          "grid_prosumer_cost_entity": "Contrôle : coût prosumer de l'intégration"
+        },
+        "data_description": {
+          "grid_capacity_eur_per_year": "Utilisé avec « Forfait annuel ».",
+          "grid_capacity_eur_per_kw_year": "Utilisé avec « Pointe mensuelle » : montant annuel par kW de pointe.",
+          "grid_capacity_min_kw": "Utilisé avec « Pointe mensuelle » : le minimum facturé même si la pointe est plus basse (2,5 kW en Flandre).",
+          "grid_prosumer_eur_per_year": "Redevance d'utilisation du réseau pour les panneaux solaires, ramenée à l'année."
         }
       }
     },

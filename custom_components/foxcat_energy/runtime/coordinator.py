@@ -93,6 +93,9 @@ from ..const import (
     CONF_PRICE_MIN_TODAY,
     CONF_PRICE_MIN_TOMORROW,
     CONF_PRICE_NEXT,
+    CONF_GRID_CAPACITY_COST_ENTITY,
+    CONF_GRID_PEAK_KW_ENTITY,
+    CONF_GRID_PROSUMER_COST_ENTITY,
     CONF_PRICE_PUBLICATION_ENTITY,
     CONF_PRICE_REFRESH_SERVICE,
     CONF_PRICE_TOMORROW_AVAILABLE,
@@ -179,6 +182,8 @@ from .inverter_core import InverterCore
 from ..domain.accounting import EnergyAccounting
 from ..domain.accounting.series import ConsumptionSeries
 from ..domain.tariff.compare import compare_tariffs, window_bounds
+from ..domain.tariff.grid_costs import GridCosts
+from ..domain.tariff.valuation import monthly_peak_kw
 from ..domain.tariff.legacy import ACTIVE_TARIFF_ID, observed_tariff, tariff_from_settings
 from ..domain.tariff.models import Tariff, TariffError
 from ..trading.virtual_assets.ha import setup_virtual_assets
@@ -4376,6 +4381,24 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 tariffs.append(tariff)
         return tariffs
 
+    # MÉTHODE : FoxCatEnergyCoordinator._grid_costs_view — Coûts de réseau saisis, et contrôle avec l'intégration de prix
+    def _grid_costs_view(self, grid_costs: GridCosts, month_slots: list[Any]) -> dict[str, Any]:
+        """Coûts de réseau configurés et valeurs lues dans l'intégration de prix.
+
+        Les valeurs de l'intégration servent uniquement de contrôle : elles ne sont
+        jamais additionnées aux coûts calculés par FoxCat.
+        """
+        entities = {
+            "capacity_cost_integration": self.config.get(CONF_GRID_CAPACITY_COST_ENTITY),
+            "peak_kw_integration": self.config.get(CONF_GRID_PEAK_KW_ENTITY),
+            "prosumer_cost_integration": self.config.get(CONF_GRID_PROSUMER_COST_ENTITY),
+        }
+        return {
+            "configured": grid_costs.to_dict(),
+            "foxcat_peak_kw": round(monthly_peak_kw(month_slots), 3),
+            **{key: self._optional_float_state(eid) if eid else None for key, eid in entities.items()},
+        }
+
     # MÉTHODE : FoxCatEnergyCoordinator._tariff_comparison — Comparateur : rejoue chaque tarif sur la consommation mesurée
     def _tariff_comparison(self) -> dict[str, Any]:
         """Rejoue chaque tarif sur la consommation mesurée (aujourd'hui, ce mois).
@@ -4392,6 +4415,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             month_start, _ = window_bounds(now, "month")
             horizon = now + timedelta(minutes=1)
             month_slots = self.series.slots(month_start, horizon)
+            grid_costs = GridCosts.from_settings(self.settings)
             result: dict[str, Any] = {
                 "reference": ACTIVE_TARIFF_ID,
                 "tariffs": {t.id: t.name for t in tariffs},
@@ -4402,7 +4426,9 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 window = [slot for slot in month_slots if slot.at >= start]
                 result[period] = compare_tariffs(
                     window, tariffs, month_slots=month_slots, reference_id=ACTIVE_TARIFF_ID,
+                    grid_costs=grid_costs,
                 )
+            result["grid_costs"] = self._grid_costs_view(grid_costs, month_slots)
         except Exception:  # pragma: no cover - le comparateur ne doit jamais casser la trame
             _LOGGER.warning("Comparateur de tarifs indisponible.", exc_info=True)
             result = {"error": True, "tariffs": {}, "today": {}, "month": {}}

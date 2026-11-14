@@ -1,0 +1,27 @@
+# Carte Lovelace (type « markdown ») pour le comparateur de tarifs et les coûts réseau.
+#
+# Remplacez les deux identifiants par ceux de votre installation : Paramètres → Appareils et
+# services → FoxCat Energy → appareil « Tarification », entités « Comparateur de tarifs • Ce mois »
+# et « Coûts réseau • Ce mois ».
+type: markdown
+title: Comparateur de tarifs (ce mois)
+content: >-
+  {% set cmp = 'sensor.REMPLACER_comparateur_de_tarifs_ce_mois' %}
+  {% set grid = 'sensor.REMPLACER_couts_reseau_ce_mois' %}
+  {% if states(cmp) in ['unknown', 'unavailable', 'Pas encore de données'] %}
+  Pas encore de données : le comparateur a besoin de quelques heures de mesure.
+  {% else %}
+  **Le moins cher : {{ states(cmp) }}**
+
+  | Tarif | Total | Écart avec l'actuel |
+  |---|---:|---:|
+  {% for name, t in (state_attr(cmp, 'tarifs') or {}).items() | sort(attribute='1.total_eur') -%}
+  | {{ name }} | {{ '%.2f' | format(t.total_eur) }} € | {{ '%+.2f' | format(t.ecart_vs_actuel_eur or 0) }} € |
+  {% endfor %}
+  {% if state_attr(cmp, 'import_kwh') is not none %}
+  Import {{ state_attr(cmp, 'import_kwh') }} kWh, export {{ state_attr(cmp, 'export_kwh') }} kWh.
+  {% endif %}
+  Coûts réseau du mois : **{{ states(grid) }} €** (pointe FoxCat {{ state_attr(grid, 'pointe_foxcat_kw') }} kW).
+
+  _{{ state_attr(cmp, 'methode') }}_
+  {% endif %}

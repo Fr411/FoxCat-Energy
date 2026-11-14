@@ -186,6 +186,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatSavingsSensor(c, "economiser_foxcat_annee", "💰 Économiser avec FoxCat Energy • Cette année", "year"),
         FoxCatTariffComparisonSensor(c, "comparateur_tarifs_jour", "⚖️ Comparateur de tarifs • Aujourd’hui", "today"),
         FoxCatTariffComparisonSensor(c, "comparateur_tarifs_mois", "⚖️ Comparateur de tarifs • Ce mois", "month"),
+        FoxCatGridCostsSensor(c, "couts_reseau_mois", "🔌 Coûts réseau • Ce mois"),
         # Accounting V2 — ventilation tarifaire sans netting énergétique.
         FoxCatNumericSensor(c, "bilan_dynamic_import_jour", "Dynamic • Prélèvement réseau aujourd’hui", "mdi:transmission-tower-import", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["import_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
         FoxCatNumericSensor(c, "bilan_dynamic_export_jour", "Dynamic • Réinjection aujourd’hui", "mdi:transmission-tower-export", "accounting", lambda d: d["accounting"]["today"]["tariff"]["dynamic"]["export_kwh"], UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
@@ -613,6 +614,7 @@ class FoxCatTariffComparisonSensor(FoxCatEntity, SensorEntity):
                     "energie_eur": entry.get("energie_eur"),
                     "reseau_eur": entry.get("reseau_eur"),
                     "capacitaire_eur": entry.get("capacitaire_eur"),
+                    "prosumer_eur": entry.get("prosumer_eur"),
                     "frais_fixes_eur": entry.get("frais_fixes_eur"),
                     "reinjection_eur": entry.get("reinjection_eur"),
                     "reinjection_valorisee": entry.get("reinjection_valorisee"),
@@ -624,6 +626,60 @@ class FoxCatTariffComparisonSensor(FoxCatEntity, SensorEntity):
             "export_kwh": view.get("export_kwh"),
             "creneaux": view.get("slots", 0),
             "methode": view.get("method"),
+        }
+
+
+class FoxCatGridCostsSensor(FoxCatEntity, SensorEntity):
+    """Coûts de réseau du mois en cours (capacitaire + prosumer), avec contrôle de l'intégration de prix.
+
+    L'état est calculé par FoxCat à partir des valeurs saisies par l'installateur. Les valeurs lues
+    dans l'intégration de prix (si configurées) sont des attributs de contrôle : elles ne s'ajoutent pas.
+    """
+
+    _attr_native_unit_of_measurement = "€"
+
+    # MÉTHODE : FoxCatGridCostsSensor.__init__ — méthode spéciale __init__
+    def __init__(self, coordinator, key: str, name: str):
+        super().__init__(coordinator, key, name, "mdi:transmission-tower", "accounting")
+
+    def _comparison(self) -> dict[str, Any]:
+        return (self.coordinator.data or {}).get("tariff_comparison") or {}
+
+    # MÉTHODE : FoxCatGridCostsSensor.native_value — Native value
+    @property
+    def native_value(self) -> float | None:
+        month = self._comparison().get("month") or {}
+        reference = (month.get("tariffs") or {}).get(self._comparison().get("reference"))
+        if not reference:
+            return None
+        return round(float(reference.get("capacitaire_eur") or 0.0) + float(reference.get("prosumer_eur") or 0.0), 2)
+
+    # MÉTHODE : FoxCatGridCostsSensor.extra_state_attributes — Extra state attributes
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        view = self._comparison().get("grid_costs") or {}
+        month = self._comparison().get("month") or {}
+        reference = (month.get("tariffs") or {}).get(self._comparison().get("reference")) or {}
+        foxcat_peak = view.get("foxcat_peak_kw")
+        integration_peak = view.get("peak_kw_integration")
+        gap = (
+            round(foxcat_peak - integration_peak, 3)
+            if isinstance(foxcat_peak, (int, float)) and isinstance(integration_peak, (int, float))
+            else None
+        )
+        return {
+            "capacitaire_eur": reference.get("capacitaire_eur"),
+            "prosumer_eur": reference.get("prosumer_eur"),
+            "reglages": view.get("configured"),
+            "pointe_foxcat_kw": foxcat_peak,
+            "pointe_integration_kw": integration_peak,
+            "ecart_pointe_kw": gap,
+            "capacitaire_integration_eur": view.get("capacity_cost_integration"),
+            "prosumer_integration_eur": view.get("prosumer_cost_integration"),
+            "methode": (
+                "Coûts calculés par FoxCat à partir des valeurs saisies (menu Tarification → Coûts réseau), "
+                "au prorata du mois en cours. Les valeurs de l'intégration de prix sont données à titre de contrôle."
+            ),
         }
 
 

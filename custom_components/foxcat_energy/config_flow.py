@@ -115,6 +115,9 @@ from .const import (
 )
 from .domain.loads.machines import records_for_options
 from .const import (
+    CONF_GRID_CAPACITY_COST_ENTITY,
+    CONF_GRID_PEAK_KW_ENTITY,
+    CONF_GRID_PROSUMER_COST_ENTITY,
     CONF_PRICE_PUBLICATION_ENTITY,
     CONF_PRICE_REFRESH_SERVICE,
     DISTRIBUTION_PROFILE_BI,
@@ -133,6 +136,7 @@ from .const import (
     TARIFF_DYNAMIC,
     TARIFF_MONO,
 )
+from .domain.tariff import grid_costs as grid_costs_model
 from .domain.tariff import templates as tariff_templates
 from .domain.tariff.legacy import ACTIVE_TARIFF_ID, CONTRACT_TARIFF_ID
 from .domain.tariff.models import TariffError, tariffs_from_json_value
@@ -1040,6 +1044,7 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id("foxcat_energy_main")
             self._abort_if_unique_id_configured()
             options = dict(self._options)
+            options.update(grid_costs_model.region_settings(self._data.get("grid_region")))
             preset = [t.to_dict() for t in tariff_templates.templates_for_region(self._data.get("grid_region"))]
             if preset:
                 options[CONF_TARIFF_COMPARISON] = preset
@@ -1362,7 +1367,10 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing — traitement asynchrone : step pricing
     async def async_step_pricing(self, user_input=None):
-        options = ["tariff_contract", "pricing_dynamic", "hphc", "price_publication", "tariff_compare", "init"]
+        options = [
+            "tariff_contract", "pricing_dynamic", "hphc", "grid_costs",
+            "price_publication", "tariff_compare", "init",
+        ]
         return self.async_show_menu(step_id="pricing", menu_options=options)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_dynamic — traitement asynchrone : step pricing dynamic
@@ -1424,6 +1432,71 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
             }
         )
         return self.async_show_form(step_id="tariff_contract", data_schema=schema)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_grid_costs — Coûts de réseau de l'installation (capacitaire, prosumer)
+    async def async_step_grid_costs(self, user_input=None):
+        """Capacitaire et redevance prosumer, saisis par l'installateur.
+
+        Ces coûts dépendent du gestionnaire de réseau, pas du fournisseur : ils sont
+        appliqués à tous les tarifs comparés. Les entités de l'intégration de prix
+        sont facultatives et ne servent que de contrôle.
+        """
+        errors: dict[str, str] = {}
+        pending = self._ensure_pending()
+        effective = self._effective()
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        settings = coordinator.settings if coordinator is not None else {}
+
+        def current(key: str, default: Any) -> Any:
+            return pending.get(key, settings.get(key, effective.get(key, default)))
+
+        if user_input is not None:
+            values = _normalise_input(user_input)
+            kind = str(values.get(grid_costs_model.KEY_KIND) or "none")
+            flat = float(values.get(grid_costs_model.KEY_FLAT) or 0.0)
+            per_kw = float(values.get(grid_costs_model.KEY_PER_KW) or 0.0)
+            if (kind == "flat" and flat <= 0) or (kind == "peak_monthly" and per_kw <= 0):
+                errors["base"] = "invalid_grid_costs"
+            else:
+                for key in (
+                    grid_costs_model.KEY_KIND, grid_costs_model.KEY_FLAT, grid_costs_model.KEY_PER_KW,
+                    grid_costs_model.KEY_MIN_KW, grid_costs_model.KEY_PROSUMER,
+                ):
+                    pending[key] = values.get(key, 0.0 if key != grid_costs_model.KEY_KIND else "none")
+                for key in (CONF_GRID_CAPACITY_COST_ENTITY, CONF_GRID_PEAK_KW_ENTITY, CONF_GRID_PROSUMER_COST_ENTITY):
+                    pending[key] = values.get(key) or ""
+                return await self.async_step_pricing()
+
+        kinds = [
+            {"value": "none", "label": "Aucun terme capacitaire"},
+            {"value": "flat", "label": "Forfait annuel (Bruxelles)"},
+            {"value": "peak_monthly", "label": "Pointe mensuelle au quart d'heure (Flandre)"},
+        ]
+
+        def box(unit: str, maximum: float) -> selector.NumberSelector:
+            return selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=maximum, step=0.01, mode=selector.NumberSelectorMode.BOX, unit_of_measurement=unit
+                )
+            )
+
+        def entity_field(key: str) -> tuple[Any, Any]:
+            return (
+                vol.Optional(key, description={"suggested_value": effective.get(key) or None}),
+                selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+            )
+
+        fields: dict[Any, Any] = {
+            vol.Required(grid_costs_model.KEY_KIND, default=str(current(grid_costs_model.KEY_KIND, "none"))): _select(kinds),
+            vol.Optional(grid_costs_model.KEY_FLAT, default=float(current(grid_costs_model.KEY_FLAT, 0.0))): box("€/an", 5000),
+            vol.Optional(grid_costs_model.KEY_PER_KW, default=float(current(grid_costs_model.KEY_PER_KW, 0.0))): box("€/kW/an", 1000),
+            vol.Optional(grid_costs_model.KEY_MIN_KW, default=float(current(grid_costs_model.KEY_MIN_KW, 0.0))): box("kW", 50),
+            vol.Optional(grid_costs_model.KEY_PROSUMER, default=float(current(grid_costs_model.KEY_PROSUMER, 0.0))): box("€/an", 5000),
+        }
+        for key in (CONF_GRID_CAPACITY_COST_ENTITY, CONF_GRID_PEAK_KW_ENTITY, CONF_GRID_PROSUMER_COST_ENTITY):
+            marker, validator = entity_field(key)
+            fields[marker] = validator
+        return self.async_show_form(step_id="grid_costs", data_schema=vol.Schema(fields), errors=errors)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_price_publication — Signal de publication des prix du lendemain
     async def async_step_price_publication(self, user_input=None):

@@ -212,6 +212,10 @@ CONF_TARIFF_SIMPLE_PRICE='tariff_simple_fixed_price_eur_kwh'
 # et service à appeler pour relire les prix (ex. « be_electricity_prices.refresh »).
 CONF_PRICE_PUBLICATION_ENTITY = "price_publication_entity"
 CONF_PRICE_REFRESH_SERVICE = "price_refresh_service"
+# Entités de l'intégration de prix lues à titre de contrôle des coûts de réseau.
+CONF_GRID_CAPACITY_COST_ENTITY = "grid_capacity_cost_entity"
+CONF_GRID_PEAK_KW_ENTITY = "grid_peak_kw_entity"
+CONF_GRID_PROSUMER_COST_ENTITY = "grid_prosumer_cost_entity"
 # Clés d'options appliquées comme réglages même si elles n'ont pas de valeur par défaut.
 OPTION_EXTRA_SETTING_KEYS = ("distribution_profile",)
 
@@ -258,6 +262,10 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "price_is_all_in": False,
     # Prix saisis à la main pour un contrat « Contractuelle / fixe » (mêmes valeurs de repli qu'avant).
     "tariff_hp_price_eur_kwh": 0.35, "tariff_hc_price_eur_kwh": 0.25,
+    # Coûts de réseau de l'installation (capacitaire, prosumer) : voir domain/tariff/grid_costs.py.
+    "grid_capacity_kind": "none",
+    "grid_capacity_eur_per_year": 0.0, "grid_capacity_eur_per_kw_year": 0.0, "grid_capacity_min_kw": 0.0,
+    "grid_prosumer_eur_per_year": 0.0,
     "dynamic_favorable_max_hours": 4.0,
     "dynamic_preferred_network_max_eur_kwh": 0.30,
     "eco_max_wait_h": 24.0, "eco_min_saving_eur": 0.03, "eco_wait_penalty_eur_h": 0.0,
