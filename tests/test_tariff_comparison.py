@@ -14,7 +14,7 @@ package.__path__ = [str(COMPONENT_PATH)]
 sys.modules.setdefault("foxcat_energy", package)
 
 from foxcat_energy.domain.accounting.series import ConsumptionSeries  # noqa: E402
-from foxcat_energy.domain.tariff import legacy, templates  # noqa: E402
+from foxcat_energy.domain.tariff import grid_costs as gc, legacy, templates  # noqa: E402
 from foxcat_energy.domain.tariff.compare import compare_tariffs, window_bounds  # noqa: E402
 from foxcat_energy.domain.tariff.models import (  # noqa: E402
     CAPACITY_FLAT,
@@ -148,8 +148,84 @@ class ValuationTests(unittest.TestCase):
         self.assertAlmostEqual(cost.capacity_eur, 6.0 * 60.0 / 12.0 / 30.0, places=6)
 
     def test_empty_window(self) -> None:
-        cost = value_series([], templates.template_catalog()["fla_capacity"])
+        cost = value_series([], templates.template_catalog()["wal_mono"])
         self.assertEqual(cost.total_eur, 0.0)
+
+
+class GridCostsTests(unittest.TestCase):
+    """Le capacitaire et la redevance prosumer sont des coûts de l'installation, pas du tarif."""
+
+    first = MONDAY.replace(day=1)
+
+    def month(self, kwh: float = 0.1, days: int = 30):
+        return [Slot(self.first + timedelta(minutes=15 * q), kwh, 0) for q in range(days * 96)]
+
+    def test_from_settings_is_tolerant(self) -> None:
+        costs = gc.GridCosts.from_settings({
+            "grid_capacity_kind": "inconnu", "grid_capacity_eur_per_kw_year": "abc",
+            "grid_capacity_min_kw": -3, "grid_prosumer_eur_per_year": None,
+        })
+        self.assertTrue(costs.is_empty)
+        self.assertTrue(gc.GridCosts.from_settings({}).is_empty)
+
+    def test_installation_capacity_applies_to_every_tariff(self) -> None:
+        costs = gc.GridCosts(CapacityTerm(CAPACITY_PEAK, eur_per_kw_year=60.0, min_kw=2.5))
+        month = self.month()
+        cheap = Tariff("a", "A", ENERGY_FIXED, 0.20)
+        dear = Tariff("b", "B", ENERGY_FIXED, 0.40)
+        a = value_series(month, cheap, month_slots=month, grid_costs=costs)
+        b = value_series(month, dear, month_slots=month, grid_costs=costs)
+        # mois complet : 2,5 kW minimum × 60 / 12 = 12,50 €, identique pour les deux tarifs
+        self.assertAlmostEqual(a.capacity_eur, 12.5, places=6)
+        self.assertAlmostEqual(b.capacity_eur, 12.5, places=6)
+
+    def test_installation_capacity_overrides_the_tariff_one(self) -> None:
+        tariff = Tariff("t", "T", capacity=CapacityTerm(CAPACITY_FLAT, eur_per_year=1200.0))
+        month = self.month(0.0)
+        alone = value_series(month, tariff, month_slots=month)
+        overridden = value_series(
+            month, tariff, month_slots=month, grid_costs=gc.GridCosts(CapacityTerm(CAPACITY_FLAT, eur_per_year=120.0))
+        )
+        self.assertAlmostEqual(alone.capacity_eur, 100.0, places=6)
+        self.assertAlmostEqual(overridden.capacity_eur, 10.0, places=6)
+
+    def test_empty_grid_costs_keep_the_tariff_capacity(self) -> None:
+        tariff = Tariff("t", "T", capacity=CapacityTerm(CAPACITY_FLAT, eur_per_year=120.0))
+        month = self.month(0.0)
+        cost = value_series(month, tariff, month_slots=month, grid_costs=gc.GridCosts())
+        self.assertAlmostEqual(cost.capacity_eur, 10.0, places=6)
+
+    def test_prosumer_fee_is_prorated_and_added_to_the_total(self) -> None:
+        costs = gc.GridCosts(prosumer_eur_per_year=87.6)
+        day = [Slot(MONDAY + timedelta(minutes=15 * q), 0, 0) for q in range(96)]
+        cost = value_series(day, Tariff("t", "T"), grid_costs=costs)
+        self.assertAlmostEqual(cost.prosumer_eur, 0.24, places=6)
+        self.assertAlmostEqual(cost.total_eur, 0.24, places=6)
+        self.assertAlmostEqual(cost.to_dict()["prosumer_eur"], 0.24, places=4)
+
+    def test_comparison_gap_is_unchanged_by_grid_costs(self) -> None:
+        """Mêmes coûts de réseau pour tous : l'écart entre tarifs ne dépend que de l'énergie."""
+        costs = gc.GridCosts(CapacityTerm(CAPACITY_PEAK, eur_per_kw_year=60.0, min_kw=2.5), 50.0)
+        month = self.month(0.2)
+        tariffs = [Tariff("a", "A", ENERGY_FIXED, 0.20), Tariff("b", "B", ENERGY_FIXED, 0.30)]
+        plain = compare_tariffs(month, tariffs, month_slots=month, reference_id="a")
+        loaded = compare_tariffs(month, tariffs, month_slots=month, reference_id="a", grid_costs=costs)
+        self.assertAlmostEqual(
+            plain["tariffs"]["b"]["ecart_vs_reference_eur"], loaded["tariffs"]["b"]["ecart_vs_reference_eur"], places=6
+        )
+        self.assertGreater(loaded["tariffs"]["a"]["total_eur"], plain["tariffs"]["a"]["total_eur"])
+
+    def test_region_presets(self) -> None:
+        self.assertEqual(gc.region_settings("flandre")["grid_capacity_kind"], "peak_monthly")
+        self.assertEqual(gc.region_settings("flandre")["grid_capacity_min_kw"], 2.5)
+        self.assertEqual(gc.region_settings("bruxelles")["grid_capacity_kind"], "flat")
+        self.assertEqual(gc.region_settings("wallonie"), {})
+        self.assertEqual(gc.region_settings(None), {})
+        self.assertEqual(gc.region_settings("flandre"), gc.region_settings("flandre"))  # copie indépendante
+
+    def test_templates_no_longer_carry_a_capacity_term(self) -> None:
+        for tid, tariff in templates.template_catalog().items():
+            self.assertEqual(tariff.capacity.kind, "none", tid)
 
 
 class LegacyEquivalenceTests(unittest.TestCase):

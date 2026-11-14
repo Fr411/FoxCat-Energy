@@ -200,7 +200,10 @@ class InstallFlowTests(unittest.TestCase):
         self.assertEqual(result["data"]["grid_region"], "flandre")
         options = result["options"]
         self.assertEqual(options["price_source"], "Contractuelle / fixe")
-        self.assertEqual([t["id"] for t in options["tariff_comparison"]], ["wal_mono", "fla_capacity"])
+        self.assertEqual([t["id"] for t in options["tariff_comparison"]], ["wal_mono"])
+        # La Flandre précharge le capacitaire du guide, modifiable dans « Coûts réseau ».
+        self.assertEqual(options["grid_capacity_kind"], "peak_monthly")
+        self.assertEqual(options["grid_capacity_min_kw"], 2.5)
         # Ce que l'installation produit alimente bien les réglages.
         settings: dict = {}
         apply_configured_tariff(settings, {**result["data"], **options})
@@ -240,7 +243,7 @@ class OptionsFlowTests(unittest.TestCase):
         menu = run(self.flow.async_step_pricing())
         self.assertEqual(
             menu["menu_options"],
-            ["tariff_contract", "pricing_dynamic", "hphc", "price_publication", "tariff_compare", "init"],
+            ["tariff_contract", "pricing_dynamic", "hphc", "grid_costs", "price_publication", "tariff_compare", "init"],
         )
         labels = self.translations["options"]["step"]["pricing"]["menu_options"]
         for option in menu["menu_options"]:
@@ -279,6 +282,44 @@ class OptionsFlowTests(unittest.TestCase):
             self.assertEqual((keys["tariff_family"], keys["tariff_regime"], keys["distribution_profile"]),
                              (family, regime, profile), (source, structure))
 
+    def test_grid_costs_screen_is_translated_and_serialisable(self) -> None:
+        self.check_form("grid_costs", run(self.flow.async_step_grid_costs()))
+
+    def test_grid_costs_are_saved_and_applied_as_settings(self) -> None:
+        result = run(self.flow.async_step_grid_costs({
+            "grid_capacity_kind": "peak_monthly", "grid_capacity_eur_per_kw_year": 58.5,
+            "grid_capacity_min_kw": 2.5, "grid_prosumer_eur_per_year": 0.0,
+            "grid_peak_kw_entity": "sensor.monthly_peak_kw",
+        }))
+        self.assertEqual(result["type"], FlowResultType.MENU)
+        pending = self.flow._ensure_pending()
+        self.assertEqual(pending["grid_capacity_kind"], "peak_monthly")
+        self.assertAlmostEqual(pending["grid_capacity_eur_per_kw_year"], 58.5)
+        self.assertEqual(pending["grid_peak_kw_entity"], "sensor.monthly_peak_kw")
+        self.assertEqual(pending["grid_capacity_cost_entity"], "")
+        from foxcat_energy.const import DEFAULT_SETTINGS
+        from foxcat_energy.domain.tariff.grid_costs import GridCosts
+
+        for key in ("grid_capacity_kind", "grid_capacity_eur_per_kw_year", "grid_capacity_min_kw", "grid_prosumer_eur_per_year"):
+            self.assertIn(key, DEFAULT_SETTINGS, key)  # sinon l'option ne serait pas appliquée
+        costs = GridCosts.from_settings(pending)
+        self.assertEqual(costs.capacity.kind, "peak_monthly")
+        self.assertAlmostEqual(costs.capacity.eur_per_kw_year, 58.5)
+
+    def test_grid_costs_incomplete_capacity_is_refused(self) -> None:
+        for payload in (
+            {"grid_capacity_kind": "flat", "grid_capacity_eur_per_year": 0},
+            {"grid_capacity_kind": "peak_monthly", "grid_capacity_eur_per_kw_year": 0},
+        ):
+            result = run(self.flow.async_step_grid_costs(payload))
+            self.assertEqual(result["errors"], {"base": "invalid_grid_costs"}, payload)
+        self.assertNotIn("grid_capacity_kind", self.flow._ensure_pending())
+
+    def test_grid_costs_can_be_switched_off(self) -> None:
+        run(self.flow.async_step_grid_costs({"grid_capacity_kind": "flat", "grid_capacity_eur_per_year": 47.0}))
+        run(self.flow.async_step_grid_costs({"grid_capacity_kind": "none"}))
+        self.assertEqual(self.flow._ensure_pending()["grid_capacity_kind"], "none")
+
     def test_publication_screen(self) -> None:
         self.check_form("price_publication", run(self.flow.async_step_price_publication()))
 
@@ -301,6 +342,27 @@ class OptionsFlowTests(unittest.TestCase):
         pending = self.flow._ensure_pending()
         self.assertEqual(pending["price_publication_entity"], "")
         self.assertEqual(pending["price_refresh_service"], "")
+
+
+@unittest.skipUnless(HAS_HOME_ASSISTANT, "Home Assistant non installé")
+class GridCostsViewTests(unittest.TestCase):
+    def test_integration_values_are_read_for_control_only(self) -> None:
+        from foxcat_energy.domain.tariff.grid_costs import GridCosts
+        from foxcat_energy.domain.tariff.valuation import Slot
+
+        values = {"sensor.cap": 12.3, "sensor.peak": 4.0}
+        me = SimpleNamespace(
+            config={"grid_capacity_cost_entity": "sensor.cap", "grid_peak_kw_entity": "sensor.peak"},
+            _optional_float_state=lambda eid: values.get(eid),
+        )
+        at = datetime(2026, 11, 3, 18, 0, tzinfo=timezone.utc)
+        slots = [Slot(at, 1.0, 0.0), Slot(at + timedelta(minutes=15), 0.2, 0.0)]  # pointe 4 kW
+        view = rc.FoxCatEnergyCoordinator._grid_costs_view(me, GridCosts(), slots)
+        self.assertEqual(view["foxcat_peak_kw"], 4.0)
+        self.assertEqual(view["peak_kw_integration"], 4.0)
+        self.assertEqual(view["capacity_cost_integration"], 12.3)
+        self.assertIsNone(view["prosumer_cost_integration"])  # entité non configurée
+        self.assertEqual(view["configured"]["capacitaire"]["kind"], "none")
 
 
 @unittest.skipUnless(HAS_HOME_ASSISTANT, "Home Assistant non installé")

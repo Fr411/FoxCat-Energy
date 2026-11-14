@@ -11,8 +11,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
 
+from .grid_costs import GridCosts
 from .models import (
     CAPACITY_FLAT,
+    CAPACITY_NONE,
     CAPACITY_PEAK,
     ENERGY_FIXED,
     ENERGY_OBSERVED,
@@ -50,6 +52,7 @@ class CostBreakdown:
     network_eur: float = 0.0
     fixed_eur: float = 0.0
     capacity_eur: float = 0.0
+    prosumer_eur: float = 0.0
     injection_revenue_eur: float = 0.0
     import_kwh: float = 0.0
     export_kwh: float = 0.0
@@ -60,7 +63,7 @@ class CostBreakdown:
         """Facture nette : coûts moins revenu de réinjection."""
         return (
             self.energy_eur + self.network_eur + self.fixed_eur
-            + self.capacity_eur - self.injection_revenue_eur
+            + self.capacity_eur + self.prosumer_eur - self.injection_revenue_eur
         )
 
     def to_dict(self) -> dict[str, float]:
@@ -69,6 +72,7 @@ class CostBreakdown:
             "reseau_eur": round(self.network_eur, 4),
             "frais_fixes_eur": round(self.fixed_eur, 4),
             "capacitaire_eur": round(self.capacity_eur, 4),
+            "prosumer_eur": round(self.prosumer_eur, 4),
             "reinjection_eur": round(self.injection_revenue_eur, 4),
             "total_eur": round(self.total_eur, 4),
             "import_kwh": round(self.import_kwh, 4),
@@ -131,6 +135,7 @@ def capacity_cost(
     window_slots: list[Slot],
     month_slots: list[Slot],
     month_hours: float,
+    grid_costs: GridCosts | None = None,
 ) -> float:
     """Terme capacitaire attribuable à la fenêtre.
 
@@ -138,7 +143,10 @@ def capacity_cost(
     mois (``month_hours``). Pour un mois en cours, c'est donc une estimation
     « à ce jour » fondée sur la pointe déjà observée.
     """
+    # Le capacitaire de l'installation (réseau) l'emporte sur celui d'un tarif.
     term = tariff.capacity
+    if grid_costs is not None and grid_costs.capacity.kind != CAPACITY_NONE:
+        term = grid_costs.capacity
     if not window_slots or month_hours <= 0:
         return 0.0
     share = len(window_slots) * SLOT_HOURS / month_hours
@@ -161,6 +169,7 @@ def value_series(
     tariff: Tariff,
     *,
     month_slots: list[Slot] | None = None,
+    grid_costs: GridCosts | None = None,
 ) -> CostBreakdown:
     """Valorise ``window_slots`` avec ``tariff``.
 
@@ -183,16 +192,20 @@ def value_series(
 
     fixed = tariff.fixed_fee_eur_year * (len(window_slots) * SLOT_HOURS / HOURS_PER_YEAR)
     capacity = 0.0
+    prosumer = 0.0
     if window_slots:
         reference = month_slots if month_slots else window_slots
         capacity = capacity_cost(
-            tariff, window_slots, reference, hours_in_month(window_slots[0].at)
+            tariff, window_slots, reference, hours_in_month(window_slots[0].at), grid_costs
         )
+        if grid_costs is not None:
+            prosumer = grid_costs.prosumer_eur_per_year * (len(window_slots) * SLOT_HOURS / HOURS_PER_YEAR)
     return CostBreakdown(
         energy_eur=energy,
         network_eur=network,
         fixed_eur=fixed,
         capacity_eur=capacity,
+        prosumer_eur=prosumer,
         injection_revenue_eur=injection,
         import_kwh=import_kwh,
         export_kwh=export_kwh,

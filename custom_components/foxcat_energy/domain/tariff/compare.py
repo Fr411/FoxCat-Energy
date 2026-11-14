@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Iterable
 
+from .grid_costs import GridCosts
 from .models import INJECTION_NONE, Tariff
 from .valuation import CostBreakdown, Slot, value_series
 
@@ -25,6 +26,7 @@ def compare_tariffs(
     *,
     month_slots: list[Slot] | None = None,
     reference_id: str | None = None,
+    grid_costs: GridCosts | None = None,
 ) -> dict[str, Any]:
     """Valorise chaque tarif et calcule l'écart par rapport à ``reference_id``."""
     costs: dict[str, CostBreakdown] = {}
@@ -32,7 +34,7 @@ def compare_tariffs(
     injection_valued: dict[str, bool] = {}
     for tariff in tariffs:
         injection_valued[tariff.id] = tariff.injection_kind != INJECTION_NONE
-        costs[tariff.id] = value_series(window_slots, tariff, month_slots=month_slots)
+        costs[tariff.id] = value_series(window_slots, tariff, month_slots=month_slots, grid_costs=grid_costs)
         names[tariff.id] = tariff.name
 
     reference = costs.get(reference_id) if reference_id else None
