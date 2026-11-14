@@ -391,7 +391,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # et, pour les unités dont FoxCat règle la consigne, la consigne d'origine
         # (conservée au redémarrage pour pouvoir la restaurer).
         self._heating_system_states: dict[str, heating_logic.HeatingBoostState] = {}
-        self.heating_setpoint_tracks: dict[str, dict[str, float]] = {}
+        self.heating_setpoint_tracks: dict[str, dict[str, Any]] = {}
         self.heating_boost_view: dict[str, Any] = {
             "offset_c": 0.0,
             "steps": 0,
@@ -582,11 +582,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.machine_learning.restore(stored.get("machine_learning"))
             self.heating_applied_c = heating_logic.clamp_applied(stored.get("heating_applied_c"))
             self.heating_setpoint_tracks = {
-                str(entity_id): {"base": float(track["base"]), "target": float(track["target"])}
-                for entity_id, track in (stored.get("heating_setpoint_tracks") or {}).items()
-                if isinstance(track, dict)
-                and heating_systems_logic._finite(track.get("base")) is not None
-                and heating_systems_logic._finite(track.get("target")) is not None
+                str(entity_id): track
+                for entity_id, raw in (stored.get("heating_setpoint_tracks") or {}).items()
+                if (track := heating_systems_logic.clean_track(raw)) is not None
             }
             price_backup = stored.get("price_backup", {})
             self.price_backup = (
@@ -1380,54 +1378,98 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "systems": systems_view,
         }
 
-    # MÉTHODE : FoxCatEnergyCoordinator._async_apply_heating_setpoints — Rehausse de consigne des PAC air/air
-    async def _async_apply_heating_setpoints(self) -> None:
-        """Règle la consigne des unités intérieures des systèmes qui l'ont demandé.
+    # MÉTHODE : FoxCatEnergyCoordinator._heating_unit_state — Lecture d'une unité intérieure (climate)
+    def _heating_unit_state(self, entity_id: str) -> heating_systems_logic.UnitState | None:
+        """``None`` si l'unité est absente ou indisponible : on n'y touche pas et son suivi est conservé."""
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state in {"unavailable", "unknown", "none", ""}:
+            return None
+        attrs = state.attributes
+        modes = attrs.get("hvac_modes")
+        return heating_systems_logic.UnitState(
+            entity_id=entity_id,
+            mode=state.state,
+            setpoint_c=attrs.get("temperature"),
+            min_c=attrs.get("min_temp"),
+            max_c=attrs.get("max_temp"),
+            step_c=attrs.get("target_temp_step"),
+            can_heat=not isinstance(modes, (list, tuple)) or "heat" in modes,
+        )
 
-        Seuls les systèmes air/air dont « FoxCat applique la consigne » est actif
-        sont pilotés. Une unité qui n'est plus pilotée (réglage coupé, système
-        supprimé, décalage retombé à 0) retrouve sa consigne d'origine.
-        """
-        wanted: dict[str, float] = {}
-        view = self.heating_boost_view.get("systems", {})
-        for record in heating_systems_logic.records_from(self.config):
-            if record.get("apply_setpoint"):
-                offset = float(view.get(record["id"], {}).get("offset_c") or 0.0)
-                for entity_id in record["indoor_units"]:
-                    wanted[entity_id] = offset
-        changed = False
-        for entity_id in sorted({*wanted, *self.heating_setpoint_tracks}):
-            state = self.hass.states.get(entity_id)
-            if state is None or state.state in {"unavailable", "unknown", "none", ""}:
-                continue  # on garde le suivi : la consigne d'origine sera restaurée plus tard
-            attrs = state.attributes
-            track = self.heating_setpoint_tracks.get(entity_id)
-            plan = heating_systems_logic.plan_setpoint(
-                track,
-                hvac_mode=state.state,
-                current_c=attrs.get("temperature"),
-                offset_c=wanted.get(entity_id, 0.0),
-                min_c=attrs.get("min_temp"),
-                max_c=attrs.get("max_temp"),
-                step_c=attrs.get("target_temp_step"),
-            )
-            if plan.set_to is not None:
+    # MÉTHODE : FoxCatEnergyCoordinator._async_run_unit_action — Applique les appels d'une unité
+    async def _async_run_unit_action(self, action: heating_systems_logic.UnitAction) -> bool:
+        """Mode, consigne puis mode ; ``False`` si un appel échoue (l'unité sera retentée au cycle suivant)."""
+        calls: list[tuple[str, dict[str, Any]]] = []
+        if action.pre_mode:
+            calls.append(("set_hvac_mode", {"hvac_mode": action.pre_mode}))
+        if action.set_to is not None:
+            calls.append(("set_temperature", {"temperature": action.set_to}))
+        if action.post_mode:
+            calls.append(("set_hvac_mode", {"hvac_mode": action.post_mode}))
+        done = 0
+        try:
+            for service, data in calls:
+                await self.hass.services.async_call(
+                    "climate", service, {"entity_id": action.entity_id, **data}, blocking=True
+                )
+                done += 1
+        except Exception as err:  # noqa: BLE001 - l'unité peut refuser ou être hors ligne
+            _LOGGER.warning("Chauffage : %s non appliqué à %s : %s", action, action.entity_id, err)
+            if action.pre_mode and done:
+                # Unité allumée mais consigne refusée : retour arrière au mieux pour ne pas la laisser allumée sans suivi.
                 try:
                     await self.hass.services.async_call(
-                        "climate",
-                        "set_temperature",
-                        {"entity_id": entity_id, "temperature": plan.set_to},
+                        "climate", "set_hvac_mode",
+                        {"entity_id": action.entity_id, "hvac_mode": heating_systems_logic.OFF_MODE},
                         blocking=True,
                     )
-                except Exception as err:  # noqa: BLE001 - l'unité peut refuser ou être hors ligne
-                    _LOGGER.warning("Consigne %s non appliquée à %s : %s", plan.set_to, entity_id, err)
+                except Exception as rollback_err:  # noqa: BLE001
+                    _LOGGER.warning("Chauffage : %s non rétablie : %s", action.entity_id, rollback_err)
+            return False
+        return True
+
+    # MÉTHODE : FoxCatEnergyCoordinator._async_apply_heating_setpoints — Optimisation des consignes des PAC air/air
+    async def _async_apply_heating_setpoints(self) -> None:
+        """Optimise les consignes des systèmes air/air qui l'ont demandé.
+
+        L'état et la consigne de chaque unité sont mémorisés avant la première
+        modification (``heating_setpoint_tracks``, conservé au redémarrage) et
+        rétablis dès que l'optimisation n'est plus possible : décalage retombé à 0,
+        fonction ou régulation coupée, réglage retiré, système supprimé.
+        """
+        view = self.heating_boost_view.get("systems", {})
+        groups: list[tuple[list[str], float, float]] = []
+        claimed: set[str] = set()
+        for record in heating_systems_logic.records_from(self.config):
+            if not record.get("apply_setpoint"):
+                continue
+            offset = float(view.get(record["id"], {}).get("offset_c") or 0.0)
+            units = [entity_id for entity_id in record["indoor_units"] if entity_id not in claimed]
+            claimed.update(units)
+            groups.append((units, offset, float(record["max_setpoint_c"])))
+        # Unités suivies qui ne sont plus pilotées : tout est rétabli (décalage 0).
+        orphans = [entity_id for entity_id in self.heating_setpoint_tracks if entity_id not in claimed]
+        if orphans:
+            groups.append((orphans, 0.0, heating_systems_logic.DEFAULT_MAX_SETPOINT_C))
+
+        changed = False
+        for entity_ids, offset, max_setpoint in groups:
+            units = [unit for entity_id in entity_ids if (unit := self._heating_unit_state(entity_id)) is not None]
+            plan = heating_systems_logic.plan_system(
+                self.heating_setpoint_tracks, units, offset_c=offset, max_setpoint_c=max_setpoint
+            )
+            failed: set[str] = set()
+            for action in plan.actions:
+                if not await self._async_run_unit_action(action):
+                    failed.add(action.entity_id)
+            for entity_id, track in plan.tracks.items():
+                if entity_id in failed:
                     continue  # suivi inchangé : nouvel essai au prochain cycle
-            if plan.track != track:
-                changed = True
-                if plan.track is None:
-                    self.heating_setpoint_tracks.pop(entity_id, None)
-                else:
-                    self.heating_setpoint_tracks[entity_id] = plan.track
+                if track is None:
+                    changed |= self.heating_setpoint_tracks.pop(entity_id, None) is not None
+                elif self.heating_setpoint_tracks.get(entity_id) != track:
+                    self.heating_setpoint_tracks[entity_id] = track
+                    changed = True
         if changed:
             await self._async_save()
 

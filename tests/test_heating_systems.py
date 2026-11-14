@@ -24,7 +24,7 @@ class NormaliseSystemTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(record, {
             "id": "id1", "name": "Salon", "system_type": "air_air", "power_sensor": "sensor.pac_w",
-            "voltage_sensor": "", "phase": "", "indoor_units": [], "apply_setpoint": False,
+            "voltage_sensor": "", "phase": "", "indoor_units": [], "max_setpoint_c": 24.0, "apply_setpoint": False,
         })
 
     def test_name_type_and_power_sensor_are_required(self) -> None:
@@ -62,54 +62,139 @@ class NormaliseSystemTests(unittest.TestCase):
         self.assertFalse(hs.normalise_system(entry(indoor_units=units, apply_setpoint="yes"), "x")[0]["apply_setpoint"])
 
 
-def plan(track=None, **kw):
-    base = {"hvac_mode": "heat", "current_c": 20.0, "offset_c": 1.0, "min_c": 16, "max_c": 30, "step_c": 0.5}
-    base.update(kw)
-    return hs.plan_setpoint(track, **base)
+def unit(entity_id="climate.a", mode="heat", setpoint=20.0, **kw):
+    kw.setdefault("min_c", 16.0)
+    kw.setdefault("max_c", 30.0)
+    kw.setdefault("step_c", 0.5)
+    return hs.UnitState(entity_id, mode, setpoint, **kw)
 
 
-class SetpointPlanTests(unittest.TestCase):
-    def test_first_raise_remembers_the_original_setpoint(self) -> None:
-        result = plan()
-        self.assertEqual(result.set_to, 21.0)
-        self.assertEqual(result.track, {"base": 20.0, "target": 21.0})
+def plan(units, tracks=None, offset=1.0, cap=24.0):
+    return hs.plan_system(tracks or {}, units, offset_c=offset, max_setpoint_c=cap)
 
-    def test_offset_changes_are_applied_on_the_same_base(self) -> None:
-        result = plan({"base": 20.0, "target": 21.0}, current_c=21.0, offset_c=1.5)
-        self.assertEqual((result.set_to, result.track), (21.5, {"base": 20.0, "target": 21.5}))
-        self.assertIsNone(plan({"base": 20.0, "target": 21.0}, current_c=21.0).set_to)  # rien à écrire
 
-    def test_offset_back_to_zero_restores_the_original_setpoint(self) -> None:
-        result = plan({"base": 20.3, "target": 21.5}, current_c=21.5, offset_c=0.0)
-        self.assertEqual((result.set_to, result.track), (20.3, None))
+def acts(result):
+    return {a.entity_id: (a.pre_mode, a.set_to, a.post_mode) for a in result.actions}
 
-    def test_no_track_and_no_offset_does_nothing(self) -> None:
-        self.assertEqual(plan(offset_c=0.0), hs.SetpointPlan(None, None))
 
-    def test_manual_change_becomes_the_new_base(self) -> None:
-        result = plan({"base": 20.0, "target": 21.0}, current_c=23.0, offset_c=1.0)
-        self.assertEqual((result.set_to, result.track), (24.0, {"base": 23.0, "target": 24.0}))
-        # Décalage nul après une modification manuelle : on ne touche à rien.
-        self.assertEqual(plan({"base": 20.0, "target": 21.0}, current_c=23.0, offset_c=0.0), hs.SetpointPlan(None, None))
+class SystemPlanTests(unittest.TestCase):
+    def test_every_heating_unit_gets_the_same_setpoint(self) -> None:
+        result = plan([unit("climate.a", setpoint=20.0), unit("climate.b", setpoint=22.0)])
+        # moyenne 21 + 1 = 22 : A monte à 22, B reste (déjà à 22)
+        self.assertEqual(acts(result), {"climate.a": (None, 22.0, None)})
+        self.assertEqual(result.tracks["climate.a"], {"mode": "heat", "base": 20.0, "target": 22.0})
+        self.assertIsNone(result.tracks.get("climate.b"))  # rien à mémoriser : consigne inchangée
+
+    def test_a_unit_is_never_lowered_below_its_own_setpoint(self) -> None:
+        result = plan([unit("climate.a", setpoint=19.0), unit("climate.b", setpoint=23.5)], offset=0.5)
+        # moyenne 21,25 + 0,5 = 21,75 → 22 ; B garde 23,5
+        self.assertEqual(acts(result), {"climate.a": (None, 22.0, None)})
+
+    def test_off_units_are_turned_on_at_the_common_setpoint_and_remembered(self) -> None:
+        result = plan([unit("climate.a", setpoint=20.0), unit("climate.b", mode="off", setpoint=17.0)])
+        self.assertEqual(acts(result)["climate.b"], ("heat", 21.0, None))
+        self.assertEqual(result.tracks["climate.b"], {"mode": "off", "base": 17.0, "target": 21.0})
+        self.assertEqual(result.tracks["climate.a"], {"mode": "heat", "base": 20.0, "target": 21.0})
+
+    def test_all_units_off_are_turned_on_when_an_offset_is_granted(self) -> None:
+        result = plan([unit("climate.a", mode="off", setpoint=19.0), unit("climate.b", mode="off", setpoint=21.0)])
+        # moyenne 20 + 1 = 21
+        self.assertEqual(acts(result), {"climate.a": ("heat", 21.0, None), "climate.b": ("heat", 21.0, None)})
+        self.assertEqual(result.tracks["climate.a"], {"mode": "off", "base": 19.0, "target": 21.0})
+
+    def test_nothing_is_turned_on_without_offset_or_without_any_known_setpoint(self) -> None:
+        self.assertEqual(plan([unit("climate.a", mode="off")], offset=0.0).actions, [])
+        self.assertEqual(plan([unit("climate.a", mode="off", setpoint=None)]).actions, [])
+
+    def test_boost_continues_on_units_turned_on_by_foxcat_when_the_user_switched_the_others_off(self) -> None:
+        tracks = {"climate.b": {"mode": "off", "base": 17.0, "target": 21.0}}
+        result = plan([unit("climate.a", mode="off", setpoint=20.0), unit("climate.b", setpoint=21.0)], tracks, offset=1.0)
+        # moyenne des références (17 et 20) = 18,5 ; + 1 = 19,5
+        self.assertEqual(result.tracks["climate.b"], {"mode": "off", "base": 17.0, "target": 19.5})
+        self.assertEqual(acts(result)["climate.a"], ("heat", 19.5, None))
+
+    def test_units_in_other_modes_or_without_heat_are_left_alone(self) -> None:
+        units = [unit("climate.a"), unit("climate.b", mode="cool"), unit("climate.c", mode="off", can_heat=False)]
+        self.assertEqual(set(acts(plan(units))), {"climate.a"})
+
+    def test_max_setpoint_caps_the_common_setpoint(self) -> None:
+        result = plan([unit("climate.a", setpoint=23.0)], offset=2.0, cap=24.0)
+        self.assertEqual(acts(result), {"climate.a": (None, 24.0, None)})
+        # Une unité déjà au-dessus du plafond n'est pas baissée.
+        self.assertEqual(plan([unit("climate.a", setpoint=25.0)], offset=2.0, cap=24.0).actions, [])
+
+    def test_unit_step_and_bounds_are_respected(self) -> None:
+        self.assertEqual(acts(plan([unit(setpoint=20.0, step_c=1.0)], offset=0.5)), {"climate.a": (None, 21.0, None)})
+        self.assertEqual(acts(plan([unit(setpoint=29.5, max_c=30.0)], offset=2.0, cap=40.0)), {"climate.a": (None, 30.0, None)})
+
+    def test_state_and_setpoints_are_restored_when_the_offset_drops_to_zero(self) -> None:
+        tracks = {
+            "climate.a": {"mode": "heat", "base": 20.0, "target": 21.0},
+            "climate.b": {"mode": "off", "base": 17.0, "target": 21.0},
+        }
+        result = plan([unit("climate.a", setpoint=21.0), unit("climate.b", setpoint=21.0)], tracks, offset=0.0)
+        self.assertEqual(acts(result), {"climate.a": (None, 20.0, None), "climate.b": (None, 17.0, "off")})
+        self.assertEqual(result.tracks, {"climate.a": None, "climate.b": None})
+
+    def test_offset_changes_keep_the_same_remembered_values(self) -> None:
+        tracks = {
+            "climate.a": {"mode": "heat", "base": 20.0, "target": 21.0},
+            "climate.b": {"mode": "off", "base": 17.0, "target": 21.0},
+        }
+        result = plan([unit("climate.a", setpoint=21.0), unit("climate.b", setpoint=21.0)], tracks, offset=1.5)
+        self.assertEqual(acts(result), {"climate.a": (None, 21.5, None), "climate.b": (None, 21.5, None)})
+        self.assertEqual(result.tracks["climate.b"], {"mode": "off", "base": 17.0, "target": 21.5})
+        # La consigne de la unité allumée redescend avec le décalage (pas de plancher).
+        down = plan([unit("climate.a", setpoint=21.5), unit("climate.b", setpoint=21.5)],
+                    {k: {**v, "target": 21.5} for k, v in tracks.items()}, offset=0.5)
+        self.assertEqual(acts(down)["climate.b"], (None, 20.5, None))
+
+    def test_manual_setpoint_change_becomes_the_new_reference(self) -> None:
+        tracks = {"climate.a": {"mode": "heat", "base": 20.0, "target": 21.0}}
+        result = plan([unit("climate.a", setpoint=23.0)], tracks, offset=1.0)
+        self.assertEqual(result.tracks["climate.a"], {"mode": "heat", "base": 23.0, "target": 24.0})
+        self.assertEqual(plan([unit("climate.a", setpoint=23.0)], tracks, offset=0.0).actions, [])
+
+    def test_unit_switched_off_by_the_user_is_not_turned_on_again(self) -> None:
+        tracks = {
+            "climate.a": {"mode": "heat", "base": 20.0, "target": 21.0},
+            "climate.b": {"mode": "off", "base": 17.0, "target": 21.0},
+        }
+        result = plan([unit("climate.a", setpoint=21.0), unit("climate.b", mode="off", setpoint=21.0)], tracks)
+        self.assertEqual(result.tracks["climate.b"], {"suppressed": True})
+        self.assertNotIn("climate.b", acts(result))
+        # Reste ignorée tant que le décalage dure, puis libérée à la fin.
+        again = plan([unit("climate.a", setpoint=21.0), unit("climate.b", mode="off")], {"climate.b": {"suppressed": True}})
+        self.assertNotIn("climate.b", acts(again))
+        end = plan([unit("climate.b", mode="off")], {"climate.b": {"suppressed": True}}, offset=0.0)
+        self.assertEqual(end.tracks, {"climate.b": None})
+
+    def test_unit_switched_off_by_the_user_after_a_raise_is_not_turned_on_again(self) -> None:
+        tracks = {"climate.a": {"mode": "heat", "base": 20.0, "target": 21.0}}
+        result = plan([unit("climate.a", mode="off", setpoint=21.0), unit("climate.b", setpoint=20.0)], tracks)
+        self.assertEqual(result.tracks["climate.a"], {"suppressed": True})
+        self.assertNotIn("climate.a", acts(result))
 
     def test_small_unit_rounding_is_not_a_manual_change(self) -> None:
-        result = plan({"base": 20.0, "target": 21.0}, current_c=21.1, offset_c=1.0)
-        self.assertEqual(result.track, {"base": 20.0, "target": 21.0})
+        tracks = {"climate.a": {"mode": "heat", "base": 20.0, "target": 21.0}}
+        result = plan([unit("climate.a", setpoint=21.1)], tracks)
+        self.assertEqual(result.tracks["climate.a"]["base"], 20.0)
 
-    def test_only_the_heating_mode_is_driven(self) -> None:
-        for mode in ("cool", "off", "auto", "heat_cool", None):
-            self.assertEqual(plan({"base": 20.0, "target": 21.0}, hvac_mode=mode), hs.SetpointPlan(None, None))
-        self.assertEqual(plan(current_c=None), hs.SetpointPlan(None, None))
-        self.assertEqual(plan(current_c="abc"), hs.SetpointPlan(None, None))
+    def test_invalid_offset_is_treated_as_zero_and_garbage_tracks_are_ignored(self) -> None:
+        self.assertEqual(plan([unit()], offset=float("nan")).actions, [])
+        self.assertIsNone(hs.clean_track({"mode": "cool", "target": 21}))
+        self.assertIsNone(hs.clean_track("x"))
+        self.assertEqual(hs.clean_track({"mode": "off", "target": 21.004, "base": "?"}), {"mode": "off", "target": 21.0})
+        self.assertEqual(hs.clean_track({"suppressed": True, "base": 3}), {"suppressed": True})
 
-    def test_step_and_bounds_of_the_unit_are_respected(self) -> None:
-        self.assertEqual(plan(offset_c=0.5, step_c=1).set_to, 21.0)  # 20.5 arrondi au pas de 1 °C
-        self.assertEqual(plan(current_c=29.5, offset_c=2.0, max_c=30).set_to, 30.0)
-        self.assertIsNone(plan(current_c=30.0, offset_c=2.0, max_c=30).set_to)
 
-    def test_invalid_offset_is_treated_as_zero(self) -> None:
-        self.assertEqual(plan(offset_c=float("nan")), hs.SetpointPlan(None, None))
-        self.assertEqual(plan(offset_c=-3.0), hs.SetpointPlan(None, None))
+class MaxSetpointTests(unittest.TestCase):
+    def test_default_and_bounds(self) -> None:
+        self.assertEqual(hs.normalise_system(entry(), "x")[0]["max_setpoint_c"], 24.0)
+        self.assertEqual(hs.normalise_system(entry(max_setpoint_c=99), "x")[0]["max_setpoint_c"], 30.0)
+        self.assertEqual(hs.normalise_system(entry(max_setpoint_c=5), "x")[0]["max_setpoint_c"], 16.0)
+        self.assertEqual(hs.normalise_system(entry(max_setpoint_c="abc"), "x")[0]["max_setpoint_c"], 24.0)
+        self.assertEqual(hs.normalise_system(entry(max_setpoint_c=22.5), "x")[0]["max_setpoint_c"], 22.5)
 
 
 class RecordsTests(unittest.TestCase):

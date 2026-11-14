@@ -468,6 +468,12 @@ def _heating_system_schema(current: dict[str, Any] | None = None) -> vol.Schema:
         opt("indoor_units"): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="climate", multiple=True)
         ),
+        vol.Optional(
+            "max_setpoint_c", default=float(current.get("max_setpoint_c", hsys.DEFAULT_MAX_SETPOINT_C))
+        ): selector.NumberSelector(selector.NumberSelectorConfig(
+            min=hsys.MIN_MAX_SETPOINT_C, max=hsys.MAX_MAX_SETPOINT_C, step=0.5,
+            unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX,
+        )),
         vol.Optional("apply_setpoint", default=bool(current.get("apply_setpoint", False))): selector.BooleanSelector(),
     })
 
