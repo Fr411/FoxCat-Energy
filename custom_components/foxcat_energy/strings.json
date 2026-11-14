@@ -637,7 +637,11 @@
             "name": "Mesures",
             "data": {
               "current_sensor": "Capteur de courant (optionnel)",
-              "voltage_sensor": "Capteur de tension (optionnel)"
+              "voltage_sensor": "Capteur de tension (optionnel)",
+              "phase": "Phase du réseau (L1, L2 ou L3, optionnel)"
+            },
+            "data_description": {
+              "phase": "Phase sur laquelle la machine est raccordée. Sert à répartir la charge par phase, notamment pour l'écrêtage."
             }
           }
         }
@@ -685,7 +689,11 @@
             "name": "Mesures",
             "data": {
               "current_sensor": "Capteur de courant (optionnel)",
-              "voltage_sensor": "Capteur de tension (optionnel)"
+              "voltage_sensor": "Capteur de tension (optionnel)",
+              "phase": "Phase du réseau (L1, L2 ou L3, optionnel)"
+            },
+            "data_description": {
+              "phase": "Phase sur laquelle la machine est raccordée. Sert à répartir la charge par phase, notamment pour l'écrêtage."
             }
           }
         }

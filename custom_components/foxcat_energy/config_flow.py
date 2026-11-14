@@ -381,6 +381,10 @@ def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
     power_marker, power_selector = opt_entity("power_sensor", "sensor")
     current_marker, current_selector = opt_entity("current_sensor", "sensor")
     voltage_marker, voltage_selector = opt_entity("voltage_sensor", "sensor")
+    phase_value = hsys.normalise_phase(current.get("phase"))
+    phase_marker = (
+        vol.Optional("phase", description={"suggested_value": phase_value}) if phase_value else vol.Optional("phase")
+    )
     return vol.Schema({
         vol.Required("name", default=str(current.get("name", ""))): selector.TextSelector(),
         vol.Required("machine_type", default=str(current.get("machine_type", "switch"))): selector.SelectSelector(
@@ -397,6 +401,9 @@ def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
         power_marker: power_selector,
         current_marker: current_selector,
         voltage_marker: voltage_selector,
+        phase_marker: selector.SelectSelector(
+            selector.SelectSelectorConfig(options=list(hsys.PHASES), mode=selector.SelectSelectorMode.DROPDOWN)
+        ),
         vol.Optional("automatic", default=bool(current.get("automatic", True))): selector.BooleanSelector(),
         vol.Optional("sheddable", default=bool(current.get("sheddable", True))): selector.BooleanSelector(),
         vol.Optional("cycle_start_w", default=float(current.get("cycle_start_w", 10.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=1,max=500,step=1,unit_of_measurement="W",mode=selector.NumberSelectorMode.BOX)),
@@ -425,6 +432,7 @@ def _normalise_machine_record(user_input: dict[str, Any], machine_id: str) -> di
     if machine_type == "cvc" and not power_sensor:
         return None
     record.update({"id": machine_id, "name": name, "machine_type": machine_type})
+    record["phase"] = hsys.normalise_phase(record.get("phase"))
     if machine_type == "cvc":
         record.update({
             "switch": "",
@@ -860,7 +868,7 @@ _MACHINE_SECTIONS: dict[str, tuple[str, ...]] = {
         "cycle", "cycle_start_w", "cycle_start_confirm_s", "cycle_duration_minutes",
         "cycle_margin_minutes", "cycle_end_w", "cycle_end_confirm_minutes",
     ),
-    "measurements": ("current_sensor", "voltage_sensor"),
+    "measurements": ("current_sensor", "voltage_sensor", "phase"),
 }
 _OPEN_SECTIONS = frozenset({"connection"})
 
