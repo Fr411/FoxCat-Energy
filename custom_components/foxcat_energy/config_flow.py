@@ -114,6 +114,25 @@ from .const import (
     SWITCH_DEFINITIONS,
 )
 from .domain.loads.machines import records_for_options
+from .const import (
+    CONF_PRICE_PUBLICATION_ENTITY,
+    CONF_PRICE_REFRESH_SERVICE,
+    DISTRIBUTION_PROFILE_BI,
+    DISTRIBUTION_PROFILE_IMPACT,
+    DISTRIBUTION_PROFILE_SIMPLE,
+    DYNAMIC_STRUCT_BI,
+    DYNAMIC_STRUCT_IMPACT,
+    DYNAMIC_STRUCT_SIMPLE,
+    NETWORK_POLICIES,
+    NETWORK_POLICY_COMPENSATION,
+    PRICE_SOURCE_CONTRACT,
+    PRICE_SOURCE_DYNAMIC,
+    PRICE_SOURCE_INTEGRATION,
+    PRICE_SOURCE_VARIABLE,
+    TARIFF_BI,
+    TARIFF_DYNAMIC,
+    TARIFF_MONO,
+)
 from .domain.tariff import templates as tariff_templates
 from .domain.tariff.legacy import ACTIVE_TARIFF_ID, CONTRACT_TARIFF_ID
 from .domain.tariff.models import TariffError, tariffs_from_json_value
@@ -208,22 +227,37 @@ def _grid_sign_selector() -> selector.SelectSelector:
     )
 
 
+# Deux axes indépendants à l'installation : le contrat (famille) et la structure du réseau.
+FAMILY_OPTIONS = [
+    {"value": "hphc", "label": "Prix fixe ou variable (prix saisis ou capteurs)"},
+    {"value": "dynamique", "label": "Dynamique (prix horaire ou au quart d'heure)"},
+]
+REGION_OPTIONS = [
+    {"value": "wallonie", "label": "Wallonie"},
+    {"value": "flandre", "label": "Flandre"},
+    {"value": "bruxelles", "label": "Bruxelles"},
+    {"value": "autre", "label": "Autre / ne pas préciser"},
+]
+STRUCTURE_OPTIONS = [
+    {"value": "Mono-horaire", "label": "Mono-horaire (un seul prix toute la journée)"},
+    {"value": "Bi-horaire", "label": "Bi-horaire (heures pleines / heures creuses)"},
+    {"value": "Impact", "label": "Impact (périodes ECO / MEDIUM / PIC)"},
+]
+PRICE_INPUT_OPTIONS = [
+    {"value": "manual", "label": "Je saisis mes prix (contrat fixe)"},
+    {"value": "sensors", "label": "Je lis mes prix depuis des capteurs Home Assistant"},
+]
 HPHC_MONO = "Mono-horaire"
 HPHC_BI = "Bi-horaire"
-HPHC_STRUCTURES = [HPHC_MONO, HPHC_BI]
-DYNAMIQUE_STRUCTURES = ["Simple", "Impact"]
+HPHC_IMPACT = "Impact"
 
 
-# FONCTION : _structure_schema — Structure schema
-def _structure_schema(options: list[str], default: str) -> vol.Schema:
-    return vol.Schema(
-        {
-            vol.Required("tariff_structure", default=default): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=options, mode=selector.SelectSelectorMode.LIST
-                )
-            )
-        }
+# FONCTION : _select — Liste déroulante d'options {valeur, libellé}
+def _select(options: list[dict[str, str]], mode=None) -> selector.SelectSelector:
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=options, mode=mode or selector.SelectSelectorMode.LIST
+        )
     )
 
 
@@ -419,16 +453,16 @@ def _dynamic_export_sign_selector() -> selector.SelectSelector:
 def _pricing_schema() -> vol.Schema:
     return vol.Schema(
         {
-            _optional(CONF_PRICE_CURRENT, "sensor.luminus_luminus_dynamic_wallonia_prix_actuel"): _entity("sensor"),
-            _optional(CONF_PRICE_NEXT, "sensor.luminus_luminus_dynamic_wallonia_prix_heure_suivante"): _entity("sensor"),
-            _optional(CONF_PRICE_INJECTION, "sensor.luminus_luminus_dynamic_wallonia_prix_d_injection"): _entity("sensor"),
-            _optional(CONF_PRICE_MIN_TODAY, "sensor.luminus_luminus_dynamic_wallonia_minimum_aujourd_hui"): _entity("sensor"),
-            _optional(CONF_PRICE_MAX_TODAY, "sensor.luminus_luminus_dynamic_wallonia_maximum_aujourd_hui"): _entity("sensor"),
-            _optional(CONF_PRICE_AVG_TODAY, "sensor.luminus_luminus_dynamic_wallonia_moyenne_aujourd_hui"): _entity("sensor"),
-            _optional(CONF_PRICE_MIN_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_minimum_demain"): _entity("sensor"),
-            _optional(CONF_PRICE_MAX_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_maximum_demain"): _entity("sensor"),
-            _optional(CONF_PRICE_AVG_TOMORROW, "sensor.luminus_luminus_dynamic_wallonia_moyenne_demain"): _entity("sensor"),
-            _optional(CONF_PRICE_TOMORROW_AVAILABLE, "binary_sensor.luminus_luminus_dynamic_wallonia_prix_de_demain_disponibles"): _entity("binary_sensor"),
+            _optional(CONF_PRICE_CURRENT): _entity("sensor"),
+            _optional(CONF_PRICE_NEXT): _entity("sensor"),
+            _optional(CONF_PRICE_INJECTION): _entity("sensor"),
+            _optional(CONF_PRICE_MIN_TODAY): _entity("sensor"),
+            _optional(CONF_PRICE_MAX_TODAY): _entity("sensor"),
+            _optional(CONF_PRICE_AVG_TODAY): _entity("sensor"),
+            _optional(CONF_PRICE_MIN_TOMORROW): _entity("sensor"),
+            _optional(CONF_PRICE_MAX_TOMORROW): _entity("sensor"),
+            _optional(CONF_PRICE_AVG_TOMORROW): _entity("sensor"),
+            _optional(CONF_PRICE_TOMORROW_AVAILABLE): _entity("binary_sensor"),
             _optional(CONF_PRICE_FORECAST_IMPORT): _entity("sensor"),
             _optional(CONF_PRICE_FORECAST_EXPORT): _entity("sensor"),
             vol.Required(CONF_DYNAMIC_EXPORT_SIGN_CONVENTION, default=DYNAMIC_EXPORT_POSITIVE_IS_REVENUE): _dynamic_export_sign_selector(),
@@ -459,9 +493,9 @@ def _hphc_schema() -> vol.Schema:
     return vol.Schema(
         {
             _optional(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor"),
-            _optional(CONF_TARIFF_HP_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_pleines_jour"): _entity("sensor"),
-            _optional(CONF_TARIFF_HC_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_heures_creuses_nuit"): _entity("sensor"),
-            _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR, "sensor.luminus_luminus_comfyflex_wallonia_prix_d_injection"): _entity("sensor"),
+            _optional(CONF_TARIFF_HP_PRICE_SENSOR): _entity("sensor"),
+            _optional(CONF_TARIFF_HC_PRICE_SENSOR): _entity("sensor"),
+            _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor"),
             vol.Optional(CONF_TARIFF_FIXED_INJECTION_PRICE, default=0.0): _price_number(0.0, -1.0, 2.0),
             vol.Optional(CONF_TARIFF_HP_START_1, default="07:00:00"): selector.TimeSelector(),
             vol.Optional(CONF_TARIFF_HP_END_1, default="11:00:00"): selector.TimeSelector(),
@@ -836,28 +870,98 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # MÉTHODE : FoxCatEnergyConfigFlow.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
+        # Réglages choisis à l'installation et appliqués comme options (voir async_step_ia).
+        self._options: dict[str, Any] = {}
 
-    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_user — Root menu: choose the contract family.
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_user — Question 1 : le contrat et la région.
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
-        """Root menu: choose the contract family."""
+        """Question 1 : type de contrat et région."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
-        return self.async_show_menu(step_id="user", menu_options=["hphc", "dynamique"])
-
-    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc — Branch A: HP/HC family, choose Mono-horaire or Bi-horaire.
-    async def async_step_hphc(self, user_input: dict[str, Any] | None = None):
-        """Branch A: HP/HC family, choose Mono-horaire or Bi-horaire."""
         if user_input is not None:
-            self._data["tariff_family"] = "hphc"
-            self._data["tariff_structure"] = user_input["tariff_structure"]
-            if user_input["tariff_structure"] == HPHC_MONO:
-                return await self.async_step_hphc_mono()
-            return await self.async_step_hphc_bi()
+            self._data["tariff_family"] = user_input["tariff_family"]
+            self._data["grid_region"] = user_input.get("grid_region", "autre")
+            return await self.async_step_network()
         return self.async_show_form(
-            step_id="hphc", data_schema=_structure_schema(HPHC_STRUCTURES, HPHC_MONO)
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("tariff_family", default="hphc"): _select(FAMILY_OPTIONS),
+                    vol.Required("grid_region", default="wallonie"): _select(
+                        REGION_OPTIONS, selector.SelectSelectorMode.DROPDOWN
+                    ),
+                }
+            ),
         )
 
-    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_mono — traitement asynchrone : step hphc mono
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_network — Question 2 : la structure du réseau (indépendante du contrat).
+    async def async_step_network(self, user_input: dict[str, Any] | None = None):
+        """Question 2 : structure du tarif de réseau, valable pour tous les contrats."""
+        if user_input is not None:
+            self._data["tariff_structure"] = user_input["tariff_structure"]
+            self._options["price_is_all_in"] = bool(user_input.get("price_is_all_in", False))
+            if self._data["tariff_family"] == "dynamique":
+                return await self.async_step_core()
+            return await self.async_step_hphc()
+        return self.async_show_form(
+            step_id="network",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("tariff_structure", default=HPHC_MONO): _select(STRUCTURE_OPTIONS),
+                    vol.Required("price_is_all_in", default=False): selector.BooleanSelector(),
+                }
+            ),
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc — Question 3 (contrat fixe ou variable) : prix saisis ou capteurs.
+    async def async_step_hphc(self, user_input: dict[str, Any] | None = None):
+        """Question 3 : les prix sont saisis à la main, ou lus depuis des capteurs."""
+        if user_input is not None:
+            if user_input["price_input"] == "manual":
+                self._options["price_source"] = PRICE_SOURCE_CONTRACT
+                return await self.async_step_hphc_manual()
+            if self._data["tariff_structure"] == HPHC_BI:
+                return await self.async_step_hphc_bi()
+            return await self.async_step_hphc_mono()
+        return self.async_show_form(
+            step_id="hphc",
+            data_schema=vol.Schema(
+                {vol.Required("price_input", default="manual"): _select(PRICE_INPUT_OPTIONS)}
+            ),
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_manual — Prix saisis à la main (contrat fixe).
+    async def async_step_hphc_manual(self, user_input: dict[str, Any] | None = None):
+        """Prix saisis : un prix de base, ou HP et HC en bi-horaire, plus le prix de réinjection."""
+        bi = self._data.get("tariff_structure") == HPHC_BI
+        if user_input is not None:
+            if bi:
+                self._options["tariff_hp_price_eur_kwh"] = float(user_input["tariff_hp_price_eur_kwh"])
+                self._options["tariff_hc_price_eur_kwh"] = float(user_input["tariff_hc_price_eur_kwh"])
+            else:
+                self._options["tariff_simple_fixed_price_eur_kwh"] = float(
+                    user_input["tariff_simple_fixed_price_eur_kwh"]
+                )
+            self._options["tariff_fixed_injection_eur_kwh"] = float(
+                user_input.get("tariff_fixed_injection_eur_kwh", 0.0)
+            )
+            return await self.async_step_core()
+        fields: dict[Any, Any] = {}
+        if bi:
+            fields[vol.Required("tariff_hp_price_eur_kwh", default=0.35)] = _price_number(0.35)
+            fields[vol.Required("tariff_hc_price_eur_kwh", default=0.25)] = _price_number(0.25)
+        else:
+            fields[vol.Required("tariff_simple_fixed_price_eur_kwh", default=0.30)] = _price_number(0.30)
+        fields[vol.Optional("tariff_fixed_injection_eur_kwh", default=0.0)] = _price_number(0.0, -1.0, 2.0)
+        return self.async_show_form(
+            step_id="hphc_bi_manual" if bi else "hphc_manual", data_schema=vol.Schema(fields)
+        )
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_bi_manual — Alias : le formulaire bi-horaire garde un identifiant distinct.
+    async def async_step_hphc_bi_manual(self, user_input: dict[str, Any] | None = None):
+        return await self.async_step_hphc_manual(user_input)
+
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_mono — Capteurs : un seul prix de base (mono-horaire ou Impact).
     async def async_step_hphc_mono(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
@@ -867,7 +971,7 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({vol.Required(CONF_TARIFF_MONO_PRICE_SENSOR): _entity("sensor"), _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor")}),
         )
 
-    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_bi — traitement asynchrone : step hphc bi
+    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_hphc_bi — Capteurs : prix heures pleines et heures creuses.
     async def async_step_hphc_bi(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._data.update(_normalise_input(user_input))
@@ -881,18 +985,6 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     _optional(CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR): _entity("sensor"),
                 }
             ),
-        )
-
-    # MÉTHODE : FoxCatEnergyConfigFlow.async_step_dynamique — Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique.
-    async def async_step_dynamique(self, user_input: dict[str, Any] | None = None):
-        """Branch B: dynamic family, choose Simple, Bi-horaire or Dynamique."""
-        if user_input is not None:
-            self._data["tariff_family"] = "dynamique"
-            self._data["tariff_structure"] = user_input["tariff_structure"]
-            return await self.async_step_core()
-        return self.async_show_form(
-            step_id="dynamique",
-            data_schema=_structure_schema(DYNAMIQUE_STRUCTURES, DYNAMIQUE_STRUCTURES[0]),
         )
 
     # MÉTHODE : FoxCatEnergyConfigFlow.async_step_core — traitement asynchrone : step core
@@ -947,7 +1039,11 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             title = str(self._data.get(CONF_INSTALLATION_NAME, "FoxCat Energy"))
             await self.async_set_unique_id("foxcat_energy_main")
             self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=title, data=self._data)
+            options = dict(self._options)
+            preset = [t.to_dict() for t in tariff_templates.templates_for_region(self._data.get("grid_region"))]
+            if preset:
+                options[CONF_TARIFF_COMPARISON] = preset
+            return self.async_create_entry(title=title, data=self._data, options=options)
         return self.async_show_form(
             step_id="ia", data_schema=_with_sections(_solar_schema(), _FORM_SECTIONS["ia"])
         )
@@ -966,6 +1062,36 @@ class FoxCatEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Home Assistant attaches config_entry to the OptionsFlow instance.
         """
         return FoxCatEnergyOptionsFlow()
+
+
+# FONCTION : _valid_service_name — Valide « domaine.service »
+def _valid_service_name(value: str) -> bool:
+    domain, _, name = value.partition(".")
+    return bool(domain) and bool(name) and all(
+        part.replace("_", "").isalnum() and part == part.lower() for part in (domain, name)
+    )
+
+
+# FONCTION : _coherent_tariff_keys — Clés dérivées qui doivent rester cohérentes avec le contrat et la structure
+def _coherent_tariff_keys(price_source: str, structure: str) -> dict[str, Any]:
+    """Dérive famille, régime, structure dynamique et profil de distribution.
+
+    Ces valeurs sont lues par des parties différentes du moteur ; les écrire ensemble
+    évite qu'un changement de contrat laisse un ancien profil actif.
+    """
+    dynamic = price_source in {PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_INTEGRATION}
+    if structure == "Bi-horaire":
+        profile, dynamic_structure, regime = DISTRIBUTION_PROFILE_BI, DYNAMIC_STRUCT_BI, TARIFF_BI
+    elif structure == "Impact":
+        profile, dynamic_structure, regime = DISTRIBUTION_PROFILE_IMPACT, DYNAMIC_STRUCT_IMPACT, TARIFF_MONO
+    else:
+        profile, dynamic_structure, regime = DISTRIBUTION_PROFILE_SIMPLE, DYNAMIC_STRUCT_SIMPLE, TARIFF_MONO
+    return {
+        "tariff_family": "dynamique" if dynamic else "hphc",
+        "tariff_regime": TARIFF_DYNAMIC if dynamic else regime,
+        "dynamic_structure": dynamic_structure,
+        "distribution_profile": profile,
+    }
 
 
 class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
@@ -1236,7 +1362,7 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing — traitement asynchrone : step pricing
     async def async_step_pricing(self, user_input=None):
-        options = ["pricing_dynamic", "hphc", "tariff_compare", "init"]
+        options = ["tariff_contract", "pricing_dynamic", "hphc", "price_publication", "tariff_compare", "init"]
         return self.async_show_menu(step_id="pricing", menu_options=options)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_pricing_dynamic — traitement asynchrone : step pricing dynamic
@@ -1246,6 +1372,88 @@ class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
     # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_hphc — traitement asynchrone : step hphc
     async def async_step_hphc(self, user_input=None):
         return await self._section("hphc", user_input, return_step="pricing")
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_tariff_contract — Contrat, structure du réseau et prix saisis, en un seul écran cohérent
+    async def async_step_tariff_contract(self, user_input=None):
+        """Contrat (source des prix) et structure du réseau : deux axes indépendants.
+
+        Écrit en une fois toutes les clés qui doivent rester cohérentes entre elles
+        (source, structure, profil de distribution, régime, famille).
+        """
+        effective = self._effective()
+        pending = self._ensure_pending()
+        if user_input is not None:
+            values = _normalise_input(user_input)
+            source = str(values["price_source"])
+            structure = str(values["tariff_structure"])
+            pending.update(values)
+            pending.update(_coherent_tariff_keys(source, structure))
+            return await self.async_step_pricing()
+
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        settings = coordinator.settings if coordinator is not None else {}
+
+        def current(key: str, default: Any) -> Any:
+            return pending.get(key, settings.get(key, effective.get(key, default)))
+
+        sources = [
+            {"value": PRICE_SOURCE_CONTRACT, "label": "Prix saisis à la main (contrat fixe)"},
+            {"value": PRICE_SOURCE_VARIABLE, "label": "Prix lus depuis des capteurs Home Assistant"},
+            {"value": PRICE_SOURCE_DYNAMIC, "label": "Dynamique (courbe horaire ou au quart d'heure)"},
+        ]
+        if current("price_source", PRICE_SOURCE_VARIABLE) == PRICE_SOURCE_INTEGRATION:
+            sources.append({"value": PRICE_SOURCE_INTEGRATION, "label": "Intégration externe (existant)"})
+        structures = [
+            {"value": "Simple", "label": "Mono-horaire (un seul prix)"},
+            {"value": "Bi-horaire", "label": "Bi-horaire (heures pleines / creuses)"},
+            {"value": "Impact", "label": "Impact (ECO / MEDIUM / PIC)"},
+        ]
+        policies = [{"value": value, "label": value} for value in NETWORK_POLICIES]
+        schema = vol.Schema(
+            {
+                vol.Required("price_source", default=current("price_source", PRICE_SOURCE_VARIABLE)): _select(sources),
+                vol.Required("tariff_structure", default=current("tariff_structure", "Simple")): _select(structures),
+                vol.Required("price_is_all_in", default=bool(current("price_is_all_in", False))): selector.BooleanSelector(),
+                vol.Required("network_policy", default=current("network_policy", NETWORK_POLICY_COMPENSATION)): _select(
+                    policies, selector.SelectSelectorMode.DROPDOWN
+                ),
+                vol.Optional("tariff_simple_fixed_price_eur_kwh", default=float(current("tariff_simple_fixed_price_eur_kwh", 0.30))): _price_number(0.30),
+                vol.Optional("tariff_hp_price_eur_kwh", default=float(current("tariff_hp_price_eur_kwh", 0.35))): _price_number(0.35),
+                vol.Optional("tariff_hc_price_eur_kwh", default=float(current("tariff_hc_price_eur_kwh", 0.25))): _price_number(0.25),
+                vol.Optional("tariff_fixed_injection_eur_kwh", default=float(current("tariff_fixed_injection_eur_kwh", 0.0))): _price_number(0.0, -1.0, 2.0),
+            }
+        )
+        return self.async_show_form(step_id="tariff_contract", data_schema=schema)
+
+    # MÉTHODE : FoxCatEnergyOptionsFlow.async_step_price_publication — Signal de publication des prix du lendemain
+    async def async_step_price_publication(self, user_input=None):
+        """Entité qui annonce la publication des prix du lendemain, et service de relecture."""
+        errors: dict[str, str] = {}
+        pending = self._ensure_pending()
+        if user_input is not None:
+            values = _normalise_input(user_input)
+            service = str(values.get(CONF_PRICE_REFRESH_SERVICE) or "").strip()
+            if service and not _valid_service_name(service):
+                errors["base"] = "invalid_service_name"
+            else:
+                pending[CONF_PRICE_REFRESH_SERVICE] = service
+                entity = values.get(CONF_PRICE_PUBLICATION_ENTITY)
+                pending[CONF_PRICE_PUBLICATION_ENTITY] = entity or ""
+                return await self.async_step_pricing()
+        effective = self._effective()
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_PRICE_PUBLICATION_ENTITY,
+                    description={"suggested_value": effective.get(CONF_PRICE_PUBLICATION_ENTITY) or None},
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["binary_sensor", "sensor"])),
+                vol.Optional(
+                    CONF_PRICE_REFRESH_SERVICE,
+                    description={"suggested_value": effective.get(CONF_PRICE_REFRESH_SERVICE) or ""},
+                ): selector.TextSelector(),
+            }
+        )
+        return self.async_show_form(step_id="price_publication", data_schema=schema, errors=errors)
 
     # MÉTHODE : FoxCatEnergyOptionsFlow._configured_tariffs — Tarifs de comparaison enregistrés
     def _configured_tariffs(self) -> list[dict[str, Any]]:

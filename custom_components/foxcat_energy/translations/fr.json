@@ -8,10 +8,10 @@
     "step": {
       "user": {
         "title": "FoxCat Energy – Contrat",
-        "description": "Choisissez la famille de votre contrat.",
-        "menu_options": {
-          "hphc": "Tarif HP/HC",
-          "dynamique": "Tarif Dynamique"
+        "description": "Étape 1/3. Choisissez votre type de contrat et votre région. La région préselectionne les tarifs à comparer ; elle ne modifie aucun prix.",
+        "data": {
+          "tariff_family": "Type de contrat",
+          "grid_region": "Région"
         }
       },
       "core": {
@@ -58,34 +58,27 @@
         }
       },
       "hphc": {
-        "title": "Tarif HP/HC",
-        "description": "Choisissez la structure du tarif.",
+        "title": "FoxCat Energy – Vos prix",
+        "description": "Étape 3/3. Saisissez vos prix à la main, ou lisez-les depuis des capteurs Home Assistant.",
         "data": {
-          "tariff_structure": "Structure"
+          "price_input": "Source des prix"
         }
       },
       "hphc_mono": {
-        "title": "HP/HC – Mono-horaire",
-        "description": "Sélectionnez l’entité source du tarif global.",
+        "title": "Capteur de prix",
+        "description": "Sélectionnez le capteur qui donne votre prix d'achat (mono-horaire ou Impact).",
         "data": {
-          "tariff_mono_price_sensor": "Source tarif global",
-          "tariff_fixed_injection_price_sensor": "Source prix de réinjection (optionnel)"
+          "tariff_mono_price_sensor": "Capteur du prix d'achat",
+          "tariff_fixed_injection_price_sensor": "Capteur du prix de réinjection (optionnel)"
         }
       },
       "hphc_bi": {
-        "title": "HP/HC – Bi-horaire",
-        "description": "Sélectionnez les entités sources des tarifs.",
+        "title": "Capteurs de prix HP / HC",
+        "description": "Sélectionnez les capteurs des heures pleines et des heures creuses.",
         "data": {
-          "tariff_hp_price_sensor": "Source Tarif HP",
-          "tariff_hc_price_sensor": "Source Tarif HC",
-          "tariff_fixed_injection_price_sensor": "Source prix de réinjection (optionnel)"
-        }
-      },
-      "dynamique": {
-        "title": "Tarif Dynamique",
-        "description": "Choisissez Simple pour suivre le prix dynamique seul, ou Impact pour appliquer les périodes et majorations configurées.",
-        "data": {
-          "tariff_structure": "Structure"
+          "tariff_hp_price_sensor": "Capteur heures pleines (HP)",
+          "tariff_hc_price_sensor": "Capteur heures creuses (HC)",
+          "tariff_fixed_injection_price_sensor": "Capteur du prix de réinjection (optionnel)"
         }
       },
       "boiler": {
@@ -182,12 +175,12 @@
       },
       "pricing": {
         "title": "FoxCat Energy – Tarification dynamique",
-        "description": "Luminus Dynamic est la référence financière du régime dynamique. FoxCat lit la courbe all-in aujourd’hui/demain et la valeur de réinjection ; Nord Pool/ENTSO-E restent des indicateurs temporels externes.",
+        "description": "dynamique est la référence financière du régime dynamique. FoxCat lit la courbe all-in aujourd’hui/demain et la valeur de réinjection ; Nord Pool/ENTSO-E restent des indicateurs temporels externes.",
         "data": {
-          "price_current": "Luminus Dynamic • Prix actuel",
-          "price_next": "Luminus Dynamic • Prix heure suivante",
-          "price_injection": "Luminus Dynamic • Prix de réinjection",
-          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+          "price_current": "Prix actuel",
+          "price_next": "Prix heure suivante",
+          "price_injection": "Prix de réinjection",
+          "dynamic_export_sign_convention": "Convention de signe réinjection (positif = rémunérateur)"
         },
         "sections": {
           "daily_stats": {
@@ -260,6 +253,34 @@
             }
           }
         }
+      },
+      "network": {
+        "title": "FoxCat Energy – Réseau",
+        "description": "Étape 2/3. La structure du tarif de réseau est indépendante du contrat : elle se choisit avec un contrat fixe, variable ou dynamique.",
+        "data": {
+          "tariff_structure": "Structure du tarif de réseau",
+          "price_is_all_in": "Mes prix sont « tout compris »"
+        },
+        "data_description": {
+          "price_is_all_in": "À cocher si le prix saisi ou lu contient déjà le réseau, les taxes et la marge du fournisseur. FoxCat n'ajoute alors aucun complément de distribution."
+        }
+      },
+      "hphc_manual": {
+        "title": "Vos prix (contrat fixe)",
+        "description": "Prix au kWh de votre contrat. Le prix de réinjection est facultatif.",
+        "data": {
+          "tariff_simple_fixed_price_eur_kwh": "Prix d'achat (€/kWh)",
+          "tariff_fixed_injection_eur_kwh": "Prix de réinjection (€/kWh)"
+        }
+      },
+      "hphc_bi_manual": {
+        "title": "Vos prix (contrat fixe, bi-horaire)",
+        "description": "Prix au kWh en heures pleines et en heures creuses. Le prix de réinjection est facultatif.",
+        "data": {
+          "tariff_hp_price_eur_kwh": "Prix heures pleines (€/kWh)",
+          "tariff_hc_price_eur_kwh": "Prix heures creuses (€/kWh)",
+          "tariff_fixed_injection_eur_kwh": "Prix de réinjection (€/kWh)"
+        }
       }
     }
   },
@@ -269,7 +290,8 @@
       "invalid_tariff_json": "Tarifs invalides : JSON illisible, tarif incomplet, identifiant en double ou réservé.",
       "peak_release_ratio_too_high": "Le seuil de réarmement (%) doit être inférieur au seuil de déclenchement (%).",
       "peak_release_not_below_trigger": "Le seuil de réarmement absolu doit être inférieur au seuil de déclenchement absolu.",
-      "peak_trigger_missing": "Renseignez un disjoncteur ou un seuil de déclenchement absolu."
+      "peak_trigger_missing": "Renseignez un disjoncteur ou un seuil de déclenchement absolu.",
+      "invalid_service_name": "Nom de service invalide : utilisez le format domaine.service (minuscules, chiffres et _)."
     },
     "step": {
       "init": {
@@ -458,10 +480,12 @@
       },
       "pricing": {
         "title": "Tarification",
-        "description": "Réglages de chaque tarif. Le tarif actif se choisit avec le sélecteur « Régime tarifaire » de FoxCat.",
+        "description": "Contrat et réseau en premier ; les autres écrans précisent les entités de prix, les plages et le comparateur.",
         "menu_options": {
-          "pricing_dynamic": "Tarification dynamique",
-          "hphc": "Tarification HP/HC",
+          "tariff_contract": "Contrat et réseau",
+          "pricing_dynamic": "Entités de prix dynamiques",
+          "hphc": "Prix et plages HP/HC",
+          "price_publication": "Publication des prix",
           "tariff_compare": "Comparateur de tarifs",
           "init": "← Retour au menu principal"
         }
@@ -677,10 +701,10 @@
         "title": "Tarification dynamique",
         "description": "Tarification dynamique Day-Ahead. FoxCat positionne le prix actuel sur l’horizon 24 h et réserve les blocs les moins chers pour les besoins thermiques du Boiler. Le tarif actif se choisit avec le sélecteur « Régime tarifaire » de FoxCat.",
         "data": {
-          "price_current": "Luminus Dynamic • Prix actuel",
-          "price_next": "Luminus Dynamic • Prix heure suivante",
-          "price_injection": "Luminus Dynamic • Prix de réinjection",
-          "dynamic_export_sign_convention": "Convention de signe réinjection (Luminus Dynamic = positif rémunérateur)"
+          "price_current": "Prix actuel",
+          "price_next": "Prix heure suivante",
+          "price_injection": "Prix de réinjection",
+          "dynamic_export_sign_convention": "Convention de signe réinjection (positif = rémunérateur)"
         },
         "sections": {
           "daily_stats": {
@@ -803,6 +827,38 @@
         "title": "À propos du fonctionnement",
         "description": "**Énergie** : puissance maison, prélèvement, réinjection, production, autoconsommation et bilans sont calculés par FoxCat, sans capteur supplémentaire.\n\n**EMS** : l’EMS Core reste le décideur souverain. Ses paramètres ajustables sont exposés sous forme d’entités FoxCat.\n\n**Energy Bus** : bus interne entre modules (trames, commandes, événements, ACK/NOK).\n\n**Métronome** : surveille la fraîcheur de la source réseau et active le secours si nécessaire. Ce n’est pas une horloge périodique.\n\n**Diagnostic** : les capteurs techniques sont dans l’appareil FoxCat Energy – Diagnostic.\n\n**Machine Learning** : apprentissage strictement passif, stocké localement.",
         "data": {}
+      },
+      "tariff_contract": {
+        "title": "Contrat et réseau",
+        "description": "Le contrat (source des prix) et la structure du réseau sont deux choix indépendants. Les prix saisis ne servent qu'avec « Prix saisis à la main ».",
+        "data": {
+          "price_source": "Source des prix",
+          "tariff_structure": "Structure du tarif de réseau",
+          "price_is_all_in": "Mes prix sont « tout compris »",
+          "network_policy": "Réinjection",
+          "tariff_simple_fixed_price_eur_kwh": "Prix d'achat unique (€/kWh)",
+          "tariff_hp_price_eur_kwh": "Prix heures pleines (€/kWh)",
+          "tariff_hc_price_eur_kwh": "Prix heures creuses (€/kWh)",
+          "tariff_fixed_injection_eur_kwh": "Prix de réinjection (€/kWh)"
+        },
+        "data_description": {
+          "price_is_all_in": "À cocher si le prix contient déjà le réseau, les taxes et la marge : FoxCat n'ajoute alors aucun complément de distribution.",
+          "tariff_simple_fixed_price_eur_kwh": "Utilisé en mono-horaire et en Impact avec des prix saisis.",
+          "tariff_hp_price_eur_kwh": "Utilisé en bi-horaire avec des prix saisis.",
+          "tariff_hc_price_eur_kwh": "Utilisé en bi-horaire avec des prix saisis."
+        }
+      },
+      "price_publication": {
+        "title": "Publication des prix",
+        "description": "Indiquez l'entité qui annonce la publication des prix du lendemain (par exemple « prix de demain disponible » de Nord Pool ou d'ENTSO-E). FoxCat relit alors les prix sans attendre le prochain rafraîchissement horaire. Ces prix de gros ne servent jamais de prix payé.",
+        "data": {
+          "price_publication_entity": "Entité de publication",
+          "price_refresh_service": "Service de relecture (optionnel)"
+        },
+        "data_description": {
+          "price_publication_entity": "Capteur binaire (déclenche en passant à « on ») ou capteur d'horodatage (déclenche à chaque changement).",
+          "price_refresh_service": "Au format domaine.service, par exemple be_electricity_prices.refresh. Appelé au plus une fois toutes les 10 minutes."
+        }
       }
     },
     "entity": {

@@ -93,7 +93,10 @@ from ..const import (
     CONF_PRICE_MIN_TODAY,
     CONF_PRICE_MIN_TOMORROW,
     CONF_PRICE_NEXT,
+    CONF_PRICE_PUBLICATION_ENTITY,
+    CONF_PRICE_REFRESH_SERVICE,
     CONF_PRICE_TOMORROW_AVAILABLE,
+    OPTION_EXTRA_SETTING_KEYS,
     CONF_PRICE_FORECAST_IMPORT,
     CONF_PRICE_FORECAST_EXPORT,
     CONF_DYNAMIC_EXPORT_SIGN_CONVENTION,
@@ -197,6 +200,7 @@ from ..dashboard.dashboard import dashboard_status
 
 _LOGGER = logging.getLogger(__name__)
 SERIES_SAVE_DELAY_S = 1800
+PRICE_REFRESH_MIN_INTERVAL_S = 600
 COMPARISON_REFRESH_S = 60
 
 from ..domain.tariff.tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, apply_configured_tariff, scoped_config
@@ -217,6 +221,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # écriture différée, afin de ne jamais alourdir la sauvegarde principale.
         self._series_store = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.series")
         self._comparison_cache: tuple[datetime, dict[str, Any]] | None = None
+        self._last_price_refresh: datetime | None = None
         self.machines: list[MachineDefinition] = machine_definitions(self.config)
         self.controllable_machines = [machine for machine in self.machines if machine.controllable]
         # FoxCat 1.5.0 : deux cœurs, communication immédiate par EnergyBus.
@@ -674,7 +679,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return {
             key: value
             for key, value in self.entry.options.items()
-            if key in self.settings
+            if key in self.settings or key in OPTION_EXTRA_SETTING_KEYS
         }
 
     # MÉTHODE : FoxCatEnergyCoordinator._async_save — Initialisation save
@@ -827,6 +832,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # V1.6.153 : les séries de prix futurs alimentent uniquement le
         # comparateur économique. Elles ne créent aucune trame EMS/PRI et ne
         # publient rien sur Energy Bus.
+        publication_entity = self.config.get(CONF_PRICE_PUBLICATION_ENTITY)
+        if publication_entity:
+            self._unsubs.append(
+                async_track_state_change_event(self.hass, [publication_entity], self._on_price_publication)
+            )
         economic_price_entities = [
             eid for eid in [
                 self.config.get(CONF_PRICE_FORECAST_IMPORT),
@@ -1191,6 +1201,48 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._capture_economic_price_backup():
             self.hass.async_create_task(self._async_save())
         self.hass.async_create_task(self.async_handle_price_change())
+
+    # MÉTHODE : FoxCatEnergyCoordinator._on_price_publication — Signal : les prix du lendemain viennent d'être publiés
+    @callback
+    def _on_price_publication(self, event: Event) -> None:
+        """Annonce de publication (ex. Nord Pool « prix de demain disponible » passe à on).
+
+        Un capteur binaire ne déclenche qu'en passant à « on » ; un autre capteur
+        (horodatage de mise à jour) déclenche à chaque changement de valeur.
+        """
+        new = event.data.get("new_state")
+        old = event.data.get("old_state")
+        if new is None or new.state in {"unknown", "unavailable", "none", ""}:
+            return
+        if old is not None and old.state == new.state:
+            return
+        if new.domain == "binary_sensor" and new.state != STATE_ON:
+            return
+        self.hass.async_create_task(self.async_refresh_prices("signal de publication des prix"))
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_refresh_prices — Demande à l'intégration de prix de relire ses données
+    async def async_refresh_prices(self, reason: str) -> None:
+        """Appelle le service de relecture configuré (si présent), puis recalcule.
+
+        Au plus une fois toutes les 10 minutes. Sans service configuré, FoxCat se
+        contente de recalculer : l'intégration de prix garde son propre rythme.
+        """
+        now = dt_util.utcnow()
+        last = self._last_price_refresh
+        if last is not None and (now - last).total_seconds() < PRICE_REFRESH_MIN_INTERVAL_S:
+            return
+        self._last_price_refresh = now
+        service = str(self.config.get(CONF_PRICE_REFRESH_SERVICE) or "").strip()
+        domain, _, name = service.partition(".")
+        if domain and name:
+            if self.hass.services.has_service(domain, name):
+                try:
+                    await self.hass.services.async_call(domain, name, {}, blocking=True)
+                except Exception:  # pragma: no cover - service tiers : jamais bloquant
+                    _LOGGER.warning("Relecture des prix impossible (%s) : %s", service, reason, exc_info=True)
+            else:
+                _LOGGER.warning("Service de relecture des prix introuvable : %s", service)
+        self.async_set_updated_data(self._build_data())
 
     # MÉTHODE : FoxCatEnergyCoordinator._on_economic_price_event — Rafraîchit le Day-Ahead; en Dynamique, réévalue les nouveaux départs machines.
     @callback

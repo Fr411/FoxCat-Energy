@@ -24,8 +24,10 @@ from ...const import (
     CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR,
     CONF_TARIFF_HC_PRICE_SENSOR,
     CONF_TARIFF_HP_PRICE_SENSOR,
+    DYNAMIC_STRUCT_BI,
     DYNAMIC_STRUCT_IMPACT,
     DYNAMIC_STRUCT_SIMPLE,
+    PRICE_SOURCE_CONTRACT,
     PRICE_SOURCE_DYNAMIC,
     PRICE_SOURCE_VARIABLE,
     TARIFF_BI,
@@ -74,46 +76,62 @@ def active_tariff(config: dict[str, Any]) -> str | None:
     if family == FAMILY_DYNAMIQUE:
         return TARIFF_DYNAMIQUE
     if family == FAMILY_HPHC:
-        if config.get(CONF_TARIFF_STRUCTURE) == "Mono-horaire":
-            return TARIFF_HPHC_MONO
-        return TARIFF_HPHC_BI
+        # Bi-horaire : deux prix (HP / HC). Mono-horaire et Impact : un seul prix de base.
+        if config.get(CONF_TARIFF_STRUCTURE) in {"Bi-horaire", TARIFF_STRUCTURE_TOU}:
+            return TARIFF_HPHC_BI
+        return TARIFF_HPHC_MONO
     return None
+
+
+# FONCTION : _structure_kind — Normalise la structure réseau choisie (mono / bi / impact)
+def _structure_kind(value: Any) -> str:
+    """Normalise la structure réseau choisie : ``simple``, ``bi`` ou ``impact``."""
+    if value in {"Impact", DYNAMIC_STRUCT_IMPACT, TARIFF_STRUCTURE_IMPACT}:
+        return "impact"
+    if value in {"Bi-horaire", DYNAMIC_STRUCT_BI, TARIFF_STRUCTURE_TOU}:
+        return "bi"
+    return "simple"
 
 
 # FONCTION : apply_configured_tariff — Apply the tariff selected during setup to runtime tariff settings.
 def apply_configured_tariff(settings: dict[str, Any], config: dict[str, Any]) -> None:
-    """Apply the tariff selected during setup to runtime tariff settings."""
+    """Apply the tariff selected during setup to runtime tariff settings.
+
+    Deux axes indépendants : le contrat (famille) et la structure du réseau
+    (mono, bi-horaire, Impact). Toutes les combinaisons sont possibles.
+    """
     tariff = active_tariff(config)
+    if tariff is None:
+        return
+    kind = _structure_kind(config.get(CONF_TARIFF_STRUCTURE))
+    structure = {
+        "simple": TARIFF_STRUCTURE_SIMPLE,
+        "bi": TARIFF_STRUCTURE_TOU,
+        "impact": TARIFF_STRUCTURE_IMPACT,
+    }[kind]
     if tariff == TARIFF_DYNAMIQUE:
-        impact = config.get(CONF_TARIFF_STRUCTURE) in {
-            "Impact",
-            DYNAMIC_STRUCT_IMPACT,
-            TARIFF_STRUCTURE_IMPACT,
-        }
         settings.update(
             {
                 "price_source": PRICE_SOURCE_DYNAMIC,
                 "tariff_regime": TARIFF_DYNAMIC,
-                "tariff_structure": TARIFF_STRUCTURE_IMPACT if impact else TARIFF_STRUCTURE_SIMPLE,
-                "dynamic_structure": DYNAMIC_STRUCT_IMPACT if impact else DYNAMIC_STRUCT_SIMPLE,
+                "tariff_structure": structure,
+                "dynamic_structure": {
+                    "simple": DYNAMIC_STRUCT_SIMPLE,
+                    "bi": DYNAMIC_STRUCT_BI,
+                    "impact": DYNAMIC_STRUCT_IMPACT,
+                }[kind],
             }
         )
-    elif tariff == TARIFF_HPHC_BI:
-        settings.update(
-            {
-                "price_source": PRICE_SOURCE_VARIABLE,
-                "tariff_regime": TARIFF_BI,
-                "tariff_structure": TARIFF_STRUCTURE_TOU,
-            }
-        )
-    elif tariff == TARIFF_HPHC_MONO:
-        settings.update(
-            {
-                "price_source": PRICE_SOURCE_VARIABLE,
-                "tariff_regime": TARIFF_MONO,
-                "tariff_structure": TARIFF_STRUCTURE_SIMPLE,
-            }
-        )
+        return
+    # Famille HP/HC : prix saisis à la main (contrat fixe) ou lus depuis des entités.
+    source = PRICE_SOURCE_CONTRACT if config.get("price_source") == PRICE_SOURCE_CONTRACT else PRICE_SOURCE_VARIABLE
+    settings.update(
+        {
+            "price_source": source,
+            "tariff_regime": TARIFF_BI if kind == "bi" else TARIFF_MONO,
+            "tariff_structure": structure,
+        }
+    )
 
 
 # FONCTION : allowed_price_keys — Allowed price keys
