@@ -139,6 +139,14 @@ class OptionsMenuTests(unittest.TestCase):
         self.assertEqual(result["type"], FlowResultType.MENU)
         self.assertEqual(result["step_id"], "heating")
 
+    def test_machine_phase_is_stored_with_the_machine(self) -> None:
+        flow = self.flow()
+        run(flow.async_step_machine_add({
+            "name": "Four", "machine_type": "switch", "switch": "switch.four",
+            "measurements": {"power_sensor": "sensor.four_w", "phase": "L3"},
+        }))
+        self.assertEqual(flow._pending_options["machines_v13"][0]["phase"], "L3")
+
     def test_heating_system_can_be_added_edited_and_removed(self) -> None:
         flow = self.flow()
         result = run(flow.async_step_heating_system_add({
