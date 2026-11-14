@@ -97,6 +97,8 @@ def distribution_period(at, settings):
 # FONCTION : final_client_price — Final client price
 def final_client_price(base,at,settings):
     p=float(base)
+    # Prix « tout compris » : réseau, taxes et marge sont déjà dans le prix lu, on ne les ajoute pas une seconde fois.
+    if settings.get('price_is_all_in',False): return p
     if not settings.get('price_curve_is_final',True): p+=sum(float(settings.get(k,0)) for k in ('tariff_network_component_eur_kwh','tariff_tax_component_eur_kwh','tariff_contract_component_eur_kwh'))
     period = distribution_period(at, settings)
     if period in IMPACT_ADDER_KEYS:

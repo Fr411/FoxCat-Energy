@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Iterable
 
-from .models import Tariff
+from .models import INJECTION_NONE, Tariff
 from .valuation import CostBreakdown, Slot, value_series
 
 METHOD_NOTE = (
@@ -29,7 +29,9 @@ def compare_tariffs(
     """Valorise chaque tarif et calcule l'écart par rapport à ``reference_id``."""
     costs: dict[str, CostBreakdown] = {}
     names: dict[str, str] = {}
+    injection_valued: dict[str, bool] = {}
     for tariff in tariffs:
+        injection_valued[tariff.id] = tariff.injection_kind != INJECTION_NONE
         costs[tariff.id] = value_series(window_slots, tariff, month_slots=month_slots)
         names[tariff.id] = tariff.name
 
@@ -47,6 +49,7 @@ def compare_tariffs(
     for tid in ranking:
         entry = costs[tid].to_dict()
         entry["name"] = names[tid]
+        entry["reinjection_valorisee"] = injection_valued[tid]
         if reference is not None:
             entry["ecart_vs_reference_eur"] = round(costs[tid].total_eur - reference.total_eur, 4)
         result["tariffs"][tid] = entry

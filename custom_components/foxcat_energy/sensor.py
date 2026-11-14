@@ -615,6 +615,7 @@ class FoxCatTariffComparisonSensor(FoxCatEntity, SensorEntity):
                     "capacitaire_eur": entry.get("capacitaire_eur"),
                     "frais_fixes_eur": entry.get("frais_fixes_eur"),
                     "reinjection_eur": entry.get("reinjection_eur"),
+                    "reinjection_valorisee": entry.get("reinjection_valorisee"),
                     "import_sans_prix_kwh": entry.get("import_sans_prix_kwh"),
                 }
                 for tid, entry in tariffs.items()

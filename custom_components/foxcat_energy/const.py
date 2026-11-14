@@ -208,6 +208,12 @@ TARIFF_STRUCTURE_SIMPLE = "Simple"; TARIFF_STRUCTURE_TOU = "Bi-horaire"; TARIFF_
 NETWORK_POLICY_COMPENSATION = "Compensation"; NETWORK_POLICY_BILLED_EXPORT = "Injection tarifée"; NETWORK_POLICY_NOT_VALUED = "Injection non valorisée"; NETWORK_POLICY_ZERO_INJECTION = "Zéro injection"; NETWORK_POLICY_LEGACY_BILLED_EXPORT="Injection facturée"; NETWORK_POLICIES=[NETWORK_POLICY_COMPENSATION,NETWORK_POLICY_BILLED_EXPORT,NETWORK_POLICY_NOT_VALUED,NETWORK_POLICY_ZERO_INJECTION]
 MODE_ALIASES={"Economie énergie":MODE_ECO,"Économie énergie":MODE_ECO,"Éco":MODE_ECO,"Eco":MODE_ECO,"Confort":MODE_COMFORT,"Manuel":MODE_MANUAL,"Dynamique":MODE_ECO,"Prix dynamique":MODE_ECO,"Tarification dynamique":MODE_ECO,"Bihoraire":MODE_ECO,"Bi-horaire":MODE_ECO,"HP/HC":MODE_ECO,"ECS solaire":MODE_ECO,"Zéro injection":MODE_ECO,"Réinjection refusée":MODE_ECO,"Réinjection autorisée":MODE_ECO,"Maxi solaire":MODE_ECO}
 CONF_TARIFF_SIMPLE_PRICE='tariff_simple_fixed_price_eur_kwh'
+# Signal de publication des prix du lendemain (ex. Nord Pool « prix de demain disponible »)
+# et service à appeler pour relire les prix (ex. « be_electricity_prices.refresh »).
+CONF_PRICE_PUBLICATION_ENTITY = "price_publication_entity"
+CONF_PRICE_REFRESH_SERVICE = "price_refresh_service"
+# Clés d'options appliquées comme réglages même si elles n'ont pas de valeur par défaut.
+OPTION_EXTRA_SETTING_KEYS = ("distribution_profile",)
 
 BOILER_NONE = "AUCUNE"
 BOILER_HEAT_45 = "CHAUFFE_45"
@@ -247,6 +253,11 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "dynamic_structure": DYNAMIC_STRUCT_SIMPLE,
     "network_policy": NETWORK_POLICY_COMPENSATION,
     "price_curve_is_final": True,
+    # Le prix lu contient déjà réseau, taxes et marge (ex. intégration de prix « tout compris ») :
+    # aucun complément de distribution n'est ajouté par FoxCat. Faux par défaut (comportement historique).
+    "price_is_all_in": False,
+    # Prix saisis à la main pour un contrat « Contractuelle / fixe » (mêmes valeurs de repli qu'avant).
+    "tariff_hp_price_eur_kwh": 0.35, "tariff_hc_price_eur_kwh": 0.25,
     "dynamic_favorable_max_hours": 4.0,
     "dynamic_preferred_network_max_eur_kwh": 0.30,
     "eco_max_wait_h": 24.0, "eco_min_saving_eur": 0.03, "eco_wait_penalty_eur_h": 0.0,
