@@ -420,13 +420,15 @@
           "voltage_sensor": "Capteur de tension du groupe extérieur (V, optionnel)",
           "phase": "Phase du groupe extérieur (optionnel)",
           "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)",
+          "max_setpoint_c": "Température de consigne max (°C)",
           "apply_setpoint": "FoxCat applique la rehausse de consigne (air/air)"
         },
         "data_description": {
           "power_sensor": "Obligatoire : consommation du groupe extérieur, comptabilisée séparément.",
           "phase": "Phase du réseau sur laquelle le groupe extérieur est raccordé.",
           "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé.",
-          "apply_setpoint": "Si activé, FoxCat règle lui-même la consigne des unités intérieures en mode chauffage (consigne d'origine + décalage) et la restaure quand le décalage retombe à 0. Si une consigne est modifiée à la main, elle devient la nouvelle consigne d'origine. Si désactivé, FoxCat publie seulement le décalage de ce système dans un capteur : une automatisation Home Assistant l'applique. Ignoré sans unité intérieure ni en eau/eau et air/eau."
+          "max_setpoint_c": "Plafond des consignes écrites par FoxCat sur les unités de ce système (16 à 30 °C, 24 °C par défaut). FoxCat ne baisse jamais une unité sous sa consigne d'origine.",
+          "apply_setpoint": "Si activé, FoxCat optimise les consignes des unités intérieures tant qu'un décalage est accordé : toutes les unités en chauffage reçoivent la même consigne (moyenne de leurs consignes + décalage, plafonnée par la température max), et les unités éteintes sont allumées au même niveau si au moins une unité chauffe déjà. L'état et la consigne de chaque unité sont mémorisés avant la première modification et rétablis dès que l'optimisation n'est plus possible (décalage à 0, fonction ou régulation coupée, système retiré). Une unité que vous modifiez à la main devient la référence, et une unité que vous éteignez pendant l'optimisation n'est plus rallumée jusqu'à la fin du décalage. Si désactivé, FoxCat publie seulement le décalage dans un capteur. Ignoré sans unité intérieure ni en eau/eau et air/eau."
         }
       },
       "heating_system_edit": {
@@ -445,13 +447,15 @@
           "voltage_sensor": "Capteur de tension du groupe extérieur (V, optionnel)",
           "phase": "Phase du groupe extérieur (optionnel)",
           "indoor_units": "Unités intérieures (air/air uniquement, 5 maximum)",
+          "max_setpoint_c": "Température de consigne max (°C)",
           "apply_setpoint": "FoxCat applique la rehausse de consigne (air/air)"
         },
         "data_description": {
           "power_sensor": "Obligatoire : consommation du groupe extérieur, comptabilisée séparément.",
           "phase": "Phase du réseau sur laquelle le groupe extérieur est raccordé.",
           "indoor_units": "Climates (climate.*) liés à ce groupe. Ignoré pour une PAC eau/eau ou air/eau : seul le capteur de puissance est utilisé.",
-          "apply_setpoint": "Si activé, FoxCat règle lui-même la consigne des unités intérieures en mode chauffage (consigne d'origine + décalage) et la restaure quand le décalage retombe à 0. Si une consigne est modifiée à la main, elle devient la nouvelle consigne d'origine. Si désactivé, FoxCat publie seulement le décalage de ce système dans un capteur : une automatisation Home Assistant l'applique. Ignoré sans unité intérieure ni en eau/eau et air/eau."
+          "max_setpoint_c": "Plafond des consignes écrites par FoxCat sur les unités de ce système (16 à 30 °C, 24 °C par défaut). FoxCat ne baisse jamais une unité sous sa consigne d'origine.",
+          "apply_setpoint": "Si activé, FoxCat optimise les consignes des unités intérieures tant qu'un décalage est accordé : toutes les unités en chauffage reçoivent la même consigne (moyenne de leurs consignes + décalage, plafonnée par la température max), et les unités éteintes sont allumées au même niveau si au moins une unité chauffe déjà. L'état et la consigne de chaque unité sont mémorisés avant la première modification et rétablis dès que l'optimisation n'est plus possible (décalage à 0, fonction ou régulation coupée, système retiré). Une unité que vous modifiez à la main devient la référence, et une unité que vous éteignez pendant l'optimisation n'est plus rallumée jusqu'à la fin du décalage. Si désactivé, FoxCat publie seulement le décalage dans un capteur. Ignoré sans unité intérieure ni en eau/eau et air/eau."
         }
       },
       "heating_system_remove": {
