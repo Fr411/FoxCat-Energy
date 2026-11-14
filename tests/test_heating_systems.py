@@ -96,9 +96,22 @@ class SystemPlanTests(unittest.TestCase):
         self.assertEqual(result.tracks["climate.b"], {"mode": "off", "base": 17.0, "target": 21.0})
         self.assertEqual(result.tracks["climate.a"], {"mode": "heat", "base": 20.0, "target": 21.0})
 
-    def test_nothing_is_turned_on_when_no_unit_is_heating(self) -> None:
-        result = plan([unit("climate.a", mode="off"), unit("climate.b", mode="off")])
-        self.assertEqual((result.actions, result.tracks), ([], {}))
+    def test_all_units_off_are_turned_on_when_an_offset_is_granted(self) -> None:
+        result = plan([unit("climate.a", mode="off", setpoint=19.0), unit("climate.b", mode="off", setpoint=21.0)])
+        # moyenne 20 + 1 = 21
+        self.assertEqual(acts(result), {"climate.a": ("heat", 21.0, None), "climate.b": ("heat", 21.0, None)})
+        self.assertEqual(result.tracks["climate.a"], {"mode": "off", "base": 19.0, "target": 21.0})
+
+    def test_nothing_is_turned_on_without_offset_or_without_any_known_setpoint(self) -> None:
+        self.assertEqual(plan([unit("climate.a", mode="off")], offset=0.0).actions, [])
+        self.assertEqual(plan([unit("climate.a", mode="off", setpoint=None)]).actions, [])
+
+    def test_boost_continues_on_units_turned_on_by_foxcat_when_the_user_switched_the_others_off(self) -> None:
+        tracks = {"climate.b": {"mode": "off", "base": 17.0, "target": 21.0}}
+        result = plan([unit("climate.a", mode="off", setpoint=20.0), unit("climate.b", setpoint=21.0)], tracks, offset=1.0)
+        # moyenne des références (17 et 20) = 18,5 ; + 1 = 19,5
+        self.assertEqual(result.tracks["climate.b"], {"mode": "off", "base": 17.0, "target": 19.5})
+        self.assertEqual(acts(result)["climate.a"], ("heat", 19.5, None))
 
     def test_units_in_other_modes_or_without_heat_are_left_alone(self) -> None:
         units = [unit("climate.a"), unit("climate.b", mode="cool"), unit("climate.c", mode="off", can_heat=False)]
@@ -122,11 +135,6 @@ class SystemPlanTests(unittest.TestCase):
         result = plan([unit("climate.a", setpoint=21.0), unit("climate.b", setpoint=21.0)], tracks, offset=0.0)
         self.assertEqual(acts(result), {"climate.a": (None, 20.0, None), "climate.b": (None, 17.0, "off")})
         self.assertEqual(result.tracks, {"climate.a": None, "climate.b": None})
-
-    def test_state_is_restored_when_no_reference_unit_is_left(self) -> None:
-        tracks = {"climate.b": {"mode": "off", "base": 17.0, "target": 21.0}}
-        result = plan([unit("climate.a", mode="off"), unit("climate.b", setpoint=21.0)], tracks)
-        self.assertEqual(acts(result), {"climate.b": (None, 17.0, "off")})
 
     def test_offset_changes_keep_the_same_remembered_values(self) -> None:
         tracks = {

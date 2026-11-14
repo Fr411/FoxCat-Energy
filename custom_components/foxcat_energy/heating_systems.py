@@ -129,10 +129,11 @@ def summary(record: dict[str, Any]) -> str:
 #
 # Pour chaque système dont « FoxCat applique la consigne » est actif :
 # - avant toute modification, l'état (mode) et la consigne de l'unité sont mémorisés ;
-# - tant qu'un décalage est accordé, les unités en chauffage reçoivent la même
-#   consigne (moyenne des consignes d'origine + décalage, plafonnée par la
-#   température max du système, sans jamais baisser une unité) et les unités
-#   éteintes sont allumées au même niveau ;
+# - tant qu'un décalage est accordé (donc seulement si le décalage de consigne est
+#   activé), les unités en chauffage reçoivent la même consigne (moyenne des
+#   consignes d'origine + décalage, plafonnée par la température max du système,
+#   sans jamais baisser une unité) et les unités éteintes sont allumées au même
+#   niveau, même si toutes sont éteintes ;
 # - dès que l'optimisation n'est plus possible, l'état et la consigne mémorisés sont rétablis.
 
 HEAT_MODE = "heat"
@@ -264,11 +265,24 @@ def plan_system(
         return track if track and not track.get("suppressed") else None
 
     heating = [u for u in units if _text(u.mode).lower() == HEAT_MODE and _finite(u.setpoint_c) is not None]
-    # Les unités de référence sont celles que l'utilisateur chauffe lui-même : sans elles,
-    # on n'allume rien (maison en veille) et on rétablit ce que FoxCat avait modifié.
+    # Unités de référence : celles que l'utilisateur chauffe lui-même.
     anchors = [u for u in heating if not (own(u) and own(u)["mode"] == OFF_MODE)]
+    bases: list[float] = [(own(u) or {}).get("base", _finite(u.setpoint_c)) for u in anchors]
+    if not bases:
+        # Tout est éteint : le décalage activé suffit à allumer les unités. Leur consigne
+        # d'avant optimisation (ou, à défaut, celle qu'elles affichent) sert de référence.
+        for unit in units:
+            track = own(unit)
+            setpoint = _finite(unit.setpoint_c)
+            if track is not None and track["mode"] == OFF_MODE and "base" in track:
+                bases.append(track["base"])
+            elif (
+                track is None and _text(unit.mode).lower() == OFF_MODE and unit.can_heat
+                and not (live[unit.entity_id] or {}).get("suppressed") and setpoint is not None
+            ):
+                bases.append(setpoint)
 
-    if offset <= 0 or not anchors:
+    if offset <= 0 or not bases:
         # 2) Optimisation impossible : rétablir le mode et la consigne mémorisés.
         for unit in units:
             track = own(unit)
@@ -287,9 +301,6 @@ def plan_system(
         return SystemPlan(actions, new_tracks)
 
     # 3) Consigne commune : moyenne des consignes d'origine des unités de référence + décalage.
-    bases = [
-        (own(u) or {}).get("base", _finite(u.setpoint_c)) for u in anchors
-    ]
     mean_base = sum(bases) / len(bases)
     common = mean_base + offset
     if cap is not None:
