@@ -272,7 +272,18 @@ Les entités sont rangées en **10 appareils** : Mesures et sources · Tarificat
 
 Principaux interrupteurs : Régulation FoxCat active, Boiler géré par FoxCat, Boiler autorisé en heures creuses, Réduction de puissance onduleur, Gestion de chaque machine, Délestage haute consommation, Analyse prédictive IA, Optimisation économique, Prédictif prix dynamique, Décalage de consigne solaire, Résumé EMS persistant.
 
-Listes : Mode EMS, Régime tarifaire, Politique réseau, Source du prix, Structure tarifaire, Version du dashboard.
+Listes : Mode EMS, Politique réseau, Version du dashboard, et cinq listes de tarif : **Source du prix**, **Structure tarifaire**, **Régime Tarifaire**, **Profil distribution Belgique** et **Structure (Si Dynamique)**.
+
+Ces cinq listes sont **synchronisées avec l'écran « Contrat et réseau »** : elles ne modifient que deux choix, le contrat et la structure du réseau, et FoxCat en déduit toutes les autres clés (régime, famille, profil de distribution, structure dynamique). Changer une liste met donc à jour les autres, et le menu affiche la même chose.
+
+| Liste | Choix | Ce qu'elle change |
+|---|---|---|
+| Source du prix | Contractuelle / fixe · Variable via entités Home Assistant · Dynamique Day-Ahead (· Intégration externe si déjà active) | Le contrat |
+| Structure tarifaire | Simple · Bi-horaire · Impact | La structure du réseau, avec tous les contrats |
+| Régime Tarifaire | Mono-horaire · Bi-horaire (HP/HC) · Dynamique | Dynamique = contrat dynamique ; Mono ou Bi = contrat non dynamique et structure simple ou bi-horaire |
+| Profil distribution Belgique, Structure (Si Dynamique) | Simple · Bi-horaire · Impact | La structure du réseau |
+
+Mono-horaire repasse la structure à Simple ; pour garder Impact, choisissez-le avec « Structure tarifaire ».
 
 **Services** :
 
