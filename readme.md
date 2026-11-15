@@ -235,13 +235,23 @@ Le menu permet aussi de déclarer des **systèmes de chauffage** (pompes à chal
 
 ## 12. Protection du raccordement
 
-Quand la puissance dépasse un seuil, FoxCat **délestage** les charges non essentielles puis les rétablit après un retour sous le seuil de réarmement.
+Quand la puissance dépasse un seuil, FoxCat **délestera** les charges non essentielles puis les rétablit après un retour sous le seuil de réarmement.
 
 - Seuil : % du calibre du disjoncteur (90 % par défaut) ou seuil absolu en watts.
-- Réseau mono, tri ou tétra ; tension et intensités par phase mesurées si disponibles.
+- Réseau mono, tri ou tétra. Si vous avez des intensités par phase, FoxCat prend la plus élevée.
 - Mesure comparée : import réseau (évite de délester quand le solaire couvre la charge) ou consommation totale.
 - Confirmation sur plusieurs trames avant déclenchement, **réarmement toujours au moins 5 % sous le déclenchement** pour éviter les oscillations.
 - Actions : couper le boiler, couper les machines délestables (jamais en plein cycle), libérer l'onduleur à 100 %, bloquer les nouveaux démarrages flexibles, assistance V2H.
+
+### Sans capteur d'intensité par phase
+
+Un disjoncteur déclenche sur la phase la plus chargée, pas sur le total. Sans courant par phase, FoxCat ne peut pas savoir quelle phase est en tête. Il travaille donc avec ce qu'il a :
+
+- **Tensions mesurées** (facultatives) : phase-neutre L1, L2, L3 (≈ 230 V) et entre lignes L1-L2, L2-L3, L3-L1 (≈ 400 V). FoxCat recoupe les deux familles, ignore les valeurs aberrantes et retombe sur la tension nominale sans mesure. La tension obtenue sert à calculer la capacité du disjoncteur et l'intensité. L'ancien capteur de tension unique reste pris en compte s'il est le seul renseigné.
+- **Coefficient de déséquilibre des phases** (1 par défaut, 3 au maximum) : il suppose que la phase la plus chargée porte K fois la charge moyenne. La capacité vue du total devient `A × V × phases ÷ K`. Exemple : 25 A, 3 phases, 230 V, K = 1,3 → capacité 13 269 W, déclenchement à 90 % ≈ 11 942 W, au lieu de 15 525 W avec K = 1. Il ne s'applique ni en monophasé ni quand des intensités par phase sont mesurées.
+- **Diagnostic** : les attributs de l'entité « Charge du disjoncteur principal » exposent l'intensité estimée et sa source, le coefficient appliqué, la tension utilisée et son origine (`nominal`, `phase`, `line` ou `phase+line`), la tension entre lignes et l'écart entre phases.
+
+Les tensions améliorent la précision du calcul ; elles **ne détectent pas** une phase surchargée. Seul le coefficient en tient compte.
 
 ## 13. Batterie et véhicule électrique
 

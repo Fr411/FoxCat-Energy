@@ -127,7 +127,7 @@ Le **prix de réinjection** est facultatif : laissez-le vide s'il n'est pas valo
 
 Sections facultatives :
 
-- **Protection du raccordement** : activer le délestage, calibre du disjoncteur (A), tension. Laissez à 0 pour renseigner plus tard (voir [§ 8](#8-protéger-le-raccordement)).
+- **Protection du raccordement** : activer le délestage, calibre du disjoncteur (A), tension nominale. Laissez à 0 pour renseigner plus tard (voir [§ 8](#8-protéger-le-raccordement)).
 - **Avancé** : puissance réseau de secours (utilisée seulement si la source principale se fige) et **mode développeur** (laissez désactivé).
 
 ### Boiler
@@ -348,7 +348,7 @@ Menu **Chauffage** :
 
 ## 8. Protéger le raccordement
 
-**Configurer → Protection.** Quand la puissance dépasse un seuil, FoxCat **délestage** les charges non essentielles puis les rétablit.
+**Configurer → Protection.** Quand la puissance dépasse un seuil, FoxCat **délestera** les charges non essentielles puis les rétablit.
 
 1. **Activer le délestage haute consommation.**
 2. **Raccordement** : régime réseau (MONO / TRI / TETRA), **calibre du disjoncteur** (A), tension nominale, facteur de puissance de l'onduleur, nombre de phases prises en compte.
@@ -358,9 +358,22 @@ Menu **Chauffage** :
    - **puissance comparée** : *Import réseau* (recommandé avec du solaire : évite de délester quand le soleil couvre la charge) ou *Consommation totale* ;
    - **réarmement** : toujours au moins 5 % sous le déclenchement.
 4. **Actions pendant le délestage** : couper le boiler, couper les machines délestables, libérer l'onduleur, bloquer les nouveaux démarrages flexibles, V2H (cible 80 % du disjoncteur).
-5. **Mesures** (facultatives) : tension réseau, intensités L1 à L3.
+5. **Mesures** (facultatives) : tensions réseau et intensités par phase (voir ci-dessous).
 
-> Exemple : disjoncteur 40 A en monophasé 230 V, soit 9 200 W ; déclenchement à 90 % ≈ 8 280 W. En tétraphasé, indiquez le nombre de phases pour multiplier la capacité (hypothèse de charge équilibrée).
+> Exemple : disjoncteur 40 A en monophasé 230 V, soit 9 200 W ; déclenchement à 90 % ≈ 8 280 W.
+
+### Sans capteur d'intensité par phase
+
+C'est le cas si vous n'avez que les tensions (phase-neutre et entre lignes) et une puissance totale. Un disjoncteur déclenche sur la phase la plus chargée : FoxCat ne peut pas la connaître sans courant par phase, mais vous pouvez le rendre plus prudent.
+
+1. **Régime réseau** : *TRI* ou *TETRA*, et **nombre de phases = 3**.
+2. **Calibre du disjoncteur** et tension nominale (230 V).
+3. Dans **Mesures**, renseignez les capteurs de tension que vous avez : L1, L2, L3 (≈ 230 V) et/ou L1-L2, L2-L3, L3-L1 (≈ 400 V). Un seul groupe suffit : FoxCat déduit l'autre. Laissez vides les intensités L1 à L3.
+4. **Coefficient de déséquilibre des phases** : commencez à **1,3**. Il suppose que la phase la plus chargée porte 30 % de plus que la moyenne et abaisse le seuil de délestage d'autant. Exemple : 25 A, 3 phases, 230 V, 90 % → 15 525 W avec K = 1, **11 942 W avec K = 1,3**.
+5. **Observez** : ouvrez l'entité **« Charge du disjoncteur principal »** (appareil Protection) et lisez ses attributs : `source_tension` doit valoir `phase`, `line` ou `phase+line` (pas `nominal`), `tension_phase_v` doit être proche de 230 V, et `ecart_tension_phases_pct` donne l'écart entre vos phases.
+6. **Ajustez le coefficient** selon vos habitudes. Si un disjoncteur a déjà déclenché alors que le total semblait bas, augmentez-le (1,5 à 2). Si le délestage se déclenche trop tôt, baissez-le. Ne le montez pas en monophasé : il est sans effet.
+
+Les tensions n'indiquent pas quelle phase est la plus chargée : elles rendent le calcul plus juste, mais seul le coefficient couvre un déséquilibre.
 
 ---
 
