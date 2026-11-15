@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16 et A-01 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
+**Statut** : **A-22, A-16, A-01, A-14 et A-03 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -21,10 +21,10 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | ~~A-16~~ | Haute | Prix au quart d'heure : un seul quart d'heure par heure est retenu ✔ |
 | ~~A-01~~ | Haute | Mode Confort : PRI inactif et onduleur jamais libéré |
 | A-02 | Moyenne | Code et réglages liés aux anciens modes devenus inatteignables |
-| A-03 | Moyenne | 21 entités et 2 réglages de formulaire sans aucun effet |
+| ~~A-03~~ | Moyenne | 22 entités et 2 réglages de formulaire sans aucun effet (signalés inactifs) |
 | A-04 | Moyenne | Deux « puissances d'onduleur » incohérentes (`pri_step_w` vs `inverter_power_w`) |
 | A-07 | Moyenne | Vérification du boiler : `float(None)` si l'attribut `temperature` est vide |
-| A-14 | Moyenne | Prix HP/HC affichés et prix « suivant » décalés des compléments de période ✔ |
+| ~~A-14~~ | Moyenne | Prix HP/HC affichés et prix « suivant » décalés des compléments de période ✔ |
 | A-15 | Moyenne | « Contrat saisi » ignore « tout compris » et les composantes réseau/taxes |
 | A-17 | Moyenne | Seuils Day-Ahead réglables ignorés par la décision économique |
 | A-23 | Moyenne | Gestion machine désactivée = prise coupée à chaque réconciliation (à confirmer) |
@@ -105,9 +105,9 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 
 **Proposition** : soit réactiver ces chemins avec la condition « tarif dynamique », soit les retirer (déplacer dans `trash/`), et garder un seul concept (régime tarifaire) pour décider.
 
-## A-03 · Moyenne · 21 entités et 2 réglages sans aucun effet
+## A-03 · Moyenne · 22 entités et 2 réglages sans aucun effet — CORRIGÉE (signalés inactifs)
 
-Des entités `number` / `switch` existent mais leur clé n'est lue nulle part (14 entités) ou seulement par du code inatteignable (7 entités) ; deux réglages de formulaire (`pri_step_percent`, `dynamic_preferred_network_max_eur_kwh`) sont lus mais sans effet :
+Des entités `number` / `switch` existent mais leur clé n'est lue nulle part (14 entités) ou seulement par du code inatteignable (8 entités) ; deux réglages de formulaire (`pri_step_percent`, `dynamic_preferred_network_max_eur_kwh`) sont lus mais sans effet :
 
 | Domaine | Clés |
 |---|---|
@@ -115,11 +115,14 @@ Des entités `number` / `switch` existent mais leur clé n'est lue nulle part (1
 | Dynamique | `dynamic_negative_price_charge_enabled`, `dynamic_grid_charge_threshold_eur_kwh`, `dynamic_preferred_network_max_eur_kwh` |
 | PRI | `pri_step_percent`, `pri_inverter_ack_tolerance_w`, `pri_up_ack_delta_w`, `pri_grid_ack_delta_w`, `pri_export_threshold_dynamic_w`, `pri_import_threshold_dynamic_w`, `pri_pv_minimum_w`, `pri_probe_margin_w`, `pri_export_optimal_w`, `pri_import_optimal_w` |
 | Protection | `high_load_confirm_s`, `high_load_restore_s` |
+| Dynamique (suite) | `dynamic_injection_lucrative_threshold` |
 | Autres | `autoconsommation_cible_percent`, `autoconsommation_min_percent`, `solar_window_min_minutes`, `pri_boiler_settle_s` (la méthode `_pri_settle_ok` n'est jamais appelée) |
 
 Le texte du README « avec un prix négatif, le boiler peut charger sur le réseau » est donc **inexact** (le boiler dynamique ne chauffe sur le réseau que jusqu'à 45 °C et n'a pas de règle « prix négatif »).
 
-**Proposition** : masquer ces entités (désactivées par défaut) ou les retirer ; corriger le README.
+**Correction appliquée** : les 22 entités sont dans `INACTIVE_SETTINGS` (`const.py`) : créées **désactivées**, en catégorie diagnostic, avec l'attribut `statut: inactif` ; elles sont conservées pour ne pas casser les tableaux de bord et les profils. `pri_step_percent` (variable inutilisée) a été retiré du moteur. Test `test_inactive_settings.py` : un réglage lu par aucun code actif doit être déclaré inactif. README et manuel corrigés. *Reste ouvert* : `dynamic_preferred_network_max_eur_kwh` (champ de formulaire) et la décision de retirer ou d'implémenter ces réglages.
+
+**Proposition d'origine** : masquer ces entités ou les retirer ; corriger le README.
 
 ## A-04 · Moyenne · Deux « puissances d'onduleur » incohérentes
 
@@ -137,7 +140,7 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition** : `float(value or 0)` et ne lire la consigne que pour les commandes de chauffe.
 
-## A-14 · Moyenne · Prix HP/HC décalés des compléments de période ✔
+## A-14 · Moyenne · Prix HP/HC décalés des compléments de période ✔ — CORRIGÉE
 
 **Où** : `prices()` appelle `final_client_price(hp, now, …)` et `final_client_price(hc, now, …)` : les **deux** reçoivent le complément de la **période courante**.
 
@@ -145,7 +148,9 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Conséquence** : le prix **actif** est correct ; `hp_price`, `hc_price`, `next_buy` et les séries HP/HC de l'optimiseur sont faux dès que les compléments HP et HC diffèrent.
 
-**Proposition** : évaluer chaque prix à un instant situé dans sa propre période.
+**Correction appliquée** : `final_client_price(..., period="HP"|"HC")` et `hp_hc_final_prices` ; `prices()` les utilise. Tests : `tests/test_tariff_period_adders.py`.
+
+**Proposition d'origine** : évaluer chaque prix à un instant situé dans sa propre période.
 
 ## A-15 · Moyenne · « Contrat saisi » ignore « tout compris » et les composantes
 

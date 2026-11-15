@@ -1,6 +1,9 @@
 # Changelog — FoxCat Energy V1.7.6
 
 ## Non publié
+- Correction (A-14) : chaque prix HP et HC reçoit le complément de distribution de sa propre période ; auparavant les deux recevaient celui de la période en cours, ce qui faussait `hp_price`, `hc_price`, le prix suivant et les séries HP/HC dès que les compléments HP et HC diffèrent.
+- Réglages inactifs (A-03) : 22 entités de réglage que le moteur actuel ne lit pas (agressivité solaire Bihoraire, charge réseau sur prix dynamique négatif, plusieurs seuils PRI…) sont désormais créées désactivées, rangées en diagnostic et marquées `statut: inactif`. Elles restent disponibles pour les tableaux de bord et les profils existants. Les entités déjà activées ne sont pas modifiées : désactivez-les si vous le souhaitez.
+- Audit des algorithmes : documentation détaillée par domaine et rapport d'anomalies dans `docs/algorithmes/`.
 - Correction (A-22) : en tarif dynamique, un cycle machine protégé (bouton « Démarrer », puissance détectée, cycle externe) faisait planter le planificateur de charges flexibles (`TypeError`) : la trame EMS finissait en erreur et les entités ne se rafraîchissaient plus pendant le cycle.
 - Correction (A-16) : avec des prix dynamiques au quart d'heure, la décision économique ne retenait que le dernier quart d'heure de chaque heure ; chaque heure est désormais la moyenne de ses points (position sur la courbe, bande, réservation du boiler, créneaux machines).
 - Correction (A-01) : le mode Confort pilote désormais la réduction de puissance de l'onduleur (PRI) et la libération de fin de journée comme le mode Éco (la garde excluait Confort : réinjection non limitée avec la politique « Zéro injection »). Passer en mode Manuel libère l'onduleur à 100 % si le PRI est activé.

@@ -90,7 +90,7 @@ Les compléments valent 0 par défaut (champ −1 à 2 €/kWh). `price_curve_is
 | bi-horaire (non dynamique) | `hp` si HP, sinon `hc` | l'autre | `HP` ou `HC` |
 | mono / Impact (non dynamique) | prix mono saisi (contrat fixe) ou `cur` | `nxt` ou `active` | `SIMPLE` |
 
-`hp` et `hc` sont passés dans `final_client_price` **à l'instant courant** : chacun reçoit le complément de la période *actuelle* et non de sa propre période (A-14). Le prix actif est correct ; `hp_price`, `hc_price` et `next_buy` sont décalés quand les compléments HP et HC diffèrent.
+`hp` et `hc` passent par `hp_hc_final_prices` : chacun reçoit le complément de **sa propre période** (HP ou HC), quelle que soit l'heure (corrigé A-14 ; auparavant tous deux recevaient le complément de la période courante). Hors profil bi-horaire, la période est celle de l'instant.
 
 ### 3.4 Valeur de la réinjection (`export_value`)
 

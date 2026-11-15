@@ -110,7 +110,7 @@ Trois choix distincts, qu'il ne faut pas confondre :
 ### Modes EMS
 
 - **Éco** : priorité à l'autoconsommation et à l'optimisation automatique. Le boiler absorbe d'abord le surplus solaire réellement disponible ; l'onduleur traite l'excédent résiduel ; aucun achat en heures pleines n'est autorisé pour le boiler. Les anciens modes (Zéro injection, ECS solaire, Bihoraire, Dynamique, Maxi solaire…) sont migrés vers Éco : leur comportement est désormais porté par le régime tarifaire et la politique réseau.
-- **Confort** : privilégie le confort tout en conservant toutes les sécurités.
+- **Confort** : même stratégie boiler et même réduction de puissance de l'onduleur qu'Éco, toutes sécurités conservées. La différence est dans le planificateur de charges flexibles : il accepte moins d'attente (6 h au plus) et exige une économie plus grande (0,10 €) pour reporter un démarrage.
 - **Manuel** : suspend les actions automatiques sur le boiler, l'onduleur et les machines. La sécurité thermique du boiler reste active.
 
 ### Politique réseau
@@ -201,7 +201,7 @@ Comportement :
 - **Sécurité d'abord** : au-delà du seuil de sécurité (sonde sur la résistance), toute chauffe est interdite et un arrêt est demandé.
 - **Éco** : le surplus solaire alimente le boiler jusqu'à 65 °C ; pas d'achat en heures pleines ; le boost solaire s'interrompt si le surplus disparaît.
 - **Heures creuses** : FoxCat attend le **dernier failback** avant de chauffer sur le réseau, pour laisser la priorité au solaire (interrupteur actif par défaut, marge de 30 min).
-- **Bihoraire** : agressivité solaire réglable.
+- **Heures creuses (bi-horaire)** : démarrage sur le réseau seulement au dernier failback (voir ci-dessus). Les anciens réglages d'« agressivité solaire » sont **inactifs**.
 - **Dynamique** : arbitrage thermique selon le prix. Un modèle (volume, puissance, eau froide à 15 °C) estime la durée de chauffe et réserve les créneaux les moins chers.
 - **Délestage** : le boiler peut être coupé pendant une pointe de consommation.
 
@@ -212,6 +212,7 @@ Le **PRI** réduit la puissance de l'onduleur par quatre relais **RRCR** (L1 à 
 - Algorithme à pas (100 à 1 000 W) avec scoring import/réinjection, tolérances et fenêtres « optimal / acceptable ».
 - Contrôle par **accusé physique** : la puissance de l'onduleur ou du réseau doit bouger comme prévu.
 - Un capteur de **puissance live** de l'onduleur est facultatif et purement informatif.
+- Actif en **Éco et Confort**, jamais en Manuel ; passer en Manuel libère l'onduleur à 100 % si le PRI est activé.
 - Niveau manuel disponible en mode Manuel ; « Libérer l'onduleur à 100 % » est le retour arrière immédiat.
 - Coupé automatiquement en fin de journée solaire (seuil et confirmation réglables).
 
@@ -269,6 +270,8 @@ Les tensions améliorent la précision du calcul ; elles **ne détectent pas** u
 ## 15. Entités, appareils et services
 
 Les entités sont rangées en **10 appareils** : Mesures et sources · Tarification · Onduleur · Boiler · Chauffage · Machines · Batterie et VE · Protection · Prévisions et IA · Système. Les `entity_id` et `unique_id` sont stables : dashboards et automatisations existants continuent de fonctionner.
+
+**Réglages inactifs.** Une vingtaine d'entités de réglage (par exemple « Agressivité solaire Bihoraire », « Charge réseau si prix dynamique négatif », plusieurs seuils PRI) ne sont lues par aucune stratégie active. Elles restent pour ne pas casser les tableaux de bord et les profils, mais elles sont créées **désactivées**, rangées en diagnostic et portent l'attribut `statut: inactif`. La liste est dans `INACTIVE_SETTINGS` (`const.py`) et dans [`docs/algorithmes/ANOMALIES.md`](docs/algorithmes/ANOMALIES.md) (A-03).
 
 Principaux interrupteurs : Régulation FoxCat active, Boiler géré par FoxCat, Boiler autorisé en heures creuses, Réduction de puissance onduleur, Gestion de chaque machine, Délestage haute consommation, Analyse prédictive IA, Optimisation économique, Prédictif prix dynamique, Décalage de consigne solaire, Résumé EMS persistant.
 
