@@ -39,6 +39,9 @@ class ConsumptionSeries:
     def __init__(self, retention_days: int = DEFAULT_RETENTION_DAYS) -> None:
         self.retention = timedelta(days=max(int(retention_days), 2))
         self._slots: dict[int, list[float]] = {}
+        # Pointe d'import au quart d'heure (kW) par mois « AAAA-MM » : sert au tarif capacitaire flamand,
+        # facturé sur la moyenne des pointes mensuelles (jusqu'à 12 mois), bien au-delà des 62 jours de créneaux.
+        self._peaks: dict[str, float] = {}
         self.last_valid_ts: datetime | None = None
         self.revision = 0
 
@@ -85,6 +88,7 @@ class ConsumptionSeries:
         hours = seconds / 3600.0
         record = self._slots.setdefault(int(start.timestamp()), [0.0] * 8)
         record[_IMP] += imp_w / 1000.0 * hours
+        self._note_peak(start, record[_IMP])
         record[_EXP] += exp_w / 1000.0 * hours
         record[_PV] += pv_w / 1000.0 * hours
         record[_HOUSE] += house_w / 1000.0 * hours
@@ -95,10 +99,28 @@ class ConsumptionSeries:
             record[_SELL_W] += sell * seconds
             record[_SELL_T] += seconds
 
+    def _note_peak(self, start: datetime, import_kwh: float) -> None:
+        """Pointe du quart d'heure = kWh du quart d'heure ÷ 0,25 h (puissance moyenne sur le quart d'heure)."""
+        kw = import_kwh / (SLOT_SECONDS / 3600.0)
+        key = start.strftime("%Y-%m")
+        if kw > self._peaks.get(key, 0.0):
+            self._peaks[key] = kw
+
+    def monthly_peaks(self) -> dict[str, float]:
+        return dict(self._peaks)
+
+    def previous_peaks_kw(self, month_start: datetime, count: int = 11) -> list[float]:
+        """Pointes des mois précédant ``month_start`` (au plus ``count``, du plus ancien au plus récent)."""
+        current = month_start.strftime("%Y-%m")
+        keys = sorted(k for k in self._peaks if k < current)
+        return [self._peaks[k] for k in keys[-count:]]
+
     def _prune(self, now: datetime) -> None:
         limit = int((now - self.retention).timestamp())
         for key in [k for k in self._slots if k < limit]:
             del self._slots[key]
+        for key in sorted(self._peaks)[:-13]:
+            del self._peaks[key]
 
     # -- lecture -----------------------------------------------------------
     def slots(self, start: datetime, end: datetime) -> list[Slot]:
@@ -128,14 +150,22 @@ class ConsumptionSeries:
                 [key, *[round(value, 6) for value in record]]
                 for key, record in sorted(self._slots.items())
             ],
+            "monthly_peaks": {key: round(value, 4) for key, value in sorted(self._peaks.items())},
         }
 
     def restore(self, raw: Any) -> None:
         """Lecture tolérante : une donnée invalide est ignorée, jamais fatale."""
         self._slots = {}
+        self._peaks = {}
         self.last_valid_ts = None  # ne jamais intégrer l'arrêt de Home Assistant
         if not isinstance(raw, dict) or raw.get("schema") != SCHEMA:
             return
+        stored = raw.get("monthly_peaks")
+        if isinstance(stored, dict):
+            for key, value in stored.items():
+                number = _number(value)
+                if isinstance(key, str) and len(key) == 7 and number is not None and number >= 0:
+                    self._peaks[key] = number
         for row in raw.get("slots") or []:
             if not isinstance(row, (list, tuple)) or len(row) != 9:
                 continue
@@ -143,4 +173,10 @@ class ConsumptionSeries:
             if any(value is None for value in values):
                 continue
             self._slots[int(values[0])] = [float(v) for v in values[1:]]
+        # Les créneaux conservés (62 jours) complètent l'historique des pointes d'avant l'enregistrement dédié.
+        for key, record in self._slots.items():
+            month = datetime.fromtimestamp(key).strftime("%Y-%m")
+            kw = record[_IMP] / (SLOT_SECONDS / 3600.0)
+            if kw > self._peaks.get(month, 0.0):
+                self._peaks[month] = kw
         self.revision += 1

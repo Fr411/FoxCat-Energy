@@ -157,8 +157,10 @@ prosumer     = redevance_prosumer_an × (nb créneaux × 0,25 h ÷ 8 760 h)
 capacitaire  = coût mensuel × min(part de la fenêtre dans le mois, 1)
      part = nb créneaux × 0,25 h ÷ heures du mois
      flat         → forfait_an ÷ 12
-     peak_monthly → max(pointe du mois, minimum kW) × €/kW/an ÷ 12
-     pointe       = max sur le mois de (kWh importés du quart d'heure ÷ 0,25 h)
+     peak_monthly → pointe facturée × €/kW/an ÷ 12
+     pointe du mois = max sur le mois de (kWh importés du quart d'heure ÷ 0,25 h)         (puissance MOYENNE du quart d'heure)
+     pointe facturée = moyenne des pointes mensuelles, chacune relevée au minimum (2,5 kW), sur au plus 12 mois :
+                       les mois précédents connus + le mois en cours (corrigé : auparavant, seul le mois en cours comptait)
 total        = énergie + réseau + frais fixes + capacitaire + prosumer − réinjection
 ```
 
@@ -189,9 +191,21 @@ Régions et modèles préchargés : Wallonie → les trois ; Flandre et Bruxelle
 
 Réglages saisis par l'installateur : type capacitaire (`none` / `flat` / `peak_monthly`), forfait annuel, €/kW/an, minimum kW, redevance prosumer annuelle. Lecture tolérante : valeur invalide ou négative → 0, type inconnu → aucun.
 
-Propositions de départ à l'installation (guide des tarifs 2026) : **Flandre** pointe mensuelle à 55 €/kW/an (minimum 2,5 kW) ; **Bruxelles** forfait 47 €/an.
+Propositions de départ à l'installation : **Flandre** pointe mensuelle à 55 €/kW/an (minimum 2,5 kW) ; **Bruxelles** forfait 47 €/an ; **Wallonie** : aucun terme capacitaire.
 
-Capteur « Coûts réseau • Ce mois » = capacitaire + prosumer du tarif actuel sur le mois ; attributs : pointe FoxCat, pointe de l'intégration de prix (contrôle), écart de pointe, valeurs de contrôle de l'intégration (jamais additionnées).
+### 5.1 Règles par région (vérifiées par recherche, novembre 2026)
+
+| Région | Règle | Ce que fait FoxCat |
+|---|---|---|
+| **Flandre** (Fluvius, VREG) | Le compteur numérique mesure la **puissance moyenne de chaque quart d'heure** (kWh × 4) ; la **pointe du mois** est le quart d'heure le plus chargé du **prélèvement**. La facture utilise la **moyenne des pointes mensuelles sur au plus 12 mois**, chacune comptée **au minimum 2,5 kW** ; sans historique validé, 2,5 kW par défaut ; compteur classique : forfait équivalent à 2,5 kW. Le prix varie selon le gestionnaire (de l'ordre de 51 à 60 €/kW/an). | `peak_monthly` : pointe du mois en quarts d'heure, **moyenne des mois connus (≤ 12) avec plancher 2,5 kW** (corrigé, A-29). L'historique est mémorisé (13 mois) et reconstitué au redémarrage depuis les 62 jours de créneaux. |
+| **Wallonie** (CWaPE, ORES, RESA, AIEG) | Pas de coût de puissance pour les ménages en pratique : le « tarif IMPACT » (option, ≤ 56 kVA, compteur communicant) est un tarif **par périodes horaires** : **PIC 17 h–22 h**, **MEDIUM 7 h–11 h et 22 h–1 h**, **ECO 11 h–17 h et 1 h–7 h**, tous les jours. Une composante « capacitaire » quart-horaire existe dans la structure (11ᵉ plus haute puissance quart-horaire du mois) mais ses montants sont **fixés à 0 €/kW pour 2026-2029**. | Aucun capacitaire par défaut en Wallonie ; Impact = périodes (déjà conformes). Le quart d'heure y reste utilisé seulement comme **résolution de mesure** du comparateur. |
+| **Bruxelles** (Sibelga, BRUGEL) | Le terme de capacité est un **forfait annuel selon la puissance mise à disposition** (≤ 13 kVA ; ≥ 13 kVA environ le double), **sans pointe mesurée**. La « tarification évoluée » (incitative) est prévue **à partir de 2028**. | `flat` : forfait annuel saisi (47 €/an proposé). |
+
+**À confirmer** : pour la Wallonie et Bruxelles, ces éléments viennent de résumés de recherche sur les documents officiels ; je n'ai pas pu ouvrir les PDF de la CWaPE et de BRUGEL depuis cette session (accès réseau limité). Le montant bruxellois 2026 diffère selon la source (47,24 €/an dans la grille tarifaire contre 24,24 € sur une page de Sibelga) : reprenez celui de **votre facture**.
+
+Sources : [Fluvius — comment le capaciteitstarief est facturé](https://www.fluvius.be/nl/factuur-en-tarieven/capaciteitstarief/gezinnen-en-kleine-ondernemingen/aangerekend), [Fluvius — FAQ](https://www.fluvius.be/nl/veelgestelde-vragen/capaciteitstarief-gezinnen-kleine-ondernemingen), [Fluvius — méthodologie d'estimation des pointes](https://www.fluvius.be/sites/fluvius/files/2024-07/schattingsmethodiek-maandpieken-capaciteitstarief.pdf), [VREG — capaciteitstarief](https://www.vlaamsenutsregulator.be/elektriciteit-en-aardgas/nettarieven/capaciteitstarief), [CWaPE — tarifs 2026-2029](https://www.cwape.be/documents-recents/communique-de-presse-tarifs-periodiques-de-distribution-delectricite-dores-resa), [Sibelga — tarif de capacité](https://www.sibelga.be/en/connections-meters/rates/net-usage-rates/capacity-rate), [BRUGEL — décision 390 (tarification évoluée)](https://brugel.brussels/publication/document/decisions/2026/fr/DECISION-390-TARIFICATION-EVOLUEE.pdf).
+
+Capteur « Coûts réseau • Ce mois » = capacitaire + prosumer du tarif actuel sur le mois ; attributs : pointe FoxCat (mois en cours), **pointe facturée** (moyenne), **nombre de mois pris en compte**, pointe de l'intégration de prix (contrôle), écart de pointe, valeurs de contrôle de l'intégration (jamais additionnées).
 
 ## 6. Paramètres de cette page
 

@@ -258,8 +258,8 @@ Ces coûts dépendent de **votre gestionnaire de réseau**, pas de votre fournis
 |---|---|
 | **Terme capacitaire** | *Aucun*, *Forfait annuel* (Bruxelles) ou *Pointe mensuelle* (Flandre) |
 | Forfait capacitaire annuel | Avec « Forfait annuel » |
-| Prix par kW de pointe | Avec « Pointe mensuelle » (montant annuel par kW) |
-| Puissance minimale facturée | Avec « Pointe mensuelle » : 2,5 kW en Flandre |
+| Prix par kW de pointe | Avec « Pointe mensuelle » (montant annuel par kW). La pointe facturée est la **moyenne des pointes mensuelles** (12 mois au plus) ; FoxCat la mémorise et la reconstitue au démarrage |
+| Puissance minimale facturée | Avec « Pointe mensuelle » : 2,5 kW en Flandre, appliqués à **chaque mois** avant la moyenne |
 | **Redevance prosumer annuelle** | Redevance pour les panneaux solaires, ramenée à l'année |
 | Contrôles (facultatifs) | Entités de l'intégration de prix : coût capacitaire, pointe mensuelle, coût prosumer. Elles servent de **vérification** et ne s'additionnent pas |
 

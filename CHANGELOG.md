@@ -1,6 +1,7 @@
 # Changelog — FoxCat Energy V1.7.6
 
 ## Non publié
+- Tarif capacitaire flamand (A-29) : la pointe facturée est maintenant la **moyenne des pointes mensuelles au quart d'heure sur au plus 12 mois, chacune au minimum 2,5 kW**, comme la facture Fluvius, au lieu de la seule pointe du mois en cours. FoxCat mémorise 13 mois de pointes (reconstituées au démarrage depuis les 62 jours de créneaux). Le capteur « Coûts réseau • Ce mois » expose `pointe_facturee_kw` et `mois_pris_en_compte`. Wallonie : aucun terme capacitaire (les montants capacitaires wallons sont à 0 €/kW sur 2026-2029) ; Bruxelles : forfait annuel selon la puissance.
 - Correction (A-14) : chaque prix HP et HC reçoit le complément de distribution de sa propre période ; auparavant les deux recevaient celui de la période en cours, ce qui faussait `hp_price`, `hc_price`, le prix suivant et les séries HP/HC dès que les compléments HP et HC diffèrent.
 - Réglages inactifs (A-03) : 22 entités de réglage que le moteur actuel ne lit pas (agressivité solaire Bihoraire, charge réseau sur prix dynamique négatif, plusieurs seuils PRI…) sont désormais créées désactivées, rangées en diagnostic et marquées `statut: inactif`. Elles restent disponibles pour les tableaux de bord et les profils existants. Les entités déjà activées ne sont pas modifiées : désactivez-les si vous le souhaitez.
 - Audit des algorithmes : documentation détaillée par domaine et rapport d'anomalies dans `docs/algorithmes/`.

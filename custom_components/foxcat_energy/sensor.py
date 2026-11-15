@@ -685,13 +685,15 @@ class FoxCatGridCostsSensor(FoxCatEntity, SensorEntity):
             "prosumer_eur": reference.get("prosumer_eur"),
             "reglages": view.get("configured"),
             "pointe_foxcat_kw": foxcat_peak,
+            "pointe_facturee_kw": view.get("billed_peak_kw"),
+            "mois_pris_en_compte": view.get("peak_months"),
             "pointe_integration_kw": integration_peak,
             "ecart_pointe_kw": gap,
             "capacitaire_integration_eur": view.get("capacity_cost_integration"),
             "prosumer_integration_eur": view.get("prosumer_cost_integration"),
             "methode": (
                 "Coûts calculés par FoxCat à partir des valeurs saisies (menu Tarification → Coûts réseau), "
-                "au prorata du mois en cours. Les valeurs de l'intégration de prix sont données à titre de contrôle."
+                "au prorata du mois en cours. Pointe facturée = moyenne des pointes mensuelles au quart d'heure (au plus 12 mois, minimum 2,5 kW en Flandre). Les valeurs de l'intégration de prix sont données à titre de contrôle."
             ),
         }
 
