@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import math
 from datetime import datetime, timedelta
@@ -3364,7 +3365,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         regime = grid_load.normalize_regime(pick(grid_load.CONF_GRID_REGIME))
         breaker_a = number(CONF_MAIN_BREAKER_CURRENT_A, 0.0)
         nominal_v = number(CONF_MAIN_BREAKER_VOLTAGE_V, 230.0)
-        measured_v = self._optional_float_state(pick(grid_load.CONF_GRID_VOLTAGE_SENSOR))
+        voltage = self._grid_voltage(nominal_v)
         phases = (
             [self._optional_float_state(pick(key)) for key in grid_load.PHASE_CURRENT_KEYS]
             if regime != grid_load.GRID_REGIME_MONO
@@ -3373,18 +3374,44 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         result = grid_load.evaluate(
             regime,
             power_w=snapshot.house_w,
-            voltage_v=measured_v if measured_v and measured_v > 0.0 else nominal_v,
+            voltage_v=voltage.phase_v,
             cos_phi=pick(grid_load.CONF_INVERTER_COS_PHI, 1.0),
             breaker_a=breaker_a,
             limit_pct=number("peak_trigger_ratio_pct", 90.0),
             enabled=bool(self.settings.get("high_load_shed_enabled")),
             phase_currents_a=phases,
+            imbalance_factor=number(grid_load.CONF_PHASE_IMBALANCE_FACTOR, 1.0),
         )
-        return dict(grid_load.as_dict(result))
+        view = dict(grid_load.as_dict(result))
+        view["voltage_source"] = voltage.source
+        view["voltage_spread_pct"] = None if voltage.spread_pct is None else round(voltage.spread_pct, 1)
+        view["line_voltage_v"] = round(voltage.line_v, 1)
+        return view
+
+    def _grid_voltage(self, nominal_v: float) -> "grid_load.VoltageInfo":
+        """Tension réseau mesurée (phase-neutre et/ou entre lignes), sinon la tension nominale."""
+        def pick(key: str) -> Any:
+            return self.settings.get(key, self.config.get(key))
+
+        phase = [self._optional_float_state(pick(key)) for key in grid_load.PHASE_VOLTAGE_KEYS]
+        line = [self._optional_float_state(pick(key)) for key in grid_load.LINE_VOLTAGE_KEYS]
+        single = self._optional_float_state(pick(grid_load.CONF_GRID_VOLTAGE_SENSOR))
+        if single and not any(v for v in phase) and not any(v for v in line):
+            # Ancien capteur unique : une valeur < 300 V est une tension simple, sinon composée.
+            (phase if single < 300.0 else line)[0] = single
+        return grid_load.resolve_voltages(nominal_v, phase_v=phase, line_v=line)
 
     def _peak_config(self) -> "peak_logic.PeakShavingConfig":
-        """Configuration validée de l'écrêtage de pointe (réglages > options)."""
-        return peak_logic.PeakShavingConfig.from_settings(self.settings, self.config)
+        """Configuration validée de l'écrêtage de pointe (réglages > options).
+
+        La tension du disjoncteur est remplacée par la tension phase-neutre mesurée quand des
+        capteurs de tension sont configurés.
+        """
+        cfg = peak_logic.PeakShavingConfig.from_settings(self.settings, self.config)
+        voltage = self._grid_voltage(cfg.breaker_voltage_v)
+        if voltage.source != grid_load.VOLTAGE_NOMINAL:
+            cfg = dataclasses.replace(cfg, breaker_voltage_v=voltage.phase_v)
+        return cfg
 
     def set_developer_price_simulation(self, scenario: str) -> None:
         """Record a diagnostic-only price scenario without changing live prices."""

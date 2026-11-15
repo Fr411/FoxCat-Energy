@@ -20,6 +20,7 @@ PEAK_FORM_KEYS = {
     CONF_MAIN_BREAKER_CURRENT_A,
     CONF_MAIN_BREAKER_VOLTAGE_V,
     peak.CONF_PEAK_PHASES,
+    peak.CONF_PEAK_IMBALANCE_FACTOR,
     peak.CONF_PEAK_MEASURE_BASIS,
     peak.CONF_PEAK_TRIGGER_RATIO_PCT,
     peak.CONF_PEAK_TRIGGER_W,
@@ -38,6 +39,12 @@ GRID_FORM_KEYS = {
     "grid_regime",
     "inverter_cos_phi",
     "grid_voltage_sensor",
+    "grid_voltage_l1_sensor",
+    "grid_voltage_l2_sensor",
+    "grid_voltage_l3_sensor",
+    "grid_line_voltage_l12_sensor",
+    "grid_line_voltage_l23_sensor",
+    "grid_line_voltage_l31_sensor",
     "grid_current_l1_sensor",
     "grid_current_l2_sensor",
     "grid_current_l3_sensor",
@@ -123,6 +130,20 @@ class HysteresisAndConfigurationTests(unittest.TestCase):
     def test_phases_multiply_capacity(self) -> None:
         cfg = _cfg(**{CONF_MAIN_BREAKER_CURRENT_A: 25, peak.CONF_PEAK_PHASES: 3})
         self.assertEqual(peak.breaker_limit_w(cfg), 25 * 230 * 3)
+
+    def test_imbalance_factor_lowers_capacity_in_three_phase(self) -> None:
+        cfg = _cfg(**{CONF_MAIN_BREAKER_CURRENT_A: 25, peak.CONF_PEAK_PHASES: 3,
+                      peak.CONF_PEAK_IMBALANCE_FACTOR: 1.5})
+        self.assertAlmostEqual(peak.breaker_limit_w(cfg), 25 * 230 * 3 / 1.5)
+        self.assertAlmostEqual(peak.trigger_w(cfg), 25 * 230 * 3 / 1.5 * 0.9)
+        self.assertLess(peak.release_w(cfg), peak.trigger_w(cfg))
+
+    def test_imbalance_factor_ignored_in_single_phase_and_clamped(self) -> None:
+        mono = _cfg(**{CONF_MAIN_BREAKER_CURRENT_A: 40, peak.CONF_PEAK_IMBALANCE_FACTOR: 2})
+        self.assertEqual(peak.breaker_limit_w(mono), 40 * 230)
+        tri = _cfg(**{CONF_MAIN_BREAKER_CURRENT_A: 25, peak.CONF_PEAK_PHASES: 3,
+                      peak.CONF_PEAK_IMBALANCE_FACTOR: 0.2})
+        self.assertEqual(peak.breaker_limit_w(tri), 25 * 230 * 3)
 
     def test_custom_trigger_ratio_and_frames(self) -> None:
         cfg = _cfg(**{

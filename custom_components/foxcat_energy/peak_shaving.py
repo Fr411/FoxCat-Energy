@@ -20,6 +20,7 @@ CONF_PEAK_ENABLED = "high_load_shed_enabled"
 CONF_PEAK_TRIGGER_W = "high_load_trigger_w"
 CONF_PEAK_RELEASE_W = "high_load_release_w"
 CONF_PEAK_PHASES = "peak_phases"
+CONF_PEAK_IMBALANCE_FACTOR = "grid_phase_imbalance_factor"
 CONF_PEAK_MEASURE_BASIS = "peak_measure_basis"
 CONF_PEAK_TRIGGER_RATIO_PCT = "peak_trigger_ratio_pct"
 CONF_PEAK_RELEASE_RATIO_PCT = "peak_release_ratio_pct"
@@ -44,6 +45,7 @@ EVENT_RELEASE = "RELEASE"
 
 DEFAULTS: dict[str, Any] = {
     CONF_PEAK_PHASES: 1.0,
+    CONF_PEAK_IMBALANCE_FACTOR: 1.0,
     CONF_PEAK_MEASURE_BASIS: BASIS_HOUSE,
     CONF_PEAK_TRIGGER_RATIO_PCT: 90.0,
     CONF_PEAK_RELEASE_RATIO_PCT: 0.0,  # 0 = utiliser le seuil absolu de réarmement
@@ -83,6 +85,7 @@ class PeakShavingConfig:
     breaker_current_a: float = 0.0
     breaker_voltage_v: float = 230.0
     phases: int = 1
+    imbalance_factor: float = 1.0
     measure_basis: str = BASIS_HOUSE
     trigger_ratio: float = 0.90
     trigger_abs_w: float = 5000.0
@@ -117,6 +120,7 @@ class PeakShavingConfig:
             breaker_current_a=_number(pick(CONF_MAIN_BREAKER_CURRENT_A, 0.0) or 0.0, 0.0, 0.0, 1000.0),
             breaker_voltage_v=_number(pick(CONF_MAIN_BREAKER_VOLTAGE_V, 230.0) or 230.0, 230.0, 1.0, 1000.0),
             phases=int(round(_number(pick(CONF_PEAK_PHASES, 1.0), 1.0, 1.0, 3.0))),
+            imbalance_factor=_number(pick(CONF_PEAK_IMBALANCE_FACTOR, 1.0), 1.0, 1.0, 3.0),
             measure_basis=basis if basis in MEASURE_BASES else BASIS_HOUSE,
             trigger_ratio=_number(pick(CONF_PEAK_TRIGGER_RATIO_PCT, 90.0), 90.0, 50.0, 100.0) / 100.0,
             trigger_abs_w=_number(pick(CONF_PEAK_TRIGGER_W, 5000.0), 5000.0, 1.0, 1_000_000.0),
@@ -134,14 +138,17 @@ class PeakShavingConfig:
 
 
 def breaker_limit_w(cfg: PeakShavingConfig) -> float | None:
-    """Capacité du raccordement en watts (A × V × phases), ``None`` si non renseignée.
+    """Capacité utile du raccordement en watts, ``None`` si non renseignée.
 
-    Hypothèse : charge équilibrée entre phases. Une charge concentrée sur une
-    seule phase peut dépasser la limite de cette phase sans que le total l'indique.
+    A × V × phases, divisé par le coefficient de déséquilibre. Sans mesure du courant par phase,
+    la phase la plus chargée est inconnue : avec un coefficient K, on suppose qu'elle porte K fois
+    la charge moyenne, donc la capacité vue du total est réduite d'autant. K = 1 correspond à une
+    charge équilibrée. Le coefficient ne s'applique pas en monophasé.
     """
     if cfg.breaker_current_a <= 0.0 or cfg.breaker_voltage_v <= 0.0:
         return None
-    return cfg.breaker_current_a * cfg.breaker_voltage_v * cfg.phases
+    capacity = cfg.breaker_current_a * cfg.breaker_voltage_v * cfg.phases
+    return capacity / cfg.imbalance_factor if cfg.phases > 1 else capacity
 
 
 def trigger_w(cfg: PeakShavingConfig) -> float:
