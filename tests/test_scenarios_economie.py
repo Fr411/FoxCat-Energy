@@ -70,11 +70,12 @@ def run_machine(curve, request_h, deadline_h, *, export_w=0.0, export_value=0.04
                                 deadline=f"{deadline.hour:02d}:00", max_delay_hours=24, **windows)
     learning = {"washer": {"average_duration_s_10": duration * 3600, "average_energy_wh_10": energy * 1000}}
     settings = dict(SETTINGS, **{machine.setting_key: True})
+    export_pts = [] if export_value is None else points([export_value] * len(curve))
     now, start, last = request, None, None
     while now < deadline:
         s = snap(now, export_w=export_w, pv_w=pv_w)
         plan = build_flexible_load_plan(
-            now=now, snapshot=s, settings=settings, import_points=pts, export_points=[],
+            now=now, snapshot=s, settings=settings, import_points=pts, export_points=export_pts,
             machines=[machine], learning=learning, cycles={"washer": {"protected": active}} if active else {},
             price_analysis={"active": True, "mode": "DYNAMIQUE"}, solar_forecast=None,
         )
@@ -166,11 +167,30 @@ class MachineScenarios(unittest.TestCase):
         self.assertEqual(out["decision"], "PRIX_INDISPONIBLE")
         self.assertFalse(out["allow_start"])
 
-    @unittest.expectedFailure   # A-30 : le planificateur ignore le surplus solaire (docs/algorithmes/ANOMALIES.md)
     def test_06_piege_soleil_gratuit_meilleur_que_la_nuit_creuse(self):
         curve = hours((10, 0.30), (4, 0.25), (10, 0.30)) + hours((6, 0.10), (18, 0.20))
         r = run_machine(curve, 12, 31, export_w=2500.0, pv_w=4000.0)   # surplus 2,5 kW, injection 0,04 €
         self.assertEqual(r["start"], r["request"])
+
+    def test_06b_piege_injection_penalisee_le_surplus_est_a_consommer_meme_si_la_nuit_est_moins_chere(self):
+        curve = hours((10, 0.15), (4, 0.15), (10, 0.15)) + hours((6, 0.10), (18, 0.20))
+        r = run_machine(curve, 12, 31, export_w=2500.0, pv_w=4000.0, export_value=-0.05)   # injecter coûte 5 c€/kWh
+        self.assertEqual(r["start"], r["request"])
+
+    def test_06c_piege_injection_penalisee_mais_pas_de_surplus_on_attend_la_nuit(self):
+        curve = hours((10, 0.15), (4, 0.15), (10, 0.15)) + hours((6, 0.10), (18, 0.20))
+        r = run_machine(curve, 12, 31, export_w=0.0, pv_w=0.0, export_value=-0.05)
+        self.assertGreater(r["start"] - r["request"], timedelta(hours=2))
+
+    def test_06d_piege_surplus_partiel_ne_bat_pas_une_nuit_nettement_moins_chere(self):
+        curve = hours((10, 0.30), (4, 0.30), (10, 0.30)) + hours((6, 0.10), (18, 0.20))
+        r = run_machine(curve, 12, 31, export_w=300.0, pv_w=1500.0, export_value=0.04)   # machine de 600 W, 300 W de surplus
+        self.assertGreater(r["start"] - r["request"], timedelta(hours=2))
+
+    def test_06e_piege_prix_d_injection_inconnu_le_solaire_n_est_pas_suppose_gratuit(self):
+        curve = hours((10, 0.30), (4, 0.30), (10, 0.30)) + hours((6, 0.10), (18, 0.20))
+        r = run_machine(curve, 12, 31, export_w=2500.0, pv_w=4000.0, export_value=None)
+        self.assertGreater(r["start"] - r["request"], timedelta(hours=2))
 
     def test_07_piege_cycle_en_cours_jamais_interrompu_au_pic(self):
         r = run_machine(DAY_AHEAD, 18, 31, active=True)      # cycle déjà lancé à 18 h, prix 0,42 €

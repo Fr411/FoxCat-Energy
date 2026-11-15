@@ -99,7 +99,7 @@ maxp = min(planner_max_parallel_power_w (5 000 W),
    - sinon profil : durée apprise (10 cycles) ≥ 0,25 h sinon durée configurée ; puissance = énergie apprise ÷ durée sinon `nominal_power_w`.
 5. **Candidats de départ** : début de chaque point de prix dans la plage `[disponible dès, échéance − durée]` **et** dans une fenêtre de la machine ; plus l'instant « disponible dès » lui-même. Échéance = `deadline` configurée (ou +24 h) bornée par l'attente max du mode.
 6. Un candidat est écarté s'il dépasse `maxp` avec les réservations déjà faites (chevauchement).
-7. Coût d'un candidat = Σ (prix × puissance ÷ 1000 × pas) sur la durée, + attente × pénalité.
+7. Coût d'un candidat = Σ (prix × puissance ÷ 1000 × pas) sur la durée, + attente × pénalité. Pour un départ « maintenant », la part couverte par le surplus mesuré (`export_w` ÷ puissance de la machine, au plus 1) est chiffrée à la **valeur de réinjection** (négative quand l'injection est pénalisée) au lieu du prix réseau ; sans prix de réinjection connu, le prix réseau reste utilisé.
 8. Décision : meilleur candidat = coût minimal ; « maintenant » = candidat dans ±30 pas ; **`START_NOW`** si le meilleur départ est dans moins d'un demi-pas (≥ 5 min) **ou** si l'économie du report est inférieure au minimum ; sinon **`WAIT`** avec heure planifiée. En mode Manuel : `USER_CONTROL`, recommandation seule. Aucun créneau réalisable : `WAIT`.
 9. La machine réserve son créneau pour les suivantes.
 
