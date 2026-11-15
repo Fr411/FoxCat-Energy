@@ -6,6 +6,13 @@ from .machines import MachineDefinition,machine_allowed
 START_NOW='START_NOW'; WAIT='WAIT'; CONTINUE='CONTINUE'; STOP_WHEN_SAFE='STOP_WHEN_SAFE'; USER_CONTROL='USER_CONTROL'; SAFETY_OVERRIDE='SAFETY_OVERRIDE'
 @dataclass(slots=True)
 class Reservation: load_id:str; start:datetime; end:datetime; power_w:float
+# FONCTION : _as_datetime — Accepte un datetime (MachineCycleManager.snapshot) ou une chaîne ISO, sinon la valeur par défaut
+def _as_datetime(value,default):
+ if isinstance(value,datetime):return value
+ if isinstance(value,str) and value:
+  try:return datetime.fromisoformat(value)
+  except ValueError:pass
+ return default
 # FONCTION : _price — Price
 def _price(ps,at):
  for p in reversed(ps):
@@ -49,7 +56,7 @@ def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points
  for m in sorted(machines,key=lambda x:-int(getattr(x,'priority',50))):
   if not settings.get(m.setting_key,m.automatic_default): result['machines'][m.machine_id]={'name':m.name,'decision':USER_CONTROL,'allow_start_now':False,'reason':'Gestion automatique désactivée'}; continue
   if cycles.get(m.machine_id,{}).get('protected'):
-   end=datetime.fromisoformat(cycles[m.machine_id]['expected_end_at']) if cycles[m.machine_id].get('expected_end_at') else now+timedelta(hours=float(m.cycle_duration_minutes)/60); result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
+   end=_as_datetime(cycles[m.machine_id].get('expected_end_at'),now+timedelta(hours=float(m.cycle_duration_minutes)/60)); result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
   if peak_shaving_active: result['machines'][m.machine_id]={'name':m.name,'decision':SAFETY_OVERRIDE,'allow_start_now':False,'reason':'Peak shaving : nouveau démarrage suspendu'}; continue
   dur,power=_profile(m,learning); av=_available(m,now); dl=min(_deadline(m,now),now+timedelta(hours=maxwait)); candidates=[]
   starts=[p.at for p in ps if av<=p.at<=dl-timedelta(hours=dur) and machine_allowed(m,p.at)]
