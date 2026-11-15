@@ -198,6 +198,7 @@ from .migration import (
 from ..domain.tariff.tariff_model import (
     tariff_dimensions,
     final_client_price,
+    hp_hc_final_prices,
     apply_final_price_components,
 )
 from ..domain.pricing.price_analyzer import analyze_price_curve
@@ -1697,7 +1698,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hp=self._optional_float_state(self.config.get(CONF_TARIFF_HP_PRICE_SENSOR)); hc=self._optional_float_state(self.config.get(CONF_TARIFF_HC_PRICE_SENSOR))
         hp=float(self.settings.get(CONF_TARIFF_HP_PRICE,.35)) if dims.price_source==PRICE_SOURCE_CONTRACT else hp
         hc=float(self.settings.get(CONF_TARIFF_HC_PRICE,.25)) if dims.price_source==PRICE_SOURCE_CONTRACT else hc
-        hp=final_client_price(hp,now,self.settings) if hp is not None else None; hc=final_client_price(hc,now,self.settings) if hc is not None else None
+        hp,hc=hp_hc_final_prices(hp,hc,now,self.settings)
         cur=final_client_price(cur,now,self.settings) if cur is not None else None; nxt=final_client_price(nxt,now+timedelta(hours=1),self.settings) if nxt is not None else None
         period=tariff_period(now,self.settings) if dims.structure==TARIFF_STRUCTURE_TOU else ('IMPACT' if dims.structure==TARIFF_STRUCTURE_IMPACT else 'SIMPLE')
         if dims.dynamic: active=cur; next_buy=nxt; label='DYNAMIQUE'; nlabel='SUIVANT'
