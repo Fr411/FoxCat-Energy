@@ -202,6 +202,7 @@ from ..domain.tariff.tariff_model import (
     apply_final_price_components,
 )
 from ..domain.pricing.price_analyzer import analyze_price_curve
+from ..domain.pricing import price_buffer
 from ..domain.loads.flexible_load_planner import build_flexible_load_plan
 from ..trading.vpp import evaluate_trade, evaluate_v2h
 from ..dashboard.dashboard import dashboard_status
@@ -1695,6 +1696,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def prices(self) -> dict[str, Any]:
         now=dt_util.now(); dims=tariff_dimensions(self.settings); regime=compatibility_tariff_regime(self.settings)
         cur=self._optional_float_state(self.config.get(CONF_PRICE_CURRENT) or self.config.get(CONF_TARIFF_MONO_PRICE_SENSOR)); nxt=self._optional_float_state(self.config.get(CONF_PRICE_NEXT)); inj=self._optional_float_state(self.config.get(CONF_PRICE_INJECTION))
+        live_price_ok=cur is not None
+        if self._price_buffer_enabled():
+            # Hors ligne : on lit le tampon local plutôt que de perdre le prix.
+            if cur is None: cur=price_buffer.current_price(self.price_backup.get("import"),now)
+            if nxt is None: nxt=price_buffer.next_price(self.price_backup.get("import"),now)
+            if inj is None: inj=price_buffer.current_price(self.price_backup.get("export"),now)
+        price_feed=price_buffer.feed_status(uses_market_prices=self._price_buffer_enabled(),live_ok=live_price_ok,store=self.price_backup.get("import"),now=now)
+        self._log_price_feed(price_feed)
         hp=self._optional_float_state(self.config.get(CONF_TARIFF_HP_PRICE_SENSOR)); hc=self._optional_float_state(self.config.get(CONF_TARIFF_HC_PRICE_SENSOR))
         hp=float(self.settings.get(CONF_TARIFF_HP_PRICE,.35)) if dims.price_source==PRICE_SOURCE_CONTRACT else hp
         hc=float(self.settings.get(CONF_TARIFF_HC_PRICE,.25)) if dims.price_source==PRICE_SOURCE_CONTRACT else hc
@@ -1714,6 +1723,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "current": cur,
             "next": nxt,
             "injection": inj,
+            "price_feed": price_feed,
             "hp_price": hp,
             "hc_price": hc,
             "fixed_injection_price": float(self.settings.get(CONF_TARIFF_FIXED_INJECTION_PRICE, 0)),
@@ -1756,7 +1766,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if regime == TARIFF_DYNAMIC
             else int(float(self.settings.get("economic_horizon_hours", 24.0)))
         )
-        if self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+        if self._price_buffer_enabled():
             source_entity = self.config.get(CONF_PRICE_FORECAST_IMPORT) or self.config.get(CONF_PRICE_CURRENT)
             state = self.hass.states.get(source_entity) if source_entity else None
             if state is None or state.state in {"unknown", "unavailable", "none", ""}:
@@ -1851,10 +1861,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         )
                     )
         points = merge_price_points(points)
-        if not points and self.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+        if self._price_buffer_enabled():
             backup_kind = self._economic_backup_kind(entity_id, source)
             if backup_kind:
-                points = self._price_backup_points(backup_kind, now, horizon_hours, source)
+                # Le tampon complète le direct (le direct prime sur les mêmes horodatages).
+                backup = self._price_backup_points(backup_kind, now, horizon_hours, source)
+                if backup:
+                    points = merge_price_points(backup, points)
         if source == "DYNAMIC_IMPORT":
             return apply_final_price_components(points, self.settings)
         return points
@@ -1892,13 +1905,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 value = float(price)
             except (TypeError, ValueError):
                 continue
-            if now <= at <= end:
+            if now - price_buffer.SLOT_MAX_AGE <= at <= end:
                 points.append(PricePoint(at, value, f"{source}_BACKUP"))
         return merge_price_points(points)
 
     # MÉTHODE : FoxCatEnergyCoordinator._capture_economic_price_backup — Capture economic price backup
     def _capture_economic_price_backup(self) -> bool:
-        if self.settings.get("price_source") != PRICE_SOURCE_INTEGRATION:
+        if not self._price_buffer_enabled():
             return False
         now = dt_util.now()
         horizon = DYNAMIC_ARBITRAGE_HORIZON_HOURS
@@ -1946,26 +1959,37 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
             cached = self.price_backup.setdefault(kind, {})
             for point in merge_price_points(points):
-                if point.at <= now:
+                if point.at < now - price_buffer.BUFFER_PAST:
                     continue
                 key = point.at.isoformat()
                 price = float(point.price)
                 if cached.get(key) != price:
                     cached[key] = price
                     updated = True
-            for key in list(cached):
-                try:
-                    at = datetime.fromisoformat(str(key).replace("Z", "+00:00"))
-                    if at.tzinfo is None and now.tzinfo is not None:
-                        at = at.replace(tzinfo=now.tzinfo)
-                except (TypeError, ValueError):
-                    del cached[key]
-                    updated = True
-                    continue
-                if at < now or at > now + timedelta(hours=horizon):
-                    del cached[key]
-                    updated = True
+            if price_buffer.prune(cached, now, horizon):
+                updated = True
         return updated
+
+    # MÉTHODE : FoxCatEnergyCoordinator._price_buffer_enabled — Le tampon de prix sert aux sources de bourse
+    def _price_buffer_enabled(self) -> bool:
+        """Vrai quand le tarif dépend de prix de marché reçus par Internet."""
+        return self.settings.get("price_source") in {PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_INTEGRATION}
+
+    # MÉTHODE : FoxCatEnergyCoordinator._log_price_feed — Journalise le passage hors ligne / retour en ligne
+    def _log_price_feed(self, feed: dict[str, Any]) -> None:
+        state = str(feed.get("state"))
+        if state == getattr(self, "_last_price_feed_state", None):
+            return
+        previous = getattr(self, "_last_price_feed_state", None)
+        self._last_price_feed_state = state
+        if previous is None:
+            return
+        if state == price_buffer.FEED_DEGRADED:
+            _LOGGER.warning("Prix de bourse indisponibles et tampon épuisé : repli autoconsommation et confort.")
+        elif state == price_buffer.FEED_BUFFER:
+            _LOGGER.warning("Prix de bourse indisponibles : FoxCat continue avec le tampon local jusqu'à %s.", feed.get("buffer_until"))
+        elif state == price_buffer.FEED_LIVE:
+            _LOGGER.info("Prix de bourse de nouveau reçus en direct.")
 
     # MÉTHODE : FoxCatEnergyCoordinator._economic_export_points — Retourne la VALEUR économique de l'export, positive = recette.
     def _economic_export_points(

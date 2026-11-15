@@ -229,3 +229,23 @@ Calcul :
 ## 10. Couverture par les tests
 
 `tests/test_dynamic_analysis.py` couvre l'analyseur, la décision dynamique et la migration ; `tests/test_peak_runtime.py` et `tests/test_vpp.py` couvrent des fonctions voisines. **Non couverts** : `extract_price_points` sur des courbes au quart d'heure, `_best_consecutive_dynamic_window`, `recommend_flexible_load`, `build_dynamic_schedule`.
+
+
+## Fonctionnement hors ligne (coupure Internet)
+
+**Principe local-first.** Le cerveau de FoxCat tourne dans Home Assistant : mesures, métronome, boiler, PRI et machines passent par le réseau local. Seules les sources de prix de bourse, la prévision solaire en ligne et la tâche IA dépendent d'Internet.
+
+**Tampon des prix.** Les prix du lendemain sont publiés vers 14 h. À chaque événement de l'entité de prix, `_capture_economic_price_backup` enregistre la courbe (import et injection) dans `price_backup` : fichier `.storage` de Home Assistant, relu au démarrage. Le tampon couvre 36 h vers l'avant (`DYNAMIC_ARBITRAGE_HORIZON_HOURS`) et garde 3 h de passé pour connaître la tranche en cours. Il s'applique aux sources `Dynamique Day-Ahead` et `Intégration externe`. Code pur : `domain/pricing/price_buffer.py`.
+
+**États du flux de prix** (capteur « Flux de prix », `prices()["price_feed"]`) :
+
+| État | Condition | Comportement |
+|---|---|---|
+| `EN_LIGNE` | l'entité de prix répond | prix en direct, tampon complété |
+| `TAMPON` | entité indisponible, tampon couvre l'instant | prix courant, suivant et injection lus dans le tampon ; décisions Day-Ahead inchangées |
+| `DEGRADE` | tampon épuisé | `PRIX_INDISPONIBLE` ; boiler en repli confort ; machines différées non lancées |
+| `LOCAL` | contrat fixe, bi-horaire, Impact | aucune connexion nécessaire |
+
+**Repli confort du boiler** (`dynamic_boiler_v2.py`). Sans position tarifaire exploitable : chauffe réseau à 45 °C si le ballon passe sous la reprise (43 °C), arrêt à 45 °C, jamais de BOOST réseau. Le BOOST solaire reste prioritaire.
+
+**Limites connues.** Au-delà de la fin du tampon, aucun prix n'est estimé (pas de « même heure hier »). La comptabilité compte 0 € d'achat quand aucun prix n'existe, et ne rattrape pas les prix réels au retour d'Internet. La prévision Forecast.Solar et la tâche IA solaire échouent hors ligne.
