@@ -202,7 +202,7 @@ Comportement :
 - **Éco** : le surplus solaire alimente le boiler jusqu'à 65 °C ; pas d'achat en heures pleines ; le boost solaire s'interrompt si le surplus disparaît.
 - **Heures creuses** : FoxCat attend le **dernier failback** avant de chauffer sur le réseau, pour laisser la priorité au solaire (interrupteur actif par défaut, marge de 30 min).
 - **Bihoraire** : agressivité solaire réglable.
-- **Dynamique** : arbitrage thermique selon le prix. Un modèle (volume, puissance, eau froide à 15 °C) estime la durée de chauffe et réserve les créneaux les moins chers. Avec un prix négatif, le boiler peut charger sur le réseau.
+- **Dynamique** : arbitrage thermique selon le prix. Un modèle (volume, puissance, eau froide à 15 °C) estime la durée de chauffe et réserve les créneaux les moins chers.
 - **Délestage** : le boiler peut être coupé pendant une pointe de consommation.
 
 ## 9. Onduleur et PRI / RRCR
@@ -304,6 +304,8 @@ FoxCat génère ses dashboards YAML dans `/config/foxcat_energy/` : `dashboard.y
 | [`docs/cartes/comparateur_tarifs.yaml`](docs/cartes/comparateur_tarifs.yaml) | Carte markdown du comparateur |
 | [`docs/automations/etage_decalage_vtherm.yaml`](docs/automations/etage_decalage_vtherm.yaml) | Automatisation du décalage de chauffage |
 
+> **Détail des algorithmes** : pas à pas, seuils et sécurités de chaque module dans [`docs/algorithmes/`](docs/algorithmes/README.md), avec le [rapport d'anomalies](docs/algorithmes/ANOMALIES.md).
+
 ## 17. Sécurité et limites
 
 FoxCat peut piloter des équipements électriques. Validez capteurs, polarités, actionneurs et limites physiques avant d'activer la régulation. Gardez les protections matérielles en place : le logiciel n'est **pas** un dispositif de sécurité certifié. **Retour arrière immédiat** : coupez « Régulation FoxCat active », libérez l'onduleur à 100 %, puis restaurez la version précédente.
@@ -316,6 +318,7 @@ Le dépôt est en développement actif. Tests et simulations ne remplacent pas u
 custom_components/foxcat_energy/   intégration (domain/, runtime/, trading/, dashboard/…)
 tests/                             tests unitaires
 docs/                              plans, cartes, automatisations, archives par version
+docs/algorithmes/                  audit des algorithmes, page par domaine, et rapport d'anomalies
 trash/                             fichiers obsolètes mis de côté (voir trash/LISEZMOI.md)
 MANUEL.md                          configuration pas à pas
 CHANGELOG.md                       journal des versions
