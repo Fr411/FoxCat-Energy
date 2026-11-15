@@ -228,6 +228,14 @@ L'écran **Contrat et réseau** écrit ensemble la source, la structure, le rég
    - *Zéro injection* : FoxCat vise une injection nulle.
 5. Prix saisis, **seulement avec « Prix saisis à la main »** : prix d'achat unique (mono et Impact), prix HP et HC (bi-horaire), prix de réinjection.
 
+**Les listes de Home Assistant suivent le menu.** Dans l'appareil **Tarification**, les listes « Source du prix », « Structure tarifaire », « Régime Tarifaire », « Profil distribution Belgique » et « Structure (Si Dynamique) » modifient les mêmes deux choix que cet écran (contrat et structure du réseau) et mettent à jour toutes les autres clés. Vous pouvez donc changer de tarif d'un côté ou de l'autre : le résultat est identique, et le menu reflète toujours l'état des listes.
+
+- « Source du prix » : Contractuelle / fixe, Variable via entités Home Assistant, Dynamique Day-Ahead.
+- « Structure tarifaire » : Simple, Bi-horaire ou Impact, avec tous les contrats.
+- « Régime Tarifaire » : *Mono-horaire* et *Bi-horaire (HP/HC)* passent le contrat en non dynamique ; *Mono-horaire* remet la structure à Simple (pour Impact, utilisez « Structure tarifaire »).
+
+> **Si vous aviez une automatisation** qui sélectionnait « Bihoraire » ou « Dynamique » dans « Source du prix » : ces choix n'existent plus. Utilisez « Régime Tarifaire » (Bi-horaire (HP/HC) ou Dynamique).
+
 ### 6.2 Prix et plages HP/HC
 
 Pour un tarif bi-horaire : prix d'achat et de réinjection, et **plages** des heures creuses. Le tarif actif se choisit ensuite avec le sélecteur **« Régime tarifaire »** de FoxCat ; ces réglages peuvent être préparés à l'avance.
@@ -399,7 +407,7 @@ Procédez **progressivement**, en observant à chaque étape.
 |---|---|---|
 | 1 | Laissez **Régulation FoxCat active = OFF** pendant 24 à 48 h | Mesures, prix et période corrects |
 | 2 | Choisissez le **Mode EMS : Manuel** | Rien n'est commandé automatiquement |
-| 3 | Choisissez le **Régime tarifaire** et la **Politique réseau** | Le prix actif suit bien votre contrat |
+| 3 | Choisissez le **contrat et la structure** (liste « Source du prix » et « Structure tarifaire », ou l'écran Contrat et réseau) puis la **Politique réseau** | Le prix actif suit bien votre contrat, et les listes de tarif affichent les mêmes valeurs que le menu |
 | 4 | Activez **Régulation FoxCat active** (toujours en Manuel) | Aucune erreur de diagnostic |
 | 5 | Passez en **Éco** avec seulement **le boiler** géré (« Boiler géré par FoxCat ») | Le boiler chauffe avec le surplus, jamais en HP |
 | 6 | Activez la **gestion de chaque machine**, une à la fois | La machine démarre dans la fenêtre prévue, un cycle n'est jamais coupé |

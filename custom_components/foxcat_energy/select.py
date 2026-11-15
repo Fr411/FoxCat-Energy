@@ -11,10 +11,15 @@ from .const import (
     DISTRIBUTION_PROFILE_IMPACT,
     DISTRIBUTION_PROFILE_SIMPLE,
     DISTRIBUTION_PROFILES,
+    DYNAMIC_STRUCTURES,
     MODE_MANUAL,
     MODES,
     NETWORK_POLICIES,
     NETWORK_POLICY_COMPENSATION,
+    PRICE_SOURCE_CONTRACT,
+    PRICE_SOURCE_DYNAMIC,
+    PRICE_SOURCE_INTEGRATION,
+    PRICE_SOURCE_VARIABLE,
     TARIFF_BI,
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
@@ -112,44 +117,47 @@ class FoxCatBaseSelect(FoxCatEntity, SelectEntity):
         self.async_write_ha_state()
 
 
-PRICE_SOURCE_BIHORAIRE = "Bihoraire"
-PRICE_SOURCE_DYNAMIQUE = "Dynamique"
-PRICE_SOURCE_CHOICES = [PRICE_SOURCE_BIHORAIRE, PRICE_SOURCE_DYNAMIQUE]
-# Structures applicables aux contrats dynamiques : Simple suit le spot,
-# Impact suit les tarifs dynamiques Impact.
-DYNAMIC_STRUCTURE_CHOICES = ["Simple", "Impact"]
-_STRUCTURE_TO_DYNAMIC = {"Simple": "Simple", "Impact": "Impact (Capacitaire)"}
+# Les listes de tarif reprennent exactement les choix de l'écran « Contrat et réseau » :
+# deux axes indépendants, le contrat (source des prix) et la structure du réseau.
+PRICE_SOURCE_CHOICES = [PRICE_SOURCE_CONTRACT, PRICE_SOURCE_VARIABLE, PRICE_SOURCE_DYNAMIC]
+STRUCTURE_CHOICES = ["Simple", "Bi-horaire", "Impact"]
+# Ancien nom conservé pour les imports existants.
+DYNAMIC_STRUCTURE_CHOICES = STRUCTURE_CHOICES
 
 
 class FoxCatPriceSourceSelect(FoxCatEntity, SelectEntity):
-    _attr_options = PRICE_SOURCE_CHOICES
+    """Contrat : même liste que l'écran « Contrat et réseau »."""
 
     # MÉTHODE : FoxCatPriceSourceSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
         super().__init__(coordinator, "source_prix", "Source du prix", "mdi:database-clock-outline", "pricing")
 
+    # MÉTHODE : FoxCatPriceSourceSelect.options — Options (« Intégration externe » seulement si déjà active)
+    @property
+    def options(self) -> list[str]:
+        options = list(PRICE_SOURCE_CHOICES)
+        if self.coordinator.settings.get("price_source") == PRICE_SOURCE_INTEGRATION:
+            options.append(PRICE_SOURCE_INTEGRATION)
+        return options
+
     # MÉTHODE : FoxCatPriceSourceSelect.current_option — Current option
     @property
-    def current_option(self) -> str:
-        return (
-            PRICE_SOURCE_DYNAMIQUE
-            if tariff_dimensions(self.coordinator.settings).dynamic
-            else PRICE_SOURCE_BIHORAIRE
-        )
+    def current_option(self) -> str | None:
+        value = self.coordinator.settings.get("price_source", PRICE_SOURCE_VARIABLE)
+        return value if value in self.options else None
 
     # MÉTHODE : FoxCatPriceSourceSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
-        if option == PRICE_SOURCE_DYNAMIQUE:
-            await self.coordinator.async_set_setting("tariff_regime", TARIFF_DYNAMIC)
-        elif option == PRICE_SOURCE_BIHORAIRE:
-            await self.coordinator.async_set_setting("tariff_regime", TARIFF_BI)
+        if option not in self.options:
+            return
+        await self.coordinator.async_set_setting("price_source", option)
         self.async_write_ha_state()
 
 
 class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
-    """Structure tarifaire : uniquement pour les contrats dynamiques."""
+    """Structure du réseau : mono, bi-horaire ou Impact, avec tous les contrats."""
 
-    _attr_options = DYNAMIC_STRUCTURE_CHOICES
+    _attr_options = STRUCTURE_CHOICES
 
     # MÉTHODE : FoxCatTariffStructureSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
@@ -159,14 +167,13 @@ class FoxCatTariffStructureSelect(FoxCatEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         structure = tariff_dimensions(self.coordinator.settings).structure
-        return "Impact" if structure == "Impact" else "Simple"
+        return structure if structure in STRUCTURE_CHOICES else "Simple"
 
     # MÉTHODE : FoxCatTariffStructureSelect.async_select_option — traitement asynchrone : select option
     async def async_select_option(self, option: str) -> None:
-        if option not in _STRUCTURE_TO_DYNAMIC:
+        if option not in STRUCTURE_CHOICES:
             return
         await self.coordinator.async_set_setting("tariff_structure", option)
-        await self.coordinator.async_set_setting("dynamic_structure", _STRUCTURE_TO_DYNAMIC[option])
         self.async_write_ha_state()
 
 
@@ -240,7 +247,7 @@ class FoxCatDynamicStructureSelect(FoxCatBaseSelect):
             "Structure (Si Dynamique)",
             "mdi:chart-bell-curve-cumulative",
             "dynamic_structure",
-            list(_STRUCTURE_TO_DYNAMIC.values()),
+            list(DYNAMIC_STRUCTURES),
         )
 
 class FoxCatNetworkPolicySelect(FoxCatDescribedSelect, FoxCatEntity, SelectEntity):

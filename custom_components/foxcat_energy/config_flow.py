@@ -141,6 +141,7 @@ from .domain.tariff import templates as tariff_templates
 from .domain.tariff.legacy import ACTIVE_TARIFF_ID, CONTRACT_TARIFF_ID
 from .domain.tariff.models import TariffError, tariffs_from_json_value
 from .domain.tariff.tariff_prices import (
+    coherent_tariff_keys,
     CONF_TARIFF_MONO_PRICE_SENSOR,
     TARIFF_HPHC_BI,
     TARIFF_DYNAMIQUE,
@@ -1146,21 +1147,11 @@ def _coherent_tariff_keys(price_source: str, structure: str) -> dict[str, Any]:
     """Dérive famille, régime, structure dynamique et profil de distribution.
 
     Ces valeurs sont lues par des parties différentes du moteur ; les écrire ensemble
-    évite qu'un changement de contrat laisse un ancien profil actif.
+    évite qu'un changement de contrat laisse un ancien profil actif. Même calcul que celui
+    des listes de Home Assistant (voir ``coherent_tariff_keys``).
     """
-    dynamic = price_source in {PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_INTEGRATION}
-    if structure == "Bi-horaire":
-        profile, dynamic_structure, regime = DISTRIBUTION_PROFILE_BI, DYNAMIC_STRUCT_BI, TARIFF_BI
-    elif structure == "Impact":
-        profile, dynamic_structure, regime = DISTRIBUTION_PROFILE_IMPACT, DYNAMIC_STRUCT_IMPACT, TARIFF_MONO
-    else:
-        profile, dynamic_structure, regime = DISTRIBUTION_PROFILE_SIMPLE, DYNAMIC_STRUCT_SIMPLE, TARIFF_MONO
-    return {
-        "tariff_family": "dynamique" if dynamic else "hphc",
-        "tariff_regime": TARIFF_DYNAMIC if dynamic else regime,
-        "dynamic_structure": dynamic_structure,
-        "distribution_profile": profile,
-    }
+    keys = coherent_tariff_keys(price_source, structure)
+    return {k: keys[k] for k in ("tariff_family", "tariff_regime", "dynamic_structure", "distribution_profile")}
 
 
 class FoxCatEnergyOptionsFlow(config_entries.OptionsFlow):
