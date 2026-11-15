@@ -93,6 +93,23 @@ def evaluate_dynamic_boiler_v2(
                 "Dynamique : position Day-Ahead indisponible ; BOOST réseau interdit.",
                 "DYNAMIC_REPLI",
             )
+        # Sans prix exploitable (coupure Internet, tampon épuisé) : on garde l'eau
+        # chaude, comme sur un automate en mode dégradé. Chauffe confort seulement.
+        if snapshot.boiler_temp_c < start or (snapshot.boiler_on and snapshot.boiler_temp_c < normal):
+            return BoilerIntent(
+                BOILER_HEAT_45,
+                (
+                    f"Dynamique : prix indisponibles, repli confort ({snapshot.boiler_temp_c:.1f} °C, "
+                    f"cible {normal:.1f} °C)."
+                ),
+                "DYNAMIC_REPLI_CONFORT",
+            )
+        if snapshot.boiler_on and snapshot.boiler_temp_c >= normal:
+            return BoilerIntent(
+                BOILER_STOP,
+                f"Dynamique : prix indisponibles, confort {normal:.1f} °C atteint.",
+                "DYNAMIC_REPLI_CONFORT_OK",
+            )
         return base_intent
 
     position = float(position)

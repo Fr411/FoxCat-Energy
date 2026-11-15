@@ -147,13 +147,23 @@ FoxCat lit la courbe « tout compris » d'aujourd'hui et de demain, ainsi que la
 
 Réglages utiles : horizon, seuil de position « favorable » (30 % par défaut), seuil de pic, durée favorable maximale (4 h), charge réseau quand le prix devient négatif.
 
+### Coupure Internet : fonctionnement local
+
+Le cerveau de FoxCat tourne dans Home Assistant : mesures, boiler, onduleur et machines utilisent le réseau local. Seuls les prix de bourse, la prévision solaire en ligne et la tâche IA dépendent d'Internet. Les contrats fixes, bi-horaires et Impact n'en ont jamais besoin.
+
+- **Tampon des prix.** Pour les sources Dynamique Day-Ahead et Intégration externe, FoxCat enregistre à chaque mise à jour la courbe d'achat et de réinjection (36 h devant, 3 h derrière) dans le stockage de Home Assistant. Il survit à un redémarrage. Les prix du lendemain étant publiés vers 14 h, une coupure en soirée laisse en général de 24 à 36 h de plan de route.
+- **Hors ligne avec tampon.** Quand l'entité de prix devient indisponible, le prix actuel, le prix suivant et le prix de réinjection sont lus dans le tampon. Les décisions Day-Ahead continuent.
+- **Tampon épuisé.** FoxCat n'estime aucun prix. La décision économique devient « Prix indisponible » et les machines différées ne démarrent plus. Le boiler dynamique passe en repli confort : chauffe réseau jusqu'à 45 °C seulement (reprise à 43 °C), jamais de BOOST réseau à 65 °C. Le BOOST solaire reste prioritaire.
+- **Capteur « Flux de prix ».** États `EN_LIGNE`, `TAMPON`, `DEGRADE` et `LOCAL`, avec la fin du tampon (`buffer_until`) et les heures restantes. Le journal signale chaque changement.
+- **Limites.** La comptabilité compte 0 € d'achat quand aucun prix n'existe et ne rattrape pas les prix au retour d'Internet. Forecast.Solar et la tâche IA solaire échouent hors ligne. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
+
 ### Publication des prix
 
 Une entité (par exemple « prix de demain disponible ») déclenche la relecture des prix, avec un service optionnel (par exemple `be_electricity_prices.refresh`), appelé au plus **une fois toutes les 10 minutes**.
 
 ### Ce que FoxCat expose
 
-Prix d'achat actif et suivant, valeur économique de la réinjection, période, statut du prix (avantageux / normal / élevé), prix négatif actif, position et rang sur la courbe, tendance, meilleur prix et créneau futurs, coût et valeur instantanés (€/h), solde réseau instantané.
+Flux de prix (en ligne, tampon local, repli), prix d'achat actif et suivant, valeur économique de la réinjection, période, statut du prix (avantageux / normal / élevé), prix négatif actif, position et rang sur la courbe, tendance, meilleur prix et créneau futurs, coût et valeur instantanés (€/h), solde réseau instantané.
 
 ## 6. Comparateur de tarifs et coûts réseau
 

@@ -135,6 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "regime_tarifaire_actif", "Régime tarifaire actif", "mdi:cash-sync", "pricing", lambda d: d["prices"].get("regime")),
         FoxCatValueSensor(c, "periode_distribution_belgique", "Période de distribution Belgique", "mdi:clock-outline", "pricing", lambda d: d["prices"].get("distribution_period")),
         FoxCatValueSensor(c, "periode_tarifaire", "Période tarifaire", "mdi:clock-time-eight-outline", "pricing", lambda d: d["prices"].get("period")),
+        FoxCatValueSensor(c, "flux_prix", "Flux de prix (en ligne / tampon local)", "mdi:cloud-check-outline", "pricing", lambda d: d["prices"].get("price_feed", {}).get("state"), attributes=lambda d: {k: v for k, v in d["prices"].get("price_feed", {}).items() if k != "state"}),
         FoxCatValueSensor(c, "statut_prix", "Statut du prix", "mdi:chart-line", "pricing", lambda d: d["prices"].get("status")),
         FoxCatValueSensor(c, "modele_cout", "Modèle de coût", "mdi:calculator-variant-outline", "pricing", lambda d: d["prices"].get("cost_model")),
         FoxCatValueSensor(c, "prix_negatif_actif", "Prix dynamique négatif actif", "mdi:cash-minus", "pricing", lambda d: "OUI" if d["prices"].get("negative_purchase") else "NON"),
@@ -527,9 +528,20 @@ def _iso(value: Any) -> str:
 
 class FoxCatValueSensor(FoxCatEntity, SensorEntity):
     # MÉTHODE : FoxCatValueSensor.__init__ — méthode spéciale __init__
-    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], *, enabled_default: bool | None = None):
+    def __init__(self, coordinator, key: str, name: str, icon: str, device: str, getter: Callable[[dict[str, Any]], Any], *, enabled_default: bool | None = None, attributes: Callable[[dict[str, Any]], dict[str, Any]] | None = None):
         super().__init__(coordinator, key, name, icon, device, enabled_default=enabled_default)
         self._getter = getter
+        self._attributes_getter = attributes
+
+    # MÉTHODE : FoxCatValueSensor.extra_state_attributes — Attributs optionnels
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        if self._attributes_getter is None:
+            return None
+        try:
+            return dict(self._attributes_getter(self.coordinator.data) or {})
+        except Exception:
+            return None
 
     # MÉTHODE : FoxCatValueSensor.native_value — Native value
     @property
