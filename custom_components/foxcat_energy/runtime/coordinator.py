@@ -185,7 +185,7 @@ from ..domain.accounting import EnergyAccounting
 from ..domain.accounting.series import ConsumptionSeries
 from ..domain.tariff.compare import compare_tariffs, window_bounds
 from ..domain.tariff.grid_costs import GridCosts
-from ..domain.tariff.valuation import monthly_peak_kw
+from ..domain.tariff.valuation import billed_peak_kw, monthly_peak_kw
 from ..domain.tariff.legacy import ACTIVE_TARIFF_ID, observed_tariff, tariff_from_settings
 from ..domain.tariff.models import Tariff, TariffError
 from ..trading.virtual_assets.ha import setup_virtual_assets
@@ -4557,7 +4557,9 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         return tariffs
 
     # MÉTHODE : FoxCatEnergyCoordinator._grid_costs_view — Coûts de réseau saisis, et contrôle avec l'intégration de prix
-    def _grid_costs_view(self, grid_costs: GridCosts, month_slots: list[Any]) -> dict[str, Any]:
+    def _grid_costs_view(
+        self, grid_costs: GridCosts, month_slots: list[Any], peak_history: list[float] | None = None
+    ) -> dict[str, Any]:
         """Coûts de réseau configurés et valeurs lues dans l'intégration de prix.
 
         Les valeurs de l'intégration servent uniquement de contrôle : elles ne sont
@@ -4571,6 +4573,10 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         return {
             "configured": grid_costs.to_dict(),
             "foxcat_peak_kw": round(monthly_peak_kw(month_slots), 3),
+            "billed_peak_kw": round(
+                billed_peak_kw(monthly_peak_kw(month_slots), grid_costs.capacity.min_kw, peak_history), 3
+            ),
+            "peak_months": len(peak_history or []) + 1,
             **{key: self._optional_float_state(eid) if eid else None for key, eid in entities.items()},
         }
 
@@ -4591,6 +4597,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             horizon = now + timedelta(minutes=1)
             month_slots = self.series.slots(month_start, horizon)
             grid_costs = GridCosts.from_settings(self.settings)
+            peak_history = self.series.previous_peaks_kw(month_start)
             result: dict[str, Any] = {
                 "reference": ACTIVE_TARIFF_ID,
                 "tariffs": {t.id: t.name for t in tariffs},
@@ -4601,9 +4608,9 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 window = [slot for slot in month_slots if slot.at >= start]
                 result[period] = compare_tariffs(
                     window, tariffs, month_slots=month_slots, reference_id=ACTIVE_TARIFF_ID,
-                    grid_costs=grid_costs,
+                    grid_costs=grid_costs, peak_history_kw=peak_history,
                 )
-            result["grid_costs"] = self._grid_costs_view(grid_costs, month_slots)
+            result["grid_costs"] = self._grid_costs_view(grid_costs, month_slots, peak_history)
         except Exception:  # pragma: no cover - le comparateur ne doit jamais casser la trame
             _LOGGER.warning("Comparateur de tarifs indisponible.", exc_info=True)
             result = {"error": True, "tariffs": {}, "today": {}, "month": {}}

@@ -166,7 +166,7 @@ Prix d'achat actif et suivant, valeur économique de la réinjection, période, 
 
 **Coûts réseau et prosumer.** Ils dépendent de votre gestionnaire de réseau, pas de votre fournisseur : le comparateur les applique **de la même façon à tous les tarifs**, si bien que l'écart ne reflète que le prix de l'énergie.
 
-- *Terme capacitaire* : forfait annuel (Bruxelles) ou pointe mensuelle au quart d'heure (Flandre, avec minimum facturé).
+- *Terme capacitaire* : forfait annuel selon la puissance (Bruxelles) ou **moyenne des pointes mensuelles au quart d'heure sur au plus 12 mois, chacune au minimum 2,5 kW** (Flandre, comme Fluvius). **Wallonie : aucun terme capacitaire** (le tarif Impact est un tarif par périodes ECO / MEDIUM / PIC). Règles et sources dans [`docs/algorithmes/04_tarification.md`](docs/algorithmes/04_tarification.md) § 5.1.
 - *Redevance prosumer* annuelle.
 - Les entités de contrôle de l'intégration de prix (coût capacitaire, pointe mensuelle, coût prosumer) sont facultatives : elles servent de vérification et ne s'additionnent jamais.
 - Capteur « Coûts réseau • Ce mois » : total, détail et écart de pointe entre FoxCat et l'intégration.

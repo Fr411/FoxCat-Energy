@@ -9,7 +9,7 @@ from __future__ import annotations
 import calendar
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from .grid_costs import GridCosts
 from .models import (
@@ -130,12 +130,29 @@ def monthly_peak_kw(slots: Iterable[Slot]) -> float:
     return peak
 
 
+MAX_PEAK_MONTHS = 12
+
+
+def billed_peak_kw(current_peak_kw: float, min_kw: float, history_kw: Sequence[float] | None = None) -> float:
+    """Pointe facturée (kW) du tarif capacitaire flamand.
+
+    Moyenne arithmétique des pointes mensuelles, chacune relevée au minimum à ``min_kw`` (2,5 kW),
+    sur au plus 12 mois : les mois précédents connus et le mois en cours. Sans historique, seul le
+    mois en cours compte. Un mois sans mesure est simplement absent de la moyenne.
+    """
+    floor = max(float(min_kw), 0.0)
+    previous = [max(float(value), floor) for value in (history_kw or ()) if value is not None]
+    values = [*previous[-(MAX_PEAK_MONTHS - 1):], max(float(current_peak_kw), floor)]
+    return sum(values) / len(values)
+
+
 def capacity_cost(
     tariff: Tariff,
     window_slots: list[Slot],
     month_slots: list[Slot],
     month_hours: float,
     grid_costs: GridCosts | None = None,
+    peak_history_kw: Sequence[float] | None = None,
 ) -> float:
     """Terme capacitaire attribuable à la fenêtre.
 
@@ -153,7 +170,7 @@ def capacity_cost(
     if term.kind == CAPACITY_FLAT:
         monthly = term.eur_per_year / 12.0
     elif term.kind == CAPACITY_PEAK:
-        billed_kw = max(monthly_peak_kw(month_slots), term.min_kw)
+        billed_kw = billed_peak_kw(monthly_peak_kw(month_slots), term.min_kw, peak_history_kw)
         monthly = billed_kw * term.eur_per_kw_year / 12.0
     else:
         return 0.0
@@ -170,6 +187,7 @@ def value_series(
     *,
     month_slots: list[Slot] | None = None,
     grid_costs: GridCosts | None = None,
+    peak_history_kw: Sequence[float] | None = None,
 ) -> CostBreakdown:
     """Valorise ``window_slots`` avec ``tariff``.
 
@@ -196,7 +214,7 @@ def value_series(
     if window_slots:
         reference = month_slots if month_slots else window_slots
         capacity = capacity_cost(
-            tariff, window_slots, reference, hours_in_month(window_slots[0].at), grid_costs
+            tariff, window_slots, reference, hours_in_month(window_slots[0].at), grid_costs, peak_history_kw
         )
         if grid_costs is not None:
             prosumer = grid_costs.prosumer_eur_per_year * (len(window_slots) * SLOT_HOURS / HOURS_PER_YEAR)

@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14 et A-03 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
+**Statut** : **A-22, A-16, A-01, A-14, A-03 et A-29 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -44,6 +44,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-24 | Basse | Le délestage compte aussi les passages de la minuterie de 30 s |
 | A-25 | Basse | Chauffage : le surplus n'est pas réparti entre systèmes |
 | A-27 | Basse | Prompt IA : plages HP/HC écrites en dur |
+| ~~A-29~~ | Moyenne | Capacitaire flamand : seule la pointe du mois en cours comptait (corrigée) |
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
 
 ---
@@ -202,6 +203,12 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 - **A-28** : `trading/virtual_assets/config.py` autorise l'arbitrage d'export si `price_source ∈ {"dynamic", "integration"}`, valeurs qui n'existent pas (les vraies sont « Dynamique Day-Ahead » et « Intégration externe ») ; seul `tariff_regime == "Dynamique"` fonctionne.
 
 ---
+
+## A-29 · Moyenne · Capacitaire flamand : pointe du mois en cours seulement — CORRIGÉE
+
+**Constat** (après recherche des règles officielles, Fluvius et VREG) : la facture flamande utilise la **moyenne des pointes mensuelles sur au plus 12 mois**, chacune au minimum 2,5 kW ; FoxCat n'utilisait que la pointe du **mois en cours** (`max(pointe, 2,5)`), donc une estimation instable (un seul pic du mois la faisait grimper) et différente de la facture.
+
+**Correction** : `billed_peak_kw` (moyenne des mois connus, plancher 2,5 kW, ≤ 12 mois), historique des pointes mémorisé par `ConsumptionSeries` (13 mois, persisté, reconstitué depuis les créneaux conservés), attributs `pointe_facturee_kw` et `mois_pris_en_compte` sur « Coûts réseau • Ce mois ». Tests : `tests/test_capacity_rolling_average.py`. Détail et sources : `04_tarification.md` § 5.1.
 
 ## Tests proposés (par ordre de valeur)
 
