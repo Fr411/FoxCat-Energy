@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03 et A-29 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
+**Statut** : **A-22, A-16, A-01, A-14, A-03 et A-29 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30 et A-31** ont été trouvées ensuite par les scénarios d'économie.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -46,6 +46,8 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-27 | Basse | Prompt IA : plages HP/HC écrites en dur |
 | ~~A-29~~ | Moyenne | Capacitaire flamand : seule la pointe du mois en cours comptait (corrigée) |
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
+| A-30 | Haute | Planificateur de charges : le surplus solaire et le prix de réinjection ne comptent pas dans le coût d'un départ ✔ |
+| A-31 | Basse | Planificateur de charges : départ jusqu'à une demi-heure trop tôt ✔ |
 
 ---
 
@@ -209,6 +211,22 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 **Constat** (après recherche des règles officielles, Fluvius et VREG) : la facture flamande utilise la **moyenne des pointes mensuelles sur au plus 12 mois**, chacune au minimum 2,5 kW ; FoxCat n'utilisait que la pointe du **mois en cours** (`max(pointe, 2,5)`), donc une estimation instable (un seul pic du mois la faisait grimper) et différente de la facture.
 
 **Correction** : `billed_peak_kw` (moyenne des mois connus, plancher 2,5 kW, ≤ 12 mois), historique des pointes mémorisé par `ConsumptionSeries` (13 mois, persisté, reconstitué depuis les créneaux conservés), attributs `pointe_facturee_kw` et `mois_pris_en_compte` sur « Coûts réseau • Ce mois ». Tests : `tests/test_capacity_rolling_average.py`. Détail et sources : `04_tarification.md` § 5.1.
+
+## A-30 · Haute · Le planificateur ignore le surplus solaire dans le coût d'un départ ✔
+
+**Constat** (scénarios `tests/test_scenarios_economie.py`, test 06) : en tarif dynamique, `build_flexible_load_plan` est le décideur (`dynamic_planner_is_authoritative`). Il chiffre chaque créneau au seul prix d'achat réseau : `export_points`, `solar_forecast` et le surplus mesuré ne servent pas au coût (seul `snapshot.pv_w` limite la puissance parallèle). Le recommandeur `recommend_flexible_load`, lui, sait valoriser le solaire, mais son avis est écrasé par celui du planificateur.
+
+**Preuve** : lave-linge 1,2 kWh, 2 h, demandé à 12 h avec 2,5 kW de surplus et une réinjection à 0,04 €/kWh ; prix réseau 0,30 € le jour, 0,10 € la nuit. Coût réel d'un départ immédiat : environ 0,05 € (solaire). Le planificateur attend 23 h 35 (environ 0,16 €) : il fait perdre l'autoconsommation et coûte plus cher.
+
+**Proposition** : dans `build_flexible_load_plan`, remplacer le prix d'achat par un coût effectif par créneau (part couverte par la prévision de surplus à la valeur de réinjection, le reste au prix réseau), comme le fait déjà `recommend_flexible_load`. Test prêt : `test_06` (marqué échec attendu).
+
+## A-31 · Basse · Départ avancé jusqu'à une demi-heure ✔
+
+**Constat** : le planificateur déclenche `START_NOW` quand le meilleur créneau est à moins de `max(pas/2, 5)` minutes. Avec des prix horaires, une machine peut donc partir jusqu'à 30 minutes avant le créneau le moins cher et payer ce délai au tarif de l'heure précédente.
+
+**Preuve** : demande à 18 h, créneau creux à 0 h ; départ à 23 h 35, coût 0,156 € contre 0,12 € au créneau exact (test `run_machine`, rapport en fin de fichier).
+
+**Proposition** : attendre le créneau lui-même, en gardant une tolérance de quelques minutes seulement, ou prendre en compte le coût du délai dans la comparaison.
 
 ## Tests proposés (par ordre de valeur)
 
