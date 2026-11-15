@@ -637,7 +637,11 @@
             "name": "Mesures",
             "data": {
               "current_sensor": "Capteur de courant (optionnel)",
-              "voltage_sensor": "Capteur de tension (optionnel)"
+              "voltage_sensor": "Capteur de tension (optionnel)",
+              "phase": "Phase du réseau (L1, L2 ou L3, optionnel)"
+            },
+            "data_description": {
+              "phase": "Phase sur laquelle la machine est raccordée. Sert à répartir la charge par phase, notamment pour l'écrêtage."
             }
           }
         }
@@ -685,7 +689,11 @@
             "name": "Mesures",
             "data": {
               "current_sensor": "Capteur de courant (optionnel)",
-              "voltage_sensor": "Capteur de tension (optionnel)"
+              "voltage_sensor": "Capteur de tension (optionnel)",
+              "phase": "Phase du réseau (L1, L2 ou L3, optionnel)"
+            },
+            "data_description": {
+              "phase": "Phase sur laquelle la machine est raccordée. Sert à répartir la charge par phase, notamment pour l'écrêtage."
             }
           }
         }
@@ -822,12 +830,14 @@
               "main_breaker_current_a": "Calibre du disjoncteur principal (A, 0 = non renseigné)",
               "main_breaker_voltage_v": "Tension nominale (V)",
               "inverter_cos_phi": "Facteur de puissance onduleur (cos φ)",
-              "peak_phases": "Nombre de phases prises en compte (1 à 3)"
+              "peak_phases": "Nombre de phases prises en compte (1 à 3)",
+              "grid_phase_imbalance_factor": "Coefficient de déséquilibre des phases (1 = équilibré)"
             },
             "data_description": {
               "grid_regime": "MONO : I = P / (U × cos φ). TRI/TETRA : intensités L1-L3 mesurées si disponibles, sinon I = P / (√3 × U composée × cos φ).",
               "main_breaker_current_a": "Si renseigné, le déclenchement est calculé à partir du disjoncteur (A × V × phases × %). Sinon le seuil absolu est utilisé.",
-              "peak_phases": "Multiplie la capacité (hypothèse de charge équilibrée). Laissez 1 en monophasé ; en tétraphasé 400 V avec une tension de 230 V, indiquez 3."
+              "peak_phases": "Multiplie la capacité (hypothèse de charge équilibrée, corrigée par le coefficient de déséquilibre). Laissez 1 en monophasé ; en triphasé ou tétraphasé indiquez 3.",
+              "grid_phase_imbalance_factor": "Sans mesure du courant par phase, la phase la plus chargée est inconnue. Avec 1,3, FoxCat suppose qu'une phase porte 30 % de plus que la moyenne et déclenche plus tôt. Sans effet en monophasé ni avec des intensités mesurées."
             }
           },
           "thresholds": {
@@ -873,10 +883,17 @@
               "grid_voltage_sensor": "Capteur de tension réseau (V, optionnel)",
               "grid_current_l1_sensor": "Intensité mesurée phase L1 (A, optionnel)",
               "grid_current_l2_sensor": "Intensité mesurée phase L2 (A, optionnel)",
-              "grid_current_l3_sensor": "Intensité mesurée phase L3 (A, optionnel)"
+              "grid_current_l3_sensor": "Intensité mesurée phase L3 (A, optionnel)",
+              "grid_voltage_l1_sensor": "Tension phase-neutre L1 (V, optionnel)",
+              "grid_voltage_l2_sensor": "Tension phase-neutre L2 (V, optionnel)",
+              "grid_voltage_l3_sensor": "Tension phase-neutre L3 (V, optionnel)",
+              "grid_line_voltage_l12_sensor": "Tension entre lignes L1-L2 (V, optionnel)",
+              "grid_line_voltage_l23_sensor": "Tension entre lignes L2-L3 (V, optionnel)",
+              "grid_line_voltage_l31_sensor": "Tension entre lignes L3-L1 (V, optionnel)"
             },
             "data_description": {
-              "grid_voltage_sensor": "Sinon la tension nominale du disjoncteur est utilisée. Une valeur < 300 V est traitée comme tension simple."
+              "grid_voltage_sensor": "Ancien capteur unique, utilisé seulement si aucune tension par phase ou entre lignes n'est renseignée.",
+              "grid_voltage_l1_sensor": "Tensions mesurées (≈ 230 V) et tensions entre lignes (≈ 400 V) sont recoupées : FoxCat en déduit la tension réelle pour la capacité du disjoncteur. Sans mesure, la tension nominale est utilisée. Ce ne sont pas des courants : ils ne disent pas quelle phase est la plus chargée."
             }
           }
         }

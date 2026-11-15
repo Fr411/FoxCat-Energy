@@ -197,6 +197,21 @@ class MaxSetpointTests(unittest.TestCase):
         self.assertEqual(hs.normalise_system(entry(max_setpoint_c=22.5), "x")[0]["max_setpoint_c"], 22.5)
 
 
+class PhaseTests(unittest.TestCase):
+    def test_normalise_phase(self) -> None:
+        self.assertEqual([hs.normalise_phase(v) for v in ("l1", " L2 ", "L3")], ["L1", "L2", "L3"])
+        self.assertEqual([hs.normalise_phase(v) for v in ("L4", "", None, 2)], ["", "", "", ""])
+
+    def test_machine_keeps_its_phase(self) -> None:
+        from foxcat_energy.domain.loads.machines import machine_from_dict
+
+        raw = {"id": "m1", "name": "Four", "switch": "switch.four", "phase": "l2"}
+        machine = machine_from_dict(raw)
+        self.assertEqual((machine.phase, machine.as_dict()["phase"]), ("L2", "L2"))
+        self.assertEqual(machine_from_dict({**raw, "phase": "L9"}).phase, "")
+        self.assertEqual(machine_from_dict({k: v for k, v in raw.items() if k != "phase"}).phase, "")
+
+
 class RecordsTests(unittest.TestCase):
     def test_invalid_or_foreign_items_are_ignored(self) -> None:
         good = hs.normalise_system(entry(), "a")[0]

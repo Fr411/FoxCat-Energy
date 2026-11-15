@@ -55,6 +55,12 @@ def _bounded(value: Any, default: float, low: float, high: float) -> float:
     return round(max(low, min(high, result)), 2) if math.isfinite(result) else default
 
 
+def normalise_phase(value: Any) -> str:
+    """``L1``, ``L2`` ou ``L3`` (casse libre) ; chaîne vide si la phase est absente ou inconnue."""
+    phase = _text(value).upper()
+    return phase if phase in PHASES else ""
+
+
 def indoor_units_from(value: Any) -> list[str]:
     """Liste d'identifiants ``climate.*`` sans vides ni doublons, ordre conservé."""
     if value is None:
@@ -76,9 +82,7 @@ def normalise_system(user_input: dict[str, Any], system_id: str) -> tuple[dict[s
     if not name or system_type not in SYSTEM_TYPES or not power_sensor:
         return None, ERR_INVALID
 
-    phase = _text(user_input.get("phase")).upper()
-    if phase not in PHASES:
-        phase = ""
+    phase = normalise_phase(user_input.get("phase"))
 
     units: list[str] = []
     if system_type == TYPE_AIR_AIR:

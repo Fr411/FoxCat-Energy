@@ -1,0 +1,629 @@
+# Vue « Coûts » FoxCat Energy — alignée sur la V1.7.6 (configurateur contrat × réseau,
+# comparateur de tarifs, coûts réseau, prix tout compris).
+#
+# Changements par rapport à l'ancienne vue :
+#  - plus aucune entité Luminus : la courbe de prix vient de « Price Analyzer V2 » (attribut `series`),
+#    quel que soit le fournisseur (Luminus, Nord Pool, ENTSO-E, be_electricity_prices…) ;
+#  - nouvelle section « Comparateur de tarifs » (aujourd'hui / ce mois) + « Coûts réseau » ;
+#  - le régime est lu comme le configurateur l'écrit (contrat × structure) ;
+#  - le coût brut vient directement du capteur FoxCat (plus de reconstruction depuis le coût net) ;
+#  - les entités sont retrouvées par leur nom : rien à remplacer si les entity_id par défaut ont changé.
+#
+# À coller dans la vue « Coûts ». Les sections « Consommation appareils » restent inchangées.
+type: sections
+max_columns: 4
+title: Coûts
+path: couts
+icon: mdi:currency-eur
+subview: true
+show_icon_and_title: false
+sections:
+  # ───────────────────────── EN-TÊTE ─────────────────────────
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_state: false
+        custom_fields:
+          header: |
+            [[[
+              return `
+                <div class="hfc-header">
+                  <div class="hfc-logo"><ha-icon icon="mdi:cat"></ha-icon></div>
+                  <div class="hfc-name">
+                    <div class="hfc-title"><span class="fox">FOX</span><span class="cat">CAT</span><span class="energy">ENERGY</span></div>
+                    <div class="hfc-subtitle">COÛTS · TARIFICATION · COMPARATEUR</div>
+                  </div>
+                  <div class="hfc-line"><span class="line-orange"></span><span class="line-blue"></span></div>
+                </div>`;
+            ]]]
+        styles:
+          card:
+            - padding: 17px 22px
+            - border-radius: 20px
+            - overflow: hidden
+            - background: radial-gradient(circle at 3% 50%,rgba(255,120,20,0.15),transparent 24%),radial-gradient(circle at 95% 30%,rgba(0,210,255,0.11),transparent 28%),linear-gradient(135deg,#080d16 0%,#0a1420 48%,#071827 100%)
+            - border: 1px solid rgba(255,255,255,0.08)
+            - box-shadow: 0 10px 30px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.035)
+          grid:
+            - grid-template-areas: '"header"'
+            - grid-template-columns: 1fr
+          custom_fields:
+            header:
+              - width: 100%
+        extra_styles: |
+          .hfc-header{display:flex;align-items:center;gap:16px;width:100%;box-sizing:border-box}
+          .hfc-logo{width:54px;height:54px;flex:0 0 54px;display:flex;align-items:center;justify-content:center;border-radius:16px;background:linear-gradient(135deg,rgba(255,126,25,.15),rgba(0,211,255,.12));border:1px solid rgba(255,255,255,.10);box-shadow:-5px 0 20px rgba(255,110,15,.12),5px 0 20px rgba(0,210,255,.12)}
+          .hfc-logo ha-icon{color:#fff;--mdc-icon-size:31px;filter:drop-shadow(-3px 0 5px rgba(255,110,20,.55)) drop-shadow(3px 0 5px rgba(0,210,255,.5))}
+          .hfc-title{white-space:nowrap;font-size:24px;font-weight:850;line-height:1;letter-spacing:.055em}
+          .hfc-title .fox{color:#ff8a26;text-shadow:0 0 12px rgba(255,120,20,.25)}
+          .hfc-title .cat{color:#19d8ff;text-shadow:0 0 12px rgba(0,210,255,.25)}
+          .hfc-title .energy{margin-left:9px;color:#a9bdcc;font-weight:600}
+          .hfc-subtitle{margin-top:7px;color:#71899d;font-size:8px;font-weight:600;letter-spacing:.28em}
+          .hfc-line{height:2px;flex:1;min-width:60px;margin-left:12px;display:flex;border-radius:10px;overflow:hidden;opacity:.75}
+          .line-orange{width:38%;background:linear-gradient(90deg,rgba(255,130,25,0),#ff8125)}
+          .line-blue{flex:1;background:linear-gradient(90deg,#00d8ff,rgba(0,216,255,0))}
+
+  # ───────────────────────── TARIFICATION + COMPARATEUR ─────────────────────────
+  - type: grid
+    cards:
+      - type: custom:button-card
+        show_name: false
+        show_icon: false
+        show_state: false
+        triggers_update: all
+        tap_action: {action: none}
+        hold_action: {action: none}
+        double_tap_action: {action: none}
+        styles:
+          card:
+            - padding: 0
+            - border-radius: 28px
+            - overflow: hidden
+            - background: radial-gradient(120% 80% at 0% 0%,rgba(25,216,255,0.10),transparent 55%),radial-gradient(100% 70% at 100% 100%,rgba(167,139,250,0.09),transparent 55%),linear-gradient(160deg,#070b14,#0b1626 60%,#08101c)
+            - border: 1px solid rgba(255,255,255,0.09)
+            - box-shadow: 0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)
+          grid:
+            - grid-template-areas: '"content"'
+            - grid-template-columns: 1fr
+          custom_fields:
+            content:
+              - width: 100%
+        custom_fields:
+          content: |
+            [[[
+              /* FOXCAT ENERGY V1.7.6 — TARIFICATION · COMPARATEUR · COÛTS RÉSEAU */
+              const norm = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+              const BAD = ['unknown', 'unavailable', 'none', ''];
+              const fin = Number.isFinite;
+              const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+              const stOf = (id, fb = '—') => { const s = id ? states[id] : null; return (!s || s.state == null || BAD.includes(String(s.state))) ? fb : s.state; };
+              const numOf = (id, fb = null) => { const s = id ? states[id] : null; if (!s || BAD.includes(String(s.state))) return fb; const v = parseFloat(s.state); return fin(v) ? v : fb; };
+              const attr = (id, k) => (id && states[id] && states[id].attributes) ? states[id].attributes[k] : undefined;
+              const eur = (v) => fin(v) ? `${v.toFixed(2)} €` : '—';
+              const kwh = (v) => fin(v) ? `${Math.max(0, v).toFixed(2)} kWh` : '—';
+              const price = (v) => fin(v) ? `${v.toFixed(4)} €/kWh` : '—';
+              const rate = (v) => fin(v) ? `${v.toFixed(3)} €/h` : '—';
+              const signed = (v) => fin(v) ? `${v > 0 ? '+' : ''}${v.toFixed(2)} €` : '—';
+
+              /* ---- Retrouve une entité FoxCat par domaine + suffixe d'identifiant ---- */
+              const ids = Object.keys(states);
+              const find = (domain, ...suffixes) => {
+                for (const sfx of suffixes) {
+                  const exact = `${domain}.foxcat_energy_${sfx}`;
+                  if (states[exact]) return exact;
+                }
+                for (const sfx of suffixes) {
+                  const hit = ids.find((i) => i.startsWith(domain + '.') && i.includes('foxcat') && i.endsWith(sfx));
+                  if (hit) return hit;
+                }
+                return null;
+              };
+              const E = {
+                regime: find('select', 'tarification_regime_tarifaire', 'regime_tarifaire'),
+                regimeActive: find('sensor', 'tarification_regime_tarifaire_actif', 'regime_tarifaire_actif'),
+                period: find('sensor', 'tarification_periode_tarifaire', 'periode_tarifaire'),
+                status: find('sensor', 'tarification_statut_du_prix', 'statut_du_prix'),
+                buy: find('sensor', 'tarification_prix_d_achat_actif', 'prix_d_achat_actif'),
+                next: find('sensor', 'tarification_prix_d_achat_suivant', 'prix_d_achat_suivant'),
+                exportVal: find('sensor', 'tarification_valeur_economique_de_la_reinjection', 'valeur_economique_de_la_reinjection'),
+                negative: find('sensor', 'tarification_prix_dynamique_negatif_actif', 'prix_dynamique_negatif_actif'),
+                labelNow: find('sensor', 'tarification_libelle_prix_actif', 'libelle_prix_actif'),
+                labelNext: find('sensor', 'tarification_libelle_prix_suivant', 'libelle_prix_suivant'),
+                trend: find('sensor', 'tarification_tendance_courbe_dynamique', 'tendance_courbe_dynamique'),
+                pos: find('sensor', 'tarification_position_sur_la_courbe_dynamique', 'position_sur_la_courbe_dynamique'),
+                rank: find('sensor', 'tarification_rang_prix_dynamique', 'rang_prix_dynamique'),
+                bestPrice: find('sensor', 'tarification_meilleur_prix_d_achat_futur', 'meilleur_prix_d_achat_futur'),
+                bestSlot: find('sensor', 'tarification_meilleur_creneau_economique', 'meilleur_creneau_economique'),
+                bestSaving: find('sensor', 'tarification_economie_potentielle_en_reportant', 'economie_potentielle_en_reportant'),
+                analyzer: find('sensor', 'tarification_price_analyzer_v2', 'price_analyzer_v2'),
+                impRate: find('sensor', 'tarification_cout_instantane_du_prelevement', 'cout_instantane_du_prelevement'),
+                expRate: find('sensor', 'tarification_valeur_instantanee_de_la_reinjection', 'valeur_instantanee_de_la_reinjection'),
+                netRate: find('sensor', 'tarification_solde_financier_instantane_reseau', 'solde_financier_instantane_reseau'),
+                imp: find('sensor', 'energie_maison_prelevement_reseau_aujourdhui', 'maison_prelevement_reseau_aujourdhui'),
+                exp: find('sensor', 'energie_pv_reinjection_aujourdhui', 'pv_reinjection_aujourdhui'),
+                self: find('sensor', 'energie_pv_energie_autoconsommee_aujourdhui', 'pv_energie_autoconsommee_aujourdhui'),
+                house: find('sensor', 'energie_maison_consommation_aujourdhui', 'maison_consommation_aujourdhui'),
+                grossCost: find('sensor', 'tarification_maison_cout_reseau_aujourdhui', 'maison_cout_reseau_aujourdhui'),
+                netCost: find('sensor', 'tarification_maison_cout_net_aujourdhui', 'maison_cout_net_aujourdhui'),
+                expRev: find('sensor', 'tarification_pv_revenu_reinjection_aujourdhui', 'pv_revenu_reinjection_aujourdhui'),
+                expCost: find('sensor', 'tarification_pv_cout_reinjection_aujourdhui', 'pv_cout_reinjection_aujourdhui'),
+                solarGain: find('sensor', 'tarification_pv_gain_solaire_estime_aujourdhui', 'pv_gain_solaire_estime_aujourdhui'),
+                savDay: find('sensor', 'economiser_avec_foxcat_energy_aujourdhui', 'economiser_foxcat_jour'),
+                savMonth: find('sensor', 'economiser_avec_foxcat_energy_ce_mois', 'economiser_foxcat_mois'),
+                savYear: find('sensor', 'economiser_avec_foxcat_energy_cette_annee', 'economiser_foxcat_annee'),
+                cmpDay: find('sensor', 'comparateur_de_tarifs_aujourd_hui', 'comparateur_de_tarifs_aujourdhui', 'comparateur_tarifs_jour'),
+                cmpMonth: find('sensor', 'comparateur_de_tarifs_ce_mois', 'comparateur_tarifs_mois'),
+                grid: find('sensor', 'couts_reseau_ce_mois', 'couts_reseau_mois')
+              };
+
+              /* ---- Régime & prix ---- */
+              const regime = stOf(E.regime, stOf(E.regimeActive, '—'));
+              const nr = norm(regime);
+              const isDyn = nr.includes('dynamique');
+              const isTou = nr.includes('bi horaire') || nr.includes('hp hc') || nr.includes('impact');
+              const period = stOf(E.period, '—');
+              const isHP = period === 'HP';
+              const buy = numOf(E.buy), next = numOf(E.next), exportVal = numOf(E.exportVal);
+              const delta = (fin(buy) && fin(next)) ? next - buy : null;
+              const trendTxt = stOf(E.trend, delta == null ? '—' : (delta > 0.01 ? 'HAUSSE' : delta < -0.01 ? 'BAISSE' : 'STABLE'));
+              const tN = norm(trendTxt);
+              const tColor = tN.includes('hausse') ? '#fb7185' : tN.includes('baisse') ? '#35e59d' : '#94a3b8';
+              const tIcon = tN.includes('hausse') ? '↗' : tN.includes('baisse') ? '↘' : '→';
+              const status = stOf(E.status, '—'); const sn = norm(status);
+              const sColor = (sn.includes('avantage') || sn.includes('bas') || sn.includes('negatif')) ? '#35e59d' : (sn.includes('eleve') || sn.includes('cher')) ? '#fb7185' : '#facc15';
+              const negative = stOf(E.negative, 'NON') === 'OUI';
+              const pos = numOf(E.pos), rank = numOf(E.rank);
+
+              let primary = '#35e59d', icon = 'mdi:swap-horizontal', short = 'COMPENSATION';
+              if (isDyn) { primary = '#a78bfa'; icon = 'mdi:chart-line'; short = 'DYNAMIQUE'; }
+              else if (isTou) { primary = isHP ? '#ff922b' : '#19d8ff'; icon = 'mdi:clock-outline'; short = nr.includes('impact') ? 'IMPACT' : 'HP / HC'; }
+
+              /* ---- Impact instantané ---- */
+              const impRate = numOf(E.impRate), expRate = numOf(E.expRate);
+              const netRate = numOf(E.netRate, (fin(impRate) && fin(expRate)) ? impRate - expRate : null);
+
+              /* ---- Jour ---- */
+              const imp = Math.max(numOf(E.imp, 0), 0), exp = Math.max(numOf(E.exp, 0), 0);
+              const selfC = Math.max(numOf(E.self, 0), 0), house = Math.max(numOf(E.house, 0), 0);
+              const net = numOf(E.netCost), gross = numOf(E.grossCost);
+              const expRev = Math.max(numOf(E.expRev, 0), 0), expCost = Math.max(numOf(E.expCost, 0), 0);
+              const gain = numOf(E.solarGain, 0);
+              const pSelf = clamp(selfC / Math.max(selfC + imp, 0.0001) * 100, 0, 100);
+
+              /* ---- Économies ---- */
+              const sav = (id) => { const v = numOf(id); const u = String(attr(id, 'unit_of_measurement') ?? '€'); return fin(v) ? `${v.toFixed(2)} ${u}` : '—'; };
+
+              /* ---- Comparateur ---- */
+              const cmpView = (id) => {
+                const raw = attr(id, 'tarifs') || {};
+                const rows = Object.entries(raw).map(([name, t]) => ({ name, ...t })).filter((t) => fin(t.total_eur));
+                rows.sort((a, b) => a.total_eur - b.total_eur);
+                const s = stOf(id, '—');
+                return { id, rows, cheapest: s, ready: rows.length > 0, imp: attr(id, 'import_kwh'), exp: attr(id, 'export_kwh'), slots: attr(id, 'creneaux'), method: attr(id, 'methode') };
+              };
+              const cMonth = cmpView(E.cmpMonth), cDay = cmpView(E.cmpDay);
+              const cmpTable = (c, title) => {
+                if (!c.id) return `<div class="note"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>Capteur « Comparateur de tarifs • ${title} » introuvable : mets FoxCat à jour et recharge l'intégration.</span></div>`;
+                if (!c.ready) return `<div class="note"><ha-icon icon="mdi:timer-sand"></ha-icon><span>${title} : pas encore de données. FoxCat enregistre la consommation au quart d'heure, il faut quelques heures de mesure.</span></div>`;
+                const min = c.rows[0].total_eur, max = c.rows[c.rows.length - 1].total_eur;
+                const span = Math.max(max - min, 0.0001);
+                const body = c.rows.map((t, i) => {
+                  const best = i === 0;
+                  const w = c.rows.length === 1 ? 100 : clamp(25 + (t.total_eur - min) / span * 75, 25, 100);
+                  const col = best ? '#35e59d' : (t.ecart_vs_actuel_eur ?? 0) > 0 ? '#fb7185' : '#19d8ff';
+                  const parts = [
+                    ['Énergie', t.energie_eur], ['Réseau', t.reseau_eur], ['Capacitaire', t.capacitaire_eur],
+                    ['Prosumer', t.prosumer_eur], ['Frais fixes', t.frais_fixes_eur], ['Réinjection', t.reinjection_eur ? -Math.abs(t.reinjection_eur) : t.reinjection_eur]
+                  ].filter(([, v]) => fin(v) && Math.abs(v) >= 0.005).map(([k, v]) => `<span>${k} <b>${v.toFixed(2)} €</b></span>`).join('');
+                  const warn = (fin(t.import_sans_prix_kwh) && t.import_sans_prix_kwh > 0.05) ? `<span class="warn">⚠ ${t.import_sans_prix_kwh.toFixed(1)} kWh sans prix</span>` : '';
+                  return `<div class="trow ${best ? 'best' : ''}" style="--c:${col}">
+                    <div class="trow-head"><div class="tname">${best ? '<ha-icon icon="mdi:trophy-outline"></ha-icon>' : ''}${t.name}</div>
+                      <div class="ttot">${eur(t.total_eur)}</div>
+                      <div class="tdelta">${(t.ecart_vs_actuel_eur == null || Math.abs(t.ecart_vs_actuel_eur) < 0.005) ? 'tarif actuel' : signed(t.ecart_vs_actuel_eur)}</div></div>
+                    <div class="tbar"><div style="width:${w}%"></div></div>
+                    <div class="tparts">${parts}${warn}</div></div>`;
+                }).join('');
+                const potential = c.rows.length > 1 ? Math.max(...c.rows.map((r) => -(r.ecart_vs_actuel_eur ?? 0)), 0) : 0;
+                return `<div class="cmp-top"><div><div class="lbl">Le moins cher · ${title.toLowerCase()}</div><div class="cmp-best">${c.cheapest}</div></div>
+                  <div class="cmp-gain"><span>ÉCONOMIE POSSIBLE</span><strong>${eur(potential)}</strong></div></div>
+                  ${body}
+                  <div class="note"><ha-icon icon="mdi:information-outline"></ha-icon><span>Import ${fin(c.imp) ? c.imp : '—'} kWh · export ${fin(c.exp) ? c.exp : '—'} kWh · ${c.slots ?? '—'} créneaux. ${c.method ?? ''}</span></div>`;
+              };
+
+              /* ---- Coûts réseau ---- */
+              const gTotal = numOf(E.grid);
+              const gCap = attr(E.grid, 'capacitaire_eur'), gPro = attr(E.grid, 'prosumer_eur');
+              const gPeak = attr(E.grid, 'pointe_foxcat_kw'), gPeakInt = attr(E.grid, 'pointe_integration_kw'), gGap = attr(E.grid, 'ecart_pointe_kw');
+
+              const tile = (lab, ic, val, sub, c) => `<div class="tile" style="--a:${c}"><div class="tile-head"><span>${lab}</span><ha-icon icon="${ic}"></ha-icon></div><div class="tile-val">${val}</div><div class="tile-sub">${sub}</div></div>`;
+              const box = (c, lab, val, sub) => `<div class="fin-box" style="--c:${c}"><span>${lab}</span><strong>${val}</strong><em>${sub}</em></div>`;
+
+              /* ---- Bloc « courbe de prix » (si prix dynamique / série disponible) ---- */
+              const curve = (isDyn || stOf(E.analyzer, 'INACTIF') !== 'INACTIF') ? `
+                <div class="section">COURBE DE PRIX<span>${stOf(E.analyzer, '—')}</span></div>
+                <div class="grid4">
+                  ${tile('PROCHAINE HEURE', 'mdi:clock-fast', price(next), stOf(E.labelNext, 'Prochaine période'), tColor)}
+                  ${tile('MEILLEUR CRÉNEAU', 'mdi:calendar-clock', String(stOf(E.bestSlot, '—')).replace('T', ' ').slice(0, 16), `${price(numOf(E.bestPrice))}`, '#35e59d')}
+                  ${tile('ÉCONOMIE EN REPORTANT', 'mdi:piggy-bank-outline', price(numOf(E.bestSaving)), 'par kWh décalé', '#facc15')}
+                  ${tile('POSITION', 'mdi:chart-bell-curve-cumulative', fin(pos) ? `${pos.toFixed(0)} %` : '—', fin(rank) ? `rang ${rank.toFixed(0)}` : '0 % = le moins cher', '#a78bfa')}
+                </div>` : '';
+
+              return `
+              <style>
+                *{box-sizing:border-box} ha-icon{display:inline-flex}
+                .wrap{container-type:inline-size;padding:24px;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+                @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+                @keyframes shimmer{from{transform:translateX(-120%)}to{transform:translateX(320%)}}
+                .header{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
+                .brand{display:flex;align-items:center;gap:14px;min-width:0}
+                .logo{width:54px;height:54px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:18px;color:${primary};background:linear-gradient(135deg,${primary}26,rgba(255,255,255,.03));border:1px solid ${primary}40;box-shadow:0 0 28px ${primary}2a}
+                .logo ha-icon{--mdc-icon-size:28px}
+                .eyebrow{color:#19d8ff;font-size:11px;font-weight:800;letter-spacing:.22em}
+                .title{margin-top:4px;font-size:26px;font-weight:800;letter-spacing:-.02em;background:linear-gradient(90deg,#fff,#a9bbd0);-webkit-background-clip:text;background-clip:text;color:transparent}
+                .subtitle{margin-top:3px;color:#64748b;font-size:12px}
+                .badge{flex:none;padding:10px 14px;border-radius:16px;text-align:right;color:${primary};background:${primary}12;border:1px solid ${primary}38}
+                .badge span{display:block;color:#7c8ba1;font-size:10px;font-weight:800;letter-spacing:.14em}
+                .badge strong{display:block;margin-top:3px;font-size:15px;font-weight:900}
+                .hero{position:relative;overflow:hidden;display:grid;grid-template-columns:1fr auto;align-items:center;gap:16px;padding:20px;border-radius:22px;background:linear-gradient(135deg,${primary}16,rgba(255,255,255,.02));border:1px solid ${primary}33}
+                .hero::before{content:"";position:absolute;top:0;bottom:0;width:30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);animation:shimmer 5s linear infinite}
+                .hero-left{display:flex;align-items:center;gap:14px;position:relative;z-index:1;min-width:0}
+                .hero-icon{width:48px;height:48px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:15px;color:${primary};background:${primary}1a;border:1px solid ${primary}30}
+                .hero-icon ha-icon{--mdc-icon-size:26px}
+                .lbl{color:#7c8ba1;font-size:10.5px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+                .hero-name{margin-top:4px;color:${primary};font-size:19px;font-weight:900}
+                .hero-right{text-align:right;position:relative;z-index:1}
+                .hero-right strong{display:block;font-size:28px;font-weight:900;letter-spacing:-.02em;text-shadow:0 0 28px ${primary}44}
+                .hero-right span{display:block;margin-top:4px;color:#64748b;font-size:11px}
+                .section{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:26px 2px 10px;color:#8a9ab0;font-size:11px;font-weight:800;letter-spacing:.16em}
+                .section span{padding:3px 9px;border-radius:999px;color:#7c8ba1;background:rgba(255,255,255,.04);font-size:10px;letter-spacing:.1em;white-space:nowrap}
+                .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+                .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+                .tile{min-width:0;padding:15px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07)}
+                .tile-head{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--a);font-size:10.5px;font-weight:800;letter-spacing:.09em}
+                .tile-head span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .tile-head ha-icon{--mdc-icon-size:19px;flex:none}
+                .tile-val{margin-top:11px;font-size:20px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .tile-sub{margin-top:5px;color:#64748b;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .fin-box{min-width:0;padding:14px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+                .fin-box::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--c);opacity:.8}
+                .fin-box span{display:block;color:#7c8ba1;font-size:10px;font-weight:800;letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .fin-box strong{display:block;margin-top:7px;color:var(--c);font-size:20px;font-weight:900;white-space:nowrap}
+                .fin-box em{display:block;margin-top:5px;color:#64748b;font-size:10.5px;font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .day{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 22px;border-radius:22px;background:radial-gradient(circle at 100% 0%,rgba(53,229,157,.13),transparent 50%),linear-gradient(135deg,rgba(25,216,255,.07),rgba(255,255,255,.02));border:1px solid rgba(25,216,255,.2)}
+                .day-val{margin-top:6px;color:#35e59d;font-size:42px;line-height:1;font-weight:900;letter-spacing:-.03em;white-space:nowrap}
+                .day-r{text-align:right}.day-r strong{display:block;margin-top:6px;font-size:22px;font-weight:900;white-space:nowrap}
+                .bar{margin-top:10px;padding:13px 16px;border-radius:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}
+                .bar-head{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#7c8ba1;font-weight:700}
+                .bar-track{display:flex;height:10px;margin-top:9px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.06)}
+                .bar-track div{transition:width .8s}
+                .sav{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px}
+                .sav>div{padding:16px;border-radius:18px;background:linear-gradient(135deg,rgba(250,204,21,.09),rgba(255,255,255,.02));border:1px solid rgba(250,204,21,.2)}
+                .sav span{display:block;color:#7c8ba1;font-size:10px;font-weight:800;letter-spacing:.1em}
+                .sav strong{display:block;margin-top:6px;color:#facc15;font-size:22px;font-weight:900;white-space:nowrap}
+                /* comparateur */
+                .cmp-top{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 18px;margin-bottom:10px;border-radius:20px;background:linear-gradient(135deg,rgba(53,229,157,.10),rgba(255,255,255,.02));border:1px solid rgba(53,229,157,.28)}
+                .cmp-best{margin-top:5px;color:#35e59d;font-size:21px;font-weight:900}
+                .cmp-gain{text-align:right}.cmp-gain span{display:block;color:#7c8ba1;font-size:10px;font-weight:800;letter-spacing:.1em}
+                .cmp-gain strong{display:block;margin-top:5px;color:#35e59d;font-size:22px;font-weight:900;white-space:nowrap}
+                .trow{padding:13px 15px;margin-top:8px;border-radius:16px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06)}
+                .trow.best{border-color:rgba(53,229,157,.4);background:rgba(53,229,157,.05)}
+                .trow-head{display:grid;grid-template-columns:1fr auto auto;align-items:baseline;gap:14px}
+                .tname{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+                .tname ha-icon{--mdc-icon-size:17px;color:#35e59d}
+                .ttot{font-size:16px;font-weight:900;white-space:nowrap}
+                .tdelta{min-width:84px;text-align:right;color:var(--c);font-size:12px;font-weight:800;white-space:nowrap}
+                .tbar{height:6px;margin-top:9px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden}
+                .tbar div{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 40%,transparent))}
+                .tparts{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:9px;color:#64748b;font-size:11px}
+                .tparts b{color:#cbd5e1;font-weight:700}.tparts .warn{color:#facc15}
+                .sub{margin:16px 2px 6px;color:#7c8ba1;font-size:10.5px;font-weight:800;letter-spacing:.13em}
+                .note{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 12px;border-radius:12px;color:#64748b;background:rgba(255,255,255,.02);font-size:11px;line-height:1.5}
+                .note ha-icon{flex:none;--mdc-icon-size:16px;margin-top:1px}
+                .footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06);color:#64748b;font-size:11px}
+                .footer strong{color:#94a3b8}
+                @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+                @container (max-width:700px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}.sav{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.hero-right{text-align:left}}
+                @container (max-width:520px){.grid3{grid-template-columns:1fr}.header{flex-direction:column;align-items:flex-start}.day{flex-direction:column;align-items:flex-start}.day-r{text-align:left}.trow-head{grid-template-columns:1fr auto}.tdelta{grid-column:1/-1;text-align:left}}
+              </style>
+
+              <div class="wrap">
+                <div class="header">
+                  <div class="brand">
+                    <div class="logo"><ha-icon icon="mdi:cash-sync"></ha-icon></div>
+                    <div><div class="eyebrow">FOXCAT ENERGY</div><div class="title">Tarification</div><div class="subtitle">Contrat, réseau, comparateur de tarifs</div></div>
+                  </div>
+                  <div class="badge"><span>RÉGIME</span><strong>${short}</strong></div>
+                </div>
+
+                <div class="hero">
+                  <div class="hero-left">
+                    <div class="hero-icon"><ha-icon icon="${icon}"></ha-icon></div>
+                    <div><div class="lbl">Régime tarifaire sélectionné</div><div class="hero-name">${regime}</div>
+                      <div class="tile-sub" style="margin-top:4px">Période ${period} · <span style="color:${sColor};font-weight:800">${status}</span></div></div>
+                  </div>
+                  <div class="hero-right"><strong>${price(buy)}</strong><span>prix d'achat actif · ${stOf(E.labelNow, 'FoxCat')}</span></div>
+                </div>
+
+                <div class="grid3" style="margin-top:10px">
+                  ${tile('TENDANCE', 'mdi:trending-up', `${tIcon} ${trendTxt}`, fin(delta) ? `${delta > 0 ? '+' : ''}${delta.toFixed(4)} €/kWh` : '—', tColor)}
+                  ${tile('VALEUR RÉINJECTION', 'mdi:transmission-tower-export', price(exportVal), 'valorisation économique', '#35e59d')}
+                  ${tile('PRIX NÉGATIF', 'mdi:cash-minus', negative ? 'OUI' : 'NON', negative ? 'consommer est rémunéré' : 'prix positif', negative ? '#35e59d' : '#94a3b8')}
+                </div>
+
+                ${curve}
+
+                <div class="section">IMPACT FINANCIER INSTANTANÉ<span>€ / H · CAPTEURS FOXCAT</span></div>
+                <div class="grid3">
+                  ${box('#fb7185', 'COÛT PRÉLÈVEMENT', rate(impRate), 'puissance importée × prix actif')}
+                  ${box('#35e59d', 'VALEUR RÉINJECTION', rate(expRate), 'puissance injectée × valeur')}
+                  ${box(fin(netRate) && netRate <= 0 ? '#35e59d' : '#19d8ff', 'SOLDE RÉSEAU', rate(netRate), fin(netRate) ? (netRate > 0 ? 'coût net actuel' : 'gain net actuel') : '—')}
+                </div>
+
+                <div class="section">BILAN DU JOUR<span>DEPUIS 00:00</span></div>
+                <div class="day">
+                  <div><div class="lbl">Coût net du jour</div><div class="day-val">${eur(net)}</div></div>
+                  <div class="day-r"><div class="lbl">Coût brut réseau</div><strong style="color:#fb7185">${eur(gross)}</strong></div>
+                </div>
+                <div class="grid4" style="margin-top:10px">
+                  ${tile('PRÉLEVÉ', 'mdi:transmission-tower-import', kwh(imp), 'depuis le réseau', '#fb7185')}
+                  ${tile('RÉINJECTÉ', 'mdi:transmission-tower-export', kwh(exp), `${eur(expRev)} de revenu${expCost > 0 ? ` · ${eur(expCost)} de coût` : ''}`, '#35e59d')}
+                  ${tile('AUTOCONSOMMÉ', 'mdi:solar-power-variant', kwh(selfC), `${kwh(house)} consommés`, '#ff922b')}
+                  ${tile('GAIN SOLAIRE', 'mdi:piggy-bank-outline', eur(gain), 'estimé du jour', '#facc15')}
+                </div>
+                <div class="bar">
+                  <div class="bar-head"><span style="color:#ff922b">Autoconsommé · ${pSelf.toFixed(0)} %</span><span style="color:#fb7185">Réseau · ${(100 - pSelf).toFixed(0)} %</span></div>
+                  <div class="bar-track"><div style="width:${pSelf}%;background:linear-gradient(90deg,#ff922b,#ffc46b)"></div><div style="width:${100 - pSelf}%;background:linear-gradient(90deg,#fb7185,#f43f5e)"></div></div>
+                </div>
+
+                <div class="section">ÉCONOMIES FOXCAT<span>OPTIMISATION</span></div>
+                <div class="sav">
+                  <div><span>AUJOURD'HUI</span><strong>${sav(E.savDay)}</strong></div>
+                  <div><span>CE MOIS</span><strong>${sav(E.savMonth)}</strong></div>
+                  <div><span>CETTE ANNÉE</span><strong>${sav(E.savYear)}</strong></div>
+                </div>
+
+                <div class="section">COMPARATEUR DE TARIFS<span>COMPORTEMENT CONSTANT</span></div>
+                <div class="sub">CE MOIS</div>
+                ${cmpTable(cMonth, 'Ce mois')}
+                <div class="sub">AUJOURD'HUI</div>
+                ${cmpTable(cDay, "Aujourd'hui")}
+
+                <div class="section">COÛTS RÉSEAU<span>CE MOIS · TARIF ACTUEL</span></div>
+                ${E.grid ? `
+                <div class="grid4">
+                  ${tile('TOTAL', 'mdi:transmission-tower', eur(gTotal), 'capacitaire + prosumer', '#19d8ff')}
+                  ${tile('CAPACITAIRE', 'mdi:chart-bar', eur(gCap), 'terme de pointe / forfait', '#a78bfa')}
+                  ${tile('PROSUMER', 'mdi:solar-panel', eur(gPro), 'redevance au prorata', '#ff922b')}
+                  ${tile('POINTE FOXCAT', 'mdi:flash', fin(gPeak) ? `${gPeak.toFixed(2)} kW` : '—', fin(gPeakInt) ? `intégration ${gPeakInt.toFixed(2)} kW${fin(gGap) ? ` · écart ${gGap.toFixed(2)}` : ''}` : 'pointe mensuelle au quart d’heure', '#fb7185')}
+                </div>
+                <div class="note"><ha-icon icon="mdi:information-outline"></ha-icon><span>Ces coûts dépendent du réseau, pas du fournisseur : ils sont appliqués à tous les tarifs comparés. Réglages : Tarification → Coûts réseau et prosumer.</span></div>`
+                : `<div class="note"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>Capteur « Coûts réseau • Ce mois » introuvable.</span></div>`}
+
+                <div class="footer">
+                  <span>Régime actif · <strong>${stOf(E.regimeActive, regime)}</strong></span>
+                  <span>Réglages : Paramètres → FoxCat Energy → Configurer → Tarification</span>
+                </div>
+              </div>`;
+            ]]]
+
+  # ───────────────────────── GRAPHIQUES ─────────────────────────
+  - type: grid
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: conditional
+            conditions:
+              - entity: sensor.foxcat_energy_tarification_price_analyzer_v2
+                state_not: INACTIF
+            card:
+              type: vertical-stack
+              cards:
+                - type: custom:apexcharts-card
+                  graph_span: 2d
+                  span: {start: day}
+                  update_interval: 1min
+                  header: {show: true, title: Prix FoxCat · achat & réinjection, show_states: false, standard_format: false}
+                  now: {show: true, label: Maintenant, color: '#ff922b'}
+                  apex_config:
+                    chart:
+                      height: 300
+                      background: transparent
+                      toolbar: {show: false}
+                      zoom: {enabled: false}
+                      fontFamily: Inter, Segoe UI, system-ui, sans-serif
+                      foreColor: '#94a3b8'
+                    grid: {borderColor: 'rgba(255,255,255,0.07)', strokeDashArray: 3}
+                    legend: {show: true, position: bottom, fontSize: 12px}
+                    tooltip: {theme: dark, shared: true, x: {format: dd/MM HH:mm}}
+                    xaxis: {type: datetime, labels: {datetimeUTC: false, style: {fontSize: 11px}}, axisBorder: {show: false}}
+                    yaxis: {labels: {style: {fontSize: 11px}}}
+                    stroke: {curve: stepline}
+                  series:
+                    # Série lue dans « Price Analyzer V2 » : prix tout compris tels que FoxCat les utilise,
+                    # indépendamment du fournisseur configuré.
+                    - entity: sensor.foxcat_energy_tarification_price_analyzer_v2
+                      name: Achat
+                      type: area
+                      color: '#a78bfa'
+                      unit: €/kWh
+                      float_precision: 3
+                      stroke_width: 3
+                      opacity: 0.2
+                      show: {in_header: false, extremas: true}
+                      data_generator: |
+                        const rows = entity.attributes.series || [];
+                        return rows.filter(r => r.at && Number.isFinite(Number(r.import_eur_kwh))).map(r => [new Date(r.at).getTime(), Number(r.import_eur_kwh)]);
+                    - entity: sensor.foxcat_energy_tarification_price_analyzer_v2
+                      name: Réinjection
+                      type: line
+                      color: '#34d399'
+                      unit: €/kWh
+                      float_precision: 3
+                      stroke_width: 2
+                      show: {in_header: false}
+                      data_generator: |
+                        const rows = entity.attributes.series || [];
+                        return rows.filter(r => r.at && Number.isFinite(Number(r.export_eur_kwh))).map(r => [new Date(r.at).getTime(), Number(r.export_eur_kwh)]);
+                    - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                      name: Maintenant
+                      type: line
+                      color: '#ff922b'
+                      unit: €/kWh
+                      float_precision: 3
+                      stroke_width: 0
+                      show: {in_header: false}
+                      data_generator: |
+                        const v = Number(entity.state); if (!Number.isFinite(v)) return []; return [[Date.now(), v]];
+                  card_mod:
+                    style: |
+                      ha-card{background:radial-gradient(120% 90% at 0% 0%,rgba(25,216,255,.08),transparent 55%),linear-gradient(160deg,#070b14,#0b1626 60%,#08101c)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:24px!important;box-shadow:0 16px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.05)!important;padding:6px 6px 2px}
+                - type: custom:apexcharts-card
+                  graph_span: 2d
+                  span: {start: day}
+                  update_interval: 1min
+                  header: {show: true, title: Niveau de prix par tranche, show_states: false, standard_format: false}
+                  now: {show: true, label: Maintenant, color: '#ff922b'}
+                  apex_config:
+                    chart: {height: 240, background: transparent, toolbar: {show: false}, zoom: {enabled: false}, foreColor: '#94a3b8'}
+                    grid: {borderColor: 'rgba(255,255,255,0.07)', strokeDashArray: 3}
+                    legend: {show: false}
+                    tooltip: {theme: dark, shared: true, x: {format: dd/MM HH:mm}}
+                    xaxis: {type: datetime, labels: {datetimeUTC: false}, axisBorder: {show: false}}
+                    stroke: {width: 0}
+                    plotOptions: {bar: {columnWidth: 85%, borderRadius: 3}}
+                  series:
+                    - entity: sensor.foxcat_energy_tarification_price_analyzer_v2
+                      name: Prix d'achat
+                      type: column
+                      unit: €/kWh
+                      float_precision: 3
+                      show: {in_header: false}
+                      data_generator: |
+                        const rows = entity.attributes.series || [];
+                        return rows.filter(r => r.at && Number.isFinite(Number(r.import_eur_kwh))).map(r => [new Date(r.at).getTime(), Number(r.import_eur_kwh)]);
+                      color_threshold:
+                        - {value: -1, color: '#35e59d'}
+                        - {value: 0.1, color: '#34d399'}
+                        - {value: 0.18, color: '#facc15'}
+                        - {value: 0.28, color: '#ff922b'}
+                        - {value: 0.38, color: '#fb7185'}
+                  card_mod:
+                    style: |
+                      ha-card{background:linear-gradient(160deg,#070b14,#0b1626 60%,#08101c)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:24px!important;padding:6px 6px 2px}
+          - type: conditional
+            conditions:
+              - entity: sensor.foxcat_energy_tarification_price_analyzer_v2
+                state: INACTIF
+            card:
+              type: custom:apexcharts-card
+              graph_span: 24h
+              span: {start: day}
+              update_interval: 1min
+              header: {show: true, title: Tarif actif sur la journée, show_states: false, standard_format: false}
+              now: {show: true, label: Maintenant, color: '#ff922b'}
+              apex_config:
+                chart: {height: 260, background: transparent, toolbar: {show: false}, zoom: {enabled: false}, foreColor: '#94a3b8'}
+                grid: {borderColor: 'rgba(255,255,255,0.07)', strokeDashArray: 3}
+                legend: {show: false}
+                tooltip: {theme: dark, shared: true, x: {format: dd/MM HH:mm}}
+                xaxis: {type: datetime, labels: {datetimeUTC: false}, axisBorder: {show: false}}
+                stroke: {curve: stepline}
+              series:
+                - entity: sensor.foxcat_energy_tarification_prix_d_achat_actif
+                  name: Prix d'achat actif
+                  type: area
+                  color: '#19d8ff'
+                  unit: €/kWh
+                  float_precision: 3
+                  stroke_width: 3
+                  group_by: {func: last, duration: 15min}
+                  show: {in_header: false}
+              card_mod:
+                style: |
+                  ha-card{background:linear-gradient(160deg,#070b14,#0b1626 60%,#08101c)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:24px!important;padding:6px 6px 2px}
+          - type: custom:apexcharts-card
+            graph_span: 24h
+            span: {start: day}
+            update_interval: 1min
+            header: {show: true, title: Impact financier instantané (€/h), show_states: false, standard_format: false}
+            now: {show: true, label: Maintenant, color: '#ff922b'}
+            apex_config:
+              chart: {height: 240, background: transparent, toolbar: {show: false}, zoom: {enabled: false}, foreColor: '#94a3b8'}
+              grid: {borderColor: 'rgba(255,255,255,0.07)', strokeDashArray: 3}
+              legend: {show: true, position: bottom}
+              tooltip: {theme: dark, shared: true, x: {format: dd/MM HH:mm}}
+              xaxis: {type: datetime, labels: {datetimeUTC: false}, axisBorder: {show: false}}
+              stroke: {curve: smooth}
+            series:
+              - entity: sensor.foxcat_energy_tarification_cout_instantane_du_prelevement
+                name: Prélèvement
+                type: area
+                color: '#fb7185'
+                unit: €/h
+                float_precision: 3
+                stroke_width: 2
+                group_by: {func: avg, duration: 15min}
+                show: {in_header: false}
+              - entity: sensor.foxcat_energy_tarification_valeur_instantanee_de_la_reinjection
+                name: Réinjection
+                type: area
+                color: '#35e59d'
+                unit: €/h
+                float_precision: 3
+                stroke_width: 2
+                group_by: {func: avg, duration: 15min}
+                show: {in_header: false}
+            card_mod:
+              style: |
+                ha-card{background:linear-gradient(160deg,#070b14,#0b1626 60%,#08101c)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:24px!important;padding:6px 6px 2px}
+          - type: custom:apexcharts-card
+            graph_span: 24h
+            span: {start: day}
+            update_interval: 1min
+            header: {show: true, title: Prélèvement, réinjection et autoconsommation du jour (kWh), show_states: false, standard_format: false}
+            now: {show: true, label: Maintenant, color: '#ff922b'}
+            apex_config:
+              chart: {height: 240, background: transparent, toolbar: {show: false}, zoom: {enabled: false}, foreColor: '#94a3b8'}
+              grid: {borderColor: 'rgba(255,255,255,0.07)', strokeDashArray: 3}
+              legend: {show: true, position: bottom}
+              tooltip: {theme: dark, shared: true, x: {format: dd/MM HH:mm}}
+              xaxis: {type: datetime, labels: {datetimeUTC: false}, axisBorder: {show: false}}
+              stroke: {curve: smooth}
+            series:
+              - entity: sensor.foxcat_energy_energie_maison_prelevement_reseau_aujourdhui
+                name: Prélevé
+                type: line
+                color: '#fb7185'
+                unit: kWh
+                float_precision: 2
+                stroke_width: 3
+                group_by: {func: last, duration: 15min}
+                show: {in_header: false}
+              - entity: sensor.foxcat_energy_energie_pv_reinjection_aujourdhui
+                name: Réinjecté
+                type: line
+                color: '#35e59d'
+                unit: kWh
+                float_precision: 2
+                stroke_width: 3
+                group_by: {func: last, duration: 15min}
+                show: {in_header: false}
+              - entity: sensor.foxcat_energy_energie_pv_energie_autoconsommee_aujourdhui
+                name: Autoconsommé
+                type: line
+                color: '#ff922b'
+                unit: kWh
+                float_precision: 2
+                stroke_width: 3
+                group_by: {func: last, duration: 15min}
+                show: {in_header: false}
+            card_mod:
+              style: |
+                ha-card{background:linear-gradient(160deg,#070b14,#0b1626 60%,#08101c)!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:24px!important;padding:6px 6px 2px}
+
+  # ───────────────────────── CONSOMMATION APPAREILS ─────────────────────────
+  # Garde ici ta section « Consommation appareils » actuelle, sans modification.
+  # Seule correction : dans son `styles.card.background`, le dégradé est tronqué
+  # (`linear-gradient(160deg,` sans fin). Termine-le par `#070b14,#0b1626 60%,#08101c)`.

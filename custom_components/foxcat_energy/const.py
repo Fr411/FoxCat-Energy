@@ -388,6 +388,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
     # Écrêtage de pointe configurable (menu EMS > Écrêtage de pointe).
     # Les défauts reproduisent le comportement historique ; voir peak_shaving.py.
     "peak_phases": 1.0,
+    "grid_phase_imbalance_factor": 1.0,
     "peak_measure_basis": "house",
     "peak_trigger_ratio_pct": 90.0,
     "peak_release_ratio_pct": 0.0,

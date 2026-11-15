@@ -381,6 +381,10 @@ def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
     power_marker, power_selector = opt_entity("power_sensor", "sensor")
     current_marker, current_selector = opt_entity("current_sensor", "sensor")
     voltage_marker, voltage_selector = opt_entity("voltage_sensor", "sensor")
+    phase_value = hsys.normalise_phase(current.get("phase"))
+    phase_marker = (
+        vol.Optional("phase", description={"suggested_value": phase_value}) if phase_value else vol.Optional("phase")
+    )
     return vol.Schema({
         vol.Required("name", default=str(current.get("name", ""))): selector.TextSelector(),
         vol.Required("machine_type", default=str(current.get("machine_type", "switch"))): selector.SelectSelector(
@@ -397,6 +401,9 @@ def _machine_record_schema(current: dict[str, Any] | None = None) -> vol.Schema:
         power_marker: power_selector,
         current_marker: current_selector,
         voltage_marker: voltage_selector,
+        phase_marker: selector.SelectSelector(
+            selector.SelectSelectorConfig(options=list(hsys.PHASES), mode=selector.SelectSelectorMode.DROPDOWN)
+        ),
         vol.Optional("automatic", default=bool(current.get("automatic", True))): selector.BooleanSelector(),
         vol.Optional("sheddable", default=bool(current.get("sheddable", True))): selector.BooleanSelector(),
         vol.Optional("cycle_start_w", default=float(current.get("cycle_start_w", 10.0))): selector.NumberSelector(selector.NumberSelectorConfig(min=1,max=500,step=1,unit_of_measurement="W",mode=selector.NumberSelectorMode.BOX)),
@@ -425,6 +432,7 @@ def _normalise_machine_record(user_input: dict[str, Any], machine_id: str) -> di
     if machine_type == "cvc" and not power_sensor:
         return None
     record.update({"id": machine_id, "name": name, "machine_type": machine_type})
+    record["phase"] = hsys.normalise_phase(record.get("phase"))
     if machine_type == "cvc":
         record.update({
             "switch": "",
@@ -664,10 +672,17 @@ def _peak_shaving_schema() -> vol.Schema:
             vol.Optional(CONF_MAIN_BREAKER_VOLTAGE_V, default=230.0): number(100, 500, 10, "V"),
             vol.Optional(grid_load.CONF_INVERTER_COS_PHI, default=1.0): number(0.1, 1, 0.01),
             _optional(grid_load.CONF_GRID_VOLTAGE_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_VOLTAGE_L1_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_VOLTAGE_L2_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_VOLTAGE_L3_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_LINE_VOLTAGE_L12_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_LINE_VOLTAGE_L23_SENSOR): _entity("sensor"),
+            _optional(grid_load.CONF_GRID_LINE_VOLTAGE_L31_SENSOR): _entity("sensor"),
             _optional(grid_load.CONF_GRID_CURRENT_L1_SENSOR): _entity("sensor"),
             _optional(grid_load.CONF_GRID_CURRENT_L2_SENSOR): _entity("sensor"),
             _optional(grid_load.CONF_GRID_CURRENT_L3_SENSOR): _entity("sensor"),
             vol.Optional(peak.CONF_PEAK_PHASES, default=1): number(1, 3, 1),
+            vol.Optional(peak.CONF_PEAK_IMBALANCE_FACTOR, default=1.0): number(1, 3, 0.05),
             vol.Optional(peak.CONF_PEAK_MEASURE_BASIS, default=peak.BASIS_HOUSE): basis,
             vol.Optional(peak.CONF_PEAK_TRIGGER_RATIO_PCT, default=90): number(50, 100, 1, "%"),
             vol.Optional(peak.CONF_PEAK_TRIGGER_W, default=5000): number(1000, 20000, 100, "W"),
@@ -837,7 +852,7 @@ _FORM_SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "peak_shaving": {
         "connection": (
             grid_load.CONF_GRID_REGIME, CONF_MAIN_BREAKER_CURRENT_A, CONF_MAIN_BREAKER_VOLTAGE_V,
-            peak.CONF_PEAK_PHASES, grid_load.CONF_INVERTER_COS_PHI,
+            peak.CONF_PEAK_PHASES, peak.CONF_PEAK_IMBALANCE_FACTOR, grid_load.CONF_INVERTER_COS_PHI,
         ),
         "thresholds": (
             peak.CONF_PEAK_MEASURE_BASIS, peak.CONF_PEAK_TRIGGER_RATIO_PCT, peak.CONF_PEAK_TRIGGER_W,
@@ -849,7 +864,12 @@ _FORM_SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
             peak.CONF_PEAK_BLOCK_FLEXIBLE, peak.CONF_PEAK_V2H_ASSIST, peak.CONF_PEAK_V2H_TARGET_RATIO_PCT,
         ),
         "measurements": (
-            grid_load.CONF_GRID_VOLTAGE_SENSOR, grid_load.CONF_GRID_CURRENT_L1_SENSOR,
+            grid_load.CONF_GRID_VOLTAGE_SENSOR,
+            grid_load.CONF_GRID_VOLTAGE_L1_SENSOR, grid_load.CONF_GRID_VOLTAGE_L2_SENSOR,
+            grid_load.CONF_GRID_VOLTAGE_L3_SENSOR,
+            grid_load.CONF_GRID_LINE_VOLTAGE_L12_SENSOR, grid_load.CONF_GRID_LINE_VOLTAGE_L23_SENSOR,
+            grid_load.CONF_GRID_LINE_VOLTAGE_L31_SENSOR,
+            grid_load.CONF_GRID_CURRENT_L1_SENSOR,
             grid_load.CONF_GRID_CURRENT_L2_SENSOR, grid_load.CONF_GRID_CURRENT_L3_SENSOR,
         ),
     },
@@ -860,7 +880,7 @@ _MACHINE_SECTIONS: dict[str, tuple[str, ...]] = {
         "cycle", "cycle_start_w", "cycle_start_confirm_s", "cycle_duration_minutes",
         "cycle_margin_minutes", "cycle_end_w", "cycle_end_confirm_minutes",
     ),
-    "measurements": ("current_sensor", "voltage_sensor"),
+    "measurements": ("current_sensor", "voltage_sensor", "phase"),
 }
 _OPEN_SECTIONS = frozenset({"connection"})
 

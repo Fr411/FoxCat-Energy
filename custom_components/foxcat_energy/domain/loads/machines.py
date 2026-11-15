@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from ...heating_systems import normalise_phase
 from ...const import (
     CONF_DISHWASHER_CYCLE,
     CONF_DISHWASHER_OFF_1,
@@ -42,6 +43,8 @@ class MachineDefinition:
     power_sensor: str | None = None
     current_sensor: str | None = None
     voltage_sensor: str | None = None
+    # Phase du réseau (L1, L2, L3) sur laquelle la machine est raccordée ; vide si inconnue.
+    phase: str = ""
     automatic_default: bool = True
     sheddable: bool = True
     on_1: str = DEFAULT_ON_1
@@ -82,6 +85,7 @@ class MachineDefinition:
             "power_sensor": self.power_sensor or "",
             "current_sensor": self.current_sensor or "",
             "voltage_sensor": self.voltage_sensor or "",
+            "phase": self.phase,
             "automatic": self.automatic_default,
             "sheddable": self.sheddable,
             "on_1": self.on_1,
@@ -132,6 +136,7 @@ def machine_from_dict(raw: dict[str, Any]) -> MachineDefinition | None:
         power_sensor=power_sensor or None,
         current_sensor=_str(raw.get("current_sensor")).strip() or None,
         voltage_sensor=_str(raw.get("voltage_sensor")).strip() or None,
+        phase=normalise_phase(raw.get("phase")),
         automatic_default=bool(raw.get("automatic", True)),
         sheddable=bool(raw.get("sheddable", True)),
         legacy_setting_key=legacy_setting_key,

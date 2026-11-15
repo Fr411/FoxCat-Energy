@@ -66,7 +66,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatNumericSensor(c, "production_pv", "Puissance de production photovoltaïque", "mdi:solar-power", "energy", lambda d: d["snapshot"].pv_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "consommation_maison", "Puissance de consommation maison", "mdi:home-lightning-bolt", "energy", lambda d: d["snapshot"].house_w, UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "intensite_reseau", "Intensité réseau", "mdi:current-ac", "ems", lambda d: d["grid_load"].get("current_a"), "A", SensorDeviceClass.CURRENT),
-        FoxCatNumericSensor(c, "charge_disjoncteur_pct", "Charge du disjoncteur principal", "mdi:gauge", "ems", lambda d: d["grid_load"].get("load_pct"), PERCENTAGE),
+        FoxCatBreakerLoadSensor(c, "charge_disjoncteur_pct", "Charge du disjoncteur principal", "mdi:gauge", "ems", lambda d: d["grid_load"].get("load_pct"), PERCENTAGE),
         FoxCatNumericSensor(c, "peak_shaving_decharge_w", "Peak shaving • Décharge batterie demandée", "mdi:battery-arrow-down", "ems", lambda d: d["grid_load"].get("discharge_w"), UnitOfPower.WATT, SensorDeviceClass.POWER),
         FoxCatNumericSensor(c, "chauffage_decalage_consigne", "Décalage de consigne", "mdi:thermometer-plus", "ems", lambda d: d["heating_boost"].get("offset_c"), UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, suggested_object_id="foxcat_chauffage_decalage_consigne"),
         FoxCatNumericSensor(c, "chauffage_pas_accordes", "Pas accordés", "mdi:stairs-up", "ems", lambda d: d["heating_boost"].get("steps")),
@@ -739,3 +739,23 @@ class FoxCatNumericSensor(FoxCatEntity, SensorEntity):
                 "via_device": (DOMAIN, f"{self.coordinator.entry.entry_id}:{HUB_DEVICE}"),
             }
         return super().device_info
+
+
+class FoxCatBreakerLoadSensor(FoxCatNumericSensor):
+    """Charge du disjoncteur ; les attributs détaillent comment l'intensité a été estimée."""
+
+    # MÉTHODE : FoxCatBreakerLoadSensor.extra_state_attributes — Extra state attributes
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        view = (self.coordinator.data or {}).get("grid_load") or {}
+        return {
+            "intensite_estimee_a": view.get("current_a"),
+            "source_intensite": view.get("source"),
+            "coefficient_desequilibre": view.get("imbalance_factor"),
+            "tension_phase_v": view.get("voltage_v"),
+            "tension_entre_lignes_v": view.get("line_voltage_v"),
+            "source_tension": view.get("voltage_source"),
+            "ecart_tension_phases_pct": view.get("voltage_spread_pct"),
+            "calibre_a": view.get("breaker_a"),
+            "seuil_pct": view.get("limit_pct"),
+        }
