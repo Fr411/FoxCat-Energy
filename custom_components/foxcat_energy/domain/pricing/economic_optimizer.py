@@ -298,14 +298,26 @@ def best_start_window(
 def _dynamic_day_ahead_points(
     points: list[PricePoint], now: datetime, *, horizon_hours: int = DYNAMIC_ARBITRAGE_HORIZON_HOURS
 ) -> list[PricePoint]:
-    """Return unique hourly Day-Ahead points for the next dynamic horizon only."""
+    """Return one point per hour for the next dynamic horizon only.
+
+    Sub-hourly curves (15 minutes) are averaged per hour: the previous behaviour kept only the
+    last point of each hour, which is not representative of the hour. A single hourly point is
+    returned unchanged.
+    """
     start = now.replace(minute=0, second=0, microsecond=0)
     end = start + timedelta(hours=max(int(horizon_hours), 1))
-    hourly: dict[datetime, PricePoint] = {}
+    grouped: dict[datetime, list[PricePoint]] = {}
     for point in points:
         slot = point.at.replace(minute=0, second=0, microsecond=0)
         if start <= slot < end:
-            hourly[slot] = PricePoint(slot, float(point.price), point.source)
+            grouped.setdefault(slot, []).append(point)
+    hourly: dict[datetime, PricePoint] = {}
+    for slot, items in grouped.items():
+        # Un même instant répété : le dernier écrase (comportement historique).
+        unique = {item.at: item for item in items}
+        values = [float(item.price) for item in unique.values()]
+        source = sorted(unique.values(), key=lambda item: item.at)[-1].source
+        hourly[slot] = PricePoint(slot, sum(values) / len(values), source)
     return [hourly[key] for key in sorted(hourly)]
 
 

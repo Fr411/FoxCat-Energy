@@ -167,3 +167,58 @@ class DynamicAnalysisTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QuarterHourDayAheadTests(unittest.TestCase):
+    """A-16 : des prix au quart d'heure ne doivent pas être réduits à leur dernier point."""
+
+    def _points(self, hours: int = 6):
+        from datetime import timedelta
+        from foxcat_energy.domain.pricing.economic_optimizer import PricePoint
+
+        base = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        prices = []
+        for hour in range(hours):
+            prices.extend([0.10 + hour * 0.01, 0.12 + hour * 0.01, 0.30 + hour * 0.01, 0.50 + hour * 0.01])
+        return base, [PricePoint(base + timedelta(minutes=15 * i), p, "TEST") for i, p in enumerate(prices)]
+
+    def test_each_hour_is_the_average_of_its_quarter_hours(self):
+        from foxcat_energy.domain.pricing.economic_optimizer import _dynamic_day_ahead_points
+
+        base, points = self._points(2)
+        hourly = _dynamic_day_ahead_points(points, base)
+        self.assertEqual([p.at.hour for p in hourly], [12, 13])
+        self.assertAlmostEqual(hourly[0].price, (0.10 + 0.12 + 0.30 + 0.50) / 4)
+        self.assertAlmostEqual(hourly[1].price, (0.11 + 0.13 + 0.31 + 0.51) / 4)
+
+    def test_hourly_points_are_unchanged_and_duplicates_collapse(self):
+        from foxcat_energy.domain.pricing.economic_optimizer import PricePoint, _dynamic_day_ahead_points
+
+        base = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        points = [PricePoint(base, 0.2, "A"), PricePoint(base, 0.4, "B"), PricePoint(base.replace(hour=13), 0.3, "A")]
+        hourly = _dynamic_day_ahead_points(points, base)
+        self.assertEqual([round(p.price, 3) for p in hourly], [0.4, 0.3])
+
+    def test_consecutive_window_uses_hourly_averages(self):
+        from foxcat_energy.domain.pricing.economic_optimizer import _best_consecutive_dynamic_window
+
+        base, points = self._points(6)
+        start, end, avg = _best_consecutive_dynamic_window(points, base, 2.0)
+        self.assertEqual(start, base)
+        self.assertAlmostEqual(avg, ((0.10 + 0.12 + 0.30 + 0.50) / 4 + (0.11 + 0.13 + 0.31 + 0.51) / 4) / 2)
+
+    def test_market_curve_is_built_from_hourly_averages(self):
+        from foxcat_energy.domain.pricing.economic_optimizer import evaluate_market
+
+        base, points = self._points(8)
+        snapshot = SimpleNamespace(export_w=0.0, import_w=300.0, pv_w=0.0, house_w=300.0)
+        prices = {"regime": "Dynamique", "active_buy": 0.30, "export_value": 0.0}
+        decision = evaluate_market(
+            now=base, snapshot=snapshot, prices=prices, settings={"predictive_pricing_enabled": True},
+            import_points=points,
+        )
+        # Moyennes horaires : 0,255 (12 h, remplacée par le prix courant 0,30) puis 0,265 (13 h) à 0,325 (19 h).
+        # Avec le seul dernier quart d'heure de chaque heure, la courbe aurait valu 0,51 à 0,57 €/kWh.
+        self.assertAlmostEqual(decision.dynamic_price_min_eur_kwh, 0.265)
+        self.assertAlmostEqual(decision.dynamic_price_max_eur_kwh, 0.325)
+        self.assertAlmostEqual(decision.dynamic_curve_position_pct, (0.30 - 0.265) / (0.325 - 0.265) * 100.0)
