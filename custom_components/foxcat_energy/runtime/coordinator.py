@@ -210,7 +210,13 @@ SERIES_SAVE_DELAY_S = 1800
 PRICE_REFRESH_MIN_INTERVAL_S = 600
 COMPARISON_REFRESH_S = 60
 
-from ..domain.tariff.tariff_prices import CONF_TARIFF_MONO_PRICE_SENSOR, apply_configured_tariff, scoped_config
+from ..domain.tariff.tariff_prices import (
+    CONF_TARIFF_MONO_PRICE_SENSOR,
+    TARIFF_SELECTOR_KEYS,
+    apply_configured_tariff,
+    scoped_config,
+    tariff_updates_for,
+)
 
 
 class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -2398,18 +2404,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ):
             value = False
 
-        if key == "price_source" and value in {PRICE_SOURCE_DYNAMIC, PRICE_SOURCE_INTEGRATION}:
-            self.settings["tariff_regime"] = TARIFF_DYNAMIC
-
-        if key == "tariff_regime":
-            if value == TARIFF_DYNAMIC:
-                self.settings["price_source"] = PRICE_SOURCE_DYNAMIC
-            elif value in {TARIFF_TOU, TARIFF_SIMPLE, TARIFF_MONO}:
-                if tariff_dimensions(self.settings).dynamic:
-                    self.settings["price_source"] = PRICE_SOURCE_VARIABLE
-                self.settings["tariff_structure"] = (
-                    TARIFF_STRUCTURE_TOU if value == TARIFF_TOU else TARIFF_STRUCTURE_SIMPLE
-                )
+        if key in TARIFF_SELECTOR_KEYS:
+            # Contrat et structure sont les deux seuls axes : les autres clés en sont déduites,
+            # comme dans l'écran « Contrat et réseau », pour que listes et menu ne divergent jamais.
+            updates = tariff_updates_for(self.settings, key, value)
+            self.settings.update(updates)
+            value = updates[key]
 
         self.settings[key] = value
 
