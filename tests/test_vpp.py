@@ -263,3 +263,38 @@ class TelemetryGapTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProtectedCyclePlannerTests(unittest.TestCase):
+    """A-22 : le planificateur recevait un datetime là où il attendait une chaîne ISO."""
+
+    def _plan(self, cycles):
+        machine = MachineDefinition("washer", "Lave-linge", "switch.washer")
+        points = [PricePoint(NOW + timedelta(hours=i), 0.20, "TEST") for i in range(24)]
+        snapshot = SimpleNamespace(pv_w=0.0, house_w=500.0, export_w=0.0, import_w=500.0)
+        return build_flexible_load_plan(
+            now=NOW, snapshot=snapshot, settings={"mode": "Éco"}, import_points=points,
+            export_points=[], machines=[machine], learning={}, cycles=cycles,
+            price_analysis={"active": True, "mode": "REACTIVE"}, solar_forecast=None,
+        )
+
+    def test_real_cycle_manager_snapshot_does_not_crash_the_planner(self):
+        from foxcat_energy.domain.loads.machine_cycle import MachineCycleManager
+
+        manager = MachineCycleManager()
+        manager.force_start("washer", NOW, duration_minutes=120, margin_minutes=45)
+        cycles = manager.snapshot(NOW)
+        self.assertIsInstance(cycles["washer"]["expected_end_at"], datetime)
+        plan = self._plan(cycles)["machines"]["washer"]
+        self.assertEqual(plan["decision"], "CONTINUE")
+        self.assertTrue(plan["allow_start_now"])
+        self.assertEqual(plan["planned_end"], (NOW + timedelta(minutes=120)).isoformat())
+
+    def test_iso_string_and_missing_end_are_still_accepted(self):
+        end = NOW + timedelta(minutes=30)
+        plan = self._plan({"washer": {"protected": True, "expected_end_at": end.isoformat()}})
+        self.assertEqual(plan["machines"]["washer"]["planned_end"], end.isoformat())
+        plan = self._plan({"washer": {"protected": True, "expected_end_at": None}})
+        self.assertEqual(plan["machines"]["washer"]["planned_end"], (NOW + timedelta(hours=2)).isoformat())
+        plan = self._plan({"washer": {"protected": True, "expected_end_at": "pas une date"}})
+        self.assertEqual(plan["machines"]["washer"]["decision"], "CONTINUE")

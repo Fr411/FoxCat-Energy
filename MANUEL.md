@@ -300,7 +300,7 @@ Mêmes champs que dans l'assistant, plus les réglages de comportement dans les 
 | Température reprise / confort / boost / sécurité | Seuils de chauffe | 43 / 45 / 65 / 68 °C |
 | Cycle minimum | Durée mini d'un cycle | 120 s |
 | Puissance chauffe-eau | Puissance nominale | 1 800 W |
-| Agressivité solaire Bihoraire | Intensité du suivi du soleil en bi-horaire | — |
+| Agressivité solaire Bihoraire | **Inactif** : sans effet dans cette version | — |
 
 **Conseils** : placez la sonde de sécurité au plus près de la résistance ; ne montez jamais le seuil de sécurité au-dessus de ce que supporte votre chauffe-eau.
 
@@ -415,11 +415,13 @@ Procédez **progressivement**, en observant à chaque étape.
 | 8 | Activez le **délestage** et le **décalage de chauffage** si voulus | Le délestage réarme proprement |
 | 9 | Activez **Optimisation économique / Prédictif prix** | Les décisions sont cohérentes avec la courbe de prix |
 
-Le mode **Confort** conserve les sécurités mais privilégie le confort. Le mode **Manuel** suspend le pilotage automatique du boiler, de l'onduleur et des machines (la sécurité thermique reste active) : utile pour reprendre la main.
+Le mode **Confort** applique la même stratégie boiler et la même réduction de l'onduleur qu'Éco, sécurités conservées (seul le planificateur de charges flexibles se montre moins patient). Le mode **Manuel** suspend le pilotage automatique du boiler, de l'onduleur et des machines (la sécurité thermique reste active) : utile pour reprendre la main.
 
 ### Réglages fins
 
 Les seuils du moteur (tolérances ACK, stabilité, watchdog, paliers PRI, import cible, etc.) sont des entités **nombre** dans l'appareil concerné (Onduleur, Système, Tarification). Modifiez-les **un par un** et observez. Gardez les valeurs par défaut tant que tout fonctionne.
+
+> **Entités « inactives »** : certaines entités de réglage n'ont aucun effet dans cette version (agressivité solaire, charge réseau sur prix négatif, plusieurs seuils PRI…). Elles sont créées désactivées, rangées en diagnostic et portent l'attribut `statut: inactif` ; inutile de les régler. Si vous les aviez déjà activées, vous pouvez les désactiver.
 
 ---
 

@@ -3,12 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..const import TARIFF_DYNAMIC
+from ..const import MODE_MANUAL, TARIFF_DYNAMIC
 
 NETWORK_COMPENSATION = "Compensation"
 NETWORK_BILLED_EXPORT = "Injection tarifée"
 NETWORK_UNVALUED_EXPORT = "Injection non valorisée"
 NETWORK_ZERO_INJECTION = "Zéro injection"
+
+
+def pri_mode_allowed(mode: Any) -> bool:
+    """Le PRI travaille dans tous les modes automatiques (Éco et Confort), jamais en Manuel.
+
+    Le réglage ``mode`` ne vaut plus que Éco, Confort ou Manuel : l'ancienne liste
+    {Éco, « Zéro injection », « Dynamique »} excluait Confort par erreur, ce qui laissait la
+    réinjection non limitée et l'onduleur bridé sans libération.
+    """
+    return str(mode) != MODE_MANUAL
 
 
 @dataclass(slots=True)
@@ -91,7 +101,6 @@ class InverterCore:
         dynamic_export_value_eur_kwh: float | None = None,
     ) -> InverterDecision:
         inverter_w = max(float(settings.get("inverter_power_w", 4000.0)), 1.0)
-        step_pct = max(int(round(float(settings.get("pri_step_percent", 10.0)))), 10)
         tolerance_w = max(float(settings.get("pri_pv_compare_tolerance_w", 200.0)), 0.0)
         ratio_threshold = min(max(float(settings.get("pri_ceiling_ratio", 0.92)), 0.50), 1.0)
 

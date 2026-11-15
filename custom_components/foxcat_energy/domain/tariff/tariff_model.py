@@ -95,16 +95,29 @@ def distribution_period(at, settings):
 
 
 # FONCTION : final_client_price — Final client price
-def final_client_price(base,at,settings):
+def final_client_price(base,at,settings,period=None):
+    """Prix final d'un prix lu ou saisi.
+
+    ``period`` (``HP`` ou ``HC``) force la période de distribution : un prix HP ou HC porte son
+    propre complément, quelle que soit l'heure de l'évaluation. Ignoré hors profil bi-horaire.
+    """
     p=float(base)
     # Prix « tout compris » : réseau, taxes et marge sont déjà dans le prix lu, on ne les ajoute pas une seconde fois.
     if settings.get('price_is_all_in',False): return p
     if not settings.get('price_curve_is_final',True): p+=sum(float(settings.get(k,0)) for k in ('tariff_network_component_eur_kwh','tariff_tax_component_eur_kwh','tariff_contract_component_eur_kwh'))
-    period = distribution_period(at, settings)
-    if period in IMPACT_ADDER_KEYS:
-        p += float(settings.get(IMPACT_ADDER_KEYS[period], 0))
-    elif period in {"HP", "HC"}:
-        p += float(settings.get(f"tariff_tou_{period.lower()}_adder_eur_kwh", 0))
+    current = distribution_period(at, settings)
+    chosen = period if period in {"HP", "HC"} and current in {"HP", "HC"} else current
+    if chosen in IMPACT_ADDER_KEYS:
+        p += float(settings.get(IMPACT_ADDER_KEYS[chosen], 0))
+    elif chosen in {"HP", "HC"}:
+        p += float(settings.get(f"tariff_tou_{chosen.lower()}_adder_eur_kwh", 0))
     return p
+# FONCTION : hp_hc_final_prices — Prix HP et HC finals, chacun avec le complément de sa propre période
+def hp_hc_final_prices(hp,hc,at,settings):
+    """Prix HP et HC avec leur complément respectif (A-14 : les deux recevaient celui de la période courante)."""
+    return (
+        final_client_price(hp,at,settings,"HP") if hp is not None else None,
+        final_client_price(hc,at,settings,"HC") if hc is not None else None,
+    )
 # FONCTION : apply_final_price_components — Apply final price components
 def apply_final_price_components(points:Iterable[PricePoint],settings): return [PricePoint(x.at,final_client_price(x.price,x.at,settings),x.source) for x in points]

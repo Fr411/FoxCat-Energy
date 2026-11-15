@@ -180,7 +180,7 @@ from ..domain.loads.machines import MachineDefinition, machine_allowed, machine_
 from ..domain.loads.machine_cycle import MachineCycleManager
 from ..domain.loads.machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
-from .inverter_core import InverterCore
+from .inverter_core import InverterCore, pri_mode_allowed
 from ..domain.accounting import EnergyAccounting
 from ..domain.accounting.series import ConsumptionSeries
 from ..domain.tariff.compare import compare_tariffs, window_bounds
@@ -198,6 +198,7 @@ from .migration import (
 from ..domain.tariff.tariff_model import (
     tariff_dimensions,
     final_client_price,
+    hp_hc_final_prices,
     apply_final_price_components,
 )
 from ..domain.pricing.price_analyzer import analyze_price_curve
@@ -1697,7 +1698,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hp=self._optional_float_state(self.config.get(CONF_TARIFF_HP_PRICE_SENSOR)); hc=self._optional_float_state(self.config.get(CONF_TARIFF_HC_PRICE_SENSOR))
         hp=float(self.settings.get(CONF_TARIFF_HP_PRICE,.35)) if dims.price_source==PRICE_SOURCE_CONTRACT else hp
         hc=float(self.settings.get(CONF_TARIFF_HC_PRICE,.25)) if dims.price_source==PRICE_SOURCE_CONTRACT else hc
-        hp=final_client_price(hp,now,self.settings) if hp is not None else None; hc=final_client_price(hc,now,self.settings) if hc is not None else None
+        hp,hc=hp_hc_final_prices(hp,hc,now,self.settings)
         cur=final_client_price(cur,now,self.settings) if cur is not None else None; nxt=final_client_price(nxt,now+timedelta(hours=1),self.settings) if nxt is not None else None
         period=tariff_period(now,self.settings) if dims.structure==TARIFF_STRUCTURE_TOU else ('IMPACT' if dims.structure==TARIFF_STRUCTURE_IMPACT else 'SIMPLE')
         if dims.dynamic: active=cur; next_buy=nxt; label='DYNAMIQUE'; nlabel='SUIVANT'
@@ -2517,7 +2518,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if canonical not in MODES: canonical=MODE_ECO
         self.settings["mode"]=canonical
         self.reset_core(f"Comportement EMS modifié vers {canonical}.")
-        if canonical==MODE_MANUAL: self.core_state["last_reason"]="Manuel : actions économiques automatiques suspendues ; mesures, comptabilité et sécurités conservées."
+        if canonical==MODE_MANUAL:
+            self.core_state["last_reason"]="Manuel : actions économiques automatiques suspendues ; mesures, comptabilité et sécurités conservées."
+            # Le PRI ne travaille pas en Manuel : repartir d'un point sûr à 100 % plutôt que de laisser un bridage automatique en place.
+            if self.settings.get("pri_enabled") and self._rrcr_level() not in (100, -1):
+                await self.async_release_pri_100("Passage en Manuel : onduleur libéré à 100 %.")
         else:
             self.core_state["last_reason"]=f"Comportement {canonical} actif."
             if self.settings.get("regulation_active"): await self.async_reconcile_machines()
@@ -3961,7 +3966,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._pv_below_since = None
             return
         mode = str(self.settings.get("mode"))
-        if mode not in {MODE_ECO, MODE_ZERO}:
+        if not pri_mode_allowed(mode):
             self._pv_below_since = None
             return
         pv = self._float_state(self.config.get(CONF_PV_SENSOR))
@@ -4043,7 +4048,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not bool(self.settings.get("pri_enabled")):
             self.pri_state["guard_reason"] = "reduction_onduleur_desactivee"
             return False
-        if str(self.settings.get("mode")) not in {MODE_ECO, MODE_ZERO, MODE_DYNAMIC}:
+        if not pri_mode_allowed(self.settings.get("mode")):
             self.pri_state["guard_reason"] = f"mode_{self.settings.get('mode')}"
             return False
         self.pri_state["guard_reason"] = "OK"
