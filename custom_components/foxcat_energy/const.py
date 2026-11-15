@@ -541,3 +541,26 @@ KNOWN_LEGACY_AUTOMATIONS = [
     "automation.foxcat_mode_economie_energie_v1_strategie",
     "automation.foxcat_mode_prix_dynamique_v1_strategie",
 ]
+
+
+# Réglages dont l'entité existe (tableaux de bord et profils les référencent) mais que le moteur
+# actuel ne lit pas, ou lit seulement dans du code inatteignable (audit A-03). Ils sont créés
+# désactivés, rangés en diagnostic et signalés par un attribut « statut : inactif ».
+INACTIVE_SETTINGS = frozenset({
+    # jamais lus
+    "autoconsommation_cible_percent", "autoconsommation_min_percent",
+    "high_load_confirm_s", "high_load_restore_s",
+    "pri_export_optimal_w", "pri_import_optimal_w",
+    "pri_export_threshold_dynamic_w", "pri_import_threshold_dynamic_w",
+    "pri_grid_ack_delta_w", "pri_up_ack_delta_w", "pri_inverter_ack_tolerance_w",
+    "pri_probe_margin_w", "pri_pv_minimum_w", "solar_window_min_minutes",
+    # lus seulement par l'ancien module « ECS solaire » ou « Dynamique », inatteignables
+    "agressivite_ecs", "coverage_solar_min_percent", "surplus_pv_min_agressivite_w", "import_boiler_max_w",
+    "dynamic_negative_price_charge_enabled", "dynamic_grid_charge_threshold_eur_kwh",
+    "dynamic_injection_lucrative_threshold",
+    # méthode jamais appelée
+    "pri_boiler_settle_s",
+})
+INACTIVE_SETTING_REASON = (
+    "Sans effet dans cette version : ce réglage n'est lu par aucune stratégie active."
+)

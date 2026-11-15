@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import heating_boost as heating
-from .const import DOMAIN, NUMBER_DEFINITIONS
+from .const import DOMAIN, INACTIVE_SETTING_REASON, INACTIVE_SETTINGS, NUMBER_DEFINITIONS
 from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 
@@ -77,6 +78,16 @@ class FoxCatSettingNumber(FoxCatEntity, NumberEntity):
         self._attr_native_unit_of_measurement = unit
         if key == "dynamic_favorable_position_pct":
             self._attr_suggested_object_id = "foxcat_seuil_prix_dynamique"
+        if key in INACTIVE_SETTINGS:
+            # A-03 : réglage que le moteur actuel ne lit pas. L'entité est conservée (tableaux de bord, profils).
+            self._attr_entity_registry_enabled_default = False
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        if self._key in INACTIVE_SETTINGS:
+            return {"statut": "inactif", "raison": INACTIVE_SETTING_REASON}
+        return None
 
     # MÉTHODE : FoxCatSettingNumber.native_value — Native value
     @property

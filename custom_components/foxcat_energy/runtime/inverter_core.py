@@ -101,7 +101,6 @@ class InverterCore:
         dynamic_export_value_eur_kwh: float | None = None,
     ) -> InverterDecision:
         inverter_w = max(float(settings.get("inverter_power_w", 4000.0)), 1.0)
-        step_pct = max(int(round(float(settings.get("pri_step_percent", 10.0)))), 10)
         tolerance_w = max(float(settings.get("pri_pv_compare_tolerance_w", 200.0)), 0.0)
         ratio_threshold = min(max(float(settings.get("pri_ceiling_ratio", 0.92)), 0.50), 1.0)
 

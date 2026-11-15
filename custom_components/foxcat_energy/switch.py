@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, SWITCH_DEFINITIONS
+from .const import DOMAIN, INACTIVE_SETTING_REASON, INACTIVE_SETTINGS, SWITCH_DEFINITIONS
 from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
 from .domain.loads.devices import DeviceDefinition, device_definitions
@@ -54,6 +55,16 @@ class FoxCatSettingSwitch(FoxCatEntity, SwitchEntity):
             self._attr_suggested_object_id = "foxcat_predictive_pricing_enabled"
         elif key == "solar_forecast_arbitrage":
             self._attr_suggested_object_id = "foxcat_solar_forecast_arbitrage"
+        if key in INACTIVE_SETTINGS:
+            # A-03 : réglage que le moteur actuel ne lit pas. L'entité est conservée (tableaux de bord, profils).
+            self._attr_entity_registry_enabled_default = False
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        if self._key in INACTIVE_SETTINGS:
+            return {"statut": "inactif", "raison": INACTIVE_SETTING_REASON}
+        return None
 
     # MÉTHODE : FoxCatSettingSwitch.is_on — Is on
     @property
