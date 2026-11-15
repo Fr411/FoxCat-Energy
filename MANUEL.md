@@ -272,6 +272,17 @@ Pour que FoxCat relise les prix dès que ceux du lendemain sont publiés :
 1. **Entité de publication** : un capteur binaire (déclenche en passant à *on*) ou un capteur d'horodatage (déclenche à chaque changement), par exemple « prix de demain disponible » de Nord Pool.
 2. **Service de relecture** (facultatif) : au format `domaine.service`, par exemple `be_electricity_prices.refresh`. Appelé au plus **une fois toutes les 10 minutes**.
 
+### 6.5 bis Coupure Internet : rien à configurer
+
+Avec une source de prix **Dynamique Day-Ahead** ou **Intégration externe**, FoxCat garde automatiquement en mémoire les prix reçus. Aucun réglage n'est nécessaire.
+
+1. Ouvrez le capteur **« Flux de prix (en ligne / tampon local) »** de l'appareil Tarification.
+2. Lisez son état : `EN_LIGNE` (tout va bien), `TAMPON` (Internet coupé, FoxCat continue avec les prix mémorisés jusqu'à `buffer_until`), `DEGRADE` (tampon épuisé), `LOCAL` (contrat fixe : aucune connexion nécessaire).
+3. En `DEGRADE`, le boiler dynamique chauffe seulement jusqu'à 45 °C sur le réseau, sans BOOST réseau. Les machines différées attendent le retour des prix.
+4. Pour tester : coupez l'entité de prix (désactivez-la) un court instant et vérifiez le passage à `TAMPON`. Réactivez-la : l'état revient à `EN_LIGNE`.
+
+La prévision solaire en ligne et la tâche IA ne fonctionnent pas hors ligne. La comptabilité compte 0 € d'achat tant qu'aucun prix n'existe.
+
 ### 6.6 Comparateur de tarifs
 
 1. **Modèles** : ajoutez des modèles belges prédéfinis (Wallonie mono, bi-horaire 2026, Impact). Un modèle ajoute un tarif avec des **prix de départ** : modifiez-les ensuite dans le JSON.
@@ -482,6 +493,7 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | Prélèvement et réinjection inversés | Convention de signe | **Mesures et sources**, inversez la convention |
+| Flux de prix en `DEGRADE` | Plus de prix reçus et tampon épuisé | Rétablissez Internet ou l'intégration de prix ; le boiler reste en repli confort 45 °C |
 | Prix actif à 0 ou « — » | Prix non saisis, capteur indisponible | Vérifiez l'écran **Contrat et réseau** et vos capteurs de prix |
 | Coûts trop élevés ou trop faibles | Case « tout compris » mal réglée | Cochez-la si votre prix inclut réseau, taxes et marge ; décochez sinon |
 | « Pas encore de données » dans le comparateur | Historique insuffisant | Attendez quelques heures de mesure |
