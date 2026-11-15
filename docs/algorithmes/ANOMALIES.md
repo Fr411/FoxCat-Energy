@@ -9,15 +9,17 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
+**Statut** : **A-22, A-16 et A-01 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
+
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
 ## Résumé
 
 | ID | Gravité | Titre |
 |---|---|---|
-| A-22 | **Critique** | Tarif dynamique : le planificateur plante dès qu'un cycle machine est protégé ✔ |
-| A-16 | Haute | Prix au quart d'heure : un seul quart d'heure par heure est retenu ✔ |
-| A-01 | Haute | Mode Confort : PRI inactif et onduleur jamais libéré |
+| ~~A-22~~ | **Critique** | Tarif dynamique : le planificateur plante dès qu'un cycle machine est protégé ✔ |
+| ~~A-16~~ | Haute | Prix au quart d'heure : un seul quart d'heure par heure est retenu ✔ |
+| ~~A-01~~ | Haute | Mode Confort : PRI inactif et onduleur jamais libéré |
 | A-02 | Moyenne | Code et réglages liés aux anciens modes devenus inatteignables |
 | A-03 | Moyenne | 21 entités et 2 réglages de formulaire sans aucun effet |
 | A-04 | Moyenne | Deux « puissances d'onduleur » incohérentes (`pri_step_w` vs `inverter_power_w`) |
@@ -46,7 +48,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 
 ---
 
-## A-22 · Critique · Tarif dynamique : le planificateur plante avec un cycle protégé ✔
+## A-22 · Critique · Tarif dynamique : le planificateur plante avec un cycle protégé ✔ — CORRIGÉE
 
 **Où** : `domain/loads/flexible_load_planner.py`, `build_flexible_load_plan` (ligne « cycle protégé » : `datetime.fromisoformat(cycles[...]['expected_end_at'])`).
 
@@ -60,9 +62,11 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 - `machine_states()` (appelé par la comptabilité à chaque trame EMS) lève → la **trame EMS finit en `ERROR`** (`_run_dispatched_core`) : plus de décision boiler ni de comptabilité pendant le cycle ;
 - `async_user_start_machine` plante juste après avoir allumé la prise.
 
-**Proposition** : accepter `datetime` **ou** chaîne (`value if isinstance(value, datetime) else datetime.fromisoformat(value)`), et ajouter un test qui passe le résultat réel de `MachineCycleManager.snapshot()` ; protéger `_economic_view` par un `try/except` qui journalise et renvoie une vue vide plutôt que de casser la trame.
+**Correction appliquée** : `_as_datetime` accepte un `datetime`, une chaîne ISO ou une valeur absente/invalide (durée par défaut). Tests : `ProtectedCyclePlannerTests` (avec le vrai `MachineCycleManager.snapshot()`). *Reste proposé* : protéger `_economic_view` par un `try/except`.
 
-## A-16 · Haute · Prix au quart d'heure : un seul quart d'heure par heure retenu ✔
+**Proposition d'origine** : accepter `datetime` **ou** chaîne (`value if isinstance(value, datetime) else datetime.fromisoformat(value)`), et ajouter un test qui passe le résultat réel de `MachineCycleManager.snapshot()` ; protéger `_economic_view` par un `try/except` qui journalise et renvoie une vue vide plutôt que de casser la trame.
+
+## A-16 · Haute · Prix au quart d'heure : un seul quart d'heure par heure retenu ✔ — CORRIGÉE
 
 **Où** : `domain/pricing/economic_optimizer.py`, `_dynamic_day_ahead_points`.
 
@@ -72,9 +76,11 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 
 **Conséquences** : avec des prix au quart d'heure (cas des contrats dynamiques belges), la position sur la courbe, la bande BAS/MEDIAN/HAUT, le créneau de réservation du boiler (blocs de **plein heures**), `best_future_buy` et l'économie potentielle reposent sur le **dernier** quart d'heure de chaque heure, qui n'est pas représentatif. Les blocs « creux / pic » du planificateur supposent aussi des points horaires (A-18).
 
-**Proposition** : conserver tous les points, ou agréger explicitement (moyenne pondérée par la durée) ; adapter `_best_consecutive_dynamic_window` et `_group_price_zones` à la granularité réelle ; ajouter des tests sur une courbe de 96 points par jour.
+**Correction appliquée** : chaque heure est la **moyenne** de ses points (`_dynamic_day_ahead_points`). Tests : `QuarterHourDayAheadTests` (moyenne horaire, doublons, fenêtre consécutive, courbe de marché). *Reste ouvert* : `_group_price_zones` suppose encore des points horaires (A-18).
 
-## A-01 · Haute · Mode Confort : PRI inactif et onduleur jamais libéré
+**Proposition d'origine** : conserver tous les points, ou agréger explicitement (moyenne pondérée par la durée) ; adapter `_best_consecutive_dynamic_window` et `_group_price_zones` à la granularité réelle ; ajouter des tests sur une courbe de 96 points par jour.
+
+## A-01 · Haute · Mode Confort : PRI inactif et onduleur jamais libéré — CORRIGÉE
 
 **Où** : `runtime/coordinator.py` `_pri_guard` (mode ∈ {Éco, « Zéro injection », « Dynamique »}), `_check_end_solar` (mode ∈ {Éco, « Zéro injection »}), `async_set_mode`.
 
@@ -85,7 +91,9 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 1. En **Confort**, le PRI ne tourne jamais : avec une politique « Zéro injection » ou « Injection non valorisée », **la réinjection n'est pas limitée**.
 2. En passant d'Éco (PRI à par exemple 30 %) à Confort, **rien ne libère l'onduleur** : la garde échoue (niveau conservé) et la fin de journée solaire est ignorée ; l'onduleur reste bridé jusqu'au retour en Éco ou à la désactivation de « Réduction de puissance onduleur » (qui, elle, libère).
 
-**Proposition** : décider si Confort doit piloter le PRI ; dans tous les cas, libérer l'onduleur à 100 % lors d'un changement de mode qui désactive la garde, et remplacer les listes de modes par `mode != Manuel`.
+**Correction appliquée** : le PRI et la fin de journée solaire fonctionnent dans tous les modes sauf Manuel (`pri_mode_allowed`) ; passer en Manuel libère l'onduleur à 100 % si le PRI est activé. Tests : `PriModeTests`. *Décision à confirmer* : Confort pilote désormais le PRI comme Éco.
+
+**Proposition d'origine** : décider si Confort doit piloter le PRI ; dans tous les cas, libérer l'onduleur à 100 % lors d'un changement de mode qui désactive la garde, et remplacer les listes de modes par `mode != Manuel`.
 
 ## A-02 · Moyenne · Code et réglages liés aux anciens modes devenus inatteignables
 

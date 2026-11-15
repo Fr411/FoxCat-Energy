@@ -180,7 +180,7 @@ from ..domain.loads.machines import MachineDefinition, machine_allowed, machine_
 from ..domain.loads.machine_cycle import MachineCycleManager
 from ..domain.loads.machine_learning import MachineLearningRecorder
 from .energy_bus import EnergyBus
-from .inverter_core import InverterCore
+from .inverter_core import InverterCore, pri_mode_allowed
 from ..domain.accounting import EnergyAccounting
 from ..domain.accounting.series import ConsumptionSeries
 from ..domain.tariff.compare import compare_tariffs, window_bounds
@@ -2517,7 +2517,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if canonical not in MODES: canonical=MODE_ECO
         self.settings["mode"]=canonical
         self.reset_core(f"Comportement EMS modifié vers {canonical}.")
-        if canonical==MODE_MANUAL: self.core_state["last_reason"]="Manuel : actions économiques automatiques suspendues ; mesures, comptabilité et sécurités conservées."
+        if canonical==MODE_MANUAL:
+            self.core_state["last_reason"]="Manuel : actions économiques automatiques suspendues ; mesures, comptabilité et sécurités conservées."
+            # Le PRI ne travaille pas en Manuel : repartir d'un point sûr à 100 % plutôt que de laisser un bridage automatique en place.
+            if self.settings.get("pri_enabled") and self._rrcr_level() not in (100, -1):
+                await self.async_release_pri_100("Passage en Manuel : onduleur libéré à 100 %.")
         else:
             self.core_state["last_reason"]=f"Comportement {canonical} actif."
             if self.settings.get("regulation_active"): await self.async_reconcile_machines()
@@ -3961,7 +3965,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._pv_below_since = None
             return
         mode = str(self.settings.get("mode"))
-        if mode not in {MODE_ECO, MODE_ZERO}:
+        if not pri_mode_allowed(mode):
             self._pv_below_since = None
             return
         pv = self._float_state(self.config.get(CONF_PV_SENSOR))
@@ -4043,7 +4047,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not bool(self.settings.get("pri_enabled")):
             self.pri_state["guard_reason"] = "reduction_onduleur_desactivee"
             return False
-        if str(self.settings.get("mode")) not in {MODE_ECO, MODE_ZERO, MODE_DYNAMIC}:
+        if not pri_mode_allowed(self.settings.get("mode")):
             self.pri_state["guard_reason"] = f"mode_{self.settings.get('mode')}"
             return False
         self.pri_state["guard_reason"] = "OK"

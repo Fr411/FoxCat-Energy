@@ -222,3 +222,33 @@ class QuarterHourDayAheadTests(unittest.TestCase):
         self.assertAlmostEqual(decision.dynamic_price_min_eur_kwh, 0.265)
         self.assertAlmostEqual(decision.dynamic_price_max_eur_kwh, 0.325)
         self.assertAlmostEqual(decision.dynamic_curve_position_pct, (0.30 - 0.265) / (0.325 - 0.265) * 100.0)
+
+
+class PriModeTests(unittest.TestCase):
+    """A-01 : le PRI doit travailler en Confort comme en Éco, et jamais en Manuel."""
+
+    def test_pri_runs_in_every_automatic_mode_but_not_in_manual(self):
+        from foxcat_energy.runtime.inverter_core import pri_mode_allowed
+
+        self.assertTrue(pri_mode_allowed("Éco"))
+        self.assertTrue(pri_mode_allowed("Confort"))
+        self.assertFalse(pri_mode_allowed("Manuel"))
+
+    def test_zero_injection_policy_reduces_the_inverter_in_comfort_mode_inputs(self):
+        # Le moteur ne dépend pas du mode : avec la garde corrigée, Confort obtient la même réduction qu'Éco.
+        snapshot = SimpleNamespace(pv_w=3000.0, import_w=0.0, export_w=1200.0, house_w=1800.0)
+        settings = {"inverter_power_w": 4000.0}
+        decision = InverterCore().decide(snapshot, 100, settings, NETWORK_ZERO_INJECTION, {})
+        self.assertLess(decision.target_level, 100)
+        self.assertEqual(decision.action, "REDUCTION")
+
+    def test_coordinator_uses_the_shared_mode_rule(self):
+        # runtime/coordinator.py exige Home Assistant : on vérifie la source plutôt que de l'importer.
+        source = (Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy" / "runtime" / "coordinator.py").read_text(encoding="utf-8")
+        guard = source[source.index("def _pri_guard"):source.index("def _rrcr_code")]
+        end_solar = source[source.index("async def _check_end_solar"):source.index("async def _watchdog")]
+        self.assertIn("pri_mode_allowed(self.settings.get(\"mode\"))", guard)
+        self.assertIn("pri_mode_allowed(mode)", end_solar)
+        self.assertNotIn("MODE_ZERO", guard + end_solar)
+        set_mode = source[source.index("async def async_set_mode"):source.index("async def async_set_pri_manual_level")]
+        self.assertIn("async_release_pri_100", set_mode)

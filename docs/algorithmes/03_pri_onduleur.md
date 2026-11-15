@@ -37,9 +37,9 @@ Le moteur ne tourne que si **toutes** ces conditions sont vraies, sinon la trame
 |---|---|
 | `regulation_active` | `regulation_inactive` |
 | `pri_enabled` (« Réduction de puissance onduleur ») | `reduction_onduleur_desactivee` |
-| mode ∈ {Éco, « Zéro injection », « Dynamique »} | `mode_<mode>` |
+| mode ≠ **Manuel** (`pri_mode_allowed`) : Éco et Confort | `mode_Manuel` |
 
-Comme le réglage `mode` ne vaut que Éco, Confort ou Manuel, **seul le mode Éco passe la garde** (voir A-01 : en Confort, le PRI est inactif **et ne libère pas** l'onduleur).
+*Corrigé (A-01)* : la garde exigeait un mode parmi Éco, « Zéro injection », « Dynamique » ; comme le mode ne vaut plus que Éco, Confort ou Manuel, Confort était exclu à tort (réinjection non limitée). En passant en **Manuel**, le coordinateur libère maintenant l'onduleur à 100 % si le PRI est activé et que le niveau lu est inférieur.
 
 Autres conditions de trame : snapshot invalide → `SNAPSHOT_INVALIDE` (niveau conservé) ; code RRCR illisible → `RRCR_INCONNU`.
 
@@ -175,7 +175,7 @@ Le plafond de ce comparateur est calculé avec **`pri_step_w × 10`** et non ave
 
 Libère l'onduleur à 100 % quand la production est durablement faible, pour repartir de 100 % le lendemain.
 
-1. Ignoré si la régulation est inactive ou si le mode ∉ {Éco, « Zéro injection »} (donc **Éco seulement**).
+1. Ignoré si la régulation est inactive ou si le mode est **Manuel** (Éco et Confort sont traités ; corrigé A-01).
 2. Ignoré si le niveau est entre 0 et 99 % ou si l'état solaire est `PV_LIMITED`, `PRI_ACK_PENDING` ou `PV_UNKNOWN` : une production bridée ne mesure pas le potentiel, **aucune conclusion « fin solaire »**.
 3. Si `pv < pri_end_solar_w` (5 W) : démarrer un chrono ; au bout de `pri_end_solar_confirm_s` (180 s), annuler la tâche PRI et libérer à 100 %. Sinon remettre le chrono à zéro.
 

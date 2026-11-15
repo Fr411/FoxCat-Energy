@@ -89,7 +89,7 @@ Les vitesses de refroidissement (0,5 °C/h) et de chauffe (10 °C/h) sont **cod�
 
 ### 4.2 Particularités
 
-- **Confort = Éco** pour le boiler. La seule différence entre les deux modes est ailleurs : la réduction de puissance de l'onduleur (PRI) n'est active qu'en Éco (voir `03_pri_onduleur.md`, A-01).
+- **Confort = Éco** pour le boiler, et pour le PRI depuis la correction A-01 : la seule différence entre les deux modes est désormais dans le planificateur de charges flexibles (pénalité d'attente, économie minimale et attente maximale propres à chaque mode, voir `07`).
 - L'achat sur le réseau n'est jamais autorisé en HP par Éco ; la seule chauffe réseau possible est en HC, bornée à 45 °C (le 65 °C est réservé au solaire).
 - En politique **Compensation**, une intention d'ARRÊT « énergétique » (raison contenant `achat réseau` ou `hp`) est neutralisée par le cœur (A-05).
 

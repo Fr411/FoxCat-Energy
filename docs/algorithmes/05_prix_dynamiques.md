@@ -110,7 +110,7 @@ Confiance : `HAUTE` si régime bi-horaire avec prix connu ou ≥ 6 points ; `MOY
 
 ### 5.1 Courbe de référence
 
-Les points d'achat sont **ramenés à un point par heure** (`_dynamic_day_ahead_points`) sur 36 h à partir de l'heure courante, complétés par le prix courant. Pour des prix au quart d'heure, **seul le dernier quart d'heure de chaque heure est conservé** (A-16). Moins de 6 points, ou « prédictif » désactivé → repli standard (§ 5.2).
+Les points d'achat sont **ramenés à un point par heure** (`_dynamic_day_ahead_points`) sur 36 h à partir de l'heure courante, complétés par le prix courant. Pour des prix au quart d'heure, chaque heure vaut la **moyenne de ses points** (corrigé A-16 ; auparavant seul le dernier point de l'heure était conservé). Moins de 6 points, ou « prédictif » désactivé → repli standard (§ 5.2).
 
 ### 5.2 Repli standard (`_legacy_dynamic_decision`)
 

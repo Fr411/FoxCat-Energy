@@ -1,7 +1,7 @@
 # 07 · Machines : fenêtres, cycles protégés, apprentissage, planificateur
 
 > Sources : `domain/loads/machines.py`, `machine_cycle.py`, `machine_learning.py`, `flexible_load_planner.py`, `runtime/coordinator.py` (`async_reconcile_machines`, `_tariff_start_favorable`, `machine_states`, `_refresh_machine_cycles`, `async_user_start_machine`, `async_user_stop_machine`, `_record_machine_learning`).
-> Les écarts `A-xx` sont détaillés dans [ANOMALIES.md](ANOMALIES.md). **A-22 est une panne bloquante en tarif dynamique.**
+> Les écarts `A-xx` sont détaillés dans [ANOMALIES.md](ANOMALIES.md). A-22 (panne en tarif dynamique avec un cycle protégé) est **corrigée**.
 
 ## 1. Définition d'une machine
 

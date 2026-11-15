@@ -3,12 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..const import TARIFF_DYNAMIC
+from ..const import MODE_MANUAL, TARIFF_DYNAMIC
 
 NETWORK_COMPENSATION = "Compensation"
 NETWORK_BILLED_EXPORT = "Injection tarifée"
 NETWORK_UNVALUED_EXPORT = "Injection non valorisée"
 NETWORK_ZERO_INJECTION = "Zéro injection"
+
+
+def pri_mode_allowed(mode: Any) -> bool:
+    """Le PRI travaille dans tous les modes automatiques (Éco et Confort), jamais en Manuel.
+
+    Le réglage ``mode`` ne vaut plus que Éco, Confort ou Manuel : l'ancienne liste
+    {Éco, « Zéro injection », « Dynamique »} excluait Confort par erreur, ce qui laissait la
+    réinjection non limitée et l'onduleur bridé sans libération.
+    """
+    return str(mode) != MODE_MANUAL
 
 
 @dataclass(slots=True)
