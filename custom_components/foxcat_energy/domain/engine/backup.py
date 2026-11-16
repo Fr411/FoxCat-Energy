@@ -1,8 +1,8 @@
 """Mode Backup : coupure Internet.
 
 Quand Internet tombe, FoxCat lâche les freins économiques : les machines restent alimentées,
-le boiler chauffe pour garder le confort, l'onduleur n'est plus bridé. Les sécurités restent
-actives (température du boiler, protection du disjoncteur). L'état des prises est mémorisé avant
+le boiler est coupé, l'onduleur n'est plus bridé. Les sécurités restent actives
+(protection du disjoncteur). L'état des prises est mémorisé avant
 la coupure et rétabli au retour de la connexion, sans jamais couper un cycle en cours.
 
 Ce module est pur (aucune dépendance Home Assistant).
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Iterable, Mapping
 
-from ...const import BOILER_HEAT_45, BOILER_NONE, BOILER_STOP
+from ...const import BOILER_NONE, BOILER_STOP
 from .models import BoilerIntent, EnergySnapshot
 
 # Résolveurs publics : on teste seulement qu'une connexion TCP s'ouvre, rien n'est envoyé.
@@ -96,23 +96,11 @@ class ConnectivityMonitor:
             self.since = None
 
 
-def backup_boiler_intent(snapshot: EnergySnapshot, settings: Mapping[str, Any]) -> BoilerIntent:
-    """Confort sans condition de prix : reprise sous le seuil de redémarrage, arrêt au confort, jamais de BOOST réseau."""
-    safety = float(settings.get("boiler_temp_safety_c", 68.0))
-    start = float(settings.get("boiler_temp_start_c", 43.0))
-    normal = float(settings.get("boiler_temp_normal_c", 45.0))
-    temp = snapshot.boiler_safety_temp_c
-    if snapshot.boiler_safety_temp_c >= safety:
-        return BoilerIntent(BOILER_STOP, f"Backup : sécurité thermique {temp:.1f} °C >= {safety:.1f} °C.", "BACKUP_SECURITE")
-    if snapshot.boiler_temp_c < start or (snapshot.boiler_on and snapshot.boiler_temp_c < normal):
-        return BoilerIntent(
-            BOILER_HEAT_45,
-            f"Backup (Internet coupé) : confort garanti, {snapshot.boiler_temp_c:.1f} °C, cible {normal:.1f} °C.",
-            "BACKUP_CONFORT",
-        )
+def backup_boiler_intent(snapshot: EnergySnapshot, settings: Mapping[str, Any] | None = None) -> BoilerIntent:
+    """En Backup, le boiler est coupé : aucune chauffe tant qu'Internet est absent."""
     if snapshot.boiler_on:
-        return BoilerIntent(BOILER_STOP, f"Backup : confort {normal:.1f} °C atteint.", "BACKUP_CONFORT_OK")
-    return BoilerIntent(BOILER_NONE, "Backup : confort assuré, aucune chauffe nécessaire.", "BACKUP_CONFORT_OK")
+        return BoilerIntent(BOILER_STOP, "Backup (Internet coupé) : boiler coupé.", "BACKUP_BOILER_COUPE")
+    return BoilerIntent(BOILER_NONE, "Backup (Internet coupé) : boiler maintenu coupé.", "BACKUP_BOILER_COUPE")
 
 
 def capture_socket_states(states: Mapping[str, str | None]) -> dict[str, str]:

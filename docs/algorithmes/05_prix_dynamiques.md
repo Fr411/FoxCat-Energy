@@ -255,7 +255,7 @@ Calcul :
 | Détection | `probe_internet` (TCP 443 vers 1.1.1.1, 8.8.8.8, 9.9.9.9) toutes les 30 s ; `ConnectivityMonitor` : hors ligne après N min d'échecs continus (`backup_offline_delay_min`, 2 par défaut), en ligne après 60 s de succès continus |
 | Prises machines | `should_on` forcé (fenêtres, prix, planificateur, gestion désactivée ignorés), sauf délestage du disjoncteur |
 | État avant coupure | mémorisé (`backup_state`, persistant) ; rétabli au retour sauf cycle protégé (`plan_restore`) |
-| Boiler | `backup_boiler_intent` : reprise < 43 °C, arrêt 45 °C, jamais de BOOST réseau ; sécurité thermique prioritaire ; peak shaving, commande utilisateur et V2H passent avant |
+| Boiler | `backup_boiler_intent` : **coupé** (ARRET s'il chauffe, sinon aucune action), même ballon froid ; peak shaving, commande utilisateur (forcer marche/arrêt) et interverrouillage V2H passent avant |
 | Onduleur (PRI) | libéré à 100 % et garde fermée, sauf politique « Zéro injection » |
 | Inchangé | Manuel (aucune commande), régulation coupée, comptabilité (utilise le tampon) |
 

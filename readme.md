@@ -162,10 +162,10 @@ Le cerveau de FoxCat tourne dans Home Assistant : mesures, boiler, onduleur et m
 FoxCat sonde Internet toutes les 30 secondes (connexion TCP vers des résolveurs publics, rien n'est envoyé). Après la durée réglée sans connexion (2 minutes par défaut), le capteur **« Internet en ligne »** passe à hors ligne et le **mode Backup** s'enclenche :
 
 - **Machines** : les prises restent alimentées ; fenêtres horaires, prix et planificateur sont ignorés.
-- **Boiler** : chauffe de confort (reprise sous 43 °C, arrêt à 45 °C), jamais de BOOST réseau.
+- **Boiler** : **coupé** pendant toute la coupure, ballon froid compris ; il reprend sa stratégie normale au retour d'Internet. Une commande utilisateur « forcer la marche » reste prioritaire.
 - **Onduleur** : plus bridé, sauf avec la politique « Zéro injection ».
 - **Mémoire** : l'état des prises est enregistré avant la coupure et rétabli au retour d'Internet (après 60 secondes de connexion stable), sans jamais couper un cycle en cours.
-- **Sécurités maintenues** : sécurité thermique du boiler, délestage du disjoncteur, interverrouillage V2H.
+- **Sécurité maintenue** : délestage du disjoncteur.
 
 Interrupteur « Mode Backup si Internet coupé » (actif par défaut) et réglage de la durée. En mode Manuel ou régulation coupée, FoxCat ne commande rien. Pendant le Backup, le tampon de prix ne guide plus les décisions ; il continue d'alimenter l'affichage et la comptabilité. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
 

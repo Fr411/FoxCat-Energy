@@ -1,4 +1,4 @@
-"""Coupure Internet : sondage, anti-rebond, boiler de confort et rétablissement des prises."""
+"""Coupure Internet : sondage, anti-rebond, boiler coupé et rétablissement des prises."""
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +13,7 @@ package = types.ModuleType("foxcat_energy")
 package.__path__ = [str(COMPONENT)]
 sys.modules.setdefault("foxcat_energy", package)
 
-from foxcat_energy.const import BOILER_HEAT_45, BOILER_NONE, BOILER_STOP, DEFAULT_SETTINGS  # noqa: E402
+from foxcat_energy.const import BOILER_NONE, BOILER_STOP, DEFAULT_SETTINGS  # noqa: E402
 from foxcat_energy.domain.engine import backup as bk  # noqa: E402
 from foxcat_energy.domain.engine.models import EnergySnapshot  # noqa: E402
 
@@ -112,22 +112,17 @@ def snap(temp, *, on=False, safety=None):
 
 
 class BackupBoilerTests(unittest.TestCase):
-    def test_cold_tank_is_heated_whatever_the_price(self):
-        self.assertEqual(bk.backup_boiler_intent(snap(40.0), DEFAULT_SETTINGS).action, BOILER_HEAT_45)
+    def test_running_boiler_is_cut_whatever_its_temperature(self):
+        for temp in (30.0, 44.0, 50.0):
+            intent = bk.backup_boiler_intent(snap(temp, on=True), DEFAULT_SETTINGS)
+            self.assertEqual(intent.action, BOILER_STOP)
+            self.assertEqual(intent.origin, "BACKUP_BOILER_COUPE")
 
-    def test_heating_continues_until_comfort(self):
-        self.assertEqual(bk.backup_boiler_intent(snap(44.0, on=True), DEFAULT_SETTINGS).action, BOILER_HEAT_45)
+    def test_piege_cold_tank_is_not_heated_in_backup(self):
+        self.assertEqual(bk.backup_boiler_intent(snap(30.0, on=False), DEFAULT_SETTINGS).action, BOILER_NONE)
 
-    def test_comfort_reached_stops_the_heating(self):
-        self.assertEqual(bk.backup_boiler_intent(snap(45.5, on=True), DEFAULT_SETTINGS).action, BOILER_STOP)
-
-    def test_warm_tank_is_left_alone_no_grid_boost_to_65(self):
+    def test_idle_boiler_stays_idle(self):
         self.assertEqual(bk.backup_boiler_intent(snap(48.0), DEFAULT_SETTINGS).action, BOILER_NONE)
-
-    def test_piege_thermal_safety_still_wins_in_backup(self):
-        intent = bk.backup_boiler_intent(snap(40.0, on=True, safety=69.0), DEFAULT_SETTINGS)
-        self.assertEqual(intent.action, BOILER_STOP)
-        self.assertEqual(intent.origin, "BACKUP_SECURITE")
 
 
 class RestoreTests(unittest.TestCase):
