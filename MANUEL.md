@@ -287,7 +287,7 @@ La prévision solaire en ligne et la tâche IA ne fonctionnent pas hors ligne. L
 
 Le mode Backup est actif par défaut.
 
-1. Ouvrez l'appareil **Système** (ou EMS) : les capteurs **« Internet en ligne »** et **« Mode Backup actif »** y sont créés.
+1. Ouvrez l'appareil **Système** : les capteurs **« Internet en ligne »** et **« Mode Backup actif »** y sont créés.
 2. Réglez la durée de coupure avant déclenchement (**« Backup : durée de coupure avant déclenchement »**, 2 minutes par défaut) : une micro-coupure plus courte ne déclenche rien.
 3. Pour désactiver le mode : coupez **« Mode Backup si Internet coupé »**.
 4. Pour tester : débranchez le routeur plus longtemps que la durée réglée. Vérifiez que « Internet en ligne » passe à *hors ligne*, que les prises machines restent alimentées et que le boiler garde le confort. Rebranchez : au bout d'environ une minute, les prises reprennent leur état d'avant la coupure.
