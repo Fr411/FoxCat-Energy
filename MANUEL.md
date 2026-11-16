@@ -283,6 +283,18 @@ Avec une source de prix **Dynamique Day-Ahead** ou **Intégration externe**, Fox
 
 La prévision solaire en ligne et la tâche IA ne fonctionnent pas hors ligne. La comptabilité compte 0 € d'achat tant qu'aucun prix n'existe.
 
+### 6.5 ter Mode Backup (Internet coupé)
+
+Le mode Backup est actif par défaut.
+
+1. Ouvrez l'appareil **Système** (ou EMS) : les capteurs **« Internet en ligne »** et **« Mode Backup actif »** y sont créés.
+2. Réglez la durée de coupure avant déclenchement (**« Backup : durée de coupure avant déclenchement »**, 2 minutes par défaut) : une micro-coupure plus courte ne déclenche rien.
+3. Pour désactiver le mode : coupez **« Mode Backup si Internet coupé »**.
+4. Pour tester : débranchez le routeur plus longtemps que la durée réglée. Vérifiez que « Internet en ligne » passe à *hors ligne*, que les prises machines restent alimentées et que le boiler garde le confort. Rebranchez : au bout d'environ une minute, les prises reprennent leur état d'avant la coupure.
+5. L'attribut `prises_memorisees` du capteur « Mode Backup actif » montre l'état enregistré.
+
+Restent actifs en Backup : la sécurité thermique du boiler, le délestage du disjoncteur et l'interverrouillage V2H. En mode **Manuel**, ou si la régulation est coupée, FoxCat ne commande rien : seul le capteur signale la coupure.
+
 ### 6.6 Comparateur de tarifs
 
 1. **Modèles** : ajoutez des modèles belges prédéfinis (Wallonie mono, bi-horaire 2026, Impact). Un modèle ajoute un tarif avec des **prix de départ** : modifiez-les ensuite dans le JSON.
@@ -493,6 +505,7 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | Prélèvement et réinjection inversés | Convention de signe | **Mesures et sources**, inversez la convention |
+| Machines allumées alors que le prix est haut, boiler qui chauffe | Mode Backup actif (Internet coupé) | Vérifiez le capteur « Internet en ligne » ; rétablissez la connexion ou coupez l'interrupteur « Mode Backup si Internet coupé » |
 | Flux de prix en `DEGRADE` | Plus de prix reçus et tampon épuisé | Rétablissez Internet ou l'intégration de prix ; le boiler reste en repli confort 45 °C |
 | Prix actif à 0 ou « — » | Prix non saisis, capteur indisponible | Vérifiez l'écran **Contrat et réseau** et vos capteurs de prix |
 | Coûts trop élevés ou trop faibles | Case « tout compris » mal réglée | Cochez-la si votre prix inclut réseau, taxes et marge ; décochez sinon |

@@ -167,6 +167,7 @@ from ..domain.engine.load_guard import (
     protected_cycle_boiler_allowed_stable,
 )
 from ..domain.engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
+from ..domain.engine import backup as backup_logic
 from ..domain.tariff.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
 from ..domain.pricing.economic_optimizer import (
     PricePoint,
@@ -355,6 +356,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._metronome_last_seen_report: dict[str, datetime] = {}
         self.solar_forecast = SolarForecast()
         self.price_backup: dict[str, dict[str, float]] = {}
+        # Coupure Internet : surveillance, mode Backup et état des prises avant la coupure.
+        self.connectivity = backup_logic.ConnectivityMonitor()
+        self.backup_state: dict[str, Any] = {"active": False, "handled": False, "since": None, "machines": {}}
+        self._probe_running = False
         self._unsubs: list[Any] = []
         # V1.6.150 : les deux corps sont cadencés par la même publication réseau
         # mais ne partagent plus aucun verrou d'exécution.
@@ -605,6 +610,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if isinstance(price_backup, dict)
                 else {}
             )
+            self.connectivity.restore(stored.get("connectivity"))
+            saved_backup = stored.get("backup_state")
+            if isinstance(saved_backup, dict):
+                self.backup_state = {
+                    "active": bool(saved_backup.get("active")),
+                    "handled": bool(saved_backup.get("handled")),
+                    "since": saved_backup.get("since"),
+                    "machines": backup_logic.capture_socket_states(saved_backup.get("machines") or {}),
+                }
             sf = stored.get("solar_forecast")
             if isinstance(sf, dict):
                 self.solar_forecast = SolarForecast(**{k: sf.get(k, getattr(SolarForecast(), k)) for k in SolarForecast.__dataclass_fields__})
@@ -718,6 +732,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "virtual_assets": self.virtual_assets.dump_state(),
                 "machine_learning": self.machine_learning.dump(),
                 "price_backup": self.price_backup,
+                "connectivity": self.connectivity.dump(),
+                "backup_state": self.backup_state,
                 "heating_applied_c": self.heating_applied_c,
                 "heating_setpoint_tracks": self.heating_setpoint_tracks,
                 "solar_forecast": {
@@ -774,6 +790,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._on_metronome_watchdog,
                 timedelta(seconds=2),
             )
+        )
+
+        # Coupure Internet : un sondage toutes les 30 s, avec anti-rebond.
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._on_connectivity_probe, timedelta(seconds=30))
         )
 
         # V1.6.1-101 : les compteurs visibles repartent chaque jour à zéro.
@@ -2950,6 +2971,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 intent = BoilerIntent(BOILER_HEAT_45, "Utilisateur : démarrage Boiler forcé.", "UTILISATEUR")
         elif user_override == "FORCE_OFF":
             intent = BoilerIntent(BOILER_STOP, "Utilisateur : arrêt Boiler forcé.", "UTILISATEUR")
+        elif self.backup_active and mode != MODE_MANUAL and not self.v2h_state.get("active"):
+            intent = backup_logic.backup_boiler_intent(snapshot, self.settings)
         else:
             if self.v2h_state.get("active"):
                 intent = BoilerIntent(
@@ -3779,7 +3802,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             # Un cycle utilisateur/protégé reste prioritaire. Seul un NOUVEAU
             # démarrage automatique est bloqué en période défavorable.
-            should_on = cycle_active or keep_running or (
+            # Mode Backup : on lâche les freins, la prise reste alimentée (sauf protection du disjoncteur).
+            backup_on = self.backup_active and not high_load_block
+            should_on = cycle_active or keep_running or backup_on or (
                 management and allowed and tariff_ok and not high_load_block
             )
             service = "turn_on" if should_on else "turn_off"
@@ -3787,6 +3812,89 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.hass.services.async_call("switch", service, {"entity_id": socket}, blocking=False)
             except Exception as err:  # pragma: no cover
                 _LOGGER.warning("FoxCat machine socket command failed for %s (%s): %s", machine.name, socket, err)
+
+    # MÉTHODE : FoxCatEnergyCoordinator.backup_active — Le mode Backup est en vigueur
+    @property
+    def backup_active(self) -> bool:
+        """Vrai quand Internet est coupé depuis assez longtemps et que le mode Backup est activé."""
+        return bool(self.backup_state.get("active")) and bool(self.settings.get("backup_on_offline_enabled", True))
+
+    # MÉTHODE : FoxCatEnergyCoordinator._on_connectivity_probe — Sondage périodique d'Internet
+    async def _on_connectivity_probe(self, now: datetime | None = None) -> None:
+        if self._probe_running:
+            return
+        self._probe_running = True
+        try:
+            ok = await backup_logic.probe_internet()
+            self.connectivity.offline_after_s = max(float(self.settings.get("backup_offline_delay_min", 2.0)), 0.0) * 60.0
+            transition = self.connectivity.observe(ok, dt_util.utcnow())
+            enabled = bool(self.settings.get("backup_on_offline_enabled", True))
+            if transition == backup_logic.TRANSITION_OFFLINE:
+                _LOGGER.warning("Internet coupé depuis plus de %.0f min : mode Backup.", self.connectivity.offline_after_s / 60.0)
+            elif transition == backup_logic.TRANSITION_ONLINE:
+                _LOGGER.info("Internet de retour : fin du mode Backup.")
+            should_be_active = enabled and not self.connectivity.online
+            if should_be_active and not self.backup_state.get("handled"):
+                await self.async_enter_backup()
+            elif not should_be_active and self.backup_state.get("handled"):
+                await self.async_exit_backup()
+            elif transition:
+                self.async_set_updated_data(self._build_data())
+        finally:
+            self._probe_running = False
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_enter_backup — Entrée en mode Backup
+    async def async_enter_backup(self) -> None:
+        """Mémorise l'état des prises, lâche les freins économiques, garde les sécurités."""
+        acting = bool(self.settings.get("regulation_active")) and str(self.settings.get("mode")) != MODE_MANUAL
+        saved = backup_logic.capture_socket_states(
+            {
+                machine.machine_id: (self.hass.states.get(machine.switch_entity).state if self.hass.states.get(machine.switch_entity) else None)
+                for machine in self.machines
+                if machine.switch_entity
+            }
+        )
+        self.backup_state = {
+            "active": acting,
+            "handled": True,
+            "since": dt_util.utcnow().isoformat() if acting else None,
+            "machines": saved if acting else {},
+        }
+        if acting:
+            if str(self.settings.get("network_policy")) != NETWORK_POLICY_ZERO_INJECTION and bool(self.settings.get("pri_enabled")):
+                await self.async_release_pri_100("Backup : Internet coupé, onduleur libéré à 100 %.")
+            self.reset_core("Backup : Internet coupé, restrictions économiques levées.")
+            await self.async_reconcile_machines()
+        await self._async_save()
+        self.async_set_updated_data(self._build_data())
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_exit_backup — Retour d'Internet
+    async def async_exit_backup(self) -> None:
+        """Rétablit les prises dans l'état d'avant la coupure, sauf cycle en cours, puis reprend la régulation normale."""
+        saved = dict(self.backup_state.get("machines") or {})
+        self.backup_state = {"active": False, "handled": False, "since": None, "machines": {}}
+        self._refresh_machine_cycles()
+        current = {
+            machine.machine_id: (self.hass.states.get(machine.switch_entity).state if self.hass.states.get(machine.switch_entity) else None)
+            for machine in self.machines
+            if machine.switch_entity
+        }
+        protected = [m.machine_id for m in self.machines if self.machine_cycle_manager.is_protected(m.machine_id)]
+        for machine_id, wanted in backup_logic.plan_restore(saved, current, protected).items():
+            machine = next((item for item in self.machines if item.machine_id == machine_id), None)
+            if machine is None or not machine.switch_entity:
+                continue
+            try:
+                await self.hass.services.async_call(
+                    "switch", "turn_on" if wanted == "on" else "turn_off",
+                    {"entity_id": machine.switch_entity}, blocking=False,
+                )
+            except Exception as err:  # pragma: no cover
+                _LOGGER.warning("Rétablissement de la prise %s impossible : %s", machine.name, err)
+        self.reset_core("Fin du mode Backup : régulation normale rétablie.")
+        await self.async_reconcile_machines()
+        await self._async_save()
+        self.async_set_updated_data(self._build_data())
 
     # MÉTHODE : FoxCatEnergyCoordinator._evaluate_high_load — Délestage synchronisé sur chaque publication réseau
     async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
@@ -4074,6 +4182,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return False
         if not pri_mode_allowed(self.settings.get("mode")):
             self.pri_state["guard_reason"] = f"mode_{self.settings.get('mode')}"
+            return False
+        if self.backup_active and str(self.settings.get("network_policy")) != NETWORK_POLICY_ZERO_INJECTION:
+            # Backup : l'onduleur n'est plus bridé, sauf si la politique réseau impose zéro injection.
+            self.pri_state["guard_reason"] = "backup_internet_coupe"
             return False
         self.pri_state["guard_reason"] = "OK"
         return True
@@ -4684,6 +4796,13 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
+            "connectivity": backup_logic.status_view(
+                online=self.connectivity.online,
+                since=self.connectivity.since,
+                active=self.backup_active,
+                enabled=bool(self.settings.get("backup_on_offline_enabled", True)),
+                saved=self.backup_state.get("machines") or {},
+            ),
             "heating_boost": {**self.heating_boost_view, "applied_c": self.heating_applied_c},
             "grid_load": self._grid_load_view(snap),
             "machine_guard": {

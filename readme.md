@@ -157,6 +157,18 @@ Le cerveau de FoxCat tourne dans Home Assistant : mesures, boiler, onduleur et m
 - **Capteur « Flux de prix ».** États `EN_LIGNE`, `TAMPON`, `DEGRADE` et `LOCAL`, avec la fin du tampon (`buffer_until`) et les heures restantes. Le journal signale chaque changement.
 - **Limites.** La comptabilité compte 0 € d'achat quand aucun prix n'existe et ne rattrape pas les prix au retour d'Internet. Forecast.Solar et la tâche IA solaire échouent hors ligne. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
 
+### Mode Backup : Internet coupé
+
+FoxCat sonde Internet toutes les 30 secondes (connexion TCP vers des résolveurs publics, rien n'est envoyé). Après la durée réglée sans connexion (2 minutes par défaut), le capteur **« Internet en ligne »** passe à hors ligne et le **mode Backup** s'enclenche :
+
+- **Machines** : les prises restent alimentées ; fenêtres horaires, prix et planificateur sont ignorés.
+- **Boiler** : chauffe de confort (reprise sous 43 °C, arrêt à 45 °C), jamais de BOOST réseau.
+- **Onduleur** : plus bridé, sauf avec la politique « Zéro injection ».
+- **Mémoire** : l'état des prises est enregistré avant la coupure et rétabli au retour d'Internet (après 60 secondes de connexion stable), sans jamais couper un cycle en cours.
+- **Sécurités maintenues** : sécurité thermique du boiler, délestage du disjoncteur, interverrouillage V2H.
+
+Interrupteur « Mode Backup si Internet coupé » (actif par défaut) et réglage de la durée. En mode Manuel ou régulation coupée, FoxCat ne commande rien. Pendant le Backup, le tampon de prix ne guide plus les décisions ; il continue d'alimenter l'affichage et la comptabilité. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
+
 ### Publication des prix
 
 Une entité (par exemple « prix de demain disponible ») déclenche la relecture des prix, avec un service optionnel (par exemple `be_electricity_prices.refresh`), appelé au plus **une fois toutes les 10 minutes**.

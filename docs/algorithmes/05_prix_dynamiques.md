@@ -248,4 +248,15 @@ Calcul :
 
 **Repli confort du boiler** (`dynamic_boiler_v2.py`). Sans position tarifaire exploitable : chauffe réseau à 45 °C si le ballon passe sous la reprise (43 °C), arrêt à 45 °C, jamais de BOOST réseau. Le BOOST solaire reste prioritaire.
 
+**Mode Backup (coupure Internet).** Le tampon garde les décisions possibles, mais le mode Backup les remplace par la continuité de service :
+
+| Élément | En Backup |
+|---|---|
+| Détection | `probe_internet` (TCP 443 vers 1.1.1.1, 8.8.8.8, 9.9.9.9) toutes les 30 s ; `ConnectivityMonitor` : hors ligne après N min d'échecs continus (`backup_offline_delay_min`, 2 par défaut), en ligne après 60 s de succès continus |
+| Prises machines | `should_on` forcé (fenêtres, prix, planificateur, gestion désactivée ignorés), sauf délestage du disjoncteur |
+| État avant coupure | mémorisé (`backup_state`, persistant) ; rétabli au retour sauf cycle protégé (`plan_restore`) |
+| Boiler | `backup_boiler_intent` : reprise < 43 °C, arrêt 45 °C, jamais de BOOST réseau ; sécurité thermique prioritaire ; peak shaving, commande utilisateur et V2H passent avant |
+| Onduleur (PRI) | libéré à 100 % et garde fermée, sauf politique « Zéro injection » |
+| Inchangé | Manuel (aucune commande), régulation coupée, comptabilité (utilise le tampon) |
+
 **Limites connues.** Au-delà de la fin du tampon, aucun prix n'est estimé (pas de « même heure hier »). La comptabilité compte 0 € d'achat quand aucun prix n'existe, et ne rattrape pas les prix réels au retour d'Internet. La prévision Forecast.Solar et la tâche IA solaire échouent hors ligne.
