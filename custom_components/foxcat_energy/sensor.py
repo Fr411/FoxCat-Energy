@@ -135,6 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "regime_tarifaire_actif", "Régime tarifaire actif", "mdi:cash-sync", "pricing", lambda d: d["prices"].get("regime")),
         FoxCatValueSensor(c, "periode_distribution_belgique", "Période de distribution Belgique", "mdi:clock-outline", "pricing", lambda d: d["prices"].get("distribution_period")),
         FoxCatValueSensor(c, "periode_tarifaire", "Période tarifaire", "mdi:clock-time-eight-outline", "pricing", lambda d: d["prices"].get("period")),
+        FoxCatValueSensor(c, "sante_foxcat", "Santé FoxCat (alertes de panne)", "mdi:heart-pulse", "ems", lambda d: d["health"]["status"], attributes=lambda d: {"nombre_alertes": d["health"]["count"], "critiques": d["health"]["critical"], "majeures": d["health"]["major"], "alertes": d["health"]["alerts"]}),
         FoxCatValueSensor(c, "flux_prix", "Flux de prix (en ligne / tampon local)", "mdi:cloud-check-outline", "pricing", lambda d: d["prices"].get("price_feed", {}).get("state"), attributes=lambda d: {k: v for k, v in d["prices"].get("price_feed", {}).items() if k != "state"}),
         FoxCatValueSensor(c, "statut_prix", "Statut du prix", "mdi:chart-line", "pricing", lambda d: d["prices"].get("status")),
         FoxCatValueSensor(c, "modele_cout", "Modèle de coût", "mdi:calculator-variant-outline", "pricing", lambda d: d["prices"].get("cost_model")),

@@ -1,0 +1,41 @@
+alias: FoxCat - Alerte de panne sur le téléphone
+description: >
+  FoxCat publie l'événement foxcat_energy_alert à chaque panne majeure ou
+  critique (et quand elle est levée). Cette automatisation l'envoie sur le
+  téléphone. Remplacez notify.mobile_app_mon_telephone par votre service
+  (Paramètres → Appareils et services → Application mobile).
+  Les notifications dans Home Assistant (cloche) existent déjà sans cette
+  automatisation ; celle-ci ajoute la notification push.
+
+triggers:
+  - trigger: event
+    event_type: foxcat_energy_alert
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.state == 'raised' }}"
+        sequence:
+          - action: notify.mobile_app_mon_telephone
+            data:
+              title: >
+                {{ '🚨' if trigger.event.data.severity == 'CRITIQUE' else '⚠️' }}
+                {{ trigger.event.data.installation }} — {{ trigger.event.data.title }}
+              message: "{{ trigger.event.data.detail }}"
+              data:
+                tag: "foxcat_{{ trigger.event.data.code }}"
+                # Les alertes critiques passent même téléphone en silencieux (Android).
+                ttl: 0
+                priority: "{{ 'high' if trigger.event.data.severity == 'CRITIQUE' else 'normal' }}"
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.state == 'cleared' }}"
+        sequence:
+          # Retire la notification du téléphone quand la panne est levée.
+          - action: notify.mobile_app_mon_telephone
+            data:
+              message: clear_notification
+              data:
+                tag: "foxcat_{{ trigger.event.data.code }}"
+mode: queued

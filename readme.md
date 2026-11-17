@@ -169,6 +169,12 @@ FoxCat sonde Internet toutes les 30 secondes (connexion TCP vers des résolveurs
 
 Interrupteur « Mode Backup si Internet coupé » (actif par défaut) et réglage de la durée. En mode Manuel ou régulation coupée, FoxCat ne commande rien. Pendant le Backup, le tampon de prix ne guide plus les décisions ; il continue d'alimenter l'affichage et la comptabilité. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
 
+### Alertes de panne
+
+FoxCat surveille sa propre santé et notifie ce qui ne fonctionne pas. **Critiques** : mesures ou métronome perdus, boiler en surchauffe, sonde du boiler ou de sécurité indisponible, relais de l'onduleur illisibles, commande en échec. **Majeures** : capteur principal silencieux, prix indisponibles, Internet coupé, prise de machine indisponible, délestage en cours, ancienne automatisation active, calcul en erreur, entité introuvable. Une alerte apparaît après 2 minutes (surchauffe et délestage : tout de suite) et disparaît après 60 secondes de retour stable.
+
+Sorties : capteur **« Santé FoxCat »** (`OK`, `MAJEUR`, `CRITIQUE`, avec la liste), capteur binaire **« Alerte de panne FoxCat »**, une **notification** dans Home Assistant par alerte, et l'événement `foxcat_energy_alert` pour envoyer un message sur téléphone (exemple : `docs/automations/alerte_panne_foxcat.yaml`). Catalogue complet : [santé et alertes](docs/algorithmes/10_sante_alertes.md).
+
 ### Publication des prix
 
 Une entité (par exemple « prix de demain disponible ») déclenche la relecture des prix, avec un service optionnel (par exemple `be_electricity_prices.refresh`), appelé au plus **une fois toutes les 10 minutes**.

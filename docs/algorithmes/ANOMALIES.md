@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29 et A-30 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30 et A-31** ont été trouvées ensuite par les scénarios d'économie.
+**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29 et A-30 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30** (corrigée) et **A-31** ont été trouvées ensuite par les scénarios d'économie, **A-32** en écrivant les alertes de panne.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -48,6 +48,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
 | ~~A-30~~ | Haute | Planificateur de charges : le surplus solaire et le prix de réinjection ne comptaient pas dans le coût d'un départ ✔ (corrigée) |
 | A-31 | Basse | Planificateur de charges : départ jusqu'à une demi-heure trop tôt ✔ |
+| A-32 | **Haute** | Sonde du boiler indisponible : FoxCat lit 0 °C et chauffe sur le réseau ✔ (signalée par une alerte critique) |
 
 ---
 
@@ -228,6 +229,16 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 **Preuve** : demande à 18 h, créneau creux à 0 h ; départ à 23 h 35, coût 0,156 € contre 0,12 € au créneau exact (test `run_machine`, rapport en fin de fichier).
 
 **Proposition** : attendre le créneau lui-même, en gardant une tolérance de quelques minutes seulement, ou prendre en compte le coût du délai dans la comparaison.
+
+## A-32 · Haute · Sonde du boiler indisponible : lue comme 0 °C ✔
+
+**Constat** : `snapshot()` lit la sonde du boiler avec `_float_state`, qui renvoie **0,0** quand l'entité est `unavailable` ou `unknown`. `valid` ne dépend que du réseau et du photovoltaïque. Les stratégies (`evaluate_eco`, boiler dynamique) comparent ensuite `boiler_temp_c < normal` : un ballon « à 0 °C » est chauffé sur le réseau. La sonde de sécurité retombe sur cette même valeur (0 °C) si la sonde de résistance est absente : la protection contre la surchauffe est alors aveugle.
+
+**Preuve** : `_float_state` (valeur par défaut 0,0), `snapshot()` (lignes `boiler_temp = self._float_state(...)` puis `boiler_safety_temp = resistance_temp if … else boiler_temp`) et `evaluate_eco` (`snapshot.boiler_temp_c < normal`).
+
+**Atténuation livrée** : alertes critiques `BOILER_SONDE_HS` et `BOILER_SONDE_SECURITE_HS` (voir `10_sante_alertes.md`), notifiées après 2 minutes.
+
+**Proposition** : lire la sonde avec `_optional_float_state` ; si elle est absente, interdire toute chauffe réseau (le boiler passe à l'arrêt sauf commande utilisateur) et ne jamais assimiler l'absence de mesure à 0 °C.
 
 ## Tests proposés (par ordre de valeur)
 

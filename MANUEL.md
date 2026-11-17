@@ -295,6 +295,18 @@ Le mode Backup est actif par défaut.
 
 En Backup, le **boiler est coupé** : l'eau chaude n'est plus chauffée tant qu'Internet est absent. Reste actif : le délestage du disjoncteur. En mode **Manuel**, ou si la régulation est coupée, FoxCat ne commande rien : seul le capteur signale la coupure.
 
+### 6.5 quater Alertes de panne
+
+Les alertes sont actives par défaut, sans réglage.
+
+1. Dans l'appareil **Système**, le capteur **« Santé FoxCat (alertes de panne) »** vaut `OK`, `MAJEUR` ou `CRITIQUE`. Ses attributs listent chaque alerte avec sa cause et l'heure de début.
+2. Home Assistant affiche une notification (cloche) par alerte, retirée quand la panne est levée.
+3. Pour recevoir un message sur le téléphone : importez `docs/automations/alerte_panne_foxcat.yaml` dans Paramètres → Automatisations, et remplacez `notify.mobile_app_mon_telephone` par votre service de notification.
+4. Pour couper les notifications : interrupteur **« Alertes de panne FoxCat (notifications) »**. Les capteurs restent.
+5. Test : désactivez le capteur de puissance réseau pendant plus de 2 minutes : l'alerte **« FoxCat ne reçoit plus les mesures »** apparaît, puis disparaît une minute après le retour du capteur.
+
+Une alerte ne signale qu'une panne (capteur, commande, connexion). Un mauvais réglage ou un mauvais choix économique ne déclenche rien.
+
 ### 6.6 Comparateur de tarifs
 
 1. **Modèles** : ajoutez des modèles belges prédéfinis (Wallonie mono, bi-horaire 2026, Impact). Un modèle ajoute un tarif avec des **prix de départ** : modifiez-les ensuite dans le JSON.
@@ -505,6 +517,7 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | Prélèvement et réinjection inversés | Convention de signe | **Mesures et sources**, inversez la convention |
+| Alerte « Sonde de température du boiler indisponible » | La sonde du boiler ne répond plus | Rétablissez la sonde ou coupez la gestion du boiler ; FoxCat lit 0 °C et peut chauffer à tort |
 | Machines allumées alors que le prix est haut, boiler coupé | Mode Backup actif (Internet coupé) | Vérifiez le capteur « Internet en ligne » ; rétablissez la connexion ou coupez l'interrupteur « Mode Backup si Internet coupé » |
 | Flux de prix en `DEGRADE` | Plus de prix reçus et tampon épuisé | Rétablissez Internet ou l'intégration de prix ; le boiler reste en repli confort 45 °C |
 | Prix actif à 0 ou « — » | Prix non saisis, capteur indisponible | Vérifiez l'écran **Contrat et réseau** et vos capteurs de prix |

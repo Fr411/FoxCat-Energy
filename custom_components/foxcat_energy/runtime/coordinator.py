@@ -168,6 +168,7 @@ from ..domain.engine.load_guard import (
 )
 from ..domain.engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
 from ..domain.engine import backup as backup_logic
+from ..domain import health as health_logic
 from ..domain.tariff.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
 from ..domain.pricing.economic_optimizer import (
     PricePoint,
@@ -360,6 +361,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.connectivity = backup_logic.ConnectivityMonitor()
         self.backup_state: dict[str, Any] = {"active": False, "handled": False, "since": None, "machines": {}}
         self._probe_running = False
+        # Santé : alertes temporisées, notifications déjà envoyées.
+        self.health_tracker = health_logic.AlertTracker()
+        self._health_notified: set[str] = set()
         self._unsubs: list[Any] = []
         # V1.6.150 : les deux corps sont cadencés par la même publication réseau
         # mais ne partagent plus aucun verrou d'exécution.
@@ -558,6 +562,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
         )
         super().async_set_updated_data(data)
+        self._sync_health_notifications(data.get("health"))
         if not bool(self.settings.get("persistent_status_notification_enabled", True)):
             return
         signature = self._status_notification_signature(data)
@@ -3896,6 +3901,107 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._async_save()
         self.async_set_updated_data(self._build_data())
 
+    # MÉTHODE : FoxCatEnergyCoordinator._health_inputs — Photographie de l'état pour les alertes de panne
+    def _health_inputs(self, snap: EnergySnapshot, prices: dict[str, Any]) -> health_logic.HealthInputs:
+        def unavailable(entity_id: str | None) -> bool:
+            state = self.hass.states.get(entity_id) if entity_id else None
+            return state is None or state.state in {"unknown", "unavailable", "none", ""}
+
+        missing_sensors: list[str] = []
+        if self.config.get(CONF_PV_SENSOR) and not self._numeric_valid(self.config.get(CONF_PV_SENSOR)):
+            missing_sensors.append("production photovoltaïque")
+        grid_ids = [self.config.get(CONF_GRID_SIGNED_SENSOR), self.config.get(CONF_METRONOME_FALLBACK_SENSOR)]
+        grid_ids = [item for item in grid_ids if item]
+        if grid_ids and not any(self._numeric_valid(item) for item in grid_ids):
+            missing_sensors.append("puissance réseau")
+
+        boiler_temp_id = self.config.get(CONF_BOILER_TEMP_SENSOR)
+        resistance_id = self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR)
+        boiler_configured = bool(boiler_temp_id) and bool(self.settings.get("device_boiler_enabled", True))
+        boiler_temp_ok = self._numeric_valid(boiler_temp_id)
+        safety_ok = boiler_temp_ok or (bool(resistance_id) and self._numeric_valid(resistance_id))
+
+        relays = [self.config.get(key) for key in (CONF_PRI_L1, CONF_PRI_L2, CONF_PRI_L3, CONF_PRI_L4)]
+        pri_relays_readable = (not all(relays)) or self._rrcr_code() != "????"
+
+        machines_down = tuple(
+            machine.name for machine in self.machines
+            if machine.switch_entity and unavailable(machine.switch_entity)
+        )
+        absent = tuple(
+            entity_id for entity_id in (
+                self.config.get(CONF_PV_SENSOR), self.config.get(CONF_GRID_SIGNED_SENSOR),
+                self.config.get(CONF_BOILER_TEMP_SENSOR), self.config.get(CONF_BOILER_BINARY),
+            )
+            if entity_id and self.hass.states.get(entity_id) is None
+        )
+        return health_logic.HealthInputs(
+            regulation_active=bool(self.settings.get("regulation_active")),
+            mode=str(self.settings.get("mode")),
+            snapshot_valid=bool(snap.valid),
+            missing_essential_sensors=tuple(missing_sensors),
+            metronome_status=str(self.metronome_state.get("status", "SYNCHRONISE")),
+            boiler_configured=boiler_configured,
+            boiler_temp_ok=boiler_temp_ok,
+            boiler_safety_temp_ok=safety_ok,
+            boiler_safety_temp_c=snap.boiler_safety_temp_c if safety_ok else None,
+            boiler_safety_limit_c=float(self.settings.get("boiler_temp_safety_c", 68.0)),
+            pri_enabled=bool(self.settings.get("pri_enabled")),
+            pri_relays_readable=pri_relays_readable,
+            actuator_status=str(self.core_state.get("execution_status", "IDLE")),
+            actuator_error=str(self.core_state.get("actuator_last_error", "") or ""),
+            unavailable_machines=machines_down,
+            price_feed_state=str((prices.get("price_feed") or {}).get("state", "LOCAL")),
+            internet_online=self.connectivity.online,
+            backup_active=self.backup_active,
+            load_shed_active=bool(self.load_shed_state.get("active")),
+            legacy_conflict=self._legacy_conflict(),
+            coordinator_update_ok=bool(getattr(self, "last_update_success", True)),
+            missing_configured_entities=absent,
+        )
+
+    # MÉTHODE : FoxCatEnergyCoordinator._health_view — Alertes de panne visibles, avec temporisation
+    def _health_view(self, snap: EnergySnapshot, prices: dict[str, Any]) -> dict[str, Any]:
+        alerts = health_logic.evaluate(self._health_inputs(snap, prices))
+        visible, _raised, _cleared = self.health_tracker.update(alerts, dt_util.utcnow())
+        return {
+            "status": health_logic.overall_status(visible),
+            "count": len(visible),
+            "alerts": visible,
+            "critical": sum(1 for row in visible if row["severite"] == health_logic.CRITICAL),
+            "major": sum(1 for row in visible if row["severite"] == health_logic.MAJOR),
+        }
+
+    # MÉTHODE : FoxCatEnergyCoordinator._sync_health_notifications — Notification persistante et événement par alerte
+    def _sync_health_notifications(self, health: dict[str, Any] | None) -> None:
+        """Crée la notification d'une nouvelle alerte, la retire quand elle est levée, et publie l'événement ``foxcat_energy_alert``."""
+        enabled = bool(self.settings.get("health_alerts_enabled", True))
+        visible = {row["code"]: row for row in (health or {}).get("alerts", [])} if enabled else {}
+        for code, row in visible.items():
+            if code in self._health_notified:
+                continue
+            self._health_notified.add(code)
+            icon = "🚨" if row["severite"] == health_logic.CRITICAL else "⚠️"
+            persistent_notification.async_create(
+                self.hass,
+                f"**{row['severite']}** — {row['detail']}\n\nDepuis {row['depuis']}.",
+                title=f"{icon} {self.installation_name} — {row['titre']}",
+                notification_id=f"foxcat_energy_alert_{self.entry.entry_id}_{code}",
+            )
+            self.hass.bus.async_fire(
+                "foxcat_energy_alert",
+                {"entry_id": self.entry.entry_id, "installation": self.installation_name, "state": "raised",
+                 "code": code, "severity": row["severite"], "title": row["titre"], "detail": row["detail"]},
+            )
+        for code in list(self._health_notified - set(visible)):
+            self._health_notified.discard(code)
+            persistent_notification.async_dismiss(self.hass, f"foxcat_energy_alert_{self.entry.entry_id}_{code}")
+            if enabled:
+                self.hass.bus.async_fire(
+                    "foxcat_energy_alert",
+                    {"entry_id": self.entry.entry_id, "installation": self.installation_name, "state": "cleared", "code": code},
+                )
+
     # MÉTHODE : FoxCatEnergyCoordinator._evaluate_high_load — Délestage synchronisé sur chaque publication réseau
     async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
         """Délestage synchronisé sur chaque publication réseau.
@@ -4796,6 +4902,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
+            "health": self._health_view(snap, prices),
             "connectivity": backup_logic.status_view(
                 online=self.connectivity.online,
                 since=self.connectivity.since,

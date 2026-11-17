@@ -15,6 +15,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     c: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [
+            FoxCatBinary(c, "alerte_foxcat", "Alerte de panne FoxCat", "mdi:alert-circle-outline", "ems", lambda d: d["health"]["count"] > 0, BinarySensorDeviceClass.PROBLEM, attributes=lambda d: {"gravite": d["health"]["status"], "alertes": d["health"]["alerts"]}),
             FoxCatBinary(c, "internet_en_ligne", "Internet en ligne", "mdi:web", "ems", lambda d: d["connectivity"]["online"], BinarySensorDeviceClass.CONNECTIVITY, attributes=lambda d: {"depuis": d["connectivity"]["since"], "mode_backup_actif": d["connectivity"]["backup_active"]}),
             FoxCatBinary(c, "mode_backup_actif", "Mode Backup actif", "mdi:cloud-off-outline", "ems", lambda d: d["connectivity"]["backup_active"], BinarySensorDeviceClass.RUNNING, attributes=lambda d: {"mode_backup_active": d["connectivity"]["backup_enabled"], "prises_memorisees": d["connectivity"]["saved_machines"]}),
             FoxCatBinary(c, "donnees_valides", "Données énergétiques valides", "mdi:database-check-outline", "energy", lambda d: d["snapshot"].valid, BinarySensorDeviceClass.CONNECTIVITY),
