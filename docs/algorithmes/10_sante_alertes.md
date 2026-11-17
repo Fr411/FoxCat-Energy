@@ -21,6 +21,8 @@ Une alerte signale une panne qui empêche FoxCat de fonctionner ou compromet la 
 | `FOXCAT_EN_ERREUR` | Majeure | dernière mise à jour du coordinateur en échec | 2 min |
 | `ENTITE_INTROUVABLE` | Majeure | une entité essentielle configurée n'existe plus | 2 min |
 
+Pour `BOILER_SONDE_HS` et `BOILER_SONDE_SECURITE_HS`, FoxCat **interdit en plus toute chauffe** tant que la sonde est illisible (`BoilerProbeGuard`, A-32) ; la chauffe reprend 60 secondes après le retour de la sonde.
+
 Les alertes du boiler et du PRI ne se déclenchent pas en mode Manuel, régulation coupée ou boiler non géré : FoxCat ne pilote alors rien. La surchauffe fait exception, c'est une sécurité du matériel.
 
 ## Temporisation (`AlertTracker`)

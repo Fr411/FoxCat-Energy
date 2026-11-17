@@ -168,6 +168,7 @@ from ..domain.engine.load_guard import (
 )
 from ..domain.engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
 from ..domain.engine import backup as backup_logic
+from ..domain.engine import boiler_probe as probe_logic
 from ..domain import health as health_logic
 from ..domain.tariff.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
 from ..domain.pricing.economic_optimizer import (
@@ -363,6 +364,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._probe_running = False
         # Santé : alertes temporisées, notifications déjà envoyées.
         self.health_tracker = health_logic.AlertTracker()
+        self.boiler_probe_guard = probe_logic.BoilerProbeGuard()
         self._health_notified: set[str] = set()
         self._unsubs: list[Any] = []
         # V1.6.150 : les deux corps sont cadencés par la même publication réseau
@@ -2883,6 +2885,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.reset_core("Mesures énergétiques invalides : aucune décision autorisée.")
             return
 
+        # Sonde du boiler illisible : aucune chauffe, jamais de température supposée à 0 °C.
+        if self._boiler_probe_blocked():
+            if snapshot.boiler_on and str(self.settings.get("mode")) != MODE_MANUAL:
+                await self.async_command_boiler(
+                    BOILER_STOP, "Sonde boiler indisponible : chauffe interdite, arrêt du boiler.", "SECURITE"
+                )
+            else:
+                self.reset_core("Sonde boiler indisponible : aucune commande de chauffe.")
+            return
+
         # Le délestage haute consommation est prioritaire sur les stratégies
         # énergétiques normales, mais reste inactif en mode Manuel.
         if (
@@ -3110,6 +3122,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_command_boiler(self, action: str, reason: str, origin: str) -> None:
         if not bool(self.settings.get("regulation_active")) and origin not in {"UTILISATEUR", "SECURITE"}:
             return
+        # Point de passage unique de toute commande de chauffe (stratégies, utilisateur, boutons, V2H) :
+        # sans sonde lisible, aucune chauffe n'est envoyée, même sur ordre de l'utilisateur.
+        if probe_logic.is_heating_action(action) and self._boiler_probe_blocked():
+            self.core_state["last_reason"] = f"Chauffe refusée : sonde boiler indisponible ({reason})"
+            return
         climate = self.config.get(CONF_BOILER_CLIMATE)
         if not climate:
             self.core_state["execution_status"] = "FAILED"
@@ -3183,6 +3200,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # MÉTHODE : FoxCatEnergyCoordinator._execute_boiler_command — Worker physique Boiler indépendant du cadenceur EMS.
     async def _execute_boiler_command(self, action: str, pending: str, climate: str) -> None:
         """Worker physique Boiler indépendant du cadenceur EMS."""
+        if probe_logic.is_heating_action(action) and self._boiler_probe_blocked():
+            self.core_state["execution_status"] = "BLOCKED"
+            self.core_state["execution_failure_reason"] = "Sonde boiler indisponible : chauffe annulée."
+            return
         try:
             self.core_state["execution_status"] = "EXECUTION"
             async with self._ems_action_lock:
@@ -3299,6 +3320,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._async_ems_service_call(
                     "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "off"}
                 )
+            elif self._boiler_probe_blocked():
+                return
             else:
                 boost = command in {"ECS_MODULE_ON_65", "ECS_MODULE_UPGRADE_65", "ECS_MODULE_SET_65"}
                 temp = float(self.settings["boiler_temp_boost_c"] if boost else self.settings["boiler_temp_normal_c"])
@@ -3316,6 +3339,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # et override utilisateur actif.
         if snap.boiler_on and snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
             await self.async_command_boiler(BOILER_STOP, "SÉCURITÉ : température boiler maximale atteinte.", "SECURITE")
+        elif self._boiler_probe_blocked() and snap.boiler_on and str(self.settings.get("mode")) != MODE_MANUAL:
+            await self.async_command_boiler(
+                BOILER_STOP, "Sonde boiler indisponible : chauffe interdite, arrêt du boiler.", "SECURITE"
+            )
         elif bool(self.settings.get("regulation_active")):
             mode = str(self.settings.get("mode"))
             user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
@@ -3900,6 +3927,24 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_reconcile_machines()
         await self._async_save()
         self.async_set_updated_data(self._build_data())
+
+    # MÉTHODE : FoxCatEnergyCoordinator._boiler_probe_blocked — La chauffe est interdite faute de sonde lisible
+    def _boiler_probe_blocked(self) -> bool:
+        """Vrai tant que la sonde du boiler est illisible, puis 60 s après son retour.
+
+        Sans sonde configurée ou boiler non géré, la garde ne s'applique pas.
+        """
+        probe_id = self.config.get(CONF_BOILER_TEMP_SENSOR)
+        if not probe_id or not bool(self.settings.get("device_boiler_enabled", True)):
+            self.boiler_probe_guard.blocked = False
+            return False
+        transition = self.boiler_probe_guard.observe(self._numeric_valid(probe_id), dt_util.utcnow())
+        if transition == probe_logic.TRANSITION_BLOCKED:
+            _LOGGER.error("Sonde du boiler indisponible : toute commande de chauffe est interdite.")
+        elif transition == probe_logic.TRANSITION_RELEASED:
+            _LOGGER.warning("Sonde du boiler de retour : chauffe de nouveau autorisée.")
+            self.reset_core("Sonde boiler rétablie : régulation normale reprise.")
+        return self.boiler_probe_guard.blocked
 
     # MÉTHODE : FoxCatEnergyCoordinator._health_inputs — Photographie de l'état pour les alertes de panne
     def _health_inputs(self, snap: EnergySnapshot, prices: dict[str, Any]) -> health_logic.HealthInputs:

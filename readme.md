@@ -173,6 +173,8 @@ Interrupteur « Mode Backup si Internet coupé » (actif par défaut) et réglag
 
 FoxCat surveille sa propre santé et notifie ce qui ne fonctionne pas. **Critiques** : mesures ou métronome perdus, boiler en surchauffe, sonde du boiler ou de sécurité indisponible, relais de l'onduleur illisibles, commande en échec. **Majeures** : capteur principal silencieux, prix indisponibles, Internet coupé, prise de machine indisponible, délestage en cours, ancienne automatisation active, calcul en erreur, entité introuvable. Une alerte apparaît après 2 minutes (surchauffe et délestage : tout de suite) et disparaît après 60 secondes de retour stable.
 
+**Sonde du boiler indisponible** : FoxCat n'assimile jamais l'absence de mesure à 0 °C. Dès que la sonde de température du boiler est illisible, toute commande de chauffe est refusée (y compris celle de l'utilisateur) et un boiler en train de chauffer est arrêté ; la chauffe reprend 60 secondes après le retour continu de la sonde. Au démarrage de Home Assistant, elle attend donc la première lecture.
+
 Sorties : capteur **« Santé FoxCat »** (`OK`, `MAJEUR`, `CRITIQUE`, avec la liste), capteur binaire **« Alerte de panne FoxCat »**, une **notification** dans Home Assistant par alerte, et l'événement `foxcat_energy_alert` pour envoyer un message sur téléphone (exemple : `docs/automations/alerte_panne_foxcat.yaml`). Catalogue complet : [santé et alertes](docs/algorithmes/10_sante_alertes.md).
 
 ### Publication des prix

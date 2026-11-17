@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29 et A-30 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30** (corrigée) et **A-31** ont été trouvées ensuite par les scénarios d'économie, **A-32** en écrivant les alertes de panne.
+**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30 et A-32 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30** et **A-32** (corrigées) et **A-31** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -48,7 +48,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
 | ~~A-30~~ | Haute | Planificateur de charges : le surplus solaire et le prix de réinjection ne comptaient pas dans le coût d'un départ ✔ (corrigée) |
 | A-31 | Basse | Planificateur de charges : départ jusqu'à une demi-heure trop tôt ✔ |
-| A-32 | **Haute** | Sonde du boiler indisponible : FoxCat lit 0 °C et chauffe sur le réseau ✔ (signalée par une alerte critique) |
+| ~~A-32~~ | **Haute** | Sonde du boiler indisponible : FoxCat lisait 0 °C et chauffait sur le réseau ✔ (corrigée, signalée par une alerte critique) |
 
 ---
 
@@ -230,15 +230,15 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition** : attendre le créneau lui-même, en gardant une tolérance de quelques minutes seulement, ou prendre en compte le coût du délai dans la comparaison.
 
-## A-32 · Haute · Sonde du boiler indisponible : lue comme 0 °C ✔
+## A-32 · Haute · Sonde du boiler indisponible : lue comme 0 °C ✔ — CORRIGÉE
 
 **Constat** : `snapshot()` lit la sonde du boiler avec `_float_state`, qui renvoie **0,0** quand l'entité est `unavailable` ou `unknown`. `valid` ne dépend que du réseau et du photovoltaïque. Les stratégies (`evaluate_eco`, boiler dynamique) comparent ensuite `boiler_temp_c < normal` : un ballon « à 0 °C » est chauffé sur le réseau. La sonde de sécurité retombe sur cette même valeur (0 °C) si la sonde de résistance est absente : la protection contre la surchauffe est alors aveugle.
 
 **Preuve** : `_float_state` (valeur par défaut 0,0), `snapshot()` (lignes `boiler_temp = self._float_state(...)` puis `boiler_safety_temp = resistance_temp if … else boiler_temp`) et `evaluate_eco` (`snapshot.boiler_temp_c < normal`).
 
-**Atténuation livrée** : alertes critiques `BOILER_SONDE_HS` et `BOILER_SONDE_SECURITE_HS` (voir `10_sante_alertes.md`), notifiées après 2 minutes.
+**Alertes** : `BOILER_SONDE_HS` et `BOILER_SONDE_SECURITE_HS` (voir `10_sante_alertes.md`), notifiées après 2 minutes.
 
-**Proposition** : lire la sonde avec `_optional_float_state` ; si elle est absente, interdire toute chauffe réseau (le boiler passe à l'arrêt sauf commande utilisateur) et ne jamais assimiler l'absence de mesure à 0 °C.
+**Correction** : `BoilerProbeGuard` (`domain/engine/boiler_probe.py`). Dès que la sonde de régulation (`boiler_temp_sensor`) est illisible, **toute commande de chauffe est interdite**, sans délai : le boiler en train de chauffer reçoit l'ordre d'arrêt (origine `SECURITE`, sauf en mode Manuel où FoxCat ne commande rien) et `async_command_boiler`, point de passage unique de toutes les commandes (stratégies, utilisateur, boutons, V2H), refuse `CHAUFFE_45` et `BOOST_65`, **même sur ordre de l'utilisateur**. Les deux exécutions physiques (envoi et nouvelle tentative) revérifient la garde. L'arrêt n'est jamais bloqué. La chauffe n'est rétablie qu'après **60 secondes de lecture continue**, puis la régulation repart d'une acquisition neuve et les stratégies normales s'appliquent. Sans sonde configurée ou boiler non géré, la garde ne s'applique pas.
 
 ## Tests proposés (par ordre de valeur)
 

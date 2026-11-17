@@ -82,12 +82,12 @@ def evaluate(h: HealthInputs) -> list[Alert]:
     if h.boiler_configured and h.regulation_active and not manual and not h.boiler_safety_temp_ok:
         alerts.append(Alert(
             "BOILER_SONDE_SECURITE_HS", CRITICAL, "Sonde de sécurité du boiler indisponible",
-            "La protection contre la surchauffe est aveugle : FoxCat lit 0 °C à la place de la mesure. Rétablissez la sonde.",
+            "La protection contre la surchauffe est aveugle. FoxCat interdit toute chauffe tant que la sonde ne répond pas. Rétablissez la sonde.",
         ))
     if h.boiler_configured and h.regulation_active and not manual and not h.boiler_temp_ok and h.boiler_safety_temp_ok:
         alerts.append(Alert(
             "BOILER_SONDE_HS", CRITICAL, "Sonde de température du boiler indisponible",
-            "FoxCat lit 0 °C : il peut chauffer à tort. Rétablissez la sonde ou coupez la gestion du boiler.",
+            "FoxCat interdit toute chauffe tant que la sonde ne répond pas, et la reprend 60 secondes après son retour. Rétablissez la sonde.",
         ))
     if h.pri_enabled and h.regulation_active and not manual and not h.pri_relays_readable:
         alerts.append(Alert(

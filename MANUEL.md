@@ -517,7 +517,7 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | Prélèvement et réinjection inversés | Convention de signe | **Mesures et sources**, inversez la convention |
-| Alerte « Sonde de température du boiler indisponible » | La sonde du boiler ne répond plus | Rétablissez la sonde ou coupez la gestion du boiler ; FoxCat lit 0 °C et peut chauffer à tort |
+| Alerte « Sonde de température du boiler indisponible », le boiler ne chauffe plus | La sonde du boiler ne répond plus : FoxCat interdit toute chauffe (même « Forcer la marche ») | Rétablissez la sonde ; la chauffe reprend 60 secondes après son retour. Pour un boiler sans sonde, retirez la sonde de la configuration ou coupez la gestion du boiler |
 | Machines allumées alors que le prix est haut, boiler coupé | Mode Backup actif (Internet coupé) | Vérifiez le capteur « Internet en ligne » ; rétablissez la connexion ou coupez l'interrupteur « Mode Backup si Internet coupé » |
 | Flux de prix en `DEGRADE` | Plus de prix reçus et tampon épuisé | Rétablissez Internet ou l'intégration de prix ; le boiler reste en repli confort 45 °C |
 | Prix actif à 0 ou « — » | Prix non saisis, capteur indisponible | Vérifiez l'écran **Contrat et réseau** et vos capteurs de prix |
