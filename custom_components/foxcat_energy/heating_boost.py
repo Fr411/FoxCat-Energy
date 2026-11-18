@@ -255,8 +255,9 @@ def evaluate(
     1. Retour à 0 si la fonction est désactivée, si la régulation FoxCat est
        inactive, si le snapshot est invalide, ou si « uniquement maison vide »
        est actif alors que quelqu'un est présent (présence inconnue = présent).
-    2. Surplus = export + puissance du groupe de clim − marge de réserve : le
-       chauffage consomme déjà une partie du surplus qu'il utilise.
+    2. Surplus = (export − import) + puissance du groupe de clim − marge de réserve :
+       ce qui resterait à exporter si les PAC étaient éteintes. Une PAC alimentée
+       par le réseau n'est pas du surplus.
     3. Pas = ``floor(surplus / surplus_par_pas)``, borné à ``max_c / pas_c``.
     4. Hystérésis : un pas déjà accordé est conservé tant que le surplus reste
        au moins égal à 60 % de son seuil.
@@ -285,8 +286,11 @@ def evaluate(
     guard_w = _optional_number(inputs.guard_power_w)
     guard_w = max(guard_w, 0.0) if guard_w is not None else group_w
 
-    # 2) Surplus disponible : le chauffage déjà en cours fait partie du surplus.
-    surplus = export_w + (group_w or 0.0) - cfg.reserve_w
+    # 2) Surplus disponible = ce qui resterait à exporter si les PAC étaient éteintes :
+    #    (export - import) + puissance des PAC - marge. La puissance des PAC ne compte
+    #    que si elle est couverte par le solaire : une PAC alimentée par le réseau
+    #    (import > 0) n'est pas du surplus.
+    surplus = export_w - import_w + (group_w or 0.0) - cfg.reserve_w
 
     # 3) Nombre de pas accordés par le surplus, borné au maximum.
     max_steps = cfg.max_steps

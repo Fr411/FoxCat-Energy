@@ -161,12 +161,13 @@ class AntiYoyoTests(unittest.TestCase):
 
     def test_import_at_the_limit_does_not_force_the_decrease(self):
         # import 300 W n'est pas > 300 W : retour au comportement d'hystérésis.
-        result = run(cfg(), state(1, T0 - 1), inputs(export_w=500.0, import_w=300.0))
+        # PAC à 1000 W : surplus = 0 - 300 + 1000 - 100 = 600 W, un pas.
+        result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=300.0, group_power_w=1000.0))
         self.assertEqual(result.steps, 1)
 
     def test_import_bypasses_hysteresis(self):
-        # Surplus 400 W conserverait le pas 1 ; l'import > 300 W l'enlève tout de suite.
-        result = run(cfg(), state(1, T0 - 1), inputs(export_w=500.0, import_w=400.0))
+        # Surplus 0 - 400 + 900 - 100 = 400 W conserverait le pas 1 ; l'import > 300 W l'enlève tout de suite.
+        result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=400.0, group_power_w=900.0))
         self.assertEqual(result.steps, 0)
 
     def test_change_timestamp_only_moves_when_steps_change(self):
@@ -195,9 +196,9 @@ class GroupGuardTests(unittest.TestCase):
 
     def test_guard_never_blocks_a_decrease(self):
         # Groupe à 2400 W (>= 2250 W) mais surplus réduit par une grande réserve :
-        # 0 + 2400 - 1000 = 1400 W -> 2 pas demandés < 3 accordés, import > 300 W.
-        config = cfg(heating_surplus_reserve_w=1000.0)
-        result = run(config, state(3, T0 - 1), inputs(export_w=0.0, import_w=500.0, group_power_w=2400.0))
+        # 0 - 400 + 2400 - 800 = 1200 W -> 2 pas demandés < 3 accordés, import > 300 W.
+        config = cfg(heating_surplus_reserve_w=800.0)
+        result = run(config, state(3, T0 - 1), inputs(export_w=0.0, import_w=400.0, group_power_w=2400.0))
         self.assertEqual(result.steps, 2)
 
     def test_guard_uses_configured_limit(self):
@@ -454,6 +455,30 @@ class HeatingEntitiesTests(unittest.TestCase):
         fake.data = {"heating_boost": {"offset_c": 0.0, "steps": 0, "surplus_w": None, "reason": "off"}}
         self.assertFalse(found["chauffage_decalage_actif"].is_on)
         self.assertIsNone(found["chauffage_surplus_calcule"].native_value)
+
+
+class GridFedHeatingTests(unittest.TestCase):
+    """Une PAC alimentée par le réseau n'est pas du surplus (capture : solaire 0 W, import 1100 W, PAC 641 W)."""
+
+    def test_piege_pac_fed_by_the_grid_gives_no_offset(self):
+        result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=1100.0, group_power_w=641.0))
+        self.assertEqual(result.steps, 0)
+        self.assertLess(result.surplus_w, 0)
+
+    def test_pac_fully_covered_by_the_solar_keeps_its_offset(self):
+        # Solaire = maison + PAC : réseau à 0, la PAC (641 W) tourne sur le surplus.
+        result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=0.0, group_power_w=641.0))
+        self.assertEqual(result.steps, 1)
+        self.assertAlmostEqual(result.surplus_w, 541.0)
+
+    def test_pac_only_partly_covered_by_the_solar_is_not_counted_in_full(self):
+        # La maison importe 400 W avec la PAC à 900 W : sans la PAC elle exporterait 500 W, donc 500 - 100 de marge = 400 W.
+        result = run(cfg(), state(0), inputs(export_w=0.0, import_w=400.0, group_power_w=900.0))
+        self.assertAlmostEqual(result.surplus_w, 400.0)
+
+    def test_surplus_adds_export_and_pac_power_when_exporting(self):
+        result = run(cfg(), state(0), inputs(export_w=800.0, import_w=0.0, group_power_w=500.0))
+        self.assertAlmostEqual(result.surplus_w, 1200.0)
 
 
 if __name__ == "__main__":

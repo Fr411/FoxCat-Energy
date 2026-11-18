@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30, A-32 et A-33 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30**, **A-32** et **A-33** (corrigées) et **A-31**, **A-34** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
+**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30, A-32, A-33 et A-35 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30**, **A-32**, **A-33** et **A-35** (corrigées) et **A-31**, **A-34** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -48,6 +48,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
 | ~~A-30~~ | Haute | Planificateur de charges : le surplus solaire et le prix de réinjection ne comptaient pas dans le coût d'un départ ✔ (corrigée) |
 | A-31 | Basse | Planificateur de charges : départ jusqu'à une demi-heure trop tôt ✔ |
+| ~~A-35~~ | **Haute** | Décalage de consigne : une PAC alimentée par le réseau comptait comme surplus ✔ (corrigée) |
 | ~~A-33~~ | Moyenne | Décalage de consigne chauffage recalculé par une mise à jour périodique que Home Assistant repousse à chaque publication ✔ (corrigée) |
 | A-34 | Moyenne | `_watchdog` (machine à états du cœur) n'est appelé que par cette même mise à jour périodique |
 | ~~A-32~~ | **Haute** | Sonde du boiler indisponible : FoxCat lisait 0 °C et chauffait sur le réseau ✔ (corrigée, signalée par une alerte critique) |
@@ -256,7 +257,13 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition** : minuteur dédié (`async_track_time_interval`). Non fait : cela change le comportement du cœur pour toutes les installations (la réinitialisation sur trame ancienne se mettrait à fonctionner), à valider séparément.
 
-## Tests proposés (par ordre de valeur)
+## A-35 · Haute · Décalage de consigne : la PAC alimentée par le réseau comptait comme surplus ✔ — CORRIGÉE
+
+**Constat** (capture de l'utilisateur : solaire 0 W, import 1,10 kW, export 0 W, PAC à 641 W) : le statut affichait « surplus 541 W » et gardait un décalage de 1,0 °C. La formule était `surplus = export + puissance du groupe − réserve`. Elle comptait donc toute la consommation de la PAC comme surplus, quelle que soit son origine, et ignorait l'import : une PAC alimentée à 100 % par le réseau « créait » du surplus et conservait son décalage, c'est-à-dire qu'elle chauffait plus fort sur le réseau. La règle « baisse immédiate si import > 300 W » ne corrigeait rien : elle baisse seulement jusqu'au nombre de pas que le surplus erroné autorisait encore.
+
+**Preuve** ✔ : `heating_boost.evaluate` rejoué avec les mesures de la capture : surplus 541 W, 1 pas conservé.
+
+**Correction** : `surplus = (export − import) + puissance du groupe − réserve`, soit ce qui resterait à exporter si les PAC étaient éteintes. Avec la capture : −559 W, décalage ramené à 0. Une PAC entièrement couverte par le solaire (réseau à 0) garde son décalage ; une PAC partiellement couverte n'est comptée que pour la part solaire. Deux anciens tests utilisaient des mesures impossibles (export et import positifs en même temps) : ils sont rendus réalistes, avec quatre nouveaux tests dont la capture.
 
 1. **A-22** : passer le vrai `MachineCycleManager.snapshot()` à `build_flexible_load_plan` ; couvrir aussi `machine_states()` en tarif dynamique.
 2. **A-16** : courbes de 96 quarts d'heure : position, bande, bloc consécutif, créneau de réservation.
