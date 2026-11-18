@@ -15,6 +15,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     c: FoxCatEnergyCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
         [
+            FoxCatBinary(c, "alerte_foxcat", "Alerte de panne FoxCat", "mdi:alert-circle-outline", "ems", lambda d: d["health"]["count"] > 0, BinarySensorDeviceClass.PROBLEM, attributes=lambda d: {"gravite": d["health"]["status"], "alertes": d["health"]["alerts"]}),
+            FoxCatBinary(c, "internet_en_ligne", "Internet en ligne", "mdi:web", "ems", lambda d: d["connectivity"]["online"], BinarySensorDeviceClass.CONNECTIVITY, attributes=lambda d: {"depuis": d["connectivity"]["since"], "mode_backup_actif": d["connectivity"]["backup_active"]}),
+            FoxCatBinary(c, "mode_backup_actif", "Mode Backup actif", "mdi:cloud-off-outline", "ems", lambda d: d["connectivity"]["backup_active"], BinarySensorDeviceClass.RUNNING, attributes=lambda d: {"mode_backup_active": d["connectivity"]["backup_enabled"], "prises_memorisees": d["connectivity"]["saved_machines"]}),
             FoxCatBinary(c, "donnees_valides", "Données énergétiques valides", "mdi:database-check-outline", "energy", lambda d: d["snapshot"].valid, BinarySensorDeviceClass.CONNECTIVITY),
             FoxCatBinary(c, "machine_protegee_active", "Machine protégée active", "mdi:shield-home-outline", "machines", lambda d: d["snapshot"].machine_active),
             FoxCatBinary(c, "chauffage_decalage_actif", "Décalage actif", "mdi:radiator", "ems", lambda d: float(d["heating_boost"].get("offset_c") or 0.0) > 0.0),
@@ -32,10 +35,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
 class FoxCatBinary(FoxCatEntity, BinarySensorEntity):
     # MÉTHODE : FoxCatBinary.__init__ — méthode spéciale __init__
-    def __init__(self, coordinator, key, name, icon, device, getter, device_class=None):
+    def __init__(self, coordinator, key, name, icon, device, getter, device_class=None, attributes=None):
         super().__init__(coordinator, key, name, icon, device)
         self._getter = getter
         self._attr_device_class = device_class
+        self._attributes_getter = attributes
+
+    # MÉTHODE : FoxCatBinary.extra_state_attributes — Attributs optionnels
+    @property
+    def extra_state_attributes(self):
+        if self._attributes_getter is None:
+            return None
+        try:
+            return dict(self._attributes_getter(self.coordinator.data) or {})
+        except Exception:
+            return None
 
     # MÉTHODE : FoxCatBinary.is_on — Is on
     @property

@@ -157,6 +157,26 @@ Le cerveau de FoxCat tourne dans Home Assistant : mesures, boiler, onduleur et m
 - **Capteur « Flux de prix ».** États `EN_LIGNE`, `TAMPON`, `DEGRADE` et `LOCAL`, avec la fin du tampon (`buffer_until`) et les heures restantes. Le journal signale chaque changement.
 - **Limites.** La comptabilité compte 0 € d'achat quand aucun prix n'existe et ne rattrape pas les prix au retour d'Internet. Forecast.Solar et la tâche IA solaire échouent hors ligne. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
 
+### Mode Backup : Internet coupé
+
+FoxCat sonde Internet toutes les 30 secondes (connexion TCP vers des résolveurs publics, rien n'est envoyé). Après la durée réglée sans connexion (2 minutes par défaut), le capteur **« Internet en ligne »** passe à hors ligne et le **mode Backup** s'enclenche :
+
+- **Machines** : les prises restent alimentées ; fenêtres horaires, prix et planificateur sont ignorés.
+- **Boiler** : **coupé** pendant toute la coupure, ballon froid compris ; il reprend sa stratégie normale au retour d'Internet. Une commande utilisateur « forcer la marche » reste prioritaire.
+- **Onduleur** : plus bridé, sauf avec la politique « Zéro injection ».
+- **Mémoire** : l'état des prises est enregistré avant la coupure et rétabli au retour d'Internet (après 60 secondes de connexion stable), sans jamais couper un cycle en cours.
+- **Sécurité maintenue** : délestage du disjoncteur.
+
+Interrupteur « Mode Backup si Internet coupé » (actif par défaut) et réglage de la durée. En mode Manuel ou régulation coupée, FoxCat ne commande rien. Pendant le Backup, le tampon de prix ne guide plus les décisions ; il continue d'alimenter l'affichage et la comptabilité. Détail : [prix dynamiques](docs/algorithmes/05_prix_dynamiques.md).
+
+### Alertes de panne
+
+FoxCat surveille sa propre santé et notifie ce qui ne fonctionne pas. **Critiques** : mesures ou métronome perdus, boiler en surchauffe, sonde du boiler ou de sécurité indisponible, relais de l'onduleur illisibles, commande en échec. **Majeures** : capteur principal silencieux, prix indisponibles, Internet coupé, prise de machine indisponible, délestage en cours, ancienne automatisation active, calcul en erreur, entité introuvable. Une alerte apparaît après 2 minutes (surchauffe et délestage : tout de suite) et disparaît après 60 secondes de retour stable.
+
+**Sonde du boiler indisponible** : FoxCat n'assimile jamais l'absence de mesure à 0 °C. Dès que la sonde de température du boiler est illisible, toute commande de chauffe est refusée (y compris celle de l'utilisateur) et un boiler en train de chauffer est arrêté ; la chauffe reprend 60 secondes après le retour continu de la sonde. Au démarrage de Home Assistant, elle attend donc la première lecture.
+
+Sorties : capteur **« Santé FoxCat »** (`OK`, `MAJEUR`, `CRITIQUE`, avec la liste), capteur binaire **« Alerte de panne FoxCat »**, une **notification** dans Home Assistant par alerte, et l'événement `foxcat_energy_alert` pour envoyer un message sur téléphone (exemple : `docs/automations/alerte_panne_foxcat.yaml`). Catalogue complet : [santé et alertes](docs/algorithmes/10_sante_alertes.md).
+
 ### Publication des prix
 
 Une entité (par exemple « prix de demain disponible ») déclenche la relecture des prix, avec un service optionnel (par exemple `be_electricity_prices.refresh`), appelé au plus **une fois toutes les 10 minutes**.
@@ -240,7 +260,7 @@ Le **PRI** réduit la puissance de l'onduleur par quatre relais **RRCR** (L1 à 
 
 Fonction **désactivée par défaut**. FoxCat calcule un décalage en °C (0 à 2 °C par pas de 0,5 °C par défaut) selon le surplus solaire et la présence, et le publie dans le capteur « Chauffage • Décalage de consigne », avec un capteur « Statut » qui donne la raison. **Une automatisation Home Assistant** applique ce décalage aux presets de **Versatile Thermostat** : FoxCat n'écrit jamais dans les `climate.*` ni dans les `number.*`.
 
-Règles : anti-yoyo (300 s avant toute augmentation), un pas accordé est conservé tant que le surplus reste à 60 % du seuil, baisse immédiate si l'import dépasse 300 W, garde sur la puissance du groupe de climatisation. Option « uniquement maison vide ». Tout est créé par FoxCat, sans helper à créer à la main. Exemple d'automatisation : [`docs/automations/etage_decalage_vtherm.yaml`](docs/automations/etage_decalage_vtherm.yaml).
+Le décalage est recalculé **à chaque trame réseau**, seulement quand la fonction est activée (le capteur « Statut » indique `calcule_a` et `calcule_par`). Règles : anti-yoyo (300 s avant toute augmentation), un pas accordé est conservé tant que le surplus reste à 60 % du seuil, baisse immédiate si l'import dépasse 300 W, garde sur la puissance du groupe de climatisation. Option « uniquement maison vide ». Tout est créé par FoxCat, sans helper à créer à la main. Exemple d'automatisation : [`docs/automations/etage_decalage_vtherm.yaml`](docs/automations/etage_decalage_vtherm.yaml).
 
 Le menu permet aussi de déclarer des **systèmes de chauffage** (pompes à chaleur : groupe extérieur, et jusqu'à 5 unités intérieures pour une PAC air/air).
 

@@ -43,7 +43,7 @@ def _profile(m,learning):
 def _conflict(a,b,p,res,maxp): return sum(r.power_w for r in res if a<r.end and b>r.start)+p>maxp
 # FONCTION : build_flexible_load_plan — Build flexible load plan
 def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points,machines,learning,cycles,price_analysis,solar_forecast,boiler_thermal=None,boiler_user_override='AUTO',peak_shaving_active=False):
- ps=sorted(import_points,key=lambda x:x.at); step=_step(ps); dyn=bool(price_analysis.get('active')); result={'active':dyn,'ready':bool(ps),'loads':{},'machines':{},'timeline':[],'behavior':settings.get('mode'),'mode':price_analysis.get('mode','REACTIVE')}
+ ps=sorted(import_points,key=lambda x:x.at); xs=sorted(export_points or [],key=lambda x:x.at); step=_step(ps); dyn=bool(price_analysis.get('active')); result={'active':dyn,'ready':bool(ps),'loads':{},'machines':{},'timeline':[],'behavior':settings.get('mode'),'mode':price_analysis.get('mode','REACTIVE')}
  if peak_shaving_active:
   result['safety_override']=True
   result['machines']={m.machine_id:{'name':m.name,'decision':SAFETY_OVERRIDE,'allow_start_now':False,'reason':'Peak shaving : nouveau démarrage suspendu'} for m in machines}
@@ -58,13 +58,18 @@ def build_flexible_load_plan(*,now,snapshot,settings,import_points,export_points
   if cycles.get(m.machine_id,{}).get('protected'):
    end=_as_datetime(cycles[m.machine_id].get('expected_end_at'),now+timedelta(hours=float(m.cycle_duration_minutes)/60)); result['machines'][m.machine_id]={'name':m.name,'decision':CONTINUE,'allow_start_now':True,'reason':'Cycle protégé par MachineCycleManager','planned_start':now.isoformat(),'planned_end':end.isoformat()}; reservations.append(Reservation(m.machine_id,now,end,float(getattr(m,'nominal_power_w',2000)))); continue
   if peak_shaving_active: result['machines'][m.machine_id]={'name':m.name,'decision':SAFETY_OVERRIDE,'allow_start_now':False,'reason':'Peak shaving : nouveau démarrage suspendu'}; continue
-  dur,power=_profile(m,learning); av=_available(m,now); dl=min(_deadline(m,now),now+timedelta(hours=maxwait)); candidates=[]
+  dur,power=_profile(m,learning); av=_available(m,now)
+  # Surplus solaire mesuré : la part qu'il couvre vaut la valeur de réinjection (négative si l'injection est pénalisée), pas le prix réseau.
+  export_now=_price(xs,now) if xs else None; solar_share=min(max(float(getattr(snapshot,'export_w',0) or 0),0.0),power)/power if export_now is not None and power>0 else 0.0
+  dl=min(_deadline(m,now),now+timedelta(hours=maxwait)); candidates=[]
   starts=[p.at for p in ps if av<=p.at<=dl-timedelta(hours=dur) and machine_allowed(m,p.at)]
   if av<=dl-timedelta(hours=dur) and machine_allowed(m,av): starts.insert(0,av)
   for st in sorted(set(starts)):
    en=st+timedelta(hours=dur)
    if _conflict(st,en,power,reservations,maxp):continue
-   c=sum((_price(ps,st+timedelta(minutes=i*step)) or 0)*power/1000*step/60 for i in range(max(1,int(dur*60/step))))
+   near=st==av or abs((st-now).total_seconds())<=step*30
+   share=solar_share if near else 0.0
+   c=sum(((1-share)*(_price(ps,st+timedelta(minutes=i*step)) or 0)+share*(export_now or 0))*power/1000*step/60 for i in range(max(1,int(dur*60/step))))
    wait=max((st-now).total_seconds()/3600,0); candidates.append((c+wait*waitpen,st,c))
   if not candidates:result['machines'][m.machine_id]={'name':m.name,'decision':WAIT,'allow_start_now':False,'reason':'Aucun créneau réalisable'};continue
   candidates.sort(); best=candidates[0]; nowc=next((x for x in candidates if x[1]==av or abs((x[1]-now).total_seconds())<=step*30),None); saving=(nowc[2]-best[2]) if nowc else 0

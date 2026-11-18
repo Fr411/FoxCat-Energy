@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03 et A-29 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts.
+**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30, A-32 et A-33 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30**, **A-32** et **A-33** (corrigées) et **A-31**, **A-34** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -46,6 +46,11 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-27 | Basse | Prompt IA : plages HP/HC écrites en dur |
 | ~~A-29~~ | Moyenne | Capacitaire flamand : seule la pointe du mois en cours comptait (corrigée) |
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
+| ~~A-30~~ | Haute | Planificateur de charges : le surplus solaire et le prix de réinjection ne comptaient pas dans le coût d'un départ ✔ (corrigée) |
+| A-31 | Basse | Planificateur de charges : départ jusqu'à une demi-heure trop tôt ✔ |
+| ~~A-33~~ | Moyenne | Décalage de consigne chauffage recalculé par une mise à jour périodique que Home Assistant repousse à chaque publication ✔ (corrigée) |
+| A-34 | Moyenne | `_watchdog` (machine à états du cœur) n'est appelé que par cette même mise à jour périodique |
+| ~~A-32~~ | **Haute** | Sonde du boiler indisponible : FoxCat lisait 0 °C et chauffait sur le réseau ✔ (corrigée, signalée par une alerte critique) |
 
 ---
 
@@ -209,6 +214,47 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 **Constat** (après recherche des règles officielles, Fluvius et VREG) : la facture flamande utilise la **moyenne des pointes mensuelles sur au plus 12 mois**, chacune au minimum 2,5 kW ; FoxCat n'utilisait que la pointe du **mois en cours** (`max(pointe, 2,5)`), donc une estimation instable (un seul pic du mois la faisait grimper) et différente de la facture.
 
 **Correction** : `billed_peak_kw` (moyenne des mois connus, plancher 2,5 kW, ≤ 12 mois), historique des pointes mémorisé par `ConsumptionSeries` (13 mois, persisté, reconstitué depuis les créneaux conservés), attributs `pointe_facturee_kw` et `mois_pris_en_compte` sur « Coûts réseau • Ce mois ». Tests : `tests/test_capacity_rolling_average.py`. Détail et sources : `04_tarification.md` § 5.1.
+
+## A-30 · Haute · Le planificateur ignore le surplus solaire dans le coût d'un départ ✔ — CORRIGÉE
+
+**Constat** (scénarios `tests/test_scenarios_economie.py`, test 06) : en tarif dynamique, `build_flexible_load_plan` est le décideur (`dynamic_planner_is_authoritative`). Il chiffre chaque créneau au seul prix d'achat réseau : `export_points`, `solar_forecast` et le surplus mesuré ne servent pas au coût (seul `snapshot.pv_w` limite la puissance parallèle). Le recommandeur `recommend_flexible_load`, lui, sait valoriser le solaire, mais son avis est écrasé par celui du planificateur.
+
+**Preuve** : lave-linge 1,2 kWh, 2 h, demandé à 12 h avec 2,5 kW de surplus et une réinjection à 0,04 €/kWh ; prix réseau 0,30 € le jour, 0,10 € la nuit. Coût réel d'un départ immédiat : environ 0,05 € (solaire). Le planificateur attend 23 h 35 (environ 0,16 €) : il fait perdre l'autoconsommation et coûte plus cher.
+
+**Proposition** : dans `build_flexible_load_plan`, remplacer le prix d'achat par un coût effectif par créneau (part couverte par la prévision de surplus à la valeur de réinjection, le reste au prix réseau), comme le fait déjà `recommend_flexible_load`. 
+**Correction** : pour les départs « maintenant » (à une demi-étape près), `build_flexible_load_plan` chiffre la part du cycle couverte par le surplus mesuré (`snapshot.export_w` ÷ puissance de la machine, plafonnée à 1) à la **valeur de réinjection**, le reste au prix réseau. En dynamique, cette valeur peut être **négative** (injection pénalisée) : consommer le surplus évite alors une perte et un départ immédiat l'emporte sur une nuit moins chère. Sans surplus, sans prix de réinjection connu ou pour les créneaux futurs, rien ne change : le solaire n'est jamais supposé gratuit. Tests : `test_06`, `06b` à `06e` dans `tests/test_scenarios_economie.py`.
+
+## A-31 · Basse · Départ avancé jusqu'à une demi-heure ✔
+
+**Constat** : le planificateur déclenche `START_NOW` quand le meilleur créneau est à moins de `max(pas/2, 5)` minutes. Avec des prix horaires, une machine peut donc partir jusqu'à 30 minutes avant le créneau le moins cher et payer ce délai au tarif de l'heure précédente.
+
+**Preuve** : demande à 18 h, créneau creux à 0 h ; départ à 23 h 35, coût 0,156 € contre 0,12 € au créneau exact (test `run_machine`, rapport en fin de fichier).
+
+**Proposition** : attendre le créneau lui-même, en gardant une tolérance de quelques minutes seulement, ou prendre en compte le coût du délai dans la comparaison.
+
+## A-32 · Haute · Sonde du boiler indisponible : lue comme 0 °C ✔ — CORRIGÉE
+
+**Constat** : `snapshot()` lit la sonde du boiler avec `_float_state`, qui renvoie **0,0** quand l'entité est `unavailable` ou `unknown`. `valid` ne dépend que du réseau et du photovoltaïque. Les stratégies (`evaluate_eco`, boiler dynamique) comparent ensuite `boiler_temp_c < normal` : un ballon « à 0 °C » est chauffé sur le réseau. La sonde de sécurité retombe sur cette même valeur (0 °C) si la sonde de résistance est absente : la protection contre la surchauffe est alors aveugle.
+
+**Preuve** : `_float_state` (valeur par défaut 0,0), `snapshot()` (lignes `boiler_temp = self._float_state(...)` puis `boiler_safety_temp = resistance_temp if … else boiler_temp`) et `evaluate_eco` (`snapshot.boiler_temp_c < normal`).
+
+**Alertes** : `BOILER_SONDE_HS` et `BOILER_SONDE_SECURITE_HS` (voir `10_sante_alertes.md`), notifiées après 2 minutes.
+
+**Correction** : `BoilerProbeGuard` (`domain/engine/boiler_probe.py`). Dès que la sonde de régulation (`boiler_temp_sensor`) est illisible, **toute commande de chauffe est interdite**, sans délai : le boiler en train de chauffer reçoit l'ordre d'arrêt (origine `SECURITE`, sauf en mode Manuel où FoxCat ne commande rien) et `async_command_boiler`, point de passage unique de toutes les commandes (stratégies, utilisateur, boutons, V2H), refuse `CHAUFFE_45` et `BOOST_65`, **même sur ordre de l'utilisateur**. Les deux exécutions physiques (envoi et nouvelle tentative) revérifient la garde. L'arrêt n'est jamais bloqué. La chauffe n'est rétablie qu'après **60 secondes de lecture continue**, puis la régulation repart d'une acquisition neuve et les stratégies normales s'appliquent. Sans sonde configurée ou boiler non géré, la garde ne s'applique pas.
+
+## A-33 · Moyenne · Décalage de consigne : calcul privé de déclencheur ✔ — CORRIGÉE
+
+**Constat** : `_evaluate_heating_boost` et `_async_apply_heating_setpoints` n'étaient appelés que dans `_async_update_data`, le rafraîchissement de 30 s du coordinateur. `DataUpdateCoordinator.async_set_updated_data` annule et reprogramme ce rafraîchissement (« reset refresh interval », `helpers/update_coordinator.py`, HA 2025.1.4). FoxCat l'appelle à chaque trame, à chaque événement du capteur réseau, de production et des machines (une quarantaine d'appels). Avec des publications espacées de moins de 30 s, le rafraîchissement ne part jamais : le décalage restait sur un ancien calcul (le désactiver ne le ramenait pas non plus à 0), la baisse « immédiate » sur import ne l'était pas.
+
+**Preuve** : lecture du code de Home Assistant et des appelants (`grep`). Non observé sur une installation en marche.
+
+**Correction** : voir `08_protection_chauffage.md` (B2). Appel à chaque trame, seulement si la fonction est activée ou à rétablir ; attributs `calcule_a` et `calcule_par` pour le vérifier ; message « baisse immédiate » affiché seulement quand il y a vraiment une baisse.
+
+## A-34 · Moyenne · La surveillance du cœur est privée du même déclencheur
+
+**Constat** : `_watchdog()` (phase du cœur invalide, accusés d'énergie expirés, réinitialisation après trame trop ancienne) n'est appelé que dans `_async_update_data`, pour la même raison que A-33 il peut ne jamais s'exécuter. La surveillance des trames du métronome (`_async_metronome_watchdog`, toutes les 2 s) est un mécanisme distinct et n'est pas touchée.
+
+**Proposition** : minuteur dédié (`async_track_time_interval`). Non fait : cela change le comportement du cœur pour toutes les installations (la réinitialisation sur trame ancienne se mettrait à fonctionner), à valider séparément.
 
 ## Tests proposés (par ordre de valeur)
 

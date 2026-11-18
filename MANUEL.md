@@ -283,6 +283,30 @@ Avec une source de prix **Dynamique Day-Ahead** ou **Intégration externe**, Fox
 
 La prévision solaire en ligne et la tâche IA ne fonctionnent pas hors ligne. La comptabilité compte 0 € d'achat tant qu'aucun prix n'existe.
 
+### 6.5 ter Mode Backup (Internet coupé)
+
+Le mode Backup est actif par défaut.
+
+1. Ouvrez l'appareil **Système** : les capteurs **« Internet en ligne »** et **« Mode Backup actif »** y sont créés.
+2. Réglez la durée de coupure avant déclenchement (**« Backup : durée de coupure avant déclenchement »**, 2 minutes par défaut) : une micro-coupure plus courte ne déclenche rien.
+3. Pour désactiver le mode : coupez **« Mode Backup si Internet coupé »**.
+4. Pour tester : débranchez le routeur plus longtemps que la durée réglée. Vérifiez que « Internet en ligne » passe à *hors ligne*, que les prises machines restent alimentées et que le boiler est coupé. Rebranchez : au bout d'environ une minute, les prises reprennent leur état d'avant la coupure.
+5. L'attribut `prises_memorisees` du capteur « Mode Backup actif » montre l'état enregistré.
+
+En Backup, le **boiler est coupé** : l'eau chaude n'est plus chauffée tant qu'Internet est absent. Reste actif : le délestage du disjoncteur. En mode **Manuel**, ou si la régulation est coupée, FoxCat ne commande rien : seul le capteur signale la coupure.
+
+### 6.5 quater Alertes de panne
+
+Les alertes sont actives par défaut, sans réglage.
+
+1. Dans l'appareil **Système**, le capteur **« Santé FoxCat (alertes de panne) »** vaut `OK`, `MAJEUR` ou `CRITIQUE`. Ses attributs listent chaque alerte avec sa cause et l'heure de début.
+2. Home Assistant affiche une notification (cloche) par alerte, retirée quand la panne est levée.
+3. Pour recevoir un message sur le téléphone : importez `docs/automations/alerte_panne_foxcat.yaml` dans Paramètres → Automatisations, et remplacez `notify.mobile_app_mon_telephone` par votre service de notification.
+4. Pour couper les notifications : interrupteur **« Alertes de panne FoxCat (notifications) »**. Les capteurs restent.
+5. Test : désactivez le capteur de puissance réseau pendant plus de 2 minutes : l'alerte **« FoxCat ne reçoit plus les mesures »** apparaît, puis disparaît une minute après le retour du capteur.
+
+Une alerte ne signale qu'une panne (capteur, commande, connexion). Un mauvais réglage ou un mauvais choix économique ne déclenche rien.
+
 ### 6.6 Comparateur de tarifs
 
 1. **Modèles** : ajoutez des modèles belges prédéfinis (Wallonie mono, bi-horaire 2026, Impact). Un modèle ajoute un tarif avec des **prix de départ** : modifiez-les ensuite dans le JSON.
@@ -348,6 +372,8 @@ Bon à savoir :
 ### 7.4 Chauffage
 
 Menu **Chauffage** :
+
+*(Le décalage est recalculé à chaque trame, seulement si la fonction est activée. Pour vérifier : l'attribut `calcule_a` du capteur « Statut » doit avancer d'environ 30 secondes à chaque trame.)*
 
 1. **Réglages du décalage de consigne** : activer la fonction (désactivée par défaut), « uniquement maison vide », entité de présence (`zone.home` par défaut), puissance et limite du groupe de climatisation, règles de calcul (décalage maximal 2 °C, pas 0,5 °C, surplus requis par pas, marge de réserve, délai anti-yoyo 300 s, import maximal 300 W).
 2. **Systèmes de chauffage** : ajoutez vos pompes à chaleur (groupe extérieur : puissance, tension, phase ; jusqu'à 5 unités intérieures pour une PAC air/air).
@@ -493,6 +519,8 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Symptôme | Cause probable | Solution |
 |---|---|---|
 | Prélèvement et réinjection inversés | Convention de signe | **Mesures et sources**, inversez la convention |
+| Alerte « Sonde de température du boiler indisponible », le boiler ne chauffe plus | La sonde du boiler ne répond plus : FoxCat interdit toute chauffe (même « Forcer la marche ») | Rétablissez la sonde ; la chauffe reprend 60 secondes après son retour. Pour un boiler sans sonde, retirez la sonde de la configuration ou coupez la gestion du boiler |
+| Machines allumées alors que le prix est haut, boiler coupé | Mode Backup actif (Internet coupé) | Vérifiez le capteur « Internet en ligne » ; rétablissez la connexion ou coupez l'interrupteur « Mode Backup si Internet coupé » |
 | Flux de prix en `DEGRADE` | Plus de prix reçus et tampon épuisé | Rétablissez Internet ou l'intégration de prix ; le boiler reste en repli confort 45 °C |
 | Prix actif à 0 ou « — » | Prix non saisis, capteur indisponible | Vérifiez l'écran **Contrat et réseau** et vos capteurs de prix |
 | Coûts trop élevés ou trop faibles | Case « tout compris » mal réglée | Cochez-la si votre prix inclut réseau, taxes et marge ; décochez sinon |

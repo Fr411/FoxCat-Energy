@@ -167,6 +167,9 @@ from ..domain.engine.load_guard import (
     protected_cycle_boiler_allowed_stable,
 )
 from ..domain.engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
+from ..domain.engine import backup as backup_logic
+from ..domain.engine import boiler_probe as probe_logic
+from ..domain import health as health_logic
 from ..domain.tariff.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
 from ..domain.pricing.economic_optimizer import (
     PricePoint,
@@ -355,6 +358,14 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._metronome_last_seen_report: dict[str, datetime] = {}
         self.solar_forecast = SolarForecast()
         self.price_backup: dict[str, dict[str, float]] = {}
+        # Coupure Internet : surveillance, mode Backup et état des prises avant la coupure.
+        self.connectivity = backup_logic.ConnectivityMonitor()
+        self.backup_state: dict[str, Any] = {"active": False, "handled": False, "since": None, "machines": {}}
+        self._probe_running = False
+        # Santé : alertes temporisées, notifications déjà envoyées.
+        self.health_tracker = health_logic.AlertTracker()
+        self.boiler_probe_guard = probe_logic.BoilerProbeGuard()
+        self._health_notified: set[str] = set()
         self._unsubs: list[Any] = []
         # V1.6.150 : les deux corps sont cadencés par la même publication réseau
         # mais ne partagent plus aucun verrou d'exécution.
@@ -407,7 +418,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "reason": "Fonction désactivée.",
             "surplus_w": None,
             "systems": {},
+            "enabled": False,
+            "computed_at": None,
+            "computed_by": None,
         }
+        self._heating_apply_task: asyncio.Task[Any] | None = None
         self.v2h_state: dict[str, Any] = {
             "active": False,
             "reason": "V2H désactivé",
@@ -553,6 +568,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             }
         )
         super().async_set_updated_data(data)
+        self._sync_health_notifications(data.get("health"))
         if not bool(self.settings.get("persistent_status_notification_enabled", True)):
             return
         signature = self._status_notification_signature(data)
@@ -605,6 +621,15 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if isinstance(price_backup, dict)
                 else {}
             )
+            self.connectivity.restore(stored.get("connectivity"))
+            saved_backup = stored.get("backup_state")
+            if isinstance(saved_backup, dict):
+                self.backup_state = {
+                    "active": bool(saved_backup.get("active")),
+                    "handled": bool(saved_backup.get("handled")),
+                    "since": saved_backup.get("since"),
+                    "machines": backup_logic.capture_socket_states(saved_backup.get("machines") or {}),
+                }
             sf = stored.get("solar_forecast")
             if isinstance(sf, dict):
                 self.solar_forecast = SolarForecast(**{k: sf.get(k, getattr(SolarForecast(), k)) for k in SolarForecast.__dataclass_fields__})
@@ -718,6 +743,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "virtual_assets": self.virtual_assets.dump_state(),
                 "machine_learning": self.machine_learning.dump(),
                 "price_backup": self.price_backup,
+                "connectivity": self.connectivity.dump(),
+                "backup_state": self.backup_state,
                 "heating_applied_c": self.heating_applied_c,
                 "heating_setpoint_tracks": self.heating_setpoint_tracks,
                 "solar_forecast": {
@@ -774,6 +801,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self._on_metronome_watchdog,
                 timedelta(seconds=2),
             )
+        )
+
+        # Coupure Internet : un sondage toutes les 30 s, avec anti-rebond.
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._on_connectivity_probe, timedelta(seconds=30))
         )
 
         # V1.6.1-101 : les compteurs visibles repartent chaque jour à zéro.
@@ -1302,8 +1334,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._check_end_solar()
         if bool(self.settings.get("regulation_active")):
             await self._evaluate_high_load(self.snapshot())
-        self._evaluate_heating_boost(self.snapshot())
-        await self._async_apply_heating_setpoints()
+        await self._async_run_heating(self.snapshot(), "mise à jour périodique")
         return self._build_data()
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_set_heating_applied — Mémorise le décalage inclus dans les presets
@@ -1321,7 +1352,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return heating_logic.parse_presence(state.state)
 
     # MÉTHODE : FoxCatEnergyCoordinator._evaluate_heating_boost — Décalage de consigne chauffage (calcul seul)
-    def _evaluate_heating_boost(self, snapshot: EnergySnapshot) -> None:
+    def _evaluate_heating_boost(self, snapshot: EnergySnapshot, source: str = "mise à jour périodique") -> None:
         """Calcule le décalage de consigne et le publie dans ``heating_boost_view``.
 
         Cette méthode n'écrit rien. Par défaut, une automatisation Home Assistant
@@ -1385,7 +1416,42 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "reason": result.reason,
             "surplus_w": result.surplus_w,
             "systems": systems_view,
+            "enabled": bool(cfg.enabled),
+            "computed_at": dt_util.now().isoformat(),
+            "computed_by": source,
         }
+
+    # MÉTHODE : FoxCatEnergyCoordinator._heating_boost_pending — Le décalage est activé ou doit être rétabli
+    def _heating_boost_pending(self) -> bool:
+        """Vrai si le décalage de consigne est activé, ou si quelque chose reste à rétablir.
+
+        Fonction désactivée et rien à rétablir : aucun calcul, aucune commande.
+        """
+        cfg = heating_logic.HeatingBoostConfig.from_settings(self.settings, self.config)
+        return heating_logic.needs_run(
+            enabled=cfg.enabled,
+            steps=self._heating_boost_state.steps,
+            system_steps=tuple(state.steps for state in self._heating_system_states.values()),
+            has_tracks=bool(self.heating_setpoint_tracks),
+            last_enabled=bool(self.heating_boost_view.get("enabled")),
+        )
+
+    # MÉTHODE : FoxCatEnergyCoordinator._async_run_heating — Calcule le décalage puis applique les consignes
+    async def _async_run_heating(self, snapshot: EnergySnapshot, source: str, *, background: bool = False) -> None:
+        """Calcul du décalage (immédiat) puis application aux PAC (en tâche de fond depuis une trame)."""
+        if not self._heating_boost_pending():
+            return
+        try:
+            self._evaluate_heating_boost(snapshot, source)
+        except Exception:  # pragma: no cover - le chauffage ne doit jamais bloquer une trame
+            _LOGGER.warning("Calcul du décalage de consigne impossible.", exc_info=True)
+            return
+        if not background:
+            await self._async_apply_heating_setpoints()
+            return
+        if self._heating_apply_task and not self._heating_apply_task.done():
+            return  # une application est déjà en cours : la suivante reprendra le dernier calcul
+        self._heating_apply_task = self.hass.async_create_task(self._async_apply_heating_setpoints())
 
     # MÉTHODE : FoxCatEnergyCoordinator._heating_unit_state — Lecture d'une unité intérieure (climate)
     def _heating_unit_state(self, entity_id: str) -> heating_systems_logic.UnitState | None:
@@ -2816,6 +2882,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if self.series.process(snapshot, virtual_prices):
                 self._series_store.async_delay_save(self.series.dump, SERIES_SAVE_DELAY_S)
 
+            # Décalage de consigne : recalculé à chaque trame, seulement s'il est activé
+            # (ou s'il reste un décalage à rétablir). Les commandes partent en tâche de fond.
+            await self._async_run_heating(snapshot, "trame réseau", background=True)
+
             if bool(self.settings.get("regulation_active")):
                 # CORE EMS uniquement. Le corps Onduleur traite le même snapshot
                 # dans une task indépendante déclenchée par la même publication.
@@ -2855,6 +2925,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _core_process_frame(self, snapshot: EnergySnapshot) -> None:
         if not snapshot.valid:
             self.reset_core("Mesures énergétiques invalides : aucune décision autorisée.")
+            return
+
+        # Sonde du boiler illisible : aucune chauffe, jamais de température supposée à 0 °C.
+        if self._boiler_probe_blocked():
+            if snapshot.boiler_on and str(self.settings.get("mode")) != MODE_MANUAL:
+                await self.async_command_boiler(
+                    BOILER_STOP, "Sonde boiler indisponible : chauffe interdite, arrêt du boiler.", "SECURITE"
+                )
+            else:
+                self.reset_core("Sonde boiler indisponible : aucune commande de chauffe.")
             return
 
         # Le délestage haute consommation est prioritaire sur les stratégies
@@ -2950,6 +3030,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 intent = BoilerIntent(BOILER_HEAT_45, "Utilisateur : démarrage Boiler forcé.", "UTILISATEUR")
         elif user_override == "FORCE_OFF":
             intent = BoilerIntent(BOILER_STOP, "Utilisateur : arrêt Boiler forcé.", "UTILISATEUR")
+        elif self.backup_active and mode != MODE_MANUAL and not self.v2h_state.get("active"):
+            intent = backup_logic.backup_boiler_intent(snapshot, self.settings)
         else:
             if self.v2h_state.get("active"):
                 intent = BoilerIntent(
@@ -3082,6 +3164,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_command_boiler(self, action: str, reason: str, origin: str) -> None:
         if not bool(self.settings.get("regulation_active")) and origin not in {"UTILISATEUR", "SECURITE"}:
             return
+        # Point de passage unique de toute commande de chauffe (stratégies, utilisateur, boutons, V2H) :
+        # sans sonde lisible, aucune chauffe n'est envoyée, même sur ordre de l'utilisateur.
+        if probe_logic.is_heating_action(action) and self._boiler_probe_blocked():
+            self.core_state["last_reason"] = f"Chauffe refusée : sonde boiler indisponible ({reason})"
+            return
         climate = self.config.get(CONF_BOILER_CLIMATE)
         if not climate:
             self.core_state["execution_status"] = "FAILED"
@@ -3155,6 +3242,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # MÉTHODE : FoxCatEnergyCoordinator._execute_boiler_command — Worker physique Boiler indépendant du cadenceur EMS.
     async def _execute_boiler_command(self, action: str, pending: str, climate: str) -> None:
         """Worker physique Boiler indépendant du cadenceur EMS."""
+        if probe_logic.is_heating_action(action) and self._boiler_probe_blocked():
+            self.core_state["execution_status"] = "BLOCKED"
+            self.core_state["execution_failure_reason"] = "Sonde boiler indisponible : chauffe annulée."
+            return
         try:
             self.core_state["execution_status"] = "EXECUTION"
             async with self._ems_action_lock:
@@ -3271,6 +3362,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self._async_ems_service_call(
                     "climate", "set_hvac_mode", {"entity_id": climate, "hvac_mode": "off"}
                 )
+            elif self._boiler_probe_blocked():
+                return
             else:
                 boost = command in {"ECS_MODULE_ON_65", "ECS_MODULE_UPGRADE_65", "ECS_MODULE_SET_65"}
                 temp = float(self.settings["boiler_temp_boost_c"] if boost else self.settings["boiler_temp_normal_c"])
@@ -3288,6 +3381,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # et override utilisateur actif.
         if snap.boiler_on and snap.boiler_safety_temp_c >= float(self.settings["boiler_temp_safety_c"]):
             await self.async_command_boiler(BOILER_STOP, "SÉCURITÉ : température boiler maximale atteinte.", "SECURITE")
+        elif self._boiler_probe_blocked() and snap.boiler_on and str(self.settings.get("mode")) != MODE_MANUAL:
+            await self.async_command_boiler(
+                BOILER_STOP, "Sonde boiler indisponible : chauffe interdite, arrêt du boiler.", "SECURITE"
+            )
         elif bool(self.settings.get("regulation_active")):
             mode = str(self.settings.get("mode"))
             user_override = str(self.core_state.get("boiler_user_override", "AUTO"))
@@ -3779,7 +3876,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             # Un cycle utilisateur/protégé reste prioritaire. Seul un NOUVEAU
             # démarrage automatique est bloqué en période défavorable.
-            should_on = cycle_active or keep_running or (
+            # Mode Backup : on lâche les freins, la prise reste alimentée (sauf protection du disjoncteur).
+            backup_on = self.backup_active and not high_load_block
+            should_on = cycle_active or keep_running or backup_on or (
                 management and allowed and tariff_ok and not high_load_block
             )
             service = "turn_on" if should_on else "turn_off"
@@ -3787,6 +3886,208 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 await self.hass.services.async_call("switch", service, {"entity_id": socket}, blocking=False)
             except Exception as err:  # pragma: no cover
                 _LOGGER.warning("FoxCat machine socket command failed for %s (%s): %s", machine.name, socket, err)
+
+    # MÉTHODE : FoxCatEnergyCoordinator.backup_active — Le mode Backup est en vigueur
+    @property
+    def backup_active(self) -> bool:
+        """Vrai quand Internet est coupé depuis assez longtemps et que le mode Backup est activé."""
+        return bool(self.backup_state.get("active")) and bool(self.settings.get("backup_on_offline_enabled", True))
+
+    # MÉTHODE : FoxCatEnergyCoordinator._on_connectivity_probe — Sondage périodique d'Internet
+    async def _on_connectivity_probe(self, now: datetime | None = None) -> None:
+        if self._probe_running:
+            return
+        self._probe_running = True
+        try:
+            ok = await backup_logic.probe_internet()
+            self.connectivity.offline_after_s = max(float(self.settings.get("backup_offline_delay_min", 2.0)), 0.0) * 60.0
+            transition = self.connectivity.observe(ok, dt_util.utcnow())
+            enabled = bool(self.settings.get("backup_on_offline_enabled", True))
+            if transition == backup_logic.TRANSITION_OFFLINE:
+                _LOGGER.warning("Internet coupé depuis plus de %.0f min : mode Backup.", self.connectivity.offline_after_s / 60.0)
+            elif transition == backup_logic.TRANSITION_ONLINE:
+                _LOGGER.info("Internet de retour : fin du mode Backup.")
+            should_be_active = enabled and not self.connectivity.online
+            if should_be_active and not self.backup_state.get("handled"):
+                await self.async_enter_backup()
+            elif not should_be_active and self.backup_state.get("handled"):
+                await self.async_exit_backup()
+            elif transition:
+                self.async_set_updated_data(self._build_data())
+        finally:
+            self._probe_running = False
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_enter_backup — Entrée en mode Backup
+    async def async_enter_backup(self) -> None:
+        """Mémorise l'état des prises, lâche les freins économiques, garde les sécurités."""
+        acting = bool(self.settings.get("regulation_active")) and str(self.settings.get("mode")) != MODE_MANUAL
+        saved = backup_logic.capture_socket_states(
+            {
+                machine.machine_id: (self.hass.states.get(machine.switch_entity).state if self.hass.states.get(machine.switch_entity) else None)
+                for machine in self.machines
+                if machine.switch_entity
+            }
+        )
+        self.backup_state = {
+            "active": acting,
+            "handled": True,
+            "since": dt_util.utcnow().isoformat() if acting else None,
+            "machines": saved if acting else {},
+        }
+        if acting:
+            if str(self.settings.get("network_policy")) != NETWORK_POLICY_ZERO_INJECTION and bool(self.settings.get("pri_enabled")):
+                await self.async_release_pri_100("Backup : Internet coupé, onduleur libéré à 100 %.")
+            self.reset_core("Backup : Internet coupé, restrictions économiques levées.")
+            await self.async_reconcile_machines()
+        await self._async_save()
+        self.async_set_updated_data(self._build_data())
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_exit_backup — Retour d'Internet
+    async def async_exit_backup(self) -> None:
+        """Rétablit les prises dans l'état d'avant la coupure, sauf cycle en cours, puis reprend la régulation normale."""
+        saved = dict(self.backup_state.get("machines") or {})
+        self.backup_state = {"active": False, "handled": False, "since": None, "machines": {}}
+        self._refresh_machine_cycles()
+        current = {
+            machine.machine_id: (self.hass.states.get(machine.switch_entity).state if self.hass.states.get(machine.switch_entity) else None)
+            for machine in self.machines
+            if machine.switch_entity
+        }
+        protected = [m.machine_id for m in self.machines if self.machine_cycle_manager.is_protected(m.machine_id)]
+        for machine_id, wanted in backup_logic.plan_restore(saved, current, protected).items():
+            machine = next((item for item in self.machines if item.machine_id == machine_id), None)
+            if machine is None or not machine.switch_entity:
+                continue
+            try:
+                await self.hass.services.async_call(
+                    "switch", "turn_on" if wanted == "on" else "turn_off",
+                    {"entity_id": machine.switch_entity}, blocking=False,
+                )
+            except Exception as err:  # pragma: no cover
+                _LOGGER.warning("Rétablissement de la prise %s impossible : %s", machine.name, err)
+        self.reset_core("Fin du mode Backup : régulation normale rétablie.")
+        await self.async_reconcile_machines()
+        await self._async_save()
+        self.async_set_updated_data(self._build_data())
+
+    # MÉTHODE : FoxCatEnergyCoordinator._boiler_probe_blocked — La chauffe est interdite faute de sonde lisible
+    def _boiler_probe_blocked(self) -> bool:
+        """Vrai tant que la sonde du boiler est illisible, puis 60 s après son retour.
+
+        Sans sonde configurée ou boiler non géré, la garde ne s'applique pas.
+        """
+        probe_id = self.config.get(CONF_BOILER_TEMP_SENSOR)
+        if not probe_id or not bool(self.settings.get("device_boiler_enabled", True)):
+            self.boiler_probe_guard.blocked = False
+            return False
+        transition = self.boiler_probe_guard.observe(self._numeric_valid(probe_id), dt_util.utcnow())
+        if transition == probe_logic.TRANSITION_BLOCKED:
+            _LOGGER.error("Sonde du boiler indisponible : toute commande de chauffe est interdite.")
+        elif transition == probe_logic.TRANSITION_RELEASED:
+            _LOGGER.warning("Sonde du boiler de retour : chauffe de nouveau autorisée.")
+            self.reset_core("Sonde boiler rétablie : régulation normale reprise.")
+        return self.boiler_probe_guard.blocked
+
+    # MÉTHODE : FoxCatEnergyCoordinator._health_inputs — Photographie de l'état pour les alertes de panne
+    def _health_inputs(self, snap: EnergySnapshot, prices: dict[str, Any]) -> health_logic.HealthInputs:
+        def unavailable(entity_id: str | None) -> bool:
+            state = self.hass.states.get(entity_id) if entity_id else None
+            return state is None or state.state in {"unknown", "unavailable", "none", ""}
+
+        missing_sensors: list[str] = []
+        if self.config.get(CONF_PV_SENSOR) and not self._numeric_valid(self.config.get(CONF_PV_SENSOR)):
+            missing_sensors.append("production photovoltaïque")
+        grid_ids = [self.config.get(CONF_GRID_SIGNED_SENSOR), self.config.get(CONF_METRONOME_FALLBACK_SENSOR)]
+        grid_ids = [item for item in grid_ids if item]
+        if grid_ids and not any(self._numeric_valid(item) for item in grid_ids):
+            missing_sensors.append("puissance réseau")
+
+        boiler_temp_id = self.config.get(CONF_BOILER_TEMP_SENSOR)
+        resistance_id = self.config.get(CONF_BOILER_RESISTANCE_TEMP_SENSOR)
+        boiler_configured = bool(boiler_temp_id) and bool(self.settings.get("device_boiler_enabled", True))
+        boiler_temp_ok = self._numeric_valid(boiler_temp_id)
+        safety_ok = boiler_temp_ok or (bool(resistance_id) and self._numeric_valid(resistance_id))
+
+        relays = [self.config.get(key) for key in (CONF_PRI_L1, CONF_PRI_L2, CONF_PRI_L3, CONF_PRI_L4)]
+        pri_relays_readable = (not all(relays)) or self._rrcr_code() != "????"
+
+        machines_down = tuple(
+            machine.name for machine in self.machines
+            if machine.switch_entity and unavailable(machine.switch_entity)
+        )
+        absent = tuple(
+            entity_id for entity_id in (
+                self.config.get(CONF_PV_SENSOR), self.config.get(CONF_GRID_SIGNED_SENSOR),
+                self.config.get(CONF_BOILER_TEMP_SENSOR), self.config.get(CONF_BOILER_BINARY),
+            )
+            if entity_id and self.hass.states.get(entity_id) is None
+        )
+        return health_logic.HealthInputs(
+            regulation_active=bool(self.settings.get("regulation_active")),
+            mode=str(self.settings.get("mode")),
+            snapshot_valid=bool(snap.valid),
+            missing_essential_sensors=tuple(missing_sensors),
+            metronome_status=str(self.metronome_state.get("status", "SYNCHRONISE")),
+            boiler_configured=boiler_configured,
+            boiler_temp_ok=boiler_temp_ok,
+            boiler_safety_temp_ok=safety_ok,
+            boiler_safety_temp_c=snap.boiler_safety_temp_c if safety_ok else None,
+            boiler_safety_limit_c=float(self.settings.get("boiler_temp_safety_c", 68.0)),
+            pri_enabled=bool(self.settings.get("pri_enabled")),
+            pri_relays_readable=pri_relays_readable,
+            actuator_status=str(self.core_state.get("execution_status", "IDLE")),
+            actuator_error=str(self.core_state.get("actuator_last_error", "") or ""),
+            unavailable_machines=machines_down,
+            price_feed_state=str((prices.get("price_feed") or {}).get("state", "LOCAL")),
+            internet_online=self.connectivity.online,
+            backup_active=self.backup_active,
+            load_shed_active=bool(self.load_shed_state.get("active")),
+            legacy_conflict=self._legacy_conflict(),
+            coordinator_update_ok=bool(getattr(self, "last_update_success", True)),
+            missing_configured_entities=absent,
+        )
+
+    # MÉTHODE : FoxCatEnergyCoordinator._health_view — Alertes de panne visibles, avec temporisation
+    def _health_view(self, snap: EnergySnapshot, prices: dict[str, Any]) -> dict[str, Any]:
+        alerts = health_logic.evaluate(self._health_inputs(snap, prices))
+        visible, _raised, _cleared = self.health_tracker.update(alerts, dt_util.utcnow())
+        return {
+            "status": health_logic.overall_status(visible),
+            "count": len(visible),
+            "alerts": visible,
+            "critical": sum(1 for row in visible if row["severite"] == health_logic.CRITICAL),
+            "major": sum(1 for row in visible if row["severite"] == health_logic.MAJOR),
+        }
+
+    # MÉTHODE : FoxCatEnergyCoordinator._sync_health_notifications — Notification persistante et événement par alerte
+    def _sync_health_notifications(self, health: dict[str, Any] | None) -> None:
+        """Crée la notification d'une nouvelle alerte, la retire quand elle est levée, et publie l'événement ``foxcat_energy_alert``."""
+        enabled = bool(self.settings.get("health_alerts_enabled", True))
+        visible = {row["code"]: row for row in (health or {}).get("alerts", [])} if enabled else {}
+        for code, row in visible.items():
+            if code in self._health_notified:
+                continue
+            self._health_notified.add(code)
+            icon = "🚨" if row["severite"] == health_logic.CRITICAL else "⚠️"
+            persistent_notification.async_create(
+                self.hass,
+                f"**{row['severite']}** — {row['detail']}\n\nDepuis {row['depuis']}.",
+                title=f"{icon} {self.installation_name} — {row['titre']}",
+                notification_id=f"foxcat_energy_alert_{self.entry.entry_id}_{code}",
+            )
+            self.hass.bus.async_fire(
+                "foxcat_energy_alert",
+                {"entry_id": self.entry.entry_id, "installation": self.installation_name, "state": "raised",
+                 "code": code, "severity": row["severite"], "title": row["titre"], "detail": row["detail"]},
+            )
+        for code in list(self._health_notified - set(visible)):
+            self._health_notified.discard(code)
+            persistent_notification.async_dismiss(self.hass, f"foxcat_energy_alert_{self.entry.entry_id}_{code}")
+            if enabled:
+                self.hass.bus.async_fire(
+                    "foxcat_energy_alert",
+                    {"entry_id": self.entry.entry_id, "installation": self.installation_name, "state": "cleared", "code": code},
+                )
 
     # MÉTHODE : FoxCatEnergyCoordinator._evaluate_high_load — Délestage synchronisé sur chaque publication réseau
     async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
@@ -4074,6 +4375,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return False
         if not pri_mode_allowed(self.settings.get("mode")):
             self.pri_state["guard_reason"] = f"mode_{self.settings.get('mode')}"
+            return False
+        if self.backup_active and str(self.settings.get("network_policy")) != NETWORK_POLICY_ZERO_INJECTION:
+            # Backup : l'onduleur n'est plus bridé, sauf si la politique réseau impose zéro injection.
+            self.pri_state["guard_reason"] = "backup_internet_coupe"
             return False
         self.pri_state["guard_reason"] = "OK"
         return True
@@ -4684,6 +4989,14 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
             "load_shed": dict(self.load_shed_state),
+            "health": self._health_view(snap, prices),
+            "connectivity": backup_logic.status_view(
+                online=self.connectivity.online,
+                since=self.connectivity.since,
+                active=self.backup_active,
+                enabled=bool(self.settings.get("backup_on_offline_enabled", True)),
+                saved=self.backup_state.get("machines") or {},
+            ),
             "heating_boost": {**self.heating_boost_view, "applied_c": self.heating_applied_c},
             "grid_load": self._grid_load_view(snap),
             "machine_guard": {

@@ -38,6 +38,7 @@ L'ordre complet vit dans `_core_process_frame` (voir `01_boucle_ems.md` § 7). R
 
 ```text
 1. sécurité thermique (≥ 68 °C, sonde de résistance en priorité)    → ARRÊT    [tous modes]
+1b. sonde du boiler illisible (A-32)                               → ARRÊT + AUCUNE chauffe, même sur ordre utilisateur [reprise 60 s après retour de la sonde]
 2. délestage actif                                                  → ARRÊT
 3. machine protégée sans surplus                                    → ARRÊT
 4. override utilisateur (FORCE_ON / FORCE_OFF)
