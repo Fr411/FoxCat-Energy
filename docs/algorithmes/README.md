@@ -14,7 +14,7 @@ Audit complet du code (V1.7.6) : chaque algorithme est décrit pas à pas (entr�
 | [08 · Protection et chauffage](08_protection_chauffage.md) | délestage, tensions et déséquilibre, décalage de consigne, PAC |
 | [09 · Batterie, VPP, IA, infrastructure](09_batterie_vpp_infra.md) | simulation, V2H, IA solaire, profils, migration, dashboards |
 | [10 · Santé et alertes](10_sante_alertes.md) | pannes critiques et majeures détectées à l'exécution, temporisation, notifications |
-| [**Anomalies**](ANOMALIES.md) | **32 écarts relevés**, gravité, preuves, propositions et tests à ajouter |
+| [**Anomalies**](ANOMALIES.md) | **34 écarts relevés**, gravité, preuves, propositions et tests à ajouter |
 
 **Méthode** : lecture du code source, puis vérification par de petits calculs exécutés quand c'était possible (points marqués ✔ dans le rapport). Rien n'a été essayé dans Home Assistant. L'audit n'a **rien corrigé**.
 

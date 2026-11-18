@@ -139,6 +139,12 @@ Décalage publié = `pas accordés × pas_c`. Défauts : décalage max 2 °C, pa
 
 Le décalage « appliqué » aux presets (écrit par l'automatisation) est borné à 0–5 °C ; il est mémorisé et conservé au redémarrage.
 
+### Quand le calcul s'exécute (A-33, corrigée)
+
+Avant : `_evaluate_heating_boost` et `_async_apply_heating_setpoints` n'étaient appelés que par `_async_update_data` (mise à jour de 30 s). Or `async_set_updated_data` de Home Assistant **remet ce minuteur à zéro** (vérifié dans `helpers/update_coordinator.py`, HA 2025.1.4) et FoxCat publie à chaque trame et à chaque événement de capteur : la mise à jour périodique pouvait ne jamais se déclencher, et le statut affiché venait d'un calcul ancien.
+
+Maintenant : `_async_run_heating` est appelé **à chaque trame réseau** (calcul immédiat, commandes aux PAC en tâche de fond, une seule à la fois) et reste appelé par la mise à jour de 30 s comme filet de sécurité. **Seulement si la fonction est activée** : `heating_boost.needs_run` renvoie faux quand la fonction est désactivée, qu'aucun pas n'est accordé, qu'aucune consigne n'est mémorisée et que l'activation n'a pas changé. Désactiver la fonction (ou la régulation) pendant qu'un décalage est accordé déclenche encore les calculs nécessaires pour revenir à 0 et rétablir les consignes. Le capteur « Statut » expose `calcule_a`, `calcule_par` (trame réseau ou mise à jour périodique) et `fonction_activee`.
+
 ## B3. Systèmes de chauffage (pompes à chaleur)
 
 Un **système** = un groupe extérieur (nom, type air/air, eau/eau ou air/eau, capteur de puissance obligatoire, tension et phase facultatifs) ; pour l'air/air, de 0 à **5** unités intérieures (`climate.*`). Validation : nom, type et capteur obligatoires ; au-delà de 5 unités : erreur.

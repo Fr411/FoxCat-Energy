@@ -223,6 +223,24 @@ def _off(reason: str) -> HeatingBoostResult:
     return HeatingBoostResult(0.0, 0, reason, HeatingBoostState())
 
 
+# FONCTION : needs_run — Faut-il calculer et appliquer le décalage à cette trame ?
+def needs_run(
+    *, enabled: bool, steps: int, system_steps: tuple[int, ...] = (), has_tracks: bool = False, last_enabled: bool = False
+) -> bool:
+    """Vrai si la fonction est activée, ou s'il reste quelque chose à rétablir.
+
+    Fonction désactivée, aucun pas accordé, aucune consigne mémorisée et aucun changement
+    d'activation à constater : ni calcul ni commande.
+    """
+    return bool(
+        enabled
+        or steps > 0
+        or any(item > 0 for item in system_steps)
+        or has_tracks
+        or bool(last_enabled) != bool(enabled)
+    )
+
+
 # FONCTION : evaluate — Calcule le décalage de consigne chauffage
 def evaluate(
     cfg: HeatingBoostConfig,
@@ -299,7 +317,11 @@ def evaluate(
             why = "augmentation"
     elif import_w > cfg.import_max_w:
         target = desired
-        why = f"baisse immédiate : import {import_w:.0f} W > {cfg.import_max_w:.0f} W"
+        if target < current:
+            why = f"baisse immédiate : import {import_w:.0f} W > {cfg.import_max_w:.0f} W"
+        else:
+            # Rien à baisser : on dit seulement pourquoi le décalage n'augmente pas.
+            why = f"import {import_w:.0f} W > {cfg.import_max_w:.0f} W : pas d'augmentation"
     else:
         target = max(desired, hold_steps)
         if target < current:

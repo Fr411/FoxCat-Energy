@@ -418,7 +418,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "reason": "Fonction désactivée.",
             "surplus_w": None,
             "systems": {},
+            "enabled": False,
+            "computed_at": None,
+            "computed_by": None,
         }
+        self._heating_apply_task: asyncio.Task[Any] | None = None
         self.v2h_state: dict[str, Any] = {
             "active": False,
             "reason": "V2H désactivé",
@@ -1330,8 +1334,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._check_end_solar()
         if bool(self.settings.get("regulation_active")):
             await self._evaluate_high_load(self.snapshot())
-        self._evaluate_heating_boost(self.snapshot())
-        await self._async_apply_heating_setpoints()
+        await self._async_run_heating(self.snapshot(), "mise à jour périodique")
         return self._build_data()
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_set_heating_applied — Mémorise le décalage inclus dans les presets
@@ -1349,7 +1352,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return heating_logic.parse_presence(state.state)
 
     # MÉTHODE : FoxCatEnergyCoordinator._evaluate_heating_boost — Décalage de consigne chauffage (calcul seul)
-    def _evaluate_heating_boost(self, snapshot: EnergySnapshot) -> None:
+    def _evaluate_heating_boost(self, snapshot: EnergySnapshot, source: str = "mise à jour périodique") -> None:
         """Calcule le décalage de consigne et le publie dans ``heating_boost_view``.
 
         Cette méthode n'écrit rien. Par défaut, une automatisation Home Assistant
@@ -1413,7 +1416,42 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "reason": result.reason,
             "surplus_w": result.surplus_w,
             "systems": systems_view,
+            "enabled": bool(cfg.enabled),
+            "computed_at": dt_util.now().isoformat(),
+            "computed_by": source,
         }
+
+    # MÉTHODE : FoxCatEnergyCoordinator._heating_boost_pending — Le décalage est activé ou doit être rétabli
+    def _heating_boost_pending(self) -> bool:
+        """Vrai si le décalage de consigne est activé, ou si quelque chose reste à rétablir.
+
+        Fonction désactivée et rien à rétablir : aucun calcul, aucune commande.
+        """
+        cfg = heating_logic.HeatingBoostConfig.from_settings(self.settings, self.config)
+        return heating_logic.needs_run(
+            enabled=cfg.enabled,
+            steps=self._heating_boost_state.steps,
+            system_steps=tuple(state.steps for state in self._heating_system_states.values()),
+            has_tracks=bool(self.heating_setpoint_tracks),
+            last_enabled=bool(self.heating_boost_view.get("enabled")),
+        )
+
+    # MÉTHODE : FoxCatEnergyCoordinator._async_run_heating — Calcule le décalage puis applique les consignes
+    async def _async_run_heating(self, snapshot: EnergySnapshot, source: str, *, background: bool = False) -> None:
+        """Calcul du décalage (immédiat) puis application aux PAC (en tâche de fond depuis une trame)."""
+        if not self._heating_boost_pending():
+            return
+        try:
+            self._evaluate_heating_boost(snapshot, source)
+        except Exception:  # pragma: no cover - le chauffage ne doit jamais bloquer une trame
+            _LOGGER.warning("Calcul du décalage de consigne impossible.", exc_info=True)
+            return
+        if not background:
+            await self._async_apply_heating_setpoints()
+            return
+        if self._heating_apply_task and not self._heating_apply_task.done():
+            return  # une application est déjà en cours : la suivante reprendra le dernier calcul
+        self._heating_apply_task = self.hass.async_create_task(self._async_apply_heating_setpoints())
 
     # MÉTHODE : FoxCatEnergyCoordinator._heating_unit_state — Lecture d'une unité intérieure (climate)
     def _heating_unit_state(self, entity_id: str) -> heating_systems_logic.UnitState | None:
@@ -2843,6 +2881,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.hass.async_create_task(self._async_save())
             if self.series.process(snapshot, virtual_prices):
                 self._series_store.async_delay_save(self.series.dump, SERIES_SAVE_DELAY_S)
+
+            # Décalage de consigne : recalculé à chaque trame, seulement s'il est activé
+            # (ou s'il reste un décalage à rétablir). Les commandes partent en tâche de fond.
+            await self._async_run_heating(snapshot, "trame réseau", background=True)
 
             if bool(self.settings.get("regulation_active")):
                 # CORE EMS uniquement. Le corps Onduleur traite le même snapshot

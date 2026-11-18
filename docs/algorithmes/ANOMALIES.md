@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30 et A-32 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30** et **A-32** (corrigées) et **A-31** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
+**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30, A-32 et A-33 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30**, **A-32** et **A-33** (corrigées) et **A-31**, **A-34** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -48,6 +48,8 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | A-28 | Basse | Arbitrage d'export virtuel : comparaison à des libellés inexistants |
 | ~~A-30~~ | Haute | Planificateur de charges : le surplus solaire et le prix de réinjection ne comptaient pas dans le coût d'un départ ✔ (corrigée) |
 | A-31 | Basse | Planificateur de charges : départ jusqu'à une demi-heure trop tôt ✔ |
+| ~~A-33~~ | Moyenne | Décalage de consigne chauffage recalculé par une mise à jour périodique que Home Assistant repousse à chaque publication ✔ (corrigée) |
+| A-34 | Moyenne | `_watchdog` (machine à états du cœur) n'est appelé que par cette même mise à jour périodique |
 | ~~A-32~~ | **Haute** | Sonde du boiler indisponible : FoxCat lisait 0 °C et chauffait sur le réseau ✔ (corrigée, signalée par une alerte critique) |
 
 ---
@@ -239,6 +241,20 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 **Alertes** : `BOILER_SONDE_HS` et `BOILER_SONDE_SECURITE_HS` (voir `10_sante_alertes.md`), notifiées après 2 minutes.
 
 **Correction** : `BoilerProbeGuard` (`domain/engine/boiler_probe.py`). Dès que la sonde de régulation (`boiler_temp_sensor`) est illisible, **toute commande de chauffe est interdite**, sans délai : le boiler en train de chauffer reçoit l'ordre d'arrêt (origine `SECURITE`, sauf en mode Manuel où FoxCat ne commande rien) et `async_command_boiler`, point de passage unique de toutes les commandes (stratégies, utilisateur, boutons, V2H), refuse `CHAUFFE_45` et `BOOST_65`, **même sur ordre de l'utilisateur**. Les deux exécutions physiques (envoi et nouvelle tentative) revérifient la garde. L'arrêt n'est jamais bloqué. La chauffe n'est rétablie qu'après **60 secondes de lecture continue**, puis la régulation repart d'une acquisition neuve et les stratégies normales s'appliquent. Sans sonde configurée ou boiler non géré, la garde ne s'applique pas.
+
+## A-33 · Moyenne · Décalage de consigne : calcul privé de déclencheur ✔ — CORRIGÉE
+
+**Constat** : `_evaluate_heating_boost` et `_async_apply_heating_setpoints` n'étaient appelés que dans `_async_update_data`, le rafraîchissement de 30 s du coordinateur. `DataUpdateCoordinator.async_set_updated_data` annule et reprogramme ce rafraîchissement (« reset refresh interval », `helpers/update_coordinator.py`, HA 2025.1.4). FoxCat l'appelle à chaque trame, à chaque événement du capteur réseau, de production et des machines (une quarantaine d'appels). Avec des publications espacées de moins de 30 s, le rafraîchissement ne part jamais : le décalage restait sur un ancien calcul (le désactiver ne le ramenait pas non plus à 0), la baisse « immédiate » sur import ne l'était pas.
+
+**Preuve** : lecture du code de Home Assistant et des appelants (`grep`). Non observé sur une installation en marche.
+
+**Correction** : voir `08_protection_chauffage.md` (B2). Appel à chaque trame, seulement si la fonction est activée ou à rétablir ; attributs `calcule_a` et `calcule_par` pour le vérifier ; message « baisse immédiate » affiché seulement quand il y a vraiment une baisse.
+
+## A-34 · Moyenne · La surveillance du cœur est privée du même déclencheur
+
+**Constat** : `_watchdog()` (phase du cœur invalide, accusés d'énergie expirés, réinitialisation après trame trop ancienne) n'est appelé que dans `_async_update_data`, pour la même raison que A-33 il peut ne jamais s'exécuter. La surveillance des trames du métronome (`_async_metronome_watchdog`, toutes les 2 s) est un mécanisme distinct et n'est pas touchée.
+
+**Proposition** : minuteur dédié (`async_track_time_interval`). Non fait : cela change le comportement du cœur pour toutes les installations (la réinitialisation sur trame ancienne se mettrait à fonctionner), à valider séparément.
 
 ## Tests proposés (par ordre de valeur)
 
