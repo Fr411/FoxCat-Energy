@@ -208,7 +208,7 @@ from ..domain.pricing.price_analyzer import analyze_price_curve
 from ..domain.pricing import price_buffer
 from ..domain.loads.flexible_load_planner import build_flexible_load_plan
 from ..trading.vpp import evaluate_trade, evaluate_v2h
-from ..dashboard.dashboard import dashboard_status
+from ..dashboard.dashboard import cached_dashboard_status, refresh_dashboard_cache
 
 _LOGGER = logging.getLogger(__name__)
 SERIES_SAVE_DELAY_S = 1800
@@ -1335,6 +1335,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if bool(self.settings.get("regulation_active")):
             await self._evaluate_high_load(self.snapshot())
         await self._async_run_heating(self.snapshot(), "mise à jour périodique")
+        await self.hass.async_add_executor_job(refresh_dashboard_cache, self.hass)
         return self._build_data()
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_set_heating_applied — Mémorise le décalage inclus dans les presets
@@ -4961,7 +4962,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "settings": dict(self.settings),
             "versions": {
                 "engine": VERSION,
-                "dashboard": dashboard_status(self.hass).get("active_version") or "Non installé",
+                "dashboard": cached_dashboard_status().get("active_version") or "Non installé",
             },
             "migration": {"model_version": self.settings.get("configuration_model_version"), "notes": getattr(self, "_migration_notes", [])},
             "core": dict(self.core_state),

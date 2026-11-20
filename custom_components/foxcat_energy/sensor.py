@@ -236,7 +236,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "onduleur_actionneur_statut", "Onduleur • Actionneur RRCR", "mdi:electric-switch", "pri", lambda d: d.get("pri", {}).get("actuator_status", "IDLE")),
         FoxCatValueSensor(c, "onduleur_actionneur_cible", "Onduleur • Cible actionneur RRCR", "mdi:gauge", "pri", lambda d: d.get("pri", {}).get("actuator_target_level") if d.get("pri", {}).get("actuator_target_level") is not None else "AUCUNE"),
         FoxCatRegistrySensor(c),
-        FoxCatValueSensor(c, "periode_tarifaire", "Période tarifaire", "mdi:clock-outline", "pricing", lambda d: d["prices"].get("period", "—")),
         FoxCatValueSensor(c, "politique_reseau_active", "Politique réseau active", "mdi:transmission-tower", "pricing", lambda d: d["settings"].get("network_policy", "Compensation")),
         FoxCatValueSensor(c, "ems_onduleur_etat", "EMS Onduleur • État", "mdi:solar-power-variant", "pri", lambda d: d["energy_bus"]["inverter"].get("status", "—")),
         FoxCatNumericSensor(c, "ems_onduleur_plafond_pv", "EMS Onduleur • Plafond PV", "mdi:solar-power", "pri", lambda d: d["energy_bus"]["inverter"].get("pv_limit_w", 0.0), "W"),

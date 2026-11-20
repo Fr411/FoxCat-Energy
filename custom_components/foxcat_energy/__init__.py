@@ -11,7 +11,8 @@ from homeassistant.exceptions import HomeAssistantError
 from .device_cleanup import async_remove_obsolete_devices
 from .const import DEFAULT_SETTINGS, DOMAIN, NUMBER_DEFINITIONS, PLATFORMS, SWITCH_DEFINITIONS, TIME_SETTING_KEYS
 from .runtime.coordinator import FoxCatEnergyCoordinator
-from .dashboard.dashboard import async_ensure_dashboards
+from .dashboard.dashboard import async_ensure_dashboards, refresh_dashboard_cache
+from .domain.loads.devices import async_preload_device_templates
 from .runtime.profiles import read_settings_profile, write_settings_profile
 
 _LOGGER = logging.getLogger(__name__)
@@ -109,6 +110,10 @@ def _async_remove_profile_services(hass: HomeAssistant) -> None:
 # FONCTION ASYNCHRONE : async_setup_entry — traitement asynchrone : setup entry
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
+
+    # Lectures de fichiers hors de la boucle d'événements.
+    await async_preload_device_templates(hass)
+    await hass.async_add_executor_job(refresh_dashboard_cache, hass)
 
     coordinator = FoxCatEnergyCoordinator(hass, entry)
     hass.data[DOMAIN][entry.entry_id] = coordinator

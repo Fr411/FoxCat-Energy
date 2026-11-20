@@ -285,12 +285,9 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     # MÉTHODE : FoxCatDashboardVersionSelect.options — Options
     @property
     def options(self) -> list[str]:
-        from .dashboard.dashboard import dashboard_select_options, dashboard_version_label
+        from .dashboard.dashboard import cached_dashboard_label, cached_dashboard_options
 
-        return [
-            dashboard_version_label(option)
-            for option in dashboard_select_options(self.coordinator.hass)
-        ]
+        return [cached_dashboard_label(option) for option in cached_dashboard_options()]
 
     # MÉTHODE : FoxCatDashboardVersionSelect.__init__ — méthode spéciale __init__
     def __init__(self, coordinator: FoxCatEnergyCoordinator) -> None:
@@ -299,10 +296,10 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
     # MÉTHODE : FoxCatDashboardVersionSelect.current_option — Current option
     @property
     def current_option(self) -> str | None:
-        from .dashboard.dashboard import dashboard_status, dashboard_version_label
+        from .dashboard.dashboard import cached_dashboard_label, cached_dashboard_status
 
-        active = dashboard_status(self.coordinator.hass).get("active_version")
-        active = dashboard_version_label(active) if active else active
+        active = cached_dashboard_status().get("active_version")
+        active = cached_dashboard_label(active) if active else active
         return active if active in self.options else (self.options[0] if self.options else None)
 
     # MÉTHODE : FoxCatDashboardVersionSelect.async_select_option — traitement asynchrone : select option
@@ -313,6 +310,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
             CUSTOM_DASHBOARD_OPTION,
             async_switch_dashboard,
             dashboard_version_for_label,
+            refresh_dashboard_cache,
         )
 
         if option == CUSTOM_DASHBOARD_OPTION:
@@ -334,6 +332,7 @@ class FoxCatDashboardVersionSelect(FoxCatEntity, SelectEntity):
                 title="Dashboard FoxCat Energy",
             )
             return
+        await self.coordinator.hass.async_add_executor_job(refresh_dashboard_cache, self.coordinator.hass)
         self.coordinator.async_set_updated_data(self.coordinator._build_data())
 
 
