@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 import re
 from typing import Any
@@ -64,6 +65,9 @@ def _validate_device(raw: Any, source: str) -> DeviceDefinition:
 
 
 # FONCTION : load_device_templates — Load device templates
+# Les modèles ne changent pas pendant l'exécution : lus une seule fois (en
+# exécuteur au démarrage, voir ``async_preload_device_templates``).
+@lru_cache(maxsize=1)
 def load_device_templates() -> tuple[DeviceDefinition, ...]:
     definitions = []
     for filename in _TEMPLATE_FILES:
@@ -105,3 +109,8 @@ def apply_device_toggle(settings: dict[str, Any], device_id: str, enabled: bool)
     if device_id == "machines":
         return "reconcile_machines"
     return None
+
+
+# FONCTION : async_preload_device_templates — Lecture des modèles hors de la boucle d'événements
+async def async_preload_device_templates(hass: Any) -> None:
+    await hass.async_add_executor_job(load_device_templates)

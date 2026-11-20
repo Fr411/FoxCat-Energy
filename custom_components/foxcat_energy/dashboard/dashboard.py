@@ -137,6 +137,38 @@ def _dashboard_customized(
     return not managed_hash or managed_hash != current_hash
 
 
+# Instantané lu par la boucle d'événements : les lectures de fichiers se font
+# uniquement dans ``refresh_dashboard_cache`` (exécuteur).
+_LOOP_CACHE: dict[str, Any] = {}
+
+
+# FONCTION : refresh_dashboard_cache — Relit l'état du dashboard (à appeler dans l'exécuteur)
+def refresh_dashboard_cache(hass: HomeAssistant) -> None:
+    status = dashboard_status(hass)
+    options = dashboard_select_options(hass)
+    labels = {
+        version: dashboard_version_label(version)
+        for version in {*status["available"], *options}
+        if version != CUSTOM_DASHBOARD_OPTION
+    }
+    _LOOP_CACHE.update(status=status, options=options, labels=labels)
+
+
+# FONCTION : cached_dashboard_status — État du dashboard sans accès disque
+def cached_dashboard_status() -> dict[str, Any]:
+    return _LOOP_CACHE.get("status") or {}
+
+
+# FONCTION : cached_dashboard_options — Options du sélecteur sans accès disque
+def cached_dashboard_options() -> list[str]:
+    return list(_LOOP_CACHE.get("options") or [])
+
+
+# FONCTION : cached_dashboard_label — Libellé d'une version sans accès disque
+def cached_dashboard_label(version: str) -> str:
+    return _LOOP_CACHE.get("labels", {}).get(version, version)
+
+
 # FONCTION : dashboard_status — Dashboard status
 def dashboard_status(
     hass: HomeAssistant, variant: DashboardVariant = "tablet"

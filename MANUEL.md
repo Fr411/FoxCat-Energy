@@ -488,6 +488,7 @@ Installez (via HACS, catégorie Interface) : **`button-card`**, **`apexcharts-ca
 - Les listes **Version du dashboard tablette/PC** et **Version du dashboard mobile** sont indépendantes.
 - Le bouton **Régénérer le dashboard FoxCat** force la régénération, avec une sauvegarde `.bak` avant chaque remplacement.
 - La **fusion à trois sources** conserve vos modifications non conflictuelles, signale les conflits et sauvegarde le dashboard courant.
+- Si vous modifiez le fichier du dashboard à la main, la liste **Version du dashboard** passe à « Personnalisé » au rafraîchissement suivant, soit 30 secondes au plus.
 
 ### Vue « Coûts » à jour
 
@@ -534,6 +535,7 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Les modifications du menu ont disparu | Fenêtre fermée sans enregistrer | Terminez toujours par **« Enregistrer et quitter »** |
 | Le dashboard n'apparaît pas | Dashboard non déclaré | Fusionnez `configuration.yaml.snippet` et redémarrez |
 | Commandes qui se contrarient | Une ancienne automatisation pilote le même équipement | Désactivez-la |
+| Journal : « does not generate unique IDs … periode_tarifaire » ou « Detected blocking call » venant de `foxcat_energy` | Version antérieure à cette correction | Mettez à jour FoxCat et redémarrez Home Assistant ; si les messages persistent, relevez-les (`Paramètres → Système → Journaux`) |
 
 ### Aller plus loin
 
