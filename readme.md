@@ -330,6 +330,8 @@ Mono-horaire repasse la structure à Simple ; pour garder Impact, choisissez-le 
 
 FoxCat génère ses dashboards YAML dans `/config/foxcat_energy/` : `dashboard.yaml` (tablette / PC) et `dashboardmob1.yaml` (mobile). Les fichiers existants ne sont jamais écrasés au démarrage ; le bouton **Régénérer le dashboard FoxCat** force la régénération avec sauvegarde `.bak`. Les versions tablette et mobile se choisissent indépendamment, et la **fusion à trois sources** conserve vos personnalisations non conflictuelles. Cartes requises : `custom:button-card`, `custom:apexcharts-card`, `card-mod`.
 
+L'état du dashboard (version active, versions disponibles, dashboard personnalisé) est relu hors de la boucle d'événements de Home Assistant à chaque rafraîchissement du coordinateur (30 secondes au plus) et après un changement de version. Une modification manuelle du fichier apparaît donc avec ce délai. Les modèles d'appareils (`domain/loads/devices/*.yaml`) sont lus une seule fois au démarrage.
+
 | Fichier | Contenu |
 |---|---|
 | [`docs/cartes/vue_couts.yaml`](docs/cartes/vue_couts.yaml) | Vue « Coûts » tablette |
