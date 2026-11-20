@@ -9,7 +9,7 @@
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
 
-Pour installer et configurer pas à pas, lisez le **[Manuel](MANUEL.md)**. Ce document-ci explique **comment FoxCat fonctionne**. Les changements de chaque version sont dans le [journal des versions](CHANGELOG.md).
+Pour installer et configurer pas à pas, lisez le **[Manuel](MANUEL.md)**. Ce document-ci explique **comment FoxCat fonctionne**. Les versions sont résumées dans le [journal des versions](JOURNAL_VERSIONS.md) et détaillées dans le [changelog](CHANGELOG.md).
 
 ---
 
@@ -356,7 +356,8 @@ docs/                              plans, cartes, automatisations, archives par 
 docs/algorithmes/                  audit des algorithmes, page par domaine, et rapport d'anomalies
 trash/                             fichiers obsolètes mis de côté (voir trash/LISEZMOI.md)
 MANUEL.md                          configuration pas à pas
-CHANGELOG.md                       journal des versions
+CHANGELOG.md                       détail des changements
+JOURNAL_VERSIONS.md                une ligne par version
 ```
 
 Licence : voir [`Licence.md.txt`](Licence.md.txt).
