@@ -6,12 +6,13 @@ Quand un échange se termine par une **fusion** (merge de la branche, de la pull
 
 1. **`readme.md`** : fonctionnement complet de FoxCat (architecture, tarification, équipements, protections, entités, dashboards, sécurité).
 2. **`MANUEL.md`** : configuration pas à pas (installation, assistant, menus, activation progressive, dépannage, retour arrière).
+3. **`JOURNAL_VERSIONS.md`** : une ligne par version (version, date, résumé, lien vers la pull request). Le détail reste dans `CHANGELOG.md`.
 
 Comment procéder :
 
 - Relis le code et les changements de l'échange (`CHANGELOG.md`, `translations/fr.json`, `config_flow.py`, `const.py`) pour que les deux documents reflètent l'état réel, pas l'état précédent.
 - Mets à jour la version affichée (`custom_components/foxcat_energy/manifest.json`) et les liens vers les fichiers de `docs/`.
-- Commite les deux fichiers sur la branche **avant** la fusion, dans le même lot de changements.
+- Commite ces fichiers sur la branche **avant** la fusion, dans le même lot de changements.
 - Si une partie n'a pas pu être vérifiée dans le code, dis-le dans la réponse au lieu de l'affirmer dans la documentation.
 
 ## Fichiers obsolètes
