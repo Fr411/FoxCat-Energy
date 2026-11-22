@@ -13,5 +13,6 @@ Rien ici n'est utilisé par l'intégration ni par les tests. Les fichiers sont d
 | `flexible_load_planner.py`, `machine_learning.py`, `tariff_model.py` | Copies à la racine, jamais importées ; les versions utilisées sont dans `custom_components/foxcat_energy/domain/` |
 | `dashboard.yaml.yaml` | Ancien dashboard orphelin (430 Ko) à la racine, référencé nulle part |
 | `custom_components/foxcat_energy/coordinator.py`, `vpp.py` | Anciennes copies mortes : le moteur actif est `runtime/coordinator.py` et `trading/vpp.py` (le CHANGELOG annonçait déjà leur suppression) |
+| `Tab Dash.yaml` | Ancien fichier de travail du dashboard tablette (vues `panel`), remplacé par `custom_components/foxcat_energy/dashboard/versions/dashboard_v1.8.0.yaml`, la version livrée à l’installation |
 
 Les fichiers `__pycache__` qui étaient suivis par git ont été retirés de l'index (ils sont déjà dans `.gitignore`).

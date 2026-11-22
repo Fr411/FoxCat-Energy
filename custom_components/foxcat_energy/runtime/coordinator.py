@@ -3564,6 +3564,38 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         view["line_voltage_v"] = round(voltage.line_v, 1)
         return view
 
+    def _peak_view(self, snapshot: EnergySnapshot) -> dict[str, Any]:
+        """Valeurs réellement utilisées par le délestage (calcul seul, aucune commande).
+
+        Reprend exactement les fonctions de ``peak_shaving`` appelées par ``_evaluate_high_load`` :
+        base de mesure, puissance comparée, seuils de déclenchement et de réarmement, trames.
+        """
+        cfg = self._peak_config()
+        limit = peak_logic.breaker_limit_w(cfg)
+        measured = (
+            peak_logic.measured_power_w(cfg, house_w=snapshot.house_w, import_w=snapshot.import_w)
+            if snapshot.valid
+            else None
+        )
+        return {
+            "peak_enabled": cfg.enabled,
+            "peak_automatic": str(self.settings.get("mode")) != MODE_MANUAL,
+            "peak_valid": bool(snapshot.valid),
+            "basis": cfg.measure_basis,
+            "basis_label": peak_logic.basis_label(cfg),
+            "measured_w": None if measured is None else round(measured, 0),
+            "house_w": round(snapshot.house_w, 0) if snapshot.valid else None,
+            "import_w": round(max(snapshot.import_w, 0.0), 0) if snapshot.valid else None,
+            "trigger_w": round(peak_logic.trigger_w(cfg), 0),
+            "release_w": round(peak_logic.release_w(cfg), 0),
+            "breaker_limit_w": None if limit is None else round(limit, 0),
+            "threshold_source": "disjoncteur" if limit is not None else "seuil absolu",
+            "confirm_frames": peak_logic.required_confirm_frames(cfg),
+            "release_frames": cfg.release_frames,
+            "high_frames": self._high_load_high_frames,
+            "low_frames": self._high_load_low_frames,
+        }
+
     def _grid_voltage(self, nominal_v: float) -> "grid_load.VoltageInfo":
         """Tension réseau mesurée (phase-neutre et/ou entre lignes), sinon la tension nominale."""
         def pick(key: str) -> Any:
@@ -5112,7 +5144,7 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
             "v2h": dict(self.v2h_state),
             "developer_simulation": dict(self.developer_simulation),
             "legacy_conflict": self._legacy_conflict(),
-            "load_shed": dict(self.load_shed_state),
+            "load_shed": {**self.load_shed_state, **self._peak_view(snap)},
             "health": self._health_view(snap, prices),
             "connectivity": backup_logic.status_view(
                 online=self.connectivity.online,

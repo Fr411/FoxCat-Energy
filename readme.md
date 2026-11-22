@@ -272,7 +272,7 @@ Quand la puissance dépasse un seuil, FoxCat **délestera** les charges non esse
 
 - Seuil : % du calibre du disjoncteur (90 % par défaut) ou seuil absolu en watts.
 - Réseau mono, tri ou tétra. Si vous avez des intensités par phase, FoxCat prend la plus élevée.
-- Mesure comparée : import réseau (évite de délester quand le solaire couvre la charge) ou consommation totale.
+- Mesure comparée (`peak_measure_basis`) : **consommation maison** par défaut (comportement historique) ou import réseau (évite de délester quand le solaire couvre la charge).
 - Confirmation sur plusieurs trames avant déclenchement, **réarmement toujours au moins 5 % sous le déclenchement** pour éviter les oscillations.
 - Actions : couper le boiler, couper les machines délestables (jamais en plein cycle), libérer l'onduleur à 100 %, bloquer les nouveaux démarrages flexibles, assistance V2H.
 
@@ -282,6 +282,7 @@ Un disjoncteur déclenche sur la phase la plus chargée, pas sur le total. Sans 
 
 - **Tensions mesurées** (facultatives) : phase-neutre L1, L2, L3 (≈ 230 V) et entre lignes L1-L2, L2-L3, L3-L1 (≈ 400 V). FoxCat recoupe les deux familles, ignore les valeurs aberrantes et retombe sur la tension nominale sans mesure. La tension obtenue sert à calculer la capacité du disjoncteur et l'intensité. L'ancien capteur de tension unique reste pris en compte s'il est le seul renseigné.
 - **Coefficient de déséquilibre des phases** (1 par défaut, 3 au maximum) : il suppose que la phase la plus chargée porte K fois la charge moyenne. La capacité vue du total devient `A × V × phases ÷ K`. Exemple : 25 A, 3 phases, 230 V, K = 1,3 → capacité 13 269 W, déclenchement à 90 % ≈ 11 942 W, au lieu de 15 525 W avec K = 1. Il ne s'applique ni en monophasé ni quand des intensités par phase sont mesurées.
+- **Valeurs réelles du délestage** : le capteur « Statut délestage haute consommation » expose en attributs la base de mesure, la puissance comparée, les seuils de déclenchement et de réarmement (et leur origine), les trames requises et leurs compteurs. C'est ce que lit la carte du dashboard.
 - **Diagnostic** : les attributs de l'entité « Charge du disjoncteur principal » exposent l'intensité estimée et sa source, le coefficient appliqué, la tension utilisée et son origine (`nominal`, `phase`, `line` ou `phase+line`), la tension entre lignes et l'écart entre phases.
 
 Les tensions améliorent la précision du calcul ; elles **ne détectent pas** une phase surchargée. Seul le coefficient en tient compte.
@@ -330,7 +331,9 @@ Mono-horaire repasse la structure à Simple ; pour garder Impact, choisissez-le 
 
 ## 16. Dashboards et cartes
 
-FoxCat génère ses dashboards YAML dans `/config/foxcat_energy/` : `dashboard.yaml` (tablette / PC) et `dashboardmob1.yaml` (mobile). Les fichiers existants ne sont jamais écrasés au démarrage ; le bouton **Régénérer le dashboard FoxCat** force la régénération avec sauvegarde `.bak`. Les versions tablette et mobile se choisissent indépendamment, et la **fusion à trois sources** conserve vos personnalisations non conflictuelles. Cartes requises : `custom:button-card`, `custom:apexcharts-card`, `card-mod`.
+FoxCat génère ses dashboards YAML dans `/config/foxcat_energy/` : `dashboard.yaml` (tablette / PC) et `dashboardmob1.yaml` (mobile). Les fichiers existants ne sont jamais écrasés au démarrage ; le bouton **Régénérer le dashboard FoxCat** force la régénération avec sauvegarde `.bak`. Les versions tablette et mobile se choisissent indépendamment, et la **fusion à trois sources** conserve vos personnalisations non conflictuelles. Cartes requises : `custom:button-card`, `custom:apexcharts-card`, `card-mod`, et pour la version 1.8.0 `vertical-stack-in-card` (mobile : aussi `layout-card`/`masonry-layout` et `html-template-card`).
+
+**Dashboards 1.8.0 (recommandés).** Une version tablette / PC et une version mobile, livrées à l'installation (`dashboard_v1.8.0.yaml`, `dashboard_mobile_v1.8.0.yaml`). Tablette : Accueil, Énergie, **Flux** (pieuvre animée **Mina**, dont l'humeur suit le solaire, le réseau et la consommation), Onduleur, Boiler animé, Machines, Chauffage, **Délestage haute consommation** (carte animée : jauge du disjoncteur, étapes surveillance / seuil dépassé / délestage / réarmement, charges délestables), Marche, Diagnostic, Technique, VE-Batterie. Les entités sont résolues par le registre FoxCat ; quelques entités propres à une installation (machines, capteurs de charges) restent écrites en clair et sont à adapter. Les vues Logger, Configuration, Coûts, Day-Ahead, Batterie+VE et Contrat de la 1.7.4 ne sont pas reprises (version 1.7.4 toujours sélectionnable). Non vérifié : le rendu sur une installation autre que celle de développement.
 
 L'état du dashboard (version active, versions disponibles, dashboard personnalisé) est relu hors de la boucle d'événements de Home Assistant à chaque rafraîchissement du coordinateur (30 secondes au plus) et après un changement de version. Une modification manuelle du fichier apparaît donc avec ce délai. Les modèles d'appareils (`domain/loads/devices/*.yaml`) sont lus une seule fois au démarrage.
 

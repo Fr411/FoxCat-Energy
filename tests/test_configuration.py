@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 import sys
 import tempfile
 import types
@@ -651,11 +652,104 @@ class DashboardAndProfileTests(unittest.TestCase):
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         self.assertIn("1.7.4", available_dashboard_versions(versions_directory))
         self.assertIn("1.7.4", available_dashboard_versions(versions_directory, "mobile"))
-        self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.4")
+        self.assertIn("1.8.0", available_dashboard_versions(versions_directory))
+        self.assertIn("1.8.0", available_dashboard_versions(versions_directory, "mobile"))
+        self.assertEqual(recommended_dashboard_version(versions_directory), "1.8.0")
         self.assertEqual(
             recommended_dashboard_version(versions_directory, "mobile"),
-            "1.7.4",
+            "1.8.0",
         )
+
+    def test_dashboard_v180_tablet_and_mobile_are_portable(self) -> None:
+        import ast
+        import re
+
+        registry = ast.parse(
+            (COMPONENT_PATH / "runtime" / "registry.py").read_text(encoding="utf-8")
+        )
+        roles = {
+            node.args[0].value
+            for node in ast.walk(registry)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in {"_native", "_config", "_literal"}
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+        }
+        versions_directory = COMPONENT_PATH / "dashboard" / "versions"
+        for filename, variant, minimum_views in (
+            ("dashboard_v1.8.0.yaml", "tablet", 10),
+            ("dashboard_mobile_v1.8.0.yaml", "mobile", 9),
+        ):
+            text = (versions_directory / filename).read_text(encoding="utf-8")
+            dashboard = yaml.safe_load(text)
+            self.assertGreaterEqual(len(dashboard["views"]), minimum_views, filename)
+            # Aucune image téléversée dans un Home Assistant particulier.
+            self.assertNotIn("image_upload", text, filename)
+            self.assertNotIn("/api/image/serve", text, filename)
+            # Chaque rôle du registre utilisé existe : pas d'entité « unresolved ».
+            used = set(re.findall(r"\[\[foxcat:([a-zA-Z0-9_.-]+)\]\]", text))
+            self.assertTrue(used, filename)
+            self.assertEqual(sorted(used - roles), [], filename)
+            manifest = json.loads(
+                (
+                    versions_directory
+                    / (
+                        "manifest_v1.8.0.json"
+                        if variant == "tablet"
+                        else "manifest_mobile_v1.8.0.json"
+                    )
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["variant"], variant)
+            self.assertEqual(manifest["dashboard_version"], "1.8.0")
+            self.assertIs(manifest["recommended"], True)
+
+    def test_dashboard_v180_has_delestage_view_with_navbar_access(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.8.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        paths = [view["path"] for view in dashboard["views"]]
+        self.assertIn("delestage", paths)
+        navbar = dashboard["button_card_templates"]["fc_navbar"]["custom_fields"]
+        targets = {
+            item["card"]["variables"]["path"]: item["card"]["name"]
+            for item in navbar.values()
+        }
+        # Chaque onglet de la barre ouvre une vue qui existe.
+        self.assertEqual(sorted(set(targets) - set(paths)), [])
+        self.assertEqual(targets["delestage"], "Délestage")
+        areas = dashboard["button_card_templates"]["fc_navbar"]["styles"]["grid"][0][
+            "grid-template-areas"
+        ]
+        self.assertEqual(len(areas.strip('"').split()), len(navbar))
+        view = next(view for view in dashboard["views"] if view["path"] == "delestage")
+        code = view["cards"][0]["cards"][3]["custom_fields"]["c"]
+        for step in ("Surveillance", "Seuil dépassé", "Délestage", "Réarmement"):
+            self.assertIn(step, code)
+
+    def test_dashboard_v180_flux_octopus_is_named_mina(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.8.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        flux = next(view for view in dashboard["views"] if view["path"] == "flux")
+        self.assertIn("<b>Mina</b>", flux["cards"][0]["cards"][-1]["custom_fields"]["c"])
+
+    def test_dashboard_v180_flux_octopus_has_all_moods(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.8.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        flux = next(view for view in dashboard["views"] if view["path"] == "flux")
+        code = flux["cards"][0]["cards"][-1]["custom_fields"]["c"]
+        for mood in ("sleep", "joy", "happy", "content", "calm", "sad", "worried", "panic"):
+            self.assertIn(f"{mood}:", code, mood)
+        self.assertIn("const moodKey", code)
 
     def test_battery_ev_menu_and_dashboard_view_exist_for_both_layouts(self) -> None:
         self.assertIn("battery_ev", EQUIPMENT_MENU_STEPS)
@@ -690,3 +784,18 @@ class DashboardAndProfileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_dashboard_v180_delestage_card_uses_real_peak_values() -> None:
+    """La carte lit base, seuils et trames publiés par FoxCat, sans les recalculer."""
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    text = (root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8")
+    for key in ("seuil_declenchement_w", "seuil_rearmement_w", "puissance_mesuree_w", "base_de_mesure", "trames_confirmation"):
+        assert key in text
+    assert "const house = Math.max(num('[[foxcat:legacy" in text  # puissance maison affichée seulement
+    assert "seuil_haute_consommation') ?? 0" not in text
+    sensor = (root / "sensor.py").read_text(encoding="utf-8")
+    coordinator = (root / "runtime" / "coordinator.py").read_text(encoding="utf-8")
+    assert "def _peak_view" in coordinator and "**self._peak_view(snap)" in coordinator
+    for key in ("seuil_declenchement_w", "seuil_rearmement_w", "puissance_mesuree_w", "base_de_mesure", "trames_confirmation"):
+        assert key in sensor

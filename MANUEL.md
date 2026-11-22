@@ -405,10 +405,11 @@ Menu **Chauffage** :
 3. **Seuils** :
    - avec disjoncteur renseigné : déclenchement à **90 %** du disjoncteur (réglable) ;
    - sans disjoncteur : seuil absolu en watts ;
-   - **puissance comparée** : *Import réseau* (recommandé avec du solaire : évite de délester quand le soleil couvre la charge) ou *Consommation totale* ;
+   - **puissance comparée** : *Puissance maison* (par défaut) ou *Import réseau* (évite de délester quand le soleil couvre la charge) ;
    - **réarmement** : toujours au moins 5 % sous le déclenchement.
 4. **Actions pendant le délestage** : couper le boiler, couper les machines délestables, libérer l'onduleur, bloquer les nouveaux démarrages flexibles, V2H (cible 80 % du disjoncteur).
 5. **Mesures** (facultatives) : tensions réseau et intensités par phase (voir ci-dessous).
+6. **Contrôler** : ouvrez le capteur **« Statut délestage haute consommation »** et lisez ses attributs : `base_de_mesure`, `puissance_mesuree_w`, `seuil_declenchement_w`, `seuil_rearmement_w`, `origine_seuil` (disjoncteur ou seuil absolu) et les trames. C'est exactement ce que compare FoxCat ; la carte « Délestage » du dashboard 1.8.0 affiche ces valeurs.
 
 > Exemple : disjoncteur 40 A en monophasé 230 V, soit 9 200 W ; déclenchement à 90 % ≈ 8 280 W.
 
@@ -486,7 +487,11 @@ Les fichiers existants **ne sont jamais écrasés** au démarrage.
 
 ### Cartes nécessaires
 
-Installez (via HACS, catégorie Interface) : **`button-card`**, **`apexcharts-card`**, **`card-mod`**.
+Installez (via HACS, catégorie Interface) : **`button-card`**, **`apexcharts-card`**, **`card-mod`**. Les dashboards 1.8.0 demandent en plus **`vertical-stack-in-card`** ; la version mobile demande aussi **`layout-card`** (masonry-layout) et **`html-template-card`**.
+
+### Dashboards 1.8.0 (recommandés)
+
+À l'installation, FoxCat crée `dashboard.yaml` (tablette / PC) et `dashboardmob1.yaml` (mobile) en version **1.8.0**. Un fichier déjà présent n'est jamais remplacé : pour passer à la 1.8.0, choisissez la version dans la liste **Version du dashboard** puis utilisez **Régénérer le dashboard FoxCat** (sauvegarde `.bak`). Sur tablette : onglets Flux (Mina, la pieuvre), Boiler, Machines, Chauffage et **Délestage** dans la barre du bas. Entités propres à votre installation (machines, capteurs de charges) : à adapter dans le YAML. Vues de la 1.7.4 absentes de la 1.8.0 (Logger, Configuration, Coûts, Day-Ahead, Batterie+VE, Contrat) : choisissez la version 1.7.4 pour les retrouver. Retour arrière : sélecteur de version ou `.bak`.
 
 ### Choisir et mettre à jour les versions
 
