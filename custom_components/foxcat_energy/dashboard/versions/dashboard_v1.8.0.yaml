@@ -8342,19 +8342,25 @@ views:
             const volt = parseFloat(at.tension_phase_v), coef = parseFloat(at.coefficient_desequilibre), dv = parseFloat(at.ecart_tension_phases_pct);
             const act = on('binary_sensor.foxcat_energy_ems_delestage_haute_consommation_actif');
             const enabled = on('switch.foxcat_energy_ems_delestage_haute_consommation');
-            const trig = num('number.foxcat_energy_ems_seuil_haute_consommation') ?? 0;
-            const rel = num('number.foxcat_energy_ems_seuil_de_rearmement_apres_haute_consommation') ?? 0;
-            const conf = num('number.foxcat_energy_ems_confirmation_haute_consommation');
+            const ss = states[P + 'statut_delestage_haute_consommation'], sa = ss?.attributes || {};
+            const nv = (k) => { const v = sa[k]; return (v === null || v === undefined || v === '' || !isFinite(+v)) ? null : +v; };
+            const trig = nv('seuil_declenchement_w') ?? 0;
+            const rel = nv('seuil_rearmement_w') ?? 0;
+            const conf = nv('trames_confirmation'), rfr = nv('trames_rearmement'), hF = nv('trames_hautes') ?? 0, lF = nv('trames_basses') ?? 0;
             const house = Math.max(num('[[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison]]') ?? 0, 0);
             const imp = Math.max(num('[[foxcat:legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau]]') ?? 0, 0);
             const bat = num(P + 'peak_shaving_decharge_batterie_demandee') ?? 0;
-            const txt = states[P + 'statut_delestage_haute_consommation']?.state || '—';
+            const txt = ss?.state || '—';
+            const basisImp = sa.base_de_mesure === 'grid_import';
+            const basisLbl = sa.base_de_mesure_libelle || (basisImp ? 'Import réseau' : 'Puissance maison');
+            const meas = nv('puissance_mesuree_w') ?? (basisImp ? imp : house);
+            const auto = sa.mode_automatique !== false;
 
-            const near = load >= thrPct * .8 || (trig > 0 && house >= trig * .8);
-            const over = load >= thrPct || (trig > 0 && house >= trig);
-            const step = !enabled ? 0 : act ? (house <= rel ? 4 : 3) : over ? 2 : 1;
-            const col = !enabled ? '#64748b' : act ? '#f87171' : over ? '#fb923c' : near ? '#fbbf24' : '#34d399';
-            const label = ['PROTECTION DÉSACTIVÉE', 'SURVEILLANCE', 'SEUIL DÉPASSÉ', 'DÉLESTAGE ACTIF', 'RÉARMEMENT'][step];
+            const near = trig > 0 && meas >= trig * .8;
+            const over = trig > 0 && meas >= trig;
+            const step = (!enabled || !auto) ? 0 : act ? (meas <= rel ? 4 : 3) : over ? 2 : 1;
+            const col = (!enabled || !auto) ? '#64748b' : act ? '#f87171' : over ? '#fb923c' : near ? '#fbbf24' : '#34d399';
+            const label = [!enabled ? 'PROTECTION DÉSACTIVÉE' : 'MODE MANUEL : INACTIF', 'SURVEILLANCE', 'SEUIL DÉPASSÉ', 'DÉLESTAGE ACTIF', 'RÉARMEMENT'][step];
 
             /* ---- jauge 270° : charge du disjoncteur ---- */
             const R = 100, C = 2 * Math.PI * R, ARC = .75;
@@ -8394,9 +8400,9 @@ views:
             const stepsHtml = STEPS.map(([ic, l], i) => { const n = i + 1, st = step === n ? 'cur' : (step > n || (step === 4 && n < 4)) ? 'done' : ''; return `<div class="sp ${st}"><i><ha-icon icon="${ic}"></ha-icon></i><span>${l}</span></div>`; }).join('<b class="ln"></b>');
 
             /* ---- puissance maison vs seuils ---- */
-            const maxW = Math.max(trig * 1.25, house * 1.1, imp * 1.1, 1000);
+            const maxW = Math.max(trig * 1.25, meas * 1.1, 1000);
             const pc = (w) => clamp(w / maxW * 100, 0, 100);
-            const bar = `<div class="pb"><div class="pf" style="width:${pc(house).toFixed(1)}%;background:linear-gradient(90deg,#34d399,${over ? '#f87171' : near ? '#fbbf24' : '#34d399'});${act ? AA('ds-bar', .8) : ''}"></div>
+            const bar = `<div class="pb"><div class="pf" style="width:${pc(meas).toFixed(1)}%;background:linear-gradient(90deg,#34d399,${over ? '#f87171' : near ? '#fbbf24' : '#34d399'});${act ? AA('ds-bar', .8) : ''}"></div>
               ${rel > 0 ? `<span class="mk r" style="left:${pc(rel)}%"><em>réarm. ${fmtW(rel)}</em></span>` : ''}${trig > 0 ? `<span class="mk t" style="left:${pc(trig)}%"><em>seuil ${fmtW(trig)}</em></span>` : ''}</div>`;
 
             /* ---- charges délestables ---- */
@@ -8466,17 +8472,17 @@ views:
                 <div>${breaker}</div>
                 <div>
                   <div class="steps">${stepsHtml}</div>
-                  <div class="pw"><div class="pl"><span>PUISSANCE MAISON</span><b class="mono">${fmtW(house)}</b></div>${bar}</div>
+                  <div class="pw"><div class="pl"><span>${esc(basisLbl).toUpperCase()} (COMPARÉE AUX SEUILS)</span><b class="mono">${fmtW(meas)}</b></div>${bar}</div>
                 </div>
               </div>
               <div class="bt">${loads}</div>
               <div class="cps">
-                ${chip('mdi:flash-alert', 'Seuil', fmtW(trig))}${chip('mdi:restart', 'Réarmement', fmtW(rel))}
-                ${chip('mdi:timer-outline', 'Confirmation', conf == null ? '—' : Math.round(conf) + ' s')}${chip('mdi:battery-arrow-up', 'Aide batterie', fmtW(bat))}
+                ${chip('mdi:flash-alert', 'Seuil' + (sa.origine_seuil ? ' (' + sa.origine_seuil + ')' : ''), trig > 0 ? fmtW(trig) : '—')}${chip('mdi:restart', 'Réarmement', trig > 0 ? fmtW(rel) : '—')}
+                ${chip('mdi:timer-outline', 'Confirmation', conf == null ? '—' : (act ? (lF + '/' + (rfr ?? '—') + ' trames basses') : (hF + '/' + conf + ' trame' + (conf > 1 ? 's' : ''))))}${chip('mdi:battery-arrow-up', 'Aide batterie', fmtW(bat))}
                 ${chip('mdi:sine-wave', 'Tension phase', isFinite(volt) ? Math.round(volt) + ' V' : '—')}${chip('mdi:scale-unbalanced', 'Déséquilibre', isFinite(coef) ? '× ' + dec(coef, 1) : '—')}
-                ${chip('mdi:transmission-tower', 'Import réseau', fmtW(imp))}${chip('mdi:shield-check', 'Seuil charge', Math.round(thrPct) + ' %')}
+                ${chip('mdi:transmission-tower', 'Import réseau', fmtW(imp))}${chip('mdi:home-lightning-bolt', 'Puissance maison', fmtW(house))}
               </div>
-              <div class="msg"><ha-icon icon="mdi:message-text-outline"></ha-icon>${esc(txt)}</div>
+              <div class="msg"><ha-icon icon="mdi:message-text-outline"></ha-icon>${esc(txt)}${sa.base_de_mesure_libelle ? ' · base : ' + esc(sa.base_de_mesure_libelle) : ''}</div>
             </div>`;
           ]]]
     - type: grid

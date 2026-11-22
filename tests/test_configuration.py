@@ -784,3 +784,18 @@ class DashboardAndProfileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_dashboard_v180_delestage_card_uses_real_peak_values() -> None:
+    """La carte lit base, seuils et trames publiés par FoxCat, sans les recalculer."""
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    text = (root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8")
+    for key in ("seuil_declenchement_w", "seuil_rearmement_w", "puissance_mesuree_w", "base_de_mesure", "trames_confirmation"):
+        assert key in text
+    assert "const house = Math.max(num('[[foxcat:legacy" in text  # puissance maison affichée seulement
+    assert "seuil_haute_consommation') ?? 0" not in text
+    sensor = (root / "sensor.py").read_text(encoding="utf-8")
+    coordinator = (root / "runtime" / "coordinator.py").read_text(encoding="utf-8")
+    assert "def _peak_view" in coordinator and "**self._peak_view(snap)" in coordinator
+    for key in ("seuil_declenchement_w", "seuil_rearmement_w", "puissance_mesuree_w", "base_de_mesure", "trames_confirmation"):
+        assert key in sensor
