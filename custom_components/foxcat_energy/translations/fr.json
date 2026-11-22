@@ -127,6 +127,7 @@
           "pri_ret_l2": "Retour réel L2 (optionnel)",
           "pri_ret_l3": "Retour réel L3 (optionnel)",
           "pri_ret_l4": "Retour réel L4 (optionnel)",
+          "pri_logo_online": "LOGO en ligne (optionnel)",
           "inverter_power_sensor": "Puissance réelle onduleur en direct (optionnel)"
         },
         "data_description": {
@@ -138,6 +139,7 @@
           "pri_ret_l2": "État réel du relais L2 renvoyé par le contrôleur (ex. LOGO NQ10).",
           "pri_ret_l3": "État réel du relais L3 renvoyé par le contrôleur (ex. LOGO NQ11).",
           "pri_ret_l4": "État réel du relais L4 renvoyé par le contrôleur (ex. LOGO NQ12).",
+          "pri_logo_online": "État de connexion du contrôleur (capteur binaire : on = en ligne). Hors ligne ou indisponible : la garde PRI suspend les commandes.",
           "inverter_power_sensor": "Capteur physique de puissance AC/DC de l’onduleur mis à jour rapidement. Le dashboard peut l’utiliser directement via le registre FoxCat."
         }
       },
@@ -539,6 +541,7 @@
           "pri_ret_l2": "Retour réel L2 (optionnel)",
           "pri_ret_l3": "Retour réel L3 (optionnel)",
           "pri_ret_l4": "Retour réel L4 (optionnel)",
+          "pri_logo_online": "LOGO en ligne (optionnel)",
           "inverter_power_sensor": "Puissance réelle onduleur en direct (optionnel)"
         },
         "data_description": {
@@ -550,6 +553,7 @@
           "pri_ret_l2": "État réel du relais L2 renvoyé par le contrôleur (ex. LOGO NQ10).",
           "pri_ret_l3": "État réel du relais L3 renvoyé par le contrôleur (ex. LOGO NQ11).",
           "pri_ret_l4": "État réel du relais L4 renvoyé par le contrôleur (ex. LOGO NQ12).",
+          "pri_logo_online": "État de connexion du contrôleur (capteur binaire : on = en ligne). Hors ligne ou indisponible : la garde PRI suspend les commandes.",
           "inverter_power_sensor": "Capteur physique de puissance AC/DC de l’onduleur mis à jour rapidement. Le dashboard peut l’utiliser directement via le registre FoxCat."
         }
       },

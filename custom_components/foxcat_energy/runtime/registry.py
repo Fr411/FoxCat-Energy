@@ -52,6 +52,7 @@ from ..const import (
     CONF_PRI_RET_L2,
     CONF_PRI_RET_L3,
     CONF_PRI_RET_L4,
+    CONF_PRI_LOGO_ONLINE,
     CONF_INVERTER_POWER_SENSOR,
     CONF_PV_SENSOR,
     CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR,
@@ -149,6 +150,7 @@ _config("inverter.rrcr_ret_l1", "Onduleur", CONF_PRI_RET_L1)
 _config("inverter.rrcr_ret_l2", "Onduleur", CONF_PRI_RET_L2)
 _config("inverter.rrcr_ret_l3", "Onduleur", CONF_PRI_RET_L3)
 _config("inverter.rrcr_ret_l4", "Onduleur", CONF_PRI_RET_L4)
+_config("inverter.logo_online", "Onduleur", CONF_PRI_LOGO_ONLINE)
 _native("inverter.ack_logo", "Onduleur", "pri_ack_logo")
 _native("inverter.command_availability", "Onduleur", "onduleur_disponibilite_commande")
 

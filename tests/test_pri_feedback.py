@@ -38,6 +38,16 @@ def test_command_blocked_only_when_feedback_unreadable():
     assert pf.command_blocked(None) is False
 
 
+def test_logo_online_overrides_feedback():
+    assert pf.command_availability("0000", None, "on") == pf.AVAILABILITY_OK
+    assert pf.command_availability("0000", None, "off") == pf.AVAILABILITY_DOWN
+    assert pf.command_availability("0000", None, "unavailable") == pf.AVAILABILITY_DOWN
+    assert pf.command_availability("0000", "0000", "off") == pf.AVAILABILITY_DOWN
+    assert pf.command_availability("0000", "0001", "on") == pf.AVAILABILITY_DEGRADED
+    assert pf.command_availability("0000", "0000", "on") == pf.AVAILABILITY_OK
+    assert pf.command_availability("0000", None, None) == pf.AVAILABILITY_NOT_CONFIGURED
+
+
 def test_command_availability_states():
     assert pf.command_availability("0000", None) == pf.AVAILABILITY_NOT_CONFIGURED
     assert pf.command_availability("0000", "????") == pf.AVAILABILITY_DOWN

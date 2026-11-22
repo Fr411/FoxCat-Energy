@@ -108,7 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatValueSensor(c, "pri_ack_onduleur", "ACK onduleur", "mdi:solar-power", "pri", lambda d: d["pri"]["ack_inverter"]),
         FoxCatValueSensor(c, "pri_ack_reseau", "ACK réseau", "mdi:transmission-tower", "pri", lambda d: d["pri"]["ack_grid"]),
         FoxCatValueSensor(c, "pri_ack_logo", "ACK LOGO (retour relais)", "mdi:check-network-outline", "pri", lambda d: d["pri"].get("ack_logo", "IDLE")),
-        FoxCatValueSensor(c, "onduleur_disponibilite_commande", "Onduleur • Disponibilité commande", "mdi:lan-check", "pri", lambda d: d["pri"].get("command_availability", "NON_CONFIGURE"), attributes=lambda d: {"code_commande": d["pri"].get("code"), "code_retour": d["pri"].get("feedback_code")}),
+        FoxCatValueSensor(c, "onduleur_disponibilite_commande", "Onduleur • Disponibilité commande", "mdi:lan-check", "pri", lambda d: d["pri"].get("command_availability", "NON_CONFIGURE"), attributes=lambda d: {"code_commande": d["pri"].get("code"), "code_retour": d["pri"].get("feedback_code"), "logo_en_ligne": d["pri"].get("logo_online")}),
         FoxCatValueSensor(c, "pri_derniere_raison", "Dernière décision PRI", "mdi:information-outline", "pri", lambda d: d["pri"]["last_reason"]),
         FoxCatNumericSensor(c, "pri_score_actuel", "Score PRI actuel", "mdi:scale-balance", "pri", lambda d: d["pri"]["score_current"]),
         FoxCatNumericSensor(c, "pri_score_cible", "Score PRI cible", "mdi:scale-balance", "pri", lambda d: d["pri"]["score_target"]),
