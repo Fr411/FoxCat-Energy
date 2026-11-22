@@ -48,6 +48,10 @@ from ..const import (
     CONF_PRI_L2,
     CONF_PRI_L3,
     CONF_PRI_L4,
+    CONF_PRI_RET_L1,
+    CONF_PRI_RET_L2,
+    CONF_PRI_RET_L3,
+    CONF_PRI_RET_L4,
     CONF_INVERTER_POWER_SENSOR,
     CONF_PV_SENSOR,
     CONF_TARIFF_FIXED_INJECTION_PRICE_SENSOR,
@@ -141,6 +145,12 @@ _config("inverter.rrcr_l1", "Onduleur", CONF_PRI_L1, "switch.l1_pri")
 _config("inverter.rrcr_l2", "Onduleur", CONF_PRI_L2, "switch.l2_pri")
 _config("inverter.rrcr_l3", "Onduleur", CONF_PRI_L3, "switch.l3_pri")
 _config("inverter.rrcr_l4", "Onduleur", CONF_PRI_L4, "switch.l4_pri")
+_config("inverter.rrcr_ret_l1", "Onduleur", CONF_PRI_RET_L1)
+_config("inverter.rrcr_ret_l2", "Onduleur", CONF_PRI_RET_L2)
+_config("inverter.rrcr_ret_l3", "Onduleur", CONF_PRI_RET_L3)
+_config("inverter.rrcr_ret_l4", "Onduleur", CONF_PRI_RET_L4)
+_native("inverter.ack_logo", "Onduleur", "pri_ack_logo")
+_native("inverter.command_availability", "Onduleur", "onduleur_disponibilite_commande")
 
 # EMS
 _native("ems.mode", "EMS", "mode_ems", "select.foxcat_energy_ems_mode_ems")

@@ -123,6 +123,10 @@
           "pri_l2": "Relais PRI L2",
           "pri_l3": "Relais PRI L3",
           "pri_l4": "Relais PRI L4",
+          "pri_ret_l1": "Retour réel L1 (optionnel)",
+          "pri_ret_l2": "Retour réel L2 (optionnel)",
+          "pri_ret_l3": "Retour réel L3 (optionnel)",
+          "pri_ret_l4": "Retour réel L4 (optionnel)",
           "inverter_power_sensor": "Puissance réelle onduleur en direct (optionnel)"
         },
         "data_description": {
@@ -130,6 +134,10 @@
           "pri_l2": "Entrée/relais RRCR correspondant au deuxième bit de commande.",
           "pri_l3": "Entrée/relais RRCR correspondant au troisième bit de commande.",
           "pri_l4": "Entrée/relais RRCR correspondant au quatrième bit de commande.",
+          "pri_ret_l1": "État réel du relais L1 renvoyé par le contrôleur (ex. LOGO NQ9). Sert à l’ACK LOGO et à la disponibilité de la commande.",
+          "pri_ret_l2": "État réel du relais L2 renvoyé par le contrôleur (ex. LOGO NQ10).",
+          "pri_ret_l3": "État réel du relais L3 renvoyé par le contrôleur (ex. LOGO NQ11).",
+          "pri_ret_l4": "État réel du relais L4 renvoyé par le contrôleur (ex. LOGO NQ12).",
           "inverter_power_sensor": "Capteur physique de puissance AC/DC de l’onduleur mis à jour rapidement. Le dashboard peut l’utiliser directement via le registre FoxCat."
         }
       },
@@ -527,6 +535,10 @@
           "pri_l2": "Relais PRI L2",
           "pri_l3": "Relais PRI L3",
           "pri_l4": "Relais PRI L4",
+          "pri_ret_l1": "Retour réel L1 (optionnel)",
+          "pri_ret_l2": "Retour réel L2 (optionnel)",
+          "pri_ret_l3": "Retour réel L3 (optionnel)",
+          "pri_ret_l4": "Retour réel L4 (optionnel)",
           "inverter_power_sensor": "Puissance réelle onduleur en direct (optionnel)"
         },
         "data_description": {
@@ -534,6 +546,10 @@
           "pri_l2": "Entrée/relais RRCR correspondant au deuxième bit de commande.",
           "pri_l3": "Entrée/relais RRCR correspondant au troisième bit de commande.",
           "pri_l4": "Entrée/relais RRCR correspondant au quatrième bit de commande.",
+          "pri_ret_l1": "État réel du relais L1 renvoyé par le contrôleur (ex. LOGO NQ9). Sert à l’ACK LOGO et à la disponibilité de la commande.",
+          "pri_ret_l2": "État réel du relais L2 renvoyé par le contrôleur (ex. LOGO NQ10).",
+          "pri_ret_l3": "État réel du relais L3 renvoyé par le contrôleur (ex. LOGO NQ11).",
+          "pri_ret_l4": "État réel du relais L4 renvoyé par le contrôleur (ex. LOGO NQ12).",
           "inverter_power_sensor": "Capteur physique de puissance AC/DC de l’onduleur mis à jour rapidement. Le dashboard peut l’utiliser directement via le registre FoxCat."
         }
       },
