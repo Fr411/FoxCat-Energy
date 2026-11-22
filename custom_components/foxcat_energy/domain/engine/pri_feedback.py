@@ -54,17 +54,34 @@ def classify_ack_logo(expected_code: str | None, fb_code: str | None) -> str:
     return ACK_LOGO_OK if fb_code == expected_code else ACK_LOGO_FAILED
 
 
+# FONCTION : command_blocked — La garde PRI interdit-elle toute commande ?
+def command_blocked(availability: str | None) -> bool:
+    """Vrai quand le retour est configuré mais illisible (contrôleur ou liaison coupés).
+
+    Une commande envoyée dans ce cas ne peut être ni confirmée ni garantie : la garde
+    PRI suspend les décisions et les envois. ``DEGRADE`` ne bloque pas (écart signalé).
+    """
+    return availability == AVAILABILITY_DOWN
+
+
 # FONCTION : command_availability — Disponibilité de la chaîne de commande
-def command_availability(commanded_code: str | None, fb_code: str | None) -> str:
+def command_availability(
+    commanded_code: str | None, fb_code: str | None, logo_online: str | None = None
+) -> str:
     """Disponibilité de la chaîne de commande onduleur.
 
-    - ``NON_CONFIGURE`` : aucun retour configuré (comportement historique).
-    - ``INDISPONIBLE`` : retour configuré mais illisible (contrôleur ou liaison coupés).
+    ``logo_online`` : état de l'entité « LOGO en ligne » (``None`` si non configurée ;
+    tout état autre que ``on``, y compris indisponible, vaut contrôleur hors ligne).
+
+    - ``NON_CONFIGURE`` : ni retour ni « LOGO en ligne » configurés (comportement historique).
+    - ``INDISPONIBLE`` : « LOGO en ligne » différent de ``on``, ou retour configuré mais illisible.
     - ``DEGRADE`` : retour lisible mais différent de l'état commandé côté Home Assistant.
     - ``DISPONIBLE`` : retour lisible et identique à l'état commandé.
     """
+    if logo_online is not None and logo_online != "on":
+        return AVAILABILITY_DOWN
     if fb_code is None:
-        return AVAILABILITY_NOT_CONFIGURED
+        return AVAILABILITY_NOT_CONFIGURED if logo_online is None else AVAILABILITY_OK
     if fb_code == UNREADABLE_CODE:
         return AVAILABILITY_DOWN
     if commanded_code is None or commanded_code == UNREADABLE_CODE:

@@ -157,7 +157,7 @@ Sous `_inverter_action_lock`, les relais sont commandés **un par un**, dans l'o
 | `ack_rrcr` | le niveau lu = le niveau commandé, sinon `FAILED` |
 | `ack_inverter` | comparateur PV/plafond (§ 6.1) : `OK` sauf état `PRI_INCONSISTENT` |
 | `ack_grid` | `OK` si réinjection ≤ `pri_export_acceptable_w` (150 W) et import ≤ `pri_import_acceptable_w` (200 W) ; sinon `NOK_REINJECTION` / `NOK_PRELEVEMENT` ; `NOK_DONNEES` si snapshot invalide |
-| `ack_logo` | retour réel des relais (entités `pri_ret_l1` à `pri_ret_l4`, ex. LOGO NQ9..NQ12) comparé au code commandé : `OK`, `FAILED`, `ABSENT` (illisible), `NON_CONFIGURE` (aucun retour). Logique : `domain/engine/pri_feedback.py`. Informatif, ne bloque pas la commande |
+| `ack_logo` | retour réel des relais (entités `pri_ret_l1` à `pri_ret_l4`, ex. LOGO NQ9..NQ12) comparé au code commandé : `OK`, `FAILED`, `ABSENT` (illisible), `NON_CONFIGURE` (aucun retour). Logique : `domain/engine/pri_feedback.py`. Informatif ; mais un contrôleur hors ligne (entité `pri_logo_online` différente de `on`) ou un retour illisible (`INDISPONIBLE`) active la garde PRI `logo_indisponible` (aucune décision, aucun envoi ; actionneur `BLOQUE_LOGO`) |
 
 ### 6.1 Comparateur PV / plafond (`_update_pri_pv_comparator`, l. 4233)
 

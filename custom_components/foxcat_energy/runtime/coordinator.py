@@ -125,6 +125,7 @@ from ..const import (
     CONF_PRI_RET_L2,
     CONF_PRI_RET_L3,
     CONF_PRI_RET_L4,
+    CONF_PRI_LOGO_ONLINE,
     CONF_INVERTER_POWER_SENSOR,
     CONF_PV_SENSOR,
     CONF_WASHER_CYCLE,
@@ -295,6 +296,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "ack_logo": "IDLE",
             "command_availability": pri_feedback_logic.AVAILABILITY_NOT_CONFIGURED,
             "feedback_code": None,
+            "logo_online": None,
             "score_current": 0.0,
             "score_target": 0.0,
             "house_target_level": 100,
@@ -4389,6 +4391,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Backup : l'onduleur n'est plus bridé, sauf si la politique réseau impose zéro injection.
             self.pri_state["guard_reason"] = "backup_internet_coupe"
             return False
+        if pri_feedback_logic.command_blocked(self.pri_state.get("command_availability")):
+            # Retour réel configuré mais illisible : le contrôleur (LOGO) ou sa liaison est coupé.
+            self.pri_state["guard_reason"] = "logo_indisponible"
+            return False
         self.pri_state["guard_reason"] = "OK"
         return True
 
@@ -4420,12 +4426,22 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             states.append(state.state if state else None)
         return pri_feedback_logic.feedback_code(states)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._logo_online_state — État de l'entité « LOGO en ligne » (None si non configurée)
+    def _logo_online_state(self) -> str | None:
+        entity_id = self.config.get(CONF_PRI_LOGO_ONLINE)
+        if not entity_id:
+            return None
+        state = self.hass.states.get(entity_id)
+        return state.state if state else "unavailable"
+
     # MÉTHODE : FoxCatEnergyCoordinator._refresh_pri_feedback — Met à jour la disponibilité de la commande et le code de retour
     def _refresh_pri_feedback(self) -> str | None:
         fb_code = self._rrcr_feedback_code()
         code = self._rrcr_code()
         self.pri_state["feedback_code"] = fb_code
-        self.pri_state["command_availability"] = pri_feedback_logic.command_availability(code, fb_code)
+        logo_online = self._logo_online_state()
+        self.pri_state["logo_online"] = logo_online
+        self.pri_state["command_availability"] = pri_feedback_logic.command_availability(code, fb_code, logo_online)
         return fb_code
 
     # MÉTHODE : FoxCatEnergyCoordinator._apply_rrcr_level — Envoie une commande RRCR sans jamais bloquer Onduleur Core.
@@ -4504,6 +4520,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.pri_state["actuator_status"] = "EXECUTION"
                 self.pri_state["actuator_target_level"] = target
                 self.pri_state["actuator_last_error"] = ""
+
+                self._refresh_pri_feedback()
+                if pri_feedback_logic.command_blocked(self.pri_state.get("command_availability")):
+                    # Garde LOGO : aucune commande tant que le retour réel est illisible.
+                    self.pri_state["actuator_status"] = "BLOQUE_LOGO"
+                    self.pri_state["actuator_last_error"] = "LOGO indisponible : commande RRCR non envoyée."
+                    continue
 
                 if current == target:
                     self.pri_state["actuator_status"] = "OK"
