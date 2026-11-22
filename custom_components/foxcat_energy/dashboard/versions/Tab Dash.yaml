@@ -401,6 +401,13 @@ views:
             cards:
               - type: custom:button-card
                 template: fc_panel
+                tap_action:
+                  action: navigate
+                  navigation_path: |
+                    [[[
+                      const base = window.location.pathname.replace(/\/[^\/]*$/, '');
+                      return `${base}/flux`;
+                    ]]]
                 custom_fields:
                   c: |
                     [[[
@@ -8547,6 +8554,185 @@ views:
     badges:
       - type: custom:button-card
         template: fc_navbar
+  - type: panel
+    title: Flux
+    path: flux
+    icon: mdi:graph-outline
+    subview: true
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: custom:button-card
+            template: fc_panel
+            styles:
+              card:
+                - border-radius: 18px 18px 0 0
+            custom_fields:
+              c: |
+                [[[
+                  const OUTDOOR = 'weather.momignies'; // <- adapte ton entité météo
+                  const d = new Date();
+                  const date = d.toLocaleDateString('fr-BE',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+                  const time = d.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});
+                  const temp = states[OUTDOOR]?.attributes?.temperature;
+                  return `
+                  <div class="p" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div class="img" style="width:44px;height:44px;background-image:url(/homeassistant/custom_components/foxcat_energy/dashboard/assets/hero_house.webp)"></div>
+                      <div>
+                        <div style="font-size:20px;font-weight:800;letter-spacing:.04em"><span style="color:#38bdf8">FOX</span>CAT <span style="font-weight:500">ENERGY</span></div>
+                        <div class="k">Home Assistant • EMS intelligent</div>
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:28px">
+                      <div style="text-align:right"><div class="k">${date}</div><div style="font-size:20px;font-weight:600">${time}</div></div>
+                      <div style="text-align:right"><div style="font-size:18px;font-weight:700"><span class="o">☀</span> ${temp!==undefined?Number(temp).toFixed(1).replace('.',','):'—'} °C</div><div class="k">Extérieur</div></div>
+                    </div>
+                  </div>`;
+                ]]]
+          - type: custom:button-card
+            template: fc_navbar
+          - type: custom:button-card
+            template: fc_head
+            variables:
+              title: Flux
+              subtitle: Où va l'énergie · sources, réseau et charges en temps réel
+              icon: mdi:graph-outline
+              color: '#19d8ff'
+          - type: custom:button-card
+            template: fc_panel
+            triggers_update: all
+            custom_fields:
+              c: |
+                [[[
+                  const num = (id) => { const v = parseFloat(states[id]?.state); return isFinite(v) ? v : null; };
+                  const pos0 = (id) => { const v = num(id); return v == null ? null : Math.max(v, 0); };
+                  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+                  const esc = (t) => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+                  const fmtW = (w) => w >= 1000 ? (w / 1000).toFixed(2).replace('.', ',') + ' kW' : Math.round(w) + ' W';
+                  const NOW = Date.now() / 1000;
+                  const ph = (d, o = 0) => `-${((((NOW + o) % d) + d) % d).toFixed(2)}s`;
+                  const AA = (n, d, tf = 'linear', o = 0) => `animation:${n} ${d}s ${tf} ${ph(d, o)} infinite;`;
+
+                  const pv = pos0('sensor.foxcat_energy_energie_puissance_de_production_photovoltaique') ?? 0;
+                  const imp = pos0('sensor.foxcat_energy_energie_puissance_prelevee_au_reseau') ?? 0;
+                  const exp = pos0('sensor.foxcat_energy_energie_puissance_reinjectee_au_reseau') ?? 0;
+                  const house = pos0('sensor.foxcat_energy_energie_puissance_de_consommation_maison');
+                  const L = [
+                    { n: 'Boiler ECS', i: 'mdi:water-boiler', c: '#fb923c', w: pos0('sensor.homefoxcat_load_chauffe_eau') },
+                    { n: 'Lave-linge', i: 'mdi:washing-machine', c: '#60a5fa', w: pos0('sensor.lave_linge_puissance') },
+                    { n: 'Sèche-linge', i: 'mdi:tumble-dryer', c: '#c4b5fd', w: pos0('sensor.seche_linge_puissance') },
+                    { n: 'Lave-vaisselle', i: 'mdi:dishwasher', c: '#34d399', w: pos0('sensor.lave_vaisselle_puissance') },
+                    { n: 'Clim étage', i: 'mdi:hvac', c: '#818cf8', w: pos0('sensor.homefoxcat_load_autre') },
+                    { n: 'Clim rez', i: 'mdi:air-conditioner', c: '#2dd4bf', w: pos0('sensor.homefoxcat_load_toshiba_rez') },
+                    { n: 'Chauffage sol', i: 'mdi:heating-coil', c: '#fb7185', w: pos0('sensor.homefoxcat_load_chauffage_sdb') ?? pos0('sensor.chauffage_sol_power') }
+                  ].map(x => ({ ...x, w: x.w ?? 0 }));
+                  const known = L.reduce((s, x) => s + x.w, 0);
+                  const other = house != null ? Math.max(house - known, 0) : 0;
+                  L.push({ n: 'Autres', i: 'mdi:home-lightning-bolt', c: '#94a3b8', w: other });
+                  const total = Math.max(house ?? 0, known + other, 1);
+                  const solarUse = Math.min(pv, total);
+                  const selfPct = total > 1 ? Math.round(solarUse / total * 100) : 0;
+                  const gridDir = imp > 20 ? 'in' : exp > 20 ? 'out' : 'none';
+                  const gridW = gridDir === 'out' ? exp : imp;
+
+                  const W = 1000, H = 620, CX = 500, CY = 310;
+                  const R0 = 82;
+                  const place = (deg, rx = 410, ry = 250) => { const a = deg * Math.PI / 180; return [CX + rx * Math.cos(a), CY + ry * Math.sin(a)]; };
+                  const cAngles = [-115, -80, -45, -15, 15, 45, 80, 115];
+                  const nodes = [
+                    { key: 'pv', n: 'Solaire', i: 'mdi:solar-power-variant', c: '#facc15', w: pv, p: place(-150), from: true, share: pv / total },
+                    { key: 'grid', n: gridDir === 'out' ? 'Injection' : 'Réseau', i: 'mdi:transmission-tower', c: gridDir === 'out' ? '#34d399' : '#38bdf8', w: gridW, p: place(150), from: gridDir !== 'out', share: gridW / total }
+                  ].concat(L.map((x, k) => ({ key: 'l' + k, n: x.n, i: x.i, c: x.c, w: x.w, p: place(cAngles[k]), from: false, share: x.w / total })));
+
+                  const arm = (nd, idx) => {
+                    const [x, y] = nd.p; const dx = x - CX, dy = y - CY; const len = Math.hypot(dx, dy); const ux = dx / len, uy = dy / len;
+                    const p0 = [CX + ux * R0, CY + uy * R0], p1 = [x - ux * 54, y - uy * 54];
+                    const ddx = p1[0] - p0[0], ddy = p1[1] - p0[1], dl = Math.hypot(ddx, ddy);
+                    const nx = -ddy / dl, ny = ddx / dl; const s = (idx % 2 ? 1 : -1) * dl * 0.17;
+                    const c1 = [p0[0] + ddx * .33 + nx * s, p0[1] + ddy * .33 + ny * s], c2 = [p0[0] + ddx * .68 - nx * s * .8, p0[1] + ddy * .68 - ny * s * .8];
+                    const fwd = `M${p0[0].toFixed(1)} ${p0[1].toFixed(1)} C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p1[0].toFixed(1)} ${p1[1].toFixed(1)}`;
+                    const rev = `M${p1[0].toFixed(1)} ${p1[1].toFixed(1)} C${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${p0[0].toFixed(1)} ${p0[1].toFixed(1)}`;
+                    const on = nd.w > 20; const wid = 3 + 13 * Math.sqrt(clamp(nd.share, 0, 1));
+                    const flow = nd.from ? rev : fwd;
+                    const nP = on ? clamp(Math.round(nd.w / 250) + 1, 1, 6) : 0; const dur = +clamp(3.4 - nd.w / 1200, 1.2, 3.4).toFixed(2);
+                    const dots = Array.from({ length: nP }, (_, k) => `<circle r="${(3.2 + wid / 6).toFixed(1)}" fill="#fff" style="filter:drop-shadow(0 0 5px ${nd.c}) drop-shadow(0 0 10px ${nd.c})"><animateMotion dur="${dur}s" repeatCount="indefinite" begin="${ph(dur, k * dur / nP)}" path="${flow}"/></circle>`).join('');
+                    return `<path d="${fwd}" fill="none" stroke="${nd.c}" stroke-opacity="${on ? .14 : .06}" stroke-width="${(wid + 9).toFixed(1)}" stroke-linecap="round"/>
+                      <path d="${fwd}" fill="none" stroke="${nd.c}" stroke-opacity="${on ? .85 : .22}" stroke-width="${on ? wid.toFixed(1) : 2}" stroke-linecap="round" ${on ? '' : 'stroke-dasharray="3 9"'} style="${on ? 'filter:drop-shadow(0 0 6px ' + nd.c + '88)' : ''}"/>${dots}`;
+                  };
+                  const arms = nodes.map(arm).join('');
+                  const nodeHtml = nodes.map((nd) => { const on = nd.w > 20; return `<div class="nd ${on ? 'on' : ''}" style="left:${(nd.p[0] / W * 100).toFixed(2)}%;top:${(nd.p[1] / H * 100).toFixed(2)}%;--c:${nd.c}"><div class="ic"><ha-icon icon="${nd.i}"></ha-icon></div><b>${esc(nd.n)}</b><span class="mono">${fmtW(nd.w)}</span><em class="mono">${Math.round(nd.share * 100)} %</em></div>`; }).join('');
+
+                  const top = L.filter(x => x.w > 20).sort((a, b) => b.w - a.w)[0];
+                  const look = top ? nodes.find(n => n.n === top.n) : null;
+                  const lx = look ? clamp((look.p[0] - CX) / 410, -1, 1) * 4 : 0, ly = look ? clamp((look.p[1] - CY) / 250, -1, 1) * 3 : 0;
+                  const R2 = 96, C2 = 2 * Math.PI * R2;
+                  const bar = (list) => list.filter(x => x.w > 0.5).map(x => `<i style="flex:${x.w};background:${x.c};box-shadow:0 0 8px ${x.c}77" title="${esc(x.n)}"></i>`).join('');
+                  const dest = bar(L);
+                  const mixSrc = bar([{ w: solarUse, c: '#facc15', n: 'Solaire' }, { w: imp, c: '#38bdf8', n: 'Réseau' }]);
+                  const kpi = (l, v, c, ic) => `<div class="k"><span><ha-icon icon="${ic}"></ha-icon>${l}</span><b class="mono" style="color:${c}">${v}</b></div>`;
+                  const legend = L.filter(x => x.w > 20).sort((a, b) => b.w - a.w).map(x => `<span><i style="background:${x.c}"></i>${esc(x.n)} <b class="mono">${Math.round(x.w / total * 100)} %</b></span>`).join('');
+                  return `
+                  <style>
+                    .oc{position:relative;padding:16px 18px 18px;font-family:Inter,'Segoe UI',system-ui,sans-serif;color:#e2e8f0;text-align:left}
+                    .oc *{box-sizing:border-box}.oc ha-icon{display:inline-flex}
+                    .oc .mono{font-family:'JetBrains Mono','SF Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+                    .oc .ks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+                    .oc .k{padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+                    .oc .k span{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:800;letter-spacing:.14em;color:#64748b;text-transform:uppercase}.oc .k ha-icon{--mdc-icon-size:14px}
+                    .oc .k b{display:block;margin-top:5px;font-size:24px;font-weight:700;line-height:1}
+                    .oc .stage{position:relative;width:100%;aspect-ratio:1000/620;margin-top:12px;border-radius:26px;background:radial-gradient(60% 60% at 50% 50%,rgba(25,216,255,.07),transparent 70%),linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.07);overflow:hidden}
+                    .oc svg.arms{position:absolute;inset:0;width:100%;height:100%}
+                    .oc .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:17%;text-align:center;pointer-events:none}
+                    .oc .hub .l{margin-top:34%;font-size:9px;font-weight:800;letter-spacing:.2em;color:#94a3b8}.oc .hub .v{margin-top:2px;font-size:clamp(16px,2.4vw,26px);font-weight:800;color:#fff}
+                    .oc .nd{position:absolute;transform:translate(-50%,-50%);width:13%;min-width:92px;text-align:center}
+                    .oc .ic{width:46px;height:46px;margin:0 auto;border-radius:50%;display:grid;place-items:center;color:#64748b;background:#0b1220;border:1.5px solid rgba(255,255,255,.12)}
+                    .oc .nd.on .ic{color:var(--c);border-color:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 55%,transparent);${AA('oc-pulse', 2.4, 'ease-in-out')}}
+                    .oc .ic ha-icon{--mdc-icon-size:24px}
+                    .oc .nd b{display:block;margin-top:5px;font-size:12px;font-weight:800;color:#f1f5f9;white-space:nowrap}
+                    .oc .nd span{display:block;margin-top:1px;font-size:13px;font-weight:700;color:#64748b}.oc .nd.on span{color:#fff}
+                    .oc .nd em{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:999px;font-style:normal;font-size:10px;color:#64748b;background:rgba(255,255,255,.05)}
+                    .oc .nd.on em{color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
+                    .oc .eye{transform-box:fill-box;transform-origin:center;${AA('oc-blink', 5.5, 'ease-in-out')}}
+                    .oc .sec{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+                    .oc .bx{padding:12px 14px;border-radius:16px;background:rgba(2,6,14,.4);border:1px solid rgba(255,255,255,.06)}
+                    .oc .bx>span{font-size:9.5px;font-weight:800;letter-spacing:.16em;color:#64748b}
+                    .oc .sb{display:flex;gap:2px;height:10px;margin:8px 0;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.07)}.oc .sb i{display:block;height:100%}
+                    .oc .lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:#94a3b8}.oc .lg span{display:inline-flex;align-items:center;gap:5px}.oc .lg i{width:8px;height:8px;border-radius:3px}.oc .lg b{color:#e2e8f0}
+                    @media (max-width:760px){.oc .ks{grid-template-columns:1fr 1fr}.oc .sec{grid-template-columns:1fr}.oc .nd{min-width:64px;width:15%}.oc .nd b{font-size:10px}.oc .nd span{font-size:11px}.oc .ic{width:34px;height:34px}}
+                    @media (prefers-reduced-motion:reduce){.oc *{animation:none!important}}
+                    @keyframes oc-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+                    @keyframes oc-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+                    @keyframes oc-breath{0%,100%{opacity:.55}50%{opacity:1}}
+                  </style>
+                  <div class="oc">
+                    <div class="ks">
+                      ${kpi('Production PV', fmtW(pv), '#facc15', 'mdi:solar-power-variant')}
+                      ${kpi('Consommation maison', fmtW(total), '#f8fafc', 'mdi:home-lightning-bolt')}
+                      ${kpi(gridDir === 'out' ? 'Injection réseau' : 'Prélèvement réseau', fmtW(gridW), gridDir === 'out' ? '#34d399' : '#38bdf8', 'mdi:transmission-tower')}
+                      ${kpi('Couverture solaire', selfPct + ' %', '#34d399', 'mdi:leaf')}
+                    </div>
+                    <div class="stage">
+                      <svg class="arms" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+                        <defs><radialGradient id="ohead" cx="50%" cy="35%" r="70%"><stop offset="0" stop-color="#2a3f63"/><stop offset=".55" stop-color="#14233d"/><stop offset="1" stop-color="#0a1322"/></radialGradient></defs>
+                        ${arms}
+                        <circle cx="${CX}" cy="${CY}" r="${R2}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>
+                        <circle cx="${CX}" cy="${CY}" r="${R2}" fill="none" stroke="#facc15" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C2 * selfPct / 100).toFixed(1)} ${C2.toFixed(1)}" transform="rotate(-90 ${CX} ${CY})" style="filter:drop-shadow(0 0 6px #facc1599)"/>
+                        <circle cx="${CX}" cy="${CY}" r="${R0 + 4}" fill="#19d8ff" opacity=".10" style="${AA('oc-breath', 2.8, 'ease-in-out')}"/>
+                        <circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#ohead)" stroke="rgba(255,255,255,.16)" stroke-width="2"/>
+                        <g class="eye"><circle cx="${CX - 27}" cy="${CY - 14}" r="14" fill="#fff"/><circle cx="${CX - 27 + lx}" cy="${CY - 14 + ly}" r="6.5" fill="#0b1220"/></g>
+                        <g class="eye"><circle cx="${CX + 27}" cy="${CY - 14}" r="14" fill="#fff"/><circle cx="${CX + 27 + lx}" cy="${CY - 14 + ly}" r="6.5" fill="#0b1220"/></g>
+                      </svg>
+                      <div class="hub"><div class="l">MAISON</div><div class="v mono">${fmtW(total)}</div></div>
+                      ${nodeHtml}
+                    </div>
+                    <div class="sec">
+                      <div class="bx"><span>D'OÙ VIENT L'ÉNERGIE ?</span><div class="sb">${mixSrc}</div><div class="lg"><span><i style="background:#facc15"></i>Solaire <b class="mono">${fmtW(solarUse)}</b></span><span><i style="background:#38bdf8"></i>Réseau <b class="mono">${fmtW(imp)}</b></span>${exp > 20 ? `<span><i style="background:#34d399"></i>Injectée <b class="mono">${fmtW(exp)}</b></span>` : ''}</div></div>
+                      <div class="bx"><span>OÙ VA L'ÉNERGIE ?</span><div class="sb">${dest}</div><div class="lg">${legend || '<span>Aucune charge active</span>'}</div></div>
+                    </div>
+                  </div>`;
+                ]]]
+    theme: ios-dark-mode-blue-red
 background:
   opacity: 60
   alignment: center
