@@ -145,7 +145,7 @@ Case **« Mes prix sont tout compris »** (décochée par défaut) : si le prix 
 
 FoxCat lit la courbe « tout compris » d'aujourd'hui et de demain, ainsi que la valeur de réinjection. Il positionne le prix actuel sur l'horizon de 24 h (position en %, rang, tendance), repère le **prochain creux** et le **prochain pic**, le meilleur créneau futur et l'économie possible en reportant un usage. Le planificateur Day-Ahead est **strictement dynamique** et informatif ; le planificateur de charges flexibles reste le seul décideur du feu vert de démarrage.
 
-Réglages utiles : horizon, seuil de position « favorable » (30 % par défaut), seuil de pic, durée favorable maximale (4 h), charge réseau quand le prix devient négatif.
+Réglages utiles (appliqués à la décision économique et aux recommandations des machines) : horizon, seuil de position « favorable » (30 % par défaut), seuil de pic, durée favorable maximale (4 h), charge réseau quand le prix devient négatif.
 
 ### Coupure Internet : fonctionnement local
 
@@ -234,6 +234,7 @@ Comportement :
 - **Heures creuses (bi-horaire)** : démarrage sur le réseau seulement au dernier failback (voir ci-dessus). Les anciens réglages d'« agressivité solaire » sont **inactifs**.
 - **Dynamique** : arbitrage thermique selon le prix. Un modèle (volume, puissance, eau froide à 15 °C) estime la durée de chauffe et réserve les créneaux les moins chers.
 - **Délestage** : le boiler peut être coupé pendant une pointe de consommation.
+- **Commande forcée** (forcer la marche ou l'arrêt) : elle expire après 6 h par défaut (réglable, 0 = illimitée) et rend la main à l'EMS. Les vitesses de chauffe (10 °C/h) et de refroidissement (0,5 °C/h) servent au calcul du dernier failback et sont réglables.
 
 ## 9. Onduleur et PRI / RRCR
 
@@ -289,7 +290,7 @@ Les tensions améliorent la précision du calcul ; elles **ne détectent pas** u
 
 - **Simulateur** de batterie domestique et de véhicule virtuels : désactivé par défaut, **sans commande physique**, isolé du registre réel. Il sert à estimer ce qu'apporterait un équipement avant de l'acheter. Les valeurs simulées sont distinguées des mesures réelles.
 - **Arbitrage virtuel** à l'achat et à la revente tenant compte de l'écart de prix et du coût d'usure.
-- **V2H physique** : fonction distincte, *opt-in*, avec commande configurée explicitement, réserve de mobilité obligatoire et interverrouillage avec le chauffe-eau de confort.
+- **V2H physique** : fonction distincte, *opt-in*, avec commande configurée explicitement, réserve de mobilité obligatoire et interverrouillage avec le chauffe-eau de confort. Couper la régulation ou passer en Manuel arrête la décharge.
 
 ## 14. Prévisions, IA et planification
 

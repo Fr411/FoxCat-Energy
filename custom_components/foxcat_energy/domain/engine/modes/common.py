@@ -8,10 +8,26 @@ def coverage(grid_net_w: float, boiler_power_w: float) -> float:
     if boiler_power_w <= 0: return 0.0
     return max(grid_net_w, 0.0) / boiler_power_w * 100.0
 
+def heat_rate_c_per_h(settings: dict[str, Any]) -> float:
+    """Vitesse de chauffe du ballon (A-08) : réglage ``boiler_heat_rate_c_per_h``, 10 °C/h par défaut."""
+    try:
+        return max(float(settings.get("boiler_heat_rate_c_per_h", 10.0)), 0.5)
+    except (TypeError, ValueError):
+        return 10.0
+
+
+def cool_rate_c_per_h(settings: dict[str, Any]) -> float:
+    """Vitesse de refroidissement (A-08) : réglage ``boiler_cool_rate_c_per_h``, 0,5 °C/h par défaut."""
+    try:
+        return max(float(settings.get("boiler_cool_rate_c_per_h", 0.5)), 0.0)
+    except (TypeError, ValueError):
+        return 0.5
+
+
 def thermal_deadline(snapshot: EnergySnapshot, settings: dict[str, Any], now: datetime) -> bool:
     normal = float(settings.get("boiler_temp_normal_c", 45.0))
     delta = max(normal - snapshot.boiler_temp_c, 0.0)
-    need_minutes = delta / 10.0 * 60.0 + 30.0
+    need_minutes = delta / heat_rate_c_per_h(settings) * 60.0 + 30.0
     m = minute_of_day(now)
     # Dynamic reading instead of 420/1020
     s1 = _time_minutes(settings.get("tariff_hp_start_1"), "07:00:00")
@@ -36,8 +52,8 @@ def ecs_last_departure(snapshot: EnergySnapshot, settings: dict[str, Any], now: 
     
     normal = float(settings.get("boiler_temp_normal_c", 45.0))
     margin = max(float(settings.get("boiler_failback_margin_min", 30.0)), 0.0)
-    projected_end = snapshot.boiler_temp_c - 0.5 * (minutes_end / 60.0)
-    heating_minutes = max(0.0, (normal - projected_end) / 10.0 * 60.0)
+    projected_end = snapshot.boiler_temp_c - cool_rate_c_per_h(settings) * (minutes_end / 60.0)
+    heating_minutes = max(0.0, (normal - projected_end) / heat_rate_c_per_h(settings) * 60.0)
     return minutes_end - heating_minutes - margin <= 0
 
 

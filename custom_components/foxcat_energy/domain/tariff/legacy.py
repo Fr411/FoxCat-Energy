@@ -52,6 +52,16 @@ def observed_tariff() -> Tariff:
     )
 
 
+def _component_sum(settings: dict[str, Any]) -> float:
+    """Réseau + taxes + marge saisis à part (A-15), seulement si le prix n'est pas déjà final."""
+    if settings.get("price_is_all_in", False) or settings.get("price_curve_is_final", True):
+        return 0.0
+    return sum(
+        _float(settings.get(k), 0.0)
+        for k in ("tariff_network_component_eur_kwh", "tariff_tax_component_eur_kwh", "tariff_contract_component_eur_kwh")
+    )
+
+
 def tariff_from_settings(settings: dict[str, Any]) -> Tariff | None:
     """Reconstruit le contrat à prix saisis, ou ``None`` si les prix viennent d'entités.
 
@@ -60,14 +70,17 @@ def tariff_from_settings(settings: dict[str, Any]) -> Tariff | None:
     """
     if settings.get("price_source") != PRICE_SOURCE_CONTRACT:
         return None
+    # A-15 : « tout compris » = aucun complément de période ; sinon les composantes saisies s'ajoutent au prix.
+    all_in = bool(settings.get("price_is_all_in", False))
+    components = _component_sum(settings)
     injection = _float(settings.get("tariff_fixed_injection_eur_kwh"), 0.0)
     injection_kind = INJECTION_FIXED if injection else "none"
     structure = settings.get("tariff_structure")
 
     if structure == TARIFF_STRUCTURE_TOU:
-        hp = _float(settings.get("tariff_hp_price_eur_kwh"), DEFAULT_HP_EUR_KWH)
-        hc = _float(settings.get("tariff_hc_price_eur_kwh"), DEFAULT_HC_EUR_KWH)
-        hp_adder = _float(settings.get("tariff_tou_hp_adder_eur_kwh"), 0.0)
+        hp = _float(settings.get("tariff_hp_price_eur_kwh"), DEFAULT_HP_EUR_KWH) + components
+        hc = _float(settings.get("tariff_hc_price_eur_kwh"), DEFAULT_HC_EUR_KWH) + components
+        hp_adder = 0.0 if all_in else _float(settings.get("tariff_tou_hp_adder_eur_kwh"), 0.0)
         windows = (
             ("HP 1", _hhmm(settings.get("tariff_hp_start_1"), "07:00"),
              _hhmm(settings.get("tariff_hp_end_1"), "11:00")),
@@ -79,13 +92,13 @@ def tariff_from_settings(settings: dict[str, Any]) -> Tariff | None:
             energy_kind=ENERGY_PERIODS, energy_price=hc,
             energy_periods=tuple(Period(n, s, e, hp) for n, s, e in windows),
             network_periods=tuple(Period(n, s, e, hp_adder) for n, s, e in windows),
-            network_default=_float(settings.get("tariff_tou_hc_adder_eur_kwh"), 0.0),
+            network_default=0.0 if all_in else _float(settings.get("tariff_tou_hc_adder_eur_kwh"), 0.0),
             injection_kind=injection_kind, injection_price=injection,
         ).validate()
 
-    price = _float(settings.get("tariff_simple_fixed_price_eur_kwh"), DEFAULT_SIMPLE_EUR_KWH)
+    price = _float(settings.get("tariff_simple_fixed_price_eur_kwh"), DEFAULT_SIMPLE_EUR_KWH) + components
     network: tuple[Period, ...] = ()
-    if structure == TARIFF_STRUCTURE_IMPACT:
+    if structure == TARIFF_STRUCTURE_IMPACT and not all_in:
         network = (
             Period("ECO nuit", _hhmm(settings.get("impact_eco_start_1"), "01:00"),
                    _hhmm(settings.get("impact_eco_end_1"), "07:00"),
@@ -97,7 +110,7 @@ def tariff_from_settings(settings: dict[str, Any]) -> Tariff | None:
                    _hhmm(settings.get("impact_peak_end"), "22:00"),
                    _float(settings.get("impact_peak_adder_eur_kwh"), 0.0)),
         )
-    medium = _float(settings.get("impact_medium_adder_eur_kwh"), 0.0) if structure == TARIFF_STRUCTURE_IMPACT else 0.0
+    medium = _float(settings.get("impact_medium_adder_eur_kwh"), 0.0) if structure == TARIFF_STRUCTURE_IMPACT and not all_in else 0.0
     return Tariff(
         id=CONTRACT_TARIFF_ID, name="Contrat saisi",
         energy_kind=ENERGY_FIXED, energy_price=price,
