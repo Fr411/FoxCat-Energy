@@ -6127,6 +6127,7 @@ views:
               { key: 'grid', n: gridDir === 'out' ? 'Injection' : 'Réseau', i: 'mdi:transmission-tower', c: gridDir === 'out' ? '#34d399' : '#38bdf8', w: gridW, p: place(150), from: gridDir !== 'out', share: gridW / total }
             ].concat(L.map((x, k) => ({ key: 'l' + k, n: x.n, i: x.i, c: x.c, w: x.w, p: place(cAngles[k]), from: false, share: x.w / total })));
 
+            const WIG = (total >= 4000 || imp >= 3000) ? [.5, 1.2] : (total < 150 && pv < 50) ? [8, .25] : exp > 200 ? [1.6, 1.4] : [3.6, .7];
             const arm = (nd, idx) => {
               const [x, y] = nd.p; const dx = x - CX, dy = y - CY; const len = Math.hypot(dx, dy); const ux = dx / len, uy = dy / len;
               const p0 = [CX + ux * R0, CY + uy * R0], p1 = [x - ux * 54, y - uy * 54];
@@ -6139,8 +6140,8 @@ views:
               const flow = nd.from ? rev : fwd;
               const nP = on ? clamp(Math.round(nd.w / 250) + 1, 1, 6) : 0; const dur = +clamp(3.4 - nd.w / 1200, 1.2, 3.4).toFixed(2);
               const dots = Array.from({ length: nP }, (_, k) => `<circle r="${(3.2 + wid / 6).toFixed(1)}" fill="#fff" style="filter:drop-shadow(0 0 5px ${nd.c}) drop-shadow(0 0 10px ${nd.c})"><animateMotion dur="${dur}s" repeatCount="indefinite" begin="${ph(dur, k * dur / nP)}" path="${flow}"/></circle>`).join('');
-              return `<path d="${fwd}" fill="none" stroke="${nd.c}" stroke-opacity="${on ? .14 : .06}" stroke-width="${(wid + 9).toFixed(1)}" stroke-linecap="round"/>
-                <path d="${fwd}" fill="none" stroke="${nd.c}" stroke-opacity="${on ? .85 : .22}" stroke-width="${on ? wid.toFixed(1) : 2}" stroke-linecap="round" ${on ? '' : 'stroke-dasharray="3 9"'} style="${on ? 'filter:drop-shadow(0 0 6px ' + nd.c + '88)' : ''}"/>${dots}`;
+              return `<g style="transform-origin:${CX}px ${CY}px;--a:${WIG[1]}deg;${AA('oc-sway', WIG[0], 'ease-in-out', idx * .9)}"><path d="${fwd}" fill="none" stroke="${nd.c}" stroke-opacity="${on ? .14 : .06}" stroke-width="${(wid + 9).toFixed(1)}" stroke-linecap="round"/>
+                <path d="${fwd}" fill="none" stroke="${nd.c}" stroke-opacity="${on ? .85 : .22}" stroke-width="${on ? wid.toFixed(1) : 2}" stroke-linecap="round" ${on ? '' : 'stroke-dasharray="3 9"'} style="${on ? 'filter:drop-shadow(0 0 6px ' + nd.c + '88)' : ''}"/>${dots}</g>`;
             };
             const arms = nodes.map(arm).join('');
             const nodeHtml = nodes.map((nd) => { const on = nd.w > 20; return `<div class="nd ${on ? 'on' : ''}" style="left:${(nd.p[0] / W * 100).toFixed(2)}%;top:${(nd.p[1] / H * 100).toFixed(2)}%;--c:${nd.c}"><div class="ic"><ha-icon icon="${nd.i}"></ha-icon></div><b>${esc(nd.n)}</b><span class="mono">${fmtW(nd.w)}</span><em class="mono">${Math.round(nd.share * 100)} %</em></div>`; }).join('');
@@ -6192,7 +6193,7 @@ views:
               const lidPath = (lid > 0 || slope) ? `<path d="M${x - r - 3} ${eyeY - r - 4} H${x + r + 3} V${yR} Q${x} ${base + 2} ${x - r - 3} ${yL} Z" fill="${LID}"/><path d="M${x - r - 3} ${yL} Q${x} ${base + 2} ${x + r + 3} ${yR}" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="2"/>` : '';
               return `<g class="eye"><circle cx="${x}" cy="${eyeY}" r="${r + 2.5}" fill="#000" opacity=".22"/><circle cx="${x}" cy="${eyeY}" r="${r}" fill="url(#osclera)"/>
                 <g clip-path="url(#oe${side ? 'R' : 'L'})"><g style="${AA('oc-look', 7, 'ease-in-out', side * 1.7)}">
-                  <circle cx="${x + lx}" cy="${eyeY + ly}" r="${ir}" fill="url(#oiris)"/><circle cx="${x + lx}" cy="${eyeY + ly}" r="${pr}" fill="#05080f"/>
+                  <circle cx="${x + lx}" cy="${eyeY + ly}" r="${ir}" fill="url(#oiris)"/><circle cx="${x + lx}" cy="${eyeY + ly}" r="${pr}" fill="#05080f" style="transform-box:fill-box;transform-origin:center;${PUP}"/>
                   <circle cx="${x + lx - ir * .32}" cy="${eyeY + ly - ir * .38}" r="${ir * .28}" fill="#fff"/><circle cx="${x + lx + ir * .3}" cy="${eyeY + ly + ir * .32}" r="${ir * .13}" fill="#fff" opacity=".85"/>
                 </g>${lidPath}</g>
                 ${wet ? `<path d="M${x - r * .75} ${eyeY + r * .62} Q${x} ${eyeY + r * 1.05} ${x + r * .75} ${eyeY + r * .62}" fill="none" stroke="#bae6fd" stroke-width="2.2" stroke-linecap="round" opacity=".85"/>` : ''}</g>`;
@@ -6202,7 +6203,7 @@ views:
               const lashes = up ? `<path d="M${x + s * 13} ${y0} l${s * 7} -4 M${x + s * 13} ${y0 - 4} l${s * 7} -7" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>` : `<path d="M${x + s * 13} ${y0} l${s * 6} 5 M${x + s * 10} ${y0 + 4} l${s * 5} 7" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>`;
               return `<path d="M${x - 13} ${y0} Q${x} ${y1} ${x + 13} ${y0}" fill="none" stroke="#f8fafc" stroke-width="5.5" stroke-linecap="round"/>${lashes}`; }).join('');
             const brow = (side, inner, outer, bend) => { const s = side ? 1 : -1, xi = CX + s * 15, xo = CX + s * 43; return `<path d="M${xo} ${eyeY - outer} Q${(xi + xo) / 2} ${eyeY - (inner + outer) / 2 - bend} ${xi} ${eyeY - inner}" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round"/>`; };
-            const brows = (inner, outer, bend = 4) => brow(0, inner, outer, bend) + brow(1, inner, outer, bend);
+            const brows = (inner, outer, bend = 4) => `<g style="${BROW}">` + brow(0, inner, outer, bend) + brow(1, inner, outer, bend) + '</g>';
             const MY = CY - 6;
             const crease = `<path d="M${CX - 34} ${MY - 4} q-5 6 0 12 M${CX + 34} ${MY - 4} q5 6 0 12" stroke="#f8fafc" stroke-width="2.5" fill="none" opacity=".55" stroke-linecap="round"/>`;
             const teeth = (w) => `<path d="M${CX - w} ${MY - 1} Q${CX} ${MY + 6} ${CX + w} ${MY - 1} L${CX + w - 2} ${MY + 5} Q${CX} ${MY + 11} ${CX - w + 2} ${MY + 5} Z" fill="#fff"/>`;
@@ -6213,18 +6214,36 @@ views:
               flat:   `<path d="M${CX - 13} ${MY + 5} Q${CX} ${MY + 2} ${CX + 13} ${MY + 5}" fill="none" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>`,
               frown:  `<g style="${AA('oc-tremble', 1.6, 'ease-in-out')}"><path d="M${CX - 19} ${MY + 11} Q${CX} ${MY - 8} ${CX + 19} ${MY + 11}" fill="none" stroke="#f8fafc" stroke-width="4.5" stroke-linecap="round"/><path d="M${CX - 8} ${MY + 15} Q${CX} ${MY + 19} ${CX + 8} ${MY + 15}" fill="none" stroke="#f8fafc" stroke-width="2.4" stroke-linecap="round" opacity=".5"/></g>`,
               wavy:   `<g style="${AA('oc-wave', 1.2, 'ease-in-out')}"><path d="M${CX - 22} ${MY + 6} q5.5 -7 11 0 t11 0 t11 0 t11 0" fill="none" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/></g>`,
-              open:   `<g style="transform-box:fill-box;transform-origin:center;${AA('oc-pant', .5, 'ease-in-out')}"><ellipse cx="${CX}" cy="${MY + 8}" rx="13" ry="15" fill="url(#omouth)" stroke="#f8fafc" stroke-width="3.5"/><path d="M${CX - 9} ${MY - 2} Q${CX} ${MY + 3} ${CX + 9} ${MY - 2} L${CX + 8} ${MY + 3} Q${CX} ${MY + 7} ${CX - 8} ${MY + 3} Z" fill="#fff"/><ellipse cx="${CX}" cy="${MY + 17}" rx="7" ry="4" fill="#fb7185"/></g>`,
+              open:   `<g style="transform-box:fill-box;transform-origin:center;${AA('oc-pant', .2, 'ease-in-out')}"><ellipse cx="${CX}" cy="${MY + 8}" rx="13" ry="15" fill="url(#omouth)" stroke="#f8fafc" stroke-width="3.5"/><path d="M${CX - 9} ${MY - 2} Q${CX} ${MY + 3} ${CX + 9} ${MY - 2} L${CX + 8} ${MY + 3} Q${CX} ${MY + 7} ${CX - 8} ${MY + 3} Z" fill="#fff"/><ellipse cx="${CX}" cy="${MY + 17}" rx="7" ry="4" fill="#fb7185"/></g>`,
               sleep:  `<ellipse cx="${CX}" cy="${MY + 6}" rx="5" ry="4" fill="#0b1220" stroke="#cbd5e1" stroke-width="2.5"/><g style="transform-box:fill-box;transform-origin:left center;${AA('oc-bubble', 4, 'ease-in-out')}"><circle cx="${CX + 9}" cy="${MY + 4}" r="9" fill="#bae6fd" fill-opacity=".22" stroke="#e0f2fe" stroke-width="1.6"/><circle cx="${CX + 6}" cy="${MY + 1}" r="2.2" fill="#fff" opacity=".8"/></g>`
             };
             const blush = [CX - 54, CX + 54].map(x => `<ellipse cx="${x}" cy="${CY - 16}" rx="14" ry="8" fill="url(#oblush)"/><path d="M${x - 7} ${CY - 18} l3 5 M${x - 1} ${CY - 18} l3 5 M${x + 5} ${CY - 18} l3 5" stroke="#fda4af" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>`).join('');
             const drop = (x, y, d, o) => `<g style="${AA('oc-drop', d, 'ease-in', o)}"><path d="M${x} ${y} q-8 12 0 18 q8 -6 0 -18 Z" fill="url(#odrop)" stroke="#e0f2fe" stroke-width=".8"/><circle cx="${x - 2}" cy="${y + 12}" r="1.6" fill="#fff"/></g>`;
             const shock = [-1, 1].map(s => [0, 1, 2].map(k => `<path d="M${CX + s * (96 + k * 7)} ${CY - 30 + k * 14} q${s * 6} 7 0 14" fill="none" stroke="#fca5a5" stroke-width="3" stroke-linecap="round" style="${AA('oc-flick', .5, 'steps(2)', k * .15)}"/>`).join('')).join('');
             const joyEye = (x) => `<circle cx="${x}" cy="${eyeY}" r="17" fill="#fde047" opacity=".18" style="${AA('oc-breath', 1.2, 'ease-in-out')}"/>` + star(x, eyeY, 14, '#fde047', 1.4, x) + star(x + 8, eyeY - 9, 4, '#fff', 1.1, x);
+            const mw = (s, a, d) => `<g style="transform-box:fill-box;transform-origin:center top;${AA(a, d, 'ease-in-out')}">${s}</g>`;
+            const BROW = { joy: AA('oc-browb', .55, 'ease-in-out'), worried: AA('oc-browb', 1.3, 'ease-in-out'), panic: AA('oc-browb', .35, 'ease-in-out') }[moodKey] || AA('oc-brow', 7.5, 'ease-in-out');
+            const PUP = moodKey === 'panic' ? AA('oc-pup', .7, 'ease-in-out') : '';
+            const TILT = { joy: AA('oc-tilt2', 1.4, 'ease-in-out'), happy: AA('oc-tilt', 3.2, 'ease-in-out'), content: AA('oc-tilt', 5, 'ease-in-out'), calm: AA('oc-tilt', 9, 'ease-in-out'), sad: AA('oc-droop', 5.5, 'ease-in-out'), sleep: AA('oc-droop', 7, 'ease-in-out'), worried: AA('oc-tilt', 1.1, 'ease-in-out') }[moodKey] || '';
+            const heart = (x, y, s, c, d, o) => `<g transform="translate(${x} ${y}) scale(${s})"><g style="${AA('oc-rise', d, 'ease-out', o)}"><path d="M0 4 C-7 -4 -13 3 0 13 C13 3 7 -4 0 4 Z" fill="${c}" stroke="#fff" stroke-opacity=".5" stroke-width="1"/></g></g>`;
+            const note = (x, y, c, d, o) => `<text x="${x}" y="${y}" fill="${c}" font-size="32" font-weight="800" style="${AA('oc-note', d, 'ease-out', o)}">♪</text>`;
+            const bub = (x, y, r, d, o) => `<g style="${AA('oc-rise', d, 'ease-out', o)}"><circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#bae6fd" stroke-width="1.6" opacity=".7"/></g>`;
+            const puff = (x, y, r, d, o) => `<g style="${AA('oc-puff', d, 'ease-out', o)}"><circle cx="${x}" cy="${y}" r="${r}" fill="#cbd5e1" opacity=".6"/></g>`;
+            const rdrop = (x, d, o) => `<g style="${AA('oc-rain', d, 'ease-in', o)}"><path d="M${x} ${CY - 90} q-4 8 0 11 q4 -3 0 -11 Z" fill="#7dd3fc"/></g>`;
+            const PARTS = {
+              joy: [[-70, -62, 1.5, '#fb7185', 2.8, 0], [-30, -86, 1.2, '#fda4af', 3.2, .9], [46, -84, 1.4, '#fb7185', 3, 1.7], [78, -56, 1.1, '#fda4af', 2.6, 2.3], [8, -92, .95, '#fecdd3', 3.4, .4]].map(a => heart(CX + a[0], CY + a[1], a[2], a[3], a[4], a[5])).join(''),
+              happy: `<g style="transform-origin:${CX}px ${CY}px;${AA('oc-spin', 24)}">${Array.from({ length: 14 }, (_, k) => { const a = k / 14 * Math.PI * 2, r1 = R0 + 18, r2 = R0 + (k % 2 ? 26 : 32); return `<line x1="${(CX + r1 * Math.cos(a)).toFixed(1)}" y1="${(CY + r1 * Math.sin(a)).toFixed(1)}" x2="${(CX + r2 * Math.cos(a)).toFixed(1)}" y2="${(CY + r2 * Math.sin(a)).toFixed(1)}" stroke="#facc15" stroke-width="3" stroke-linecap="round" opacity=".55"/>`; }).join('')}</g>`,
+              content: note(CX + 70, CY - 66, '#a3e635', 3.6, 0) + note(CX - 86, CY - 46, '#bef264', 4.2, 1.8),
+              calm: bub(CX - 60, CY - 66, 5, 5, 0) + bub(CX + 52, CY - 74, 4, 5.4, 1.7) + bub(CX + 8, CY - 84, 3.2, 4.6, 3.2),
+              sad: `<circle cx="${CX - 22}" cy="${CY - 104}" r="15" fill="#64748b"/><circle cx="${CX + 2}" cy="${CY - 113}" r="19" fill="#71819a"/><circle cx="${CX + 28}" cy="${CY - 103}" r="14" fill="#64748b"/><rect x="${CX - 36}" y="${CY - 106}" width="78" height="14" rx="7" fill="#64748b"/>` + rdrop(CX - 14, 1.2, 0) + rdrop(CX + 8, 1.2, .4) + rdrop(CX + 26, 1.2, .8),
+              worried: `<text x="${CX + 74}" y="${CY - 74}" fill="#fb923c" font-size="32" font-weight="800" style="${AA('oc-tremble', .8, 'ease-in-out')}">?</text><text x="${CX - 90}" y="${CY - 56}" fill="#fdba74" font-size="22" font-weight="800" style="${AA('oc-tremble', 1, 'ease-in-out', .3)}">?</text>`,
+              panic: `<text x="${CX + 78}" y="${CY - 72}" fill="#f87171" font-size="34" font-weight="900" style="${AA('oc-bang', .5, 'ease-in-out')}">!</text><text x="${CX - 96}" y="${CY - 60}" fill="#fca5a5" font-size="26" font-weight="900" style="${AA('oc-bang', .5, 'ease-in-out', .25)}">!</text>` + puff(CX - 34, CY - 84, 9, 1.6, 0) + puff(CX + 30, CY - 86, 8, 1.6, .55) + puff(CX - 2, CY - 90, 10, 1.6, 1.1)
+            }[moodKey] || '';
             const FACE = {
               sleep:   eyeArc2(false) + brows(16, 12, 3) + mouths.sleep + blush + `<text x="${CX + 62}" y="${CY - 52}" fill="#94a3b8" font-size="22" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out')}">z</text><text x="${CX + 80}" y="${CY - 72}" fill="#94a3b8" font-size="30" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out', 1.1)}">Z</text>`,
-              joy:     joyEye(eyeX[0]) + joyEye(eyeX[1]) + brows(31, 26, 7) + mouths.big + blush + star(CX - 96, CY - 70, 11, '#fde047', 1.6, 0) + star(CX + 100, CY - 60, 9, '#34d399', 1.3, .5) + star(CX + 70, CY - 98, 7, '#fff', 1.1, .9) + star(CX - 70, CY - 100, 8, '#34d399', 1.5, .3),
-              happy:   eyeArc2(true) + brows(29, 24, 6) + mouths.smile + blush + star(CX + 92, CY - 76, 9, '#facc15', 2, 0),
-              content: eyes(14, 5.5) + brows(25, 22, 4) + mouths.small,
+              joy:     joyEye(eyeX[0]) + joyEye(eyeX[1]) + brows(31, 26, 7) + mw(mouths.big, 'oc-laugh', .5) + blush + star(CX - 96, CY - 70, 11, '#fde047', 1.6, 0) + star(CX + 100, CY - 60, 9, '#34d399', 1.3, .5) + star(CX + 70, CY - 98, 7, '#fff', 1.1, .9) + star(CX - 70, CY - 100, 8, '#34d399', 1.5, .3),
+              happy:   eyeArc2(true) + brows(29, 24, 6) + mw(mouths.smile, 'oc-smile', 2.6) + blush + star(CX + 92, CY - 76, 9, '#facc15', 2, 0),
+              content: eyes(14, 5.5) + brows(25, 22, 4) + mw(mouths.small, 'oc-smile', 3.4),
               calm:    eyes(14, 5.5, .2) + brows(23, 23, 2) + mouths.flat,
               sad:     eyes(14, 5.5, .3, 6, true) + brows(27, 14, 3) + mouths.frown + drop(eyeX[0] - 4, eyeY + 17, 2.6, 0),
               worried: eyes(16, 4.8) + brows(31, 16, 6) + mouths.wavy + drop(CX + 62, CY - 62, 2.2, 0),
@@ -6257,7 +6276,7 @@ views:
               .oc .nd span{display:block;margin-top:1px;font-size:13px;font-weight:700;color:#64748b}.oc .nd.on span{color:#fff}
               .oc .nd em{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:999px;font-style:normal;font-size:10px;color:#64748b;background:rgba(255,255,255,.05)}
               .oc .nd.on em{color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
-              .oc .eye{transform-box:fill-box;transform-origin:center;${AA('oc-blink', 5.5, 'ease-in-out')}}
+              .oc .eye{transform-box:fill-box;transform-origin:center;${AA('oc-blink2', 6.5, 'ease-in-out')}}
               .oc .mood{position:absolute;left:2.2%;top:3%;display:flex;align-items:center;gap:8px;max-width:46%;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;color:#f1f5f9;background:color-mix(in srgb,var(--c) 14%,rgba(6,10,19,.85));border:1px solid color-mix(in srgb,var(--c) 50%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--c) 25%,transparent)}
               .oc .mood ha-icon{--mdc-icon-size:20px;color:var(--c);flex:none}
               .oc .mood b{color:var(--c);font-weight:800}
@@ -6282,7 +6301,7 @@ views:
               @keyframes oc-look{0%,100%{transform:translate(0,0)}25%{transform:translate(2.2px,1px)}55%{transform:translate(-2.2px,.5px)}80%{transform:translate(.8px,-1.2px)}}
               @keyframes oc-wave{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
               @keyframes oc-bubble{0%,100%{transform:scale(.55)}55%{transform:scale(1.25)}}
-              @keyframes oc-flick{0%{opacity:1}50%{opacity:.15}}
+              @keyframes oc-tilt{0%,100%{transform:rotate(-2.4deg)}50%{transform:rotate(2.4deg)}} @keyframes oc-tilt2{0%,100%{transform:rotate(-4.5deg) translateY(1px)}50%{transform:rotate(4.5deg)}} @keyframes oc-droop{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(3px) rotate(1deg)}} @keyframes oc-blink2{0%,86%,100%{transform:scaleY(1)}88%{transform:scaleY(.08)}90%{transform:scaleY(1)}92%{transform:scaleY(.08)}94%{transform:scaleY(1)}} @keyframes oc-brow{0%,70%,100%{transform:translateY(0)}80%,90%{transform:translateY(-4px)}} @keyframes oc-browb{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}} @keyframes oc-laugh{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.6)}} @keyframes oc-smile{0%,100%{transform:scaleX(1) scaleY(1)}50%{transform:scaleX(1.12) scaleY(1.15)}} @keyframes oc-rise{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-58px) scale(1.1);opacity:0}} @keyframes oc-note{0%{transform:translate(0,0) rotate(-8deg);opacity:0}15%{opacity:1}50%{transform:translate(8px,-26px) rotate(8deg)}100%{transform:translate(-4px,-54px) rotate(-8deg);opacity:0}} @keyframes oc-rain{0%{transform:translateY(0);opacity:0}20%{opacity:1}100%{transform:translateY(46px);opacity:0}} @keyframes oc-puff{0%{transform:translateY(0) scale(.4);opacity:0}25%{opacity:.7}100%{transform:translateY(-52px) scale(1.5);opacity:0}} @keyframes oc-spin{to{transform:rotate(360deg)}} @keyframes oc-pup{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}} @keyframes oc-bang{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-7px) scale(1.15)}} @keyframes oc-sway{0%,100%{transform:rotate(calc(var(--a) * -1))}50%{transform:rotate(var(--a))}} @keyframes oc-flick{0%{opacity:1}50%{opacity:.15}}
             </style>
             <div class="oc">
               <div class="ks">
@@ -6298,11 +6317,12 @@ views:
                   <circle cx="${CX}" cy="${CY}" r="${R2}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>
                   <circle cx="${CX}" cy="${CY}" r="${R2}" fill="none" stroke="#facc15" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C2 * selfPct / 100).toFixed(1)} ${C2.toFixed(1)}" transform="rotate(-90 ${CX} ${CY})" style="filter:drop-shadow(0 0 6px #facc1599)"/>
                   <circle cx="${CX}" cy="${CY}" r="${R0 + 4}" fill="${MD.c}" opacity=".16" style="${AA('oc-breath', 2.8, 'ease-in-out')}"/>
+                  ${PARTS}
                   <g style="transform-origin:${CX}px ${CY}px;${bodyAnim}">
                     <circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#ohead)" stroke="${MD.c}" stroke-opacity=".55" stroke-width="2.5"/>
                     <circle cx="${CX}" cy="${CY}" r="${R0}" fill="${MD.c}" opacity=".10"/>
                     ${DECOR}
-                    ${FACE}
+                    <g style="transform-origin:${CX}px ${CY}px;${TILT}">${FACE}</g>
                   </g>
                 </svg>
                 <div class="hub"><div class="l">MAISON</div><div class="v mono">${fmtW(total)}</div></div>

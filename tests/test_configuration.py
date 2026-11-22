@@ -799,3 +799,11 @@ def test_dashboard_v180_delestage_card_uses_real_peak_values() -> None:
     assert "def _peak_view" in coordinator and "**self._peak_view(snap)" in coordinator
     for key in ("seuil_declenchement_w", "seuil_rearmement_w", "puissance_mesuree_w", "base_de_mesure", "trames_confirmation"):
         assert key in sensor
+
+
+def test_dashboard_v180_flux_mina_is_animated() -> None:
+    """Mina bouge : tentacules, sourcils, bouche, inclinaison et particules propres à chaque humeur."""
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    text = (root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8")
+    for token in ("oc-sway", "oc-tilt", "oc-blink2", "oc-laugh", "oc-rise", "oc-rain", "oc-puff", "oc-bang", "const PARTS", "const BROW"):
+        assert token in text
