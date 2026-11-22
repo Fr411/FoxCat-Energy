@@ -158,8 +158,8 @@ button_card_templates:
         - box-shadow: none
         - border: none
       grid:
-        - grid-template-areas: '"a b c d e f g h"'
-        - grid-template-columns: repeat(8,1fr)
+        - grid-template-areas: '"a b c d e f g h i"'
+        - grid-template-columns: repeat(9,1fr)
         - column-gap: 8px
     custom_fields:
       a:
@@ -182,11 +182,19 @@ button_card_templates:
         card:
           type: custom:button-card
           template: fc_nav
+          name: Flux
+          icon: mdi:graph-outline
+          variables:
+            path: flux
+      d:
+        card:
+          type: custom:button-card
+          template: fc_nav
           name: Onduleur
           icon: mdi:solar-power
           variables:
             path: onduleur
-      d:
+      e:
         card:
           type: custom:button-card
           template: fc_nav
@@ -194,7 +202,7 @@ button_card_templates:
           icon: mdi:water-boiler
           variables:
             path: boiler
-      e:
+      f:
         card:
           type: custom:button-card
           template: fc_nav
@@ -202,7 +210,7 @@ button_card_templates:
           icon: mdi:washing-machine
           variables:
             path: appareils
-      f:
+      g:
         card:
           type: custom:button-card
           template: fc_nav
@@ -210,7 +218,7 @@ button_card_templates:
           icon: mdi:chart-timeline-variant-shimmer
           variables:
             path: marche
-      g:
+      h:
         card:
           type: custom:button-card
           template: fc_nav
@@ -218,7 +226,7 @@ button_card_templates:
           icon: mdi:stethoscope
           variables:
             path: diagnostic
-      h:
+      i:
         card:
           type: custom:button-card
           template: fc_nav
