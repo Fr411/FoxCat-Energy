@@ -705,6 +705,40 @@ class DashboardAndProfileTests(unittest.TestCase):
             self.assertEqual(manifest["dashboard_version"], "1.8.0")
             self.assertIs(manifest["recommended"], True)
 
+    def test_dashboard_v180_has_delestage_view_with_navbar_access(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.8.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        paths = [view["path"] for view in dashboard["views"]]
+        self.assertIn("delestage", paths)
+        navbar = dashboard["button_card_templates"]["fc_navbar"]["custom_fields"]
+        targets = {
+            item["card"]["variables"]["path"]: item["card"]["name"]
+            for item in navbar.values()
+        }
+        # Chaque onglet de la barre ouvre une vue qui existe.
+        self.assertEqual(sorted(set(targets) - set(paths)), [])
+        self.assertEqual(targets["delestage"], "Délestage")
+        areas = dashboard["button_card_templates"]["fc_navbar"]["styles"]["grid"][0][
+            "grid-template-areas"
+        ]
+        self.assertEqual(len(areas.strip('"').split()), len(navbar))
+        view = next(view for view in dashboard["views"] if view["path"] == "delestage")
+        code = view["cards"][0]["cards"][3]["custom_fields"]["c"]
+        for step in ("Surveillance", "Seuil dépassé", "Délestage", "Réarmement"):
+            self.assertIn(step, code)
+
+    def test_dashboard_v180_flux_octopus_is_named_mina(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.8.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        flux = next(view for view in dashboard["views"] if view["path"] == "flux")
+        self.assertIn("<b>Mina</b>", flux["cards"][0]["cards"][-1]["custom_fields"]["c"])
+
     def test_dashboard_v180_flux_octopus_has_all_moods(self) -> None:
         dashboard = yaml.safe_load(
             (

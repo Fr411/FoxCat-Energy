@@ -107,8 +107,8 @@ button_card_templates:
       - box-shadow: none
       - border: none
       grid:
-      - grid-template-areas: '"a b c d e f g h i j"'
-      - grid-template-columns: repeat(10,1fr)
+      - grid-template-areas: '"a b c d e f g h i j k"'
+      - grid-template-columns: repeat(11,1fr)
       - column-gap: 8px
     custom_fields:
       a:
@@ -171,11 +171,19 @@ button_card_templates:
         card:
           type: custom:button-card
           template: fc_nav
+          name: Délestage
+          icon: mdi:flash-alert
+          variables:
+            path: delestage
+      i:
+        card:
+          type: custom:button-card
+          template: fc_nav
           name: Économie
           icon: mdi:chart-timeline-variant-shimmer
           variables:
             path: marche
-      i:
+      j:
         card:
           type: custom:button-card
           template: fc_nav
@@ -183,7 +191,7 @@ button_card_templates:
           icon: mdi:stethoscope
           variables:
             path: diagnostic
-      j:
+      k:
         card:
           type: custom:button-card
           template: fc_nav
@@ -6252,6 +6260,7 @@ views:
               .oc .eye{transform-box:fill-box;transform-origin:center;${AA('oc-blink', 5.5, 'ease-in-out')}}
               .oc .mood{position:absolute;left:2.2%;top:3%;display:flex;align-items:center;gap:8px;max-width:46%;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;color:#f1f5f9;background:color-mix(in srgb,var(--c) 14%,rgba(6,10,19,.85));border:1px solid color-mix(in srgb,var(--c) 50%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--c) 25%,transparent)}
               .oc .mood ha-icon{--mdc-icon-size:20px;color:var(--c);flex:none}
+              .oc .mood b{color:var(--c);font-weight:800}
               .oc .sec{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
               .oc .bx{padding:12px 14px;border-radius:16px;background:rgba(2,6,14,.4);border:1px solid rgba(255,255,255,.06)}
               .oc .bx>span{font-size:9.5px;font-weight:800;letter-spacing:.16em;color:#64748b}
@@ -6297,7 +6306,7 @@ views:
                   </g>
                 </svg>
                 <div class="hub"><div class="l">MAISON</div><div class="v mono">${fmtW(total)}</div></div>
-                <div class="mood" style="--c:${MD.c}"><ha-icon icon="${MD.i}"></ha-icon><span>${MD.t}</span></div>
+                <div class="mood" style="--c:${MD.c}"><ha-icon icon="${MD.i}"></ha-icon><span><b>Mina</b> · ${MD.t}</span></div>
                 ${nodeHtml}
               </div>
               <div class="sec">
@@ -8263,6 +8272,225 @@ views:
             </div>`;
           ]]]
   subview: true
+- type: panel
+  path: delestage
+  title: Délestage
+  icon: mdi:flash-alert
+  theme: ios-dark-mode-blue-red
+  cards:
+  - type: vertical-stack
+    cards:
+    - type: custom:button-card
+      template: fc_panel
+      styles:
+        card:
+        - border-radius: 18px 18px 0 0
+      custom_fields:
+        c: |
+          [[[
+            const OUTDOOR = 'weather.momignies'; // <- adapte ton entité météo
+            const d = new Date();
+            const date = d.toLocaleDateString('fr-BE',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+            const time = d.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});
+            const temp = states[OUTDOOR]?.attributes?.temperature;
+            return `
+            <div class="p" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="img" style="width:44px;height:44px;background-image:url(/homeassistant/custom_components/foxcat_energy/dashboard/assets/hero_house.webp)"></div>
+                <div>
+                  <div style="font-size:20px;font-weight:800;letter-spacing:.04em"><span style="color:#38bdf8">FOX</span>CAT <span style="font-weight:500">ENERGY</span></div>
+                  <div class="k">Home Assistant • EMS intelligent</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:28px">
+                <div style="text-align:right"><div class="k">${date}</div><div style="font-size:20px;font-weight:600">${time}</div></div>
+                <div style="text-align:right"><div style="font-size:18px;font-weight:700"><span class="o">☀</span> ${temp!==undefined?Number(temp).toFixed(1).replace('.',','):'—'} °C</div><div class="k">Extérieur</div></div>
+              </div>
+            </div>`;
+          ]]]
+    - type: custom:button-card
+      template: fc_navbar
+    - type: custom:button-card
+      template: fc_head
+      variables:
+        title: Délestage
+        subtitle: Protection du disjoncteur · haute consommation
+        icon: mdi:flash-alert
+        color: '#f87171'
+    - type: custom:button-card
+      template: fc_panel
+      triggers_update: all
+      custom_fields:
+        c: |
+          [[[
+            const num = (id) => { const v = parseFloat(states[id]?.state); return isFinite(v) ? v : null; };
+            const on = (id) => states[id]?.state === 'on';
+            const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+            const esc = (t) => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+            const dec = (v, d = 1) => v == null ? '—' : v.toFixed(d).replace('.', ',');
+            const fmtW = (w) => w == null ? '—' : w >= 1000 ? (w / 1000).toFixed(2).replace('.', ',') + ' kW' : Math.round(w) + ' W';
+            const NOW = Date.now() / 1000;
+            const ph = (d, o = 0) => `-${((((NOW + o) % d) + d) % d).toFixed(2)}s`;
+            const AA = (n, d, tf = 'linear', o = 0) => `animation:${n} ${d}s ${tf} ${ph(d, o)} infinite;`;
+
+            const P = 'sensor.foxcat_energy_ems_';
+            const chS = states[P + 'charge_du_disjoncteur_principal'];
+            const at = chS?.attributes || {};
+            const load = num(P + 'charge_du_disjoncteur_principal') ?? 0;
+            const amps = parseFloat(at.intensite_estimee_a), cal = parseFloat(at.calibre_a) || num('number.foxcat_energy_ems_calibre_du_disjoncteur_principal');
+            const thrPct = parseFloat(at.seuil_pct) || 90;
+            const volt = parseFloat(at.tension_phase_v), coef = parseFloat(at.coefficient_desequilibre), dv = parseFloat(at.ecart_tension_phases_pct);
+            const act = on('binary_sensor.foxcat_energy_ems_delestage_haute_consommation_actif');
+            const enabled = on('switch.foxcat_energy_ems_delestage_haute_consommation');
+            const trig = num('number.foxcat_energy_ems_seuil_haute_consommation') ?? 0;
+            const rel = num('number.foxcat_energy_ems_seuil_de_rearmement_apres_haute_consommation') ?? 0;
+            const conf = num('number.foxcat_energy_ems_confirmation_haute_consommation');
+            const house = Math.max(num('[[foxcat:legacy.sensor_foxcat_energy_energie_puissance_de_consommation_maison]]') ?? 0, 0);
+            const imp = Math.max(num('[[foxcat:legacy.sensor_foxcat_energy_energie_puissance_prelevee_au_reseau]]') ?? 0, 0);
+            const bat = num(P + 'peak_shaving_decharge_batterie_demandee') ?? 0;
+            const txt = states[P + 'statut_delestage_haute_consommation']?.state || '—';
+
+            const near = load >= thrPct * .8 || (trig > 0 && house >= trig * .8);
+            const over = load >= thrPct || (trig > 0 && house >= trig);
+            const step = !enabled ? 0 : act ? (house <= rel ? 4 : 3) : over ? 2 : 1;
+            const col = !enabled ? '#64748b' : act ? '#f87171' : over ? '#fb923c' : near ? '#fbbf24' : '#34d399';
+            const label = ['PROTECTION DÉSACTIVÉE', 'SURVEILLANCE', 'SEUIL DÉPASSÉ', 'DÉLESTAGE ACTIF', 'RÉARMEMENT'][step];
+
+            /* ---- jauge 270° : charge du disjoncteur ---- */
+            const R = 100, C = 2 * Math.PI * R, ARC = .75;
+            const zone = (a, b, c) => `<circle cx="150" cy="150" r="${R}" fill="none" stroke="${c}" stroke-width="14" stroke-dasharray="${(C * ARC * (b - a) / 100).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-C * ARC * a / 100).toFixed(1)}" transform="rotate(135 150 150)" opacity=".28"/>`;
+            const amber0 = Math.max(thrPct - 20, 0);
+            const ang = (p) => 135 + 270 * clamp(p, 0, 100) / 100;
+            const tick = (p, c) => { const a = ang(p) * Math.PI / 180; return `<line x1="${(150 + 88 * Math.cos(a)).toFixed(1)}" y1="${(150 + 88 * Math.sin(a)).toFixed(1)}" x2="${(150 + 116 * Math.cos(a)).toFixed(1)}" y2="${(150 + 116 * Math.sin(a)).toFixed(1)}" stroke="${c}" stroke-width="3" stroke-linecap="round"/>`; };
+            const gauge = `<svg viewBox="0 0 300 270" class="gs">
+              ${zone(0, amber0, '#34d399')}${zone(amber0, thrPct, '#fbbf24')}${zone(thrPct, 100, '#f87171')}
+              <circle cx="150" cy="150" r="${R}" fill="none" stroke="${col}" stroke-width="14" stroke-linecap="round" stroke-dasharray="${(C * ARC * clamp(load, 0, 100) / 100).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 150 150)" style="filter:drop-shadow(0 0 7px ${col}aa)"/>
+              ${[0, 25, 50, 75, 100].map(p => { const a = ang(p) * Math.PI / 180; return `<text x="${(150 + 126 * Math.cos(a)).toFixed(1)}" y="${(154 + 126 * Math.sin(a)).toFixed(1)}" class="gt" text-anchor="middle">${p}</text>`; }).join('')}
+              ${tick(thrPct, '#f87171')}
+              <g transform="rotate(${ang(load).toFixed(1)} 150 150)"><g style="transform-origin:150px 150px;${near ? AA('ds-wig', act ? .25 : .9, 'ease-in-out') : ''}">
+                <path d="M${150 + 88} 150 L${150 + 66} 141 L${150 + 66} 159 Z" fill="${col}" style="filter:drop-shadow(0 0 5px ${col})"/></g></g>
+              ${act ? `<circle cx="150" cy="150" r="${R + 14}" fill="none" stroke="#f87171" stroke-width="2" style="transform-box:fill-box;transform-origin:center;${AA('ds-ring', 1.4, 'ease-out')}"/><circle cx="150" cy="150" r="${R + 14}" fill="none" stroke="#f87171" stroke-width="2" style="transform-box:fill-box;transform-origin:center;${AA('ds-ring', 1.4, 'ease-out', .7)}"/>` : ''}
+            </svg>`;
+
+            /* ---- disjoncteur : levier qui bascule ---- */
+            const arcs = act ? [0, 1, 2].map(k => `<polyline points="${108 + k * 6},${66 + k * 8} ${116 + k * 6},${72 + k * 8} ${110 + k * 6},${78 + k * 8} ${120 + k * 6},${85 + k * 8}" fill="none" stroke="#fde68a" stroke-width="2.4" stroke-linecap="round" style="${AA('ds-spark', .35, 'steps(2)', k * .11)}"/>`).join('') : '';
+            const breaker = `<svg viewBox="0 0 150 230" class="bk">
+              <rect x="30" y="14" width="90" height="202" rx="16" fill="#1a2538" stroke="rgba(255,255,255,.14)" stroke-width="2"/>
+              <rect x="40" y="26" width="70" height="178" rx="10" fill="#0d1626"/>
+              <text x="75" y="48" text-anchor="middle" class="bl">${cal ? Math.round(cal) + ' A' : 'DISJ.'}</text>
+              <rect x="62" y="62" width="26" height="96" rx="8" fill="#060b14" stroke="rgba(255,255,255,.1)"/>
+              <g style="transform-origin:75px 110px;transform:rotate(${act ? 28 : -28}deg);${act ? AA('ds-trip', 4, 'ease-out') : ''}">
+                <rect x="64" y="${act ? 96 : 66}" width="22" height="46" rx="7" fill="${act ? '#7f1d1d' : '#14532d'}" stroke="${act ? '#f87171' : '#34d399'}" stroke-width="2"/>
+                <rect x="70" y="${act ? 104 : 74}" width="10" height="6" rx="3" fill="${act ? '#f87171' : '#34d399'}" opacity=".8"/>
+              </g>
+              <text x="75" y="178" text-anchor="middle" class="bl" fill="${act ? '#f87171' : '#34d399'}">${act ? 'OFF' : 'ON'}</text>
+              <circle cx="75" cy="196" r="5" fill="${col}" style="filter:drop-shadow(0 0 6px ${col});${act || over ? AA('ds-blink', .7, 'steps(2)') : ''}"/>
+              <path d="M75 14 V2 M75 216 V228" stroke="#94a3b8" stroke-width="4" stroke-linecap="round" opacity=".6"/>
+              ${arcs}
+            </svg>`;
+
+            /* ---- étapes ---- */
+            const STEPS = [['mdi:eye-check-outline', 'Surveillance'], ['mdi:alert-outline', 'Seuil dépassé'], ['mdi:flash-off', 'Délestage'], ['mdi:restart', 'Réarmement']];
+            const stepsHtml = STEPS.map(([ic, l], i) => { const n = i + 1, st = step === n ? 'cur' : (step > n || (step === 4 && n < 4)) ? 'done' : ''; return `<div class="sp ${st}"><i><ha-icon icon="${ic}"></ha-icon></i><span>${l}</span></div>`; }).join('<b class="ln"></b>');
+
+            /* ---- puissance maison vs seuils ---- */
+            const maxW = Math.max(trig * 1.25, house * 1.1, imp * 1.1, 1000);
+            const pc = (w) => clamp(w / maxW * 100, 0, 100);
+            const bar = `<div class="pb"><div class="pf" style="width:${pc(house).toFixed(1)}%;background:linear-gradient(90deg,#34d399,${over ? '#f87171' : near ? '#fbbf24' : '#34d399'});${act ? AA('ds-bar', .8) : ''}"></div>
+              ${rel > 0 ? `<span class="mk r" style="left:${pc(rel)}%"><em>réarm. ${fmtW(rel)}</em></span>` : ''}${trig > 0 ? `<span class="mk t" style="left:${pc(trig)}%"><em>seuil ${fmtW(trig)}</em></span>` : ''}</div>`;
+
+            /* ---- charges délestables ---- */
+            const L = [['Boiler ECS', 'mdi:water-boiler', '#fb923c', 'sensor.homefoxcat_load_chauffe_eau'], ['Lave-linge', 'mdi:washing-machine', '#60a5fa', '[[foxcat:legacy.sensor_lave_linge_puissance]]'], ['Sèche-linge', 'mdi:tumble-dryer', '#c4b5fd', '[[foxcat:legacy.sensor_seche_linge_puissance]]'], ['Lave-vaisselle', 'mdi:dishwasher', '#34d399', '[[foxcat:legacy.sensor_lave_vaisselle_puissance]]']];
+            const loads = L.map(([n, ic, c, id], i) => { const w = num(id) ?? 0; const run = w > 20; const st = act ? (run ? ['Délestage…', '#fbbf24', 'mdi:flash-off', 'pend'] : ['Délestée', '#f87171', 'mdi:lock', 'off']) : (run ? ['En marche', c, ic, 'on'] : ['Prête', '#64748b', ic, '']); return `<div class="ld ${st[3]}" style="--c:${st[1]}"><div class="li"><ha-icon icon="${st[2]}"></ha-icon></div><b>${n}</b><span class="mono">${fmtW(w)}</span><em>${st[0]}</em></div>`; }).join('');
+            const chip = (ic, l, v) => `<div class="cp"><ha-icon icon="${ic}"></ha-icon><span>${l}</span><b class="mono">${v}</b></div>`;
+            return `
+            <style>
+              .ds{position:relative;overflow:hidden;padding:18px 22px 20px;font-family:Inter,'Segoe UI',system-ui,sans-serif;color:#e2e8f0;text-align:left}
+              .ds *{box-sizing:border-box}.ds ha-icon{display:inline-flex}
+              .ds .mono{font-family:'JetBrains Mono','SF Mono',ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+              .ds::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 70% at 25% 40%,${col}${act ? '38' : '18'},transparent 70%);${act ? AA('ds-alarm', 1.2, 'ease-in-out') : ''}}
+              .ds>*{position:relative}
+              .ds .hd{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+              .ds .eye{font-size:10.5px;font-weight:800;letter-spacing:.24em;color:#f87171}.ds .h1{margin-top:3px;font-size:22px;font-weight:800;color:#f8fafc}
+              .ds .st{display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.1em;color:${col};background:${col}16;border:1px solid ${col}55;${act ? AA('ds-glow', 1.1, 'ease-in-out') : ''}}
+              .ds .st i{position:relative;width:8px;height:8px;border-radius:50%;background:${col}}.ds .st i::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid ${col};${AA('ds-ping', act ? 1 : 2.6, 'ease-out')}}
+              .ds .haz{display:${act ? 'flex' : 'none'};align-items:center;gap:10px;margin-top:12px;padding:10px 14px;border-radius:14px;border:1px solid rgba(248,113,113,.45);background:repeating-linear-gradient(-45deg,rgba(248,113,113,.16) 0 12px,rgba(248,113,113,.05) 12px 24px);background-size:34px 34px;color:#fecaca;font-size:13px;font-weight:600;${AA('ds-haz', 1.2)}}
+              .ds .haz ha-icon{--mdc-icon-size:22px;color:#f87171;${AA('ds-blink', .8, 'steps(2)')}}
+              .ds .body{display:grid;grid-template-columns:300px 150px minmax(0,1fr);gap:18px;align-items:center;margin-top:14px}
+              .ds .gw{position:relative}.ds .gs{width:100%;display:block;overflow:visible}.ds .bk{width:100%;max-width:150px;display:block;margin:0 auto;overflow:visible}
+              .ds .gt{font:700 10px Inter,system-ui,sans-serif;fill:#64748b}.ds .bl{font:800 12px Inter,system-ui,sans-serif;fill:#94a3b8;letter-spacing:.1em}
+              .ds .gc{position:absolute;left:0;right:0;top:112px;text-align:center}
+              .ds .gl{font-size:9px;font-weight:800;letter-spacing:.18em;color:#64748b}.ds .gv{margin-top:2px;font-size:46px;font-weight:700;line-height:1;color:#fff}.ds .gv small{font-size:17px;color:${col};margin-left:2px}
+              .ds .gs2{margin-top:4px;font-size:12px;color:#94a3b8}
+              .ds .steps{display:flex;align-items:center;gap:4px}.ds .ln{flex:1;height:2px;border-radius:2px;background:rgba(255,255,255,.1)}
+              .ds .sp{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:70px;font-size:10px;font-weight:800;letter-spacing:.08em;color:#64748b;text-transform:uppercase;text-align:center}
+              .ds .sp i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:#0b1220;border:1.5px solid rgba(255,255,255,.12)}.ds .sp ha-icon{--mdc-icon-size:20px}
+              .ds .sp.done{color:#94a3b8}.ds .sp.done i{border-color:#34d39988;color:#34d399}
+              .ds .sp.cur{color:${col}}.ds .sp.cur i{color:${col};border-color:${col};box-shadow:0 0 18px ${col}77;${AA('ds-pulse', 1.4, 'ease-in-out')}}
+              .ds .pw{margin-top:22px}.ds .pl{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#94a3b8}.ds .pl b{font-size:22px;color:#fff}
+              .ds .pb{position:relative;height:12px;margin:10px 0 24px;border-radius:12px;background:rgba(255,255,255,.07)}.ds .pf{height:100%;border-radius:12px;transition:width .6s;${act ? 'background-size:40px 40px;' : ''}}
+              .ds .mk{position:absolute;top:-4px;width:2px;height:20px;margin-left:-1px;border-radius:2px}.ds .mk.t{background:#f87171;box-shadow:0 0 8px #f87171}.ds .mk.r{background:#34d399}
+              .ds .mk em{position:absolute;top:24px;left:50%;transform:translateX(-50%);font-style:normal;font-size:10px;font-weight:700;white-space:nowrap;color:#94a3b8}.ds .mk.t em{color:#fca5a5}
+              .ds .bt{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:6px}
+              .ds .ld{position:relative;padding:12px 10px;border-radius:16px;text-align:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);transition:all .3s}
+              .ds .ld .li{width:42px;height:42px;margin:0 auto;border-radius:50%;display:grid;place-items:center;color:#64748b;background:#0b1220;border:1.5px solid rgba(255,255,255,.1)}.ds .ld .li ha-icon{--mdc-icon-size:22px}
+              .ds .ld b{display:block;margin-top:7px;font-size:12px;color:#f1f5f9}.ds .ld span{display:block;margin-top:2px;font-size:14px;font-weight:700;color:#94a3b8}
+              .ds .ld em{display:inline-block;margin-top:5px;padding:2px 9px;border-radius:999px;font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+              .ds .ld.on .li{color:var(--c);border-color:var(--c);box-shadow:0 0 16px color-mix(in srgb,var(--c) 45%,transparent)}
+              .ds .ld.off{opacity:.8;border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.06)}.ds .ld.off .li{color:#f87171;border-color:#f87171}
+              .ds .ld.pend{border-color:rgba(251,191,36,.5);${AA('ds-glow', 1, 'ease-in-out')}}.ds .ld.pend .li{color:#fbbf24;border-color:#fbbf24;${AA('ds-blink', .6, 'steps(2)')}}
+              .ds .cps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+              .ds .cp{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);font-size:11px;color:#94a3b8;min-width:0}
+              .ds .cp ha-icon{--mdc-icon-size:15px;color:#fb923c;flex:none}.ds .cp span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ds .cp b{color:#e2e8f0;font-size:12px}
+              .ds .msg{margin-top:12px;padding:11px 14px;border-radius:14px;font-size:12px;line-height:1.5;color:#cbd5e1;background:linear-gradient(135deg,${col}14,transparent);border:1px solid ${col}33}
+              .ds .msg ha-icon{--mdc-icon-size:16px;color:${col};vertical-align:-3px;margin-right:6px}
+              @media (max-width:980px){.ds .body{grid-template-columns:1fr}.ds .bt,.ds .cps{grid-template-columns:1fr 1fr}.ds .gw{max-width:300px;margin:0 auto}}
+              @media (prefers-reduced-motion:reduce){.ds,.ds *{animation:none!important}}
+              @keyframes ds-wig{0%,100%{transform:rotate(-1.6deg)}50%{transform:rotate(1.6deg)}}
+              @keyframes ds-ring{0%{transform:scale(.9);opacity:.8}100%{transform:scale(1.18);opacity:0}}
+              @keyframes ds-spark{0%{opacity:1}50%{opacity:.1}}
+              @keyframes ds-trip{0%{transform:rotate(-28deg)}12%{transform:rotate(34deg)}22%{transform:rotate(26deg)}100%{transform:rotate(28deg)}}
+              @keyframes ds-blink{0%{opacity:1}50%{opacity:.25}}
+              @keyframes ds-ping{0%{transform:scale(.6);opacity:1}100%{transform:scale(2.6);opacity:0}}
+              @keyframes ds-glow{0%,100%{box-shadow:0 0 0 0 transparent}50%{box-shadow:0 0 22px ${col}77}}
+              @keyframes ds-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+              @keyframes ds-alarm{0%,100%{opacity:.5}50%{opacity:1}}
+              @keyframes ds-haz{to{background-position:34px 0}}
+              @keyframes ds-bar{to{background-position:40px 0}}
+            </style>
+            <div class="ds">
+              <div class="hd"><div><div class="eye">FOXCAT ENERGY · PROTECTION</div><div class="h1">Délestage haute consommation</div></div><span class="st"><i></i>${label}</span></div>
+              <div class="haz"><ha-icon icon="mdi:alert-octagon"></ha-icon>Délestage en cours : FoxCat coupe les charges flexibles pour protéger le disjoncteur.</div>
+              <div class="body">
+                <div class="gw">${gauge}<div class="gc"><div class="gl">CHARGE DISJONCTEUR</div><div class="gv mono">${Math.round(load)}<small>%</small></div><div class="gs2 mono">${isFinite(amps) ? dec(amps, 1) : '—'} A${cal ? ' / ' + Math.round(cal) + ' A' : ''}</div></div></div>
+                <div>${breaker}</div>
+                <div>
+                  <div class="steps">${stepsHtml}</div>
+                  <div class="pw"><div class="pl"><span>PUISSANCE MAISON</span><b class="mono">${fmtW(house)}</b></div>${bar}</div>
+                </div>
+              </div>
+              <div class="bt">${loads}</div>
+              <div class="cps">
+                ${chip('mdi:flash-alert', 'Seuil', fmtW(trig))}${chip('mdi:restart', 'Réarmement', fmtW(rel))}
+                ${chip('mdi:timer-outline', 'Confirmation', conf == null ? '—' : Math.round(conf) + ' s')}${chip('mdi:battery-arrow-up', 'Aide batterie', fmtW(bat))}
+                ${chip('mdi:sine-wave', 'Tension phase', isFinite(volt) ? Math.round(volt) + ' V' : '—')}${chip('mdi:scale-unbalanced', 'Déséquilibre', isFinite(coef) ? '× ' + dec(coef, 1) : '—')}
+                ${chip('mdi:transmission-tower', 'Import réseau', fmtW(imp))}${chip('mdi:shield-check', 'Seuil charge', Math.round(thrPct) + ' %')}
+              </div>
+              <div class="msg"><ha-icon icon="mdi:message-text-outline"></ha-icon>${esc(txt)}</div>
+            </div>`;
+          ]]]
+    - type: grid
+      columns: 1
+      square: false
+      cards:
+      - type: custom:button-card
+        template: fc_tog
+        entity: switch.foxcat_energy_ems_delestage_haute_consommation
+        variables:
+          col: '#f87171'
+          icon: mdi:flash-alert
+          label: Délestage haute consommation
+          sub: Protège le disjoncteur principal
 - title: Marché & Réseau
   path: marche
   icon: mdi:trending-up
