@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 import sys
 import tempfile
 import types
@@ -651,11 +652,58 @@ class DashboardAndProfileTests(unittest.TestCase):
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         self.assertIn("1.7.4", available_dashboard_versions(versions_directory))
         self.assertIn("1.7.4", available_dashboard_versions(versions_directory, "mobile"))
-        self.assertEqual(recommended_dashboard_version(versions_directory), "1.7.4")
+        self.assertIn("1.8.0", available_dashboard_versions(versions_directory))
+        self.assertIn("1.8.0", available_dashboard_versions(versions_directory, "mobile"))
+        self.assertEqual(recommended_dashboard_version(versions_directory), "1.8.0")
         self.assertEqual(
             recommended_dashboard_version(versions_directory, "mobile"),
-            "1.7.4",
+            "1.8.0",
         )
+
+    def test_dashboard_v180_tablet_and_mobile_are_portable(self) -> None:
+        import ast
+        import re
+
+        registry = ast.parse(
+            (COMPONENT_PATH / "runtime" / "registry.py").read_text(encoding="utf-8")
+        )
+        roles = {
+            node.args[0].value
+            for node in ast.walk(registry)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in {"_native", "_config", "_literal"}
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+        }
+        versions_directory = COMPONENT_PATH / "dashboard" / "versions"
+        for filename, variant, minimum_views in (
+            ("dashboard_v1.8.0.yaml", "tablet", 10),
+            ("dashboard_mobile_v1.8.0.yaml", "mobile", 9),
+        ):
+            text = (versions_directory / filename).read_text(encoding="utf-8")
+            dashboard = yaml.safe_load(text)
+            self.assertGreaterEqual(len(dashboard["views"]), minimum_views, filename)
+            # Aucune image téléversée dans un Home Assistant particulier.
+            self.assertNotIn("image_upload", text, filename)
+            self.assertNotIn("/api/image/serve", text, filename)
+            # Chaque rôle du registre utilisé existe : pas d'entité « unresolved ».
+            used = set(re.findall(r"\[\[foxcat:([a-zA-Z0-9_.-]+)\]\]", text))
+            self.assertTrue(used, filename)
+            self.assertEqual(sorted(used - roles), [], filename)
+            manifest = json.loads(
+                (
+                    versions_directory
+                    / (
+                        "manifest_v1.8.0.json"
+                        if variant == "tablet"
+                        else "manifest_mobile_v1.8.0.json"
+                    )
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["variant"], variant)
+            self.assertEqual(manifest["dashboard_version"], "1.8.0")
+            self.assertIs(manifest["recommended"], True)
 
     def test_battery_ev_menu_and_dashboard_view_exist_for_both_layouts(self) -> None:
         self.assertIn("battery_ev", EQUIPMENT_MENU_STEPS)
