@@ -705,6 +705,18 @@ class DashboardAndProfileTests(unittest.TestCase):
             self.assertEqual(manifest["dashboard_version"], "1.8.0")
             self.assertIs(manifest["recommended"], True)
 
+    def test_dashboard_v180_flux_octopus_has_all_moods(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.8.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        flux = next(view for view in dashboard["views"] if view["path"] == "flux")
+        code = flux["cards"][0]["cards"][-1]["custom_fields"]["c"]
+        for mood in ("sleep", "joy", "happy", "content", "calm", "sad", "worried", "panic"):
+            self.assertIn(f"{mood}:", code, mood)
+        self.assertIn("const moodKey", code)
+
     def test_battery_ev_menu_and_dashboard_view_exist_for_both_layouts(self) -> None:
         self.assertIn("battery_ev", EQUIPMENT_MENU_STEPS)
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"

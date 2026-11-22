@@ -6141,6 +6141,55 @@ views:
             const look = top ? nodes.find(n => n.n === top.n) : null;
             const lx = look ? clamp((look.p[0] - CX) / 410, -1, 1) * 4 : 0, ly = look ? clamp((look.p[1] - CY) / 250, -1, 1) * 3 : 0;
             const R2 = 96, C2 = 2 * Math.PI * R2;
+
+            /* ---------- ÉMOTION de la pieuvre ---------- */
+            const moodKey = (total < 150 && pv < 50) ? 'sleep'
+              : exp > 200 ? 'joy'
+              : (total >= 4000 || imp >= 3000) ? 'panic'
+              : imp >= 1500 ? 'worried'
+              : selfPct >= 60 ? 'happy'
+              : selfPct >= 25 ? 'content'
+              : imp > 300 ? 'sad'
+              : 'calm';
+            const MOODS = {
+              sleep:   { c: '#64748b', t: 'Zzz… la maison dort', i: 'mdi:sleep' },
+              joy:     { c: '#34d399', t: "J'injecte du soleil sur le réseau !", i: 'mdi:party-popper' },
+              happy:   { c: '#facc15', t: 'Je profite du soleil', i: 'mdi:white-balance-sunny' },
+              content: { c: '#a3e635', t: 'Soleil et réseau : ça va', i: 'mdi:emoticon-happy-outline' },
+              calm:    { c: '#19d8ff', t: 'Tout est calme', i: 'mdi:emoticon-neutral-outline' },
+              sad:     { c: '#38bdf8', t: 'Je dépends du réseau…', i: 'mdi:emoticon-sad-outline' },
+              worried: { c: '#fb923c', t: 'Ça tire fort sur le réseau', i: 'mdi:emoticon-confused-outline' },
+              panic:   { c: '#f87171', t: 'La maison consomme beaucoup !', i: 'mdi:emoticon-dead-outline' }
+            };
+            const MD = MOODS[moodKey];
+            const star = (x, y, r, col, d, o) => `<path d="M${x} ${y - r} L${x + r * .28} ${y - r * .28} L${x + r} ${y} L${x + r * .28} ${y + r * .28} L${x} ${y + r} L${x - r * .28} ${y + r * .28} L${x - r} ${y} L${x - r * .28} ${y - r * .28} Z" fill="${col}" style="transform-box:fill-box;transform-origin:center;${AA('oc-twinkle', d, 'ease-in-out', o)}"/>`;
+            const eyeX = [CX - 27, CX + 27], eyeY = CY - 40;
+            const eyeOpen = (r, pr) => eyeX.map(x => `<g class="eye"><circle cx="${x}" cy="${eyeY}" r="${r}" fill="#fff"/><circle cx="${x + lx}" cy="${eyeY + ly}" r="${pr}" fill="#0b1220"/></g>`).join('');
+            const eyeArc = (up) => eyeX.map(x => `<path d="M${x - 13} ${eyeY + (up ? 5 : -2)} Q${x} ${eyeY + (up ? -13 : 9)} ${x + 13} ${eyeY + (up ? 5 : -2)}" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`).join('');
+            const brows = (inner, outer) => `<path d="M${CX - 41} ${eyeY - outer} L${CX - 15} ${eyeY - inner}" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/><path d="M${CX + 41} ${eyeY - outer} L${CX + 15} ${eyeY - inner}" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>`;
+            const MY = CY - 6;
+            const mouths = {
+              smile:   `<path d="M${CX - 20} ${MY} Q${CX} ${MY + 18} ${CX + 20} ${MY}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>`,
+              big:     `<path d="M${CX - 26} ${MY - 2} Q${CX} ${MY + 32} ${CX + 26} ${MY - 2} Z" fill="#0b1220" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/><path d="M${CX - 12} ${MY + 13} Q${CX} ${MY + 22} ${CX + 12} ${MY + 13} Q${CX} ${MY + 8} ${CX - 12} ${MY + 13} Z" fill="#fb7185"/>`,
+              small:   `<path d="M${CX - 12} ${MY + 2} Q${CX} ${MY + 11} ${CX + 12} ${MY + 2}" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`,
+              flat:    `<path d="M${CX - 12} ${MY + 4} L${CX + 12} ${MY + 4}" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>`,
+              frown:   `<path d="M${CX - 18} ${MY + 10} Q${CX} ${MY - 7} ${CX + 18} ${MY + 10}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>`,
+              wavy:    `<path d="M${CX - 22} ${MY + 6} q5.5 -7 11 0 t11 0 t11 0 t11 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`,
+              open:    `<ellipse cx="${CX}" cy="${MY + 8}" rx="12" ry="${14}" fill="#0b1220" stroke="#fff" stroke-width="3.5" style="transform-box:fill-box;transform-origin:center;${AA('oc-pant', .5, 'ease-in-out')}"/>`
+            };
+            const cheeks = `<ellipse cx="${CX - 52}" cy="${CY - 18}" rx="10" ry="6" fill="#fb7185" opacity=".45"/><ellipse cx="${CX + 52}" cy="${CY - 18}" rx="10" ry="6" fill="#fb7185" opacity=".45"/>`;
+            const drop = (x, y, d, o) => `<path d="M${x} ${y} q-7 11 0 16 q7 -5 0 -16 Z" fill="#7dd3fc" style="${AA('oc-drop', d, 'ease-in', o)}"/>`;
+            const FACE = {
+              sleep:   eyeArc(false) + mouths.flat + `<text x="${CX + 62}" y="${CY - 52}" fill="#94a3b8" font-size="22" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out')}">z</text><text x="${CX + 80}" y="${CY - 72}" fill="#94a3b8" font-size="30" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out', 1.1)}">Z</text>`,
+              joy:     [eyeX.map(x => star(x, eyeY, 14, '#fde047', 1.4, x)).join(''), mouths.big, cheeks, star(CX - 96, CY - 70, 11, '#fde047', 1.6, 0), star(CX + 100, CY - 60, 9, '#34d399', 1.3, .5), star(CX + 70, CY - 98, 7, '#fff', 1.1, .9), star(CX - 70, CY - 100, 8, '#34d399', 1.5, .3)].join(''),
+              happy:   eyeArc(true) + mouths.smile + cheeks + star(CX + 92, CY - 76, 9, '#facc15', 2, 0),
+              content: eyeOpen(14, 6.5) + mouths.small,
+              calm:    eyeOpen(14, 6.5) + mouths.flat,
+              sad:     eyeOpen(14, 6) + brows(24, 16) + mouths.frown,
+              worried: eyeOpen(16, 4.5) + brows(28, 18) + mouths.wavy + drop(CX + 62, CY - 62, 2.2, 0),
+              panic:   eyeOpen(17, 3.2) + brows(32, 22) + mouths.open + drop(CX + 64, CY - 64, 1.3, 0) + drop(CX - 64, CY - 50, 1.5, .6)
+            }[moodKey];
+            const bodyAnim = { joy: AA('oc-bounce', 1.1, 'ease-in-out'), happy: AA('oc-bounce', 1.8, 'ease-in-out'), panic: AA('oc-shake', .22), worried: AA('oc-tremble', .9, 'ease-in-out'), sleep: AA('oc-breathe', 4.5, 'ease-in-out'), sad: AA('oc-breathe', 6, 'ease-in-out') }[moodKey] || '';
             const bar = (list) => list.filter(x => x.w > 0.5).map(x => `<i style="flex:${x.w};background:${x.c};box-shadow:0 0 8px ${x.c}77" title="${esc(x.n)}"></i>`).join('');
             const dest = bar(L);
             const mixSrc = bar([{ w: solarUse, c: '#facc15', n: 'Solaire' }, { w: imp, c: '#38bdf8', n: 'Réseau' }]);
@@ -6157,8 +6206,8 @@ views:
               .oc .k b{display:block;margin-top:5px;font-size:24px;font-weight:700;line-height:1}
               .oc .stage{position:relative;width:100%;aspect-ratio:1000/620;margin-top:12px;border-radius:26px;background:radial-gradient(60% 60% at 50% 50%,rgba(25,216,255,.07),transparent 70%),linear-gradient(160deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.07);overflow:hidden}
               .oc svg.arms{position:absolute;inset:0;width:100%;height:100%}
-              .oc .hub{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:17%;text-align:center;pointer-events:none}
-              .oc .hub .l{margin-top:34%;font-size:9px;font-weight:800;letter-spacing:.2em;color:#94a3b8}.oc .hub .v{margin-top:2px;font-size:clamp(16px,2.4vw,26px);font-weight:800;color:#fff}
+              .oc .hub{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);width:17%;text-align:center;pointer-events:none}
+              .oc .hub .l{margin-top:0;font-size:9px;font-weight:800;letter-spacing:.2em;color:#94a3b8}.oc .hub .v{margin-top:2px;font-size:clamp(16px,2.4vw,26px);font-weight:800;color:#fff}
               .oc .nd{position:absolute;transform:translate(-50%,-50%);width:13%;min-width:92px;text-align:center}
               .oc .ic{width:46px;height:46px;margin:0 auto;border-radius:50%;display:grid;place-items:center;color:#64748b;background:#0b1220;border:1.5px solid rgba(255,255,255,.12)}
               .oc .nd.on .ic{color:var(--c);border-color:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 55%,transparent);${AA('oc-pulse', 2.4, 'ease-in-out')}}
@@ -6168,6 +6217,8 @@ views:
               .oc .nd em{display:inline-block;margin-top:2px;padding:1px 7px;border-radius:999px;font-style:normal;font-size:10px;color:#64748b;background:rgba(255,255,255,.05)}
               .oc .nd.on em{color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent)}
               .oc .eye{transform-box:fill-box;transform-origin:center;${AA('oc-blink', 5.5, 'ease-in-out')}}
+              .oc .mood{position:absolute;left:2.2%;top:3%;display:flex;align-items:center;gap:8px;max-width:46%;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:700;color:#f1f5f9;background:color-mix(in srgb,var(--c) 14%,rgba(6,10,19,.85));border:1px solid color-mix(in srgb,var(--c) 50%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--c) 25%,transparent)}
+              .oc .mood ha-icon{--mdc-icon-size:20px;color:var(--c);flex:none}
               .oc .sec{margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
               .oc .bx{padding:12px 14px;border-radius:16px;background:rgba(2,6,14,.4);border:1px solid rgba(255,255,255,.06)}
               .oc .bx>span{font-size:9.5px;font-weight:800;letter-spacing:.16em;color:#64748b}
@@ -6178,6 +6229,14 @@ views:
               @keyframes oc-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
               @keyframes oc-blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
               @keyframes oc-breath{0%,100%{opacity:.55}50%{opacity:1}}
+              @keyframes oc-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+              @keyframes oc-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+              @keyframes oc-tremble{0%,100%{transform:translate(0,0)}30%{transform:translate(-1.5px,1px)}60%{transform:translate(1.5px,-1px)}}
+              @keyframes oc-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+              @keyframes oc-twinkle{0%,100%{transform:scale(.4);opacity:.3}50%{transform:scale(1.15);opacity:1}}
+              @keyframes oc-drop{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(34px);opacity:0}}
+              @keyframes oc-zzz{0%{transform:translateY(8px);opacity:0}30%{opacity:1}100%{transform:translateY(-16px);opacity:0}}
+              @keyframes oc-pant{0%,100%{transform:scaleY(.8)}50%{transform:scaleY(1.15)}}
             </style>
             <div class="oc">
               <div class="ks">
@@ -6192,12 +6251,15 @@ views:
                   ${arms}
                   <circle cx="${CX}" cy="${CY}" r="${R2}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="7"/>
                   <circle cx="${CX}" cy="${CY}" r="${R2}" fill="none" stroke="#facc15" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C2 * selfPct / 100).toFixed(1)} ${C2.toFixed(1)}" transform="rotate(-90 ${CX} ${CY})" style="filter:drop-shadow(0 0 6px #facc1599)"/>
-                  <circle cx="${CX}" cy="${CY}" r="${R0 + 4}" fill="#19d8ff" opacity=".10" style="${AA('oc-breath', 2.8, 'ease-in-out')}"/>
-                  <circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#ohead)" stroke="rgba(255,255,255,.16)" stroke-width="2"/>
-                  <g class="eye"><circle cx="${CX - 27}" cy="${CY - 14}" r="14" fill="#fff"/><circle cx="${CX - 27 + lx}" cy="${CY - 14 + ly}" r="6.5" fill="#0b1220"/></g>
-                  <g class="eye"><circle cx="${CX + 27}" cy="${CY - 14}" r="14" fill="#fff"/><circle cx="${CX + 27 + lx}" cy="${CY - 14 + ly}" r="6.5" fill="#0b1220"/></g>
+                  <circle cx="${CX}" cy="${CY}" r="${R0 + 4}" fill="${MD.c}" opacity=".16" style="${AA('oc-breath', 2.8, 'ease-in-out')}"/>
+                  <g style="transform-origin:${CX}px ${CY}px;${bodyAnim}">
+                    <circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#ohead)" stroke="${MD.c}" stroke-opacity=".55" stroke-width="2.5"/>
+                    <circle cx="${CX}" cy="${CY}" r="${R0}" fill="${MD.c}" opacity=".10"/>
+                    ${FACE}
+                  </g>
                 </svg>
                 <div class="hub"><div class="l">MAISON</div><div class="v mono">${fmtW(total)}</div></div>
+                <div class="mood" style="--c:${MD.c}"><ha-icon icon="${MD.i}"></ha-icon><span>${MD.t}</span></div>
                 ${nodeHtml}
               </div>
               <div class="sec">
