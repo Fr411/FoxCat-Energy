@@ -87,6 +87,10 @@ from .const import (
     CONF_PRI_L2,
     CONF_PRI_L3,
     CONF_PRI_L4,
+    CONF_PRI_RET_L1,
+    CONF_PRI_RET_L2,
+    CONF_PRI_RET_L3,
+    CONF_PRI_RET_L4,
     CONF_INVERTER_POWER_SENSOR,
     CONF_PV_SENSOR,
     CONF_TARIFF_HP_END_1,
@@ -336,6 +340,10 @@ def _pri_schema() -> vol.Schema:
             _required(CONF_PRI_L2, "switch.l2_pri"): _entity("switch"),
             _required(CONF_PRI_L3, "switch.l3_pri"): _entity("switch"),
             _required(CONF_PRI_L4, "switch.l4_pri"): _entity("switch"),
+            _optional(CONF_PRI_RET_L1): _entity(["binary_sensor", "switch"]),
+            _optional(CONF_PRI_RET_L2): _entity(["binary_sensor", "switch"]),
+            _optional(CONF_PRI_RET_L3): _entity(["binary_sensor", "switch"]),
+            _optional(CONF_PRI_RET_L4): _entity(["binary_sensor", "switch"]),
             _optional(CONF_INVERTER_POWER_SENSOR): _entity("sensor"),
         }
     )

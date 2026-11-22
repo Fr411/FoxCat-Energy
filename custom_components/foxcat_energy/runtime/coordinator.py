@@ -121,6 +121,10 @@ from ..const import (
     CONF_PRI_L2,
     CONF_PRI_L3,
     CONF_PRI_L4,
+    CONF_PRI_RET_L1,
+    CONF_PRI_RET_L2,
+    CONF_PRI_RET_L3,
+    CONF_PRI_RET_L4,
     CONF_INVERTER_POWER_SENSOR,
     CONF_PV_SENSOR,
     CONF_WASHER_CYCLE,
@@ -168,6 +172,7 @@ from ..domain.engine.load_guard import (
 )
 from ..domain.engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
 from ..domain.engine import backup as backup_logic
+from ..domain.engine import pri_feedback as pri_feedback_logic
 from ..domain.engine import boiler_probe as probe_logic
 from ..domain import health as health_logic
 from ..domain.tariff.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
@@ -287,6 +292,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "ack_rrcr": "IDLE",
             "ack_inverter": "IDLE",
             "ack_grid": "IDLE",
+            "ack_logo": "IDLE",
+            "command_availability": pri_feedback_logic.AVAILABILITY_NOT_CONFIGURED,
+            "feedback_code": None,
             "score_current": 0.0,
             "score_target": 0.0,
             "house_target_level": 100,
@@ -4400,6 +4408,26 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _rrcr_level(self) -> int:
         return RRCR_CODE_TO_LEVEL.get(self._rrcr_code(), -1)
 
+    # MÉTHODE : FoxCatEnergyCoordinator._rrcr_feedback_code — Code RRCR relu sur le retour physique (ex. LOGO NQ9..NQ12)
+    def _rrcr_feedback_code(self) -> str | None:
+        """Code relu sur les retours réels L4 L3 L2 L1, ou ``None`` si non configurés."""
+        entities = [self.config.get(key) for key in (CONF_PRI_RET_L4, CONF_PRI_RET_L3, CONF_PRI_RET_L2, CONF_PRI_RET_L1)]
+        if not all(entities):
+            return None
+        states = []
+        for entity_id in entities:
+            state = self.hass.states.get(entity_id)
+            states.append(state.state if state else None)
+        return pri_feedback_logic.feedback_code(states)
+
+    # MÉTHODE : FoxCatEnergyCoordinator._refresh_pri_feedback — Met à jour la disponibilité de la commande et le code de retour
+    def _refresh_pri_feedback(self) -> str | None:
+        fb_code = self._rrcr_feedback_code()
+        code = self._rrcr_code()
+        self.pri_state["feedback_code"] = fb_code
+        self.pri_state["command_availability"] = pri_feedback_logic.command_availability(code, fb_code)
+        return fb_code
+
     # MÉTHODE : FoxCatEnergyCoordinator._apply_rrcr_level — Envoie une commande RRCR sans jamais bloquer Onduleur Core.
     async def _apply_rrcr_level(self, level: int) -> bool:
         """Envoie une commande RRCR sans jamais bloquer Onduleur Core."""
@@ -4514,6 +4542,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "ack_rrcr": "PENDING",
                     "ack_inverter": "PENDING",
                     "ack_grid": "PENDING",
+                    "ack_logo": "PENDING" if self._rrcr_feedback_code() is not None else pri_feedback_logic.ACK_LOGO_NOT_CONFIGURED,
                     "pending_level": target,
                     "pending_frame_id": int(request["frame_id"]),
                     "pending_frame_serial": int(request["frame_serial"]),
@@ -4596,6 +4625,17 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if pending is None or pending_frame is None or pending_serial is None or current_serial <= int(pending_serial):
             return
         level=self._rrcr_level()
+        # ACK LOGO : le retour réel du contrôleur doit correspondre à la commande.
+        fb_code = self._refresh_pri_feedback()
+        self.pri_state["ack_logo"] = pri_feedback_logic.classify_ack_logo(
+            RRCR_LEVEL_TO_CODE.get(int(pending)), fb_code
+        )
+        if self.pri_state["ack_logo"] == pri_feedback_logic.ACK_LOGO_FAILED:
+            self.pri_state["last_reason"] = (
+                f"ACK LOGO : retour relais {fb_code} != commande {RRCR_LEVEL_TO_CODE.get(int(pending))} ({pending}%)."
+            )
+        elif self.pri_state["ack_logo"] == pri_feedback_logic.ACK_LOGO_ABSENT:
+            self.pri_state["last_reason"] = "ACK LOGO : retour relais illisible, commande non confirmée."
         if level != int(pending):
             self.pri_state["ack_rrcr"]="FAILED"
             self.pri_state["last_reason"]=f"ACK N+1 : RRCR {level}% != commande {pending}%."
@@ -4615,6 +4655,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     ) -> str:
         """Onduleur Core 1.6.150 : décision immédiate, action RRCR asynchrone."""
         self.pri_state["last_engine_run"] = dt_util.now()
+        self._refresh_pri_feedback()
         self.pri_state["engine_run_count"] = int(self.pri_state.get("engine_run_count", 0)) + 1
 
         if not snapshot.valid:
@@ -4722,7 +4763,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.reset_core("Cycle EMS réinitialisé manuellement.")
         if self._pri_task and not self._pri_task.done():
             self._pri_task.cancel()
-        self.pri_state.update({"ack_rrcr": "IDLE", "ack_inverter": "IDLE", "ack_grid": "IDLE", "last_reason": "Cycle PRI réinitialisé."})
+        self.pri_state.update({"ack_rrcr": "IDLE", "ack_inverter": "IDLE", "ack_grid": "IDLE", "ack_logo": "IDLE", "last_reason": "Cycle PRI réinitialisé."})
         self.async_set_updated_data(self._build_data())
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_diagnostic — traitement asynchrone : diagnostic

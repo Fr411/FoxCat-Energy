@@ -148,6 +148,7 @@ Sections facultatives :
 *Facultatif : seulement si votre onduleur se pilote par RRCR.*
 
 - **Relais PRI L1 à L4** : les quatre entrées de commande RRCR, dans l'ordre des bits.
+- **Retour réel L1 à L4** (facultatif) : l'état réel des quatre relais renvoyé par votre contrôleur (ex. LOGO NQ9 à NQ12), dans le même ordre que les relais. Active l'**ACK LOGO** et la **disponibilité de la commande**.
 - **Puissance réelle de l'onduleur en direct** (facultatif) : télémétrie rapide, purement informative.
 
 ### Machines
@@ -343,9 +344,10 @@ Mêmes champs que dans l'assistant, plus les réglages de comportement dans les 
 
 1. Renseignez les **quatre relais** L1 à L4 dans le bon ordre.
 2. Ajoutez, si vous l'avez, le **capteur de puissance live**.
-3. Activez **« Réduction de puissance onduleur »** seulement après vérification (étape 10).
+3. Si votre contrôleur renvoie l'état réel de ses relais (ex. LOGO), renseignez les quatre **« Retour réel L1 à L4 »**. Contrôlez ensuite dans l'appareil **Onduleur** : **« Onduleur • Disponibilité commande »** doit indiquer `DISPONIBLE` et **« ACK LOGO (retour relais) »** `OK` après une commande. `FAILED` : le relais n'a pas suivi la commande ; `INDISPONIBLE` ou `ABSENT` : le retour est illisible (contrôleur, Node-RED ou liaison coupés). Sans retour configuré, ces capteurs restent à `NON_CONFIGURE` et rien ne change.
+4. Activez **« Réduction de puissance onduleur »** seulement après vérification (étape 10).
 
-Le bouton **« Libérer l'onduleur à 100 % »** annule toute réduction : c'est votre retour arrière immédiat.
+Le bouton **« Libérer l'onduleur à 100 % »** annule toute réduction : c'est votre retour arrière immédiat. Pour retirer le retour réel, videz les quatre champs « Retour réel » : FoxCat revient au comportement précédent.
 
 ### 7.3 Machines
 
