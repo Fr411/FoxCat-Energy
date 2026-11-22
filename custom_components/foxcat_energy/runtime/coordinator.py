@@ -4389,6 +4389,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Backup : l'onduleur n'est plus bridé, sauf si la politique réseau impose zéro injection.
             self.pri_state["guard_reason"] = "backup_internet_coupe"
             return False
+        if pri_feedback_logic.command_blocked(self.pri_state.get("command_availability")):
+            # Retour réel configuré mais illisible : le contrôleur (LOGO) ou sa liaison est coupé.
+            self.pri_state["guard_reason"] = "logo_indisponible"
+            return False
         self.pri_state["guard_reason"] = "OK"
         return True
 
@@ -4504,6 +4508,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.pri_state["actuator_status"] = "EXECUTION"
                 self.pri_state["actuator_target_level"] = target
                 self.pri_state["actuator_last_error"] = ""
+
+                self._refresh_pri_feedback()
+                if pri_feedback_logic.command_blocked(self.pri_state.get("command_availability")):
+                    # Garde LOGO : aucune commande tant que le retour réel est illisible.
+                    self.pri_state["actuator_status"] = "BLOQUE_LOGO"
+                    self.pri_state["actuator_last_error"] = "LOGO indisponible : commande RRCR non envoyée."
+                    continue
 
                 if current == target:
                     self.pri_state["actuator_status"] = "OK"

@@ -54,6 +54,16 @@ def classify_ack_logo(expected_code: str | None, fb_code: str | None) -> str:
     return ACK_LOGO_OK if fb_code == expected_code else ACK_LOGO_FAILED
 
 
+# FONCTION : command_blocked — La garde PRI interdit-elle toute commande ?
+def command_blocked(availability: str | None) -> bool:
+    """Vrai quand le retour est configuré mais illisible (contrôleur ou liaison coupés).
+
+    Une commande envoyée dans ce cas ne peut être ni confirmée ni garantie : la garde
+    PRI suspend les décisions et les envois. ``DEGRADE`` ne bloque pas (écart signalé).
+    """
+    return availability == AVAILABILITY_DOWN
+
+
 # FONCTION : command_availability — Disponibilité de la chaîne de commande
 def command_availability(commanded_code: str | None, fb_code: str | None) -> str:
     """Disponibilité de la chaîne de commande onduleur.

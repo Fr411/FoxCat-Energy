@@ -30,6 +30,14 @@ def test_ack_logo_ok_failed_absent_and_not_configured():
     assert pf.classify_ack_logo(None, "0101") == pf.ACK_LOGO_ABSENT
 
 
+def test_command_blocked_only_when_feedback_unreadable():
+    assert pf.command_blocked(pf.AVAILABILITY_DOWN) is True
+    assert pf.command_blocked(pf.AVAILABILITY_DEGRADED) is False
+    assert pf.command_blocked(pf.AVAILABILITY_OK) is False
+    assert pf.command_blocked(pf.AVAILABILITY_NOT_CONFIGURED) is False
+    assert pf.command_blocked(None) is False
+
+
 def test_command_availability_states():
     assert pf.command_availability("0000", None) == pf.AVAILABILITY_NOT_CONFIGURED
     assert pf.command_availability("0000", "????") == pf.AVAILABILITY_DOWN
