@@ -165,7 +165,7 @@ from ..const import (
     TARIFF_TOU,
     TIME_SETTING_KEYS,
 )
-from ..domain.engine import BoilerIntent, EnergySnapshot, SolarForecast, decide_dynamic, decide_zero, evaluate_mode
+from ..domain.engine import BoilerIntent, EnergySnapshot, SolarForecast, evaluate_mode
 from ..domain.engine.load_guard import (
     boiler_surplus_before_load_w,
     protected_cycle_boiler_allowed,
@@ -175,6 +175,7 @@ from ..domain.engine.modes.dynamic_boiler_v2 import evaluate_dynamic_boiler_v2
 from ..domain.engine import backup as backup_logic
 from ..domain.engine import pri_feedback as pri_feedback_logic
 from ..domain.engine import boiler_probe as probe_logic
+from ..domain.engine import runtime_rules as rules
 from ..domain import health as health_logic
 from ..domain.tariff.tariff import distribution_period, price_status, tariff_boundaries, tariff_period
 from ..domain.pricing.economic_optimizer import (
@@ -813,6 +814,12 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
         )
 
+        # A-34 : la surveillance du cœur (phase invalide, ACK inter-corps expirés, trame trop ancienne)
+        # a sa propre minuterie : le rafraîchissement de 30 s est repoussé par chaque publication.
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._on_core_watchdog, timedelta(seconds=15))
+        )
+
         # Coupure Internet : un sondage toutes les 30 s, avec anti-rebond.
         self._unsubs.append(
             async_track_time_interval(self.hass, self._on_connectivity_probe, timedelta(seconds=30))
@@ -1027,6 +1034,32 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hass.async_create_task(
             self._async_metronome_report(entity_id, reported_at, "event")
         )
+
+    # MÉTHODE : FoxCatEnergyCoordinator._on_core_watchdog — Minuterie dédiée à la surveillance du cœur (A-34)
+    def _on_core_watchdog(self, now: datetime) -> None:
+        self.hass.async_create_task(self._async_core_watchdog())
+
+    # MÉTHODE : FoxCatEnergyCoordinator._async_core_watchdog — Surveillance du cœur, sans dépendre du rafraîchissement
+    async def _async_core_watchdog(self) -> None:
+        try:
+            await self._watchdog()
+            self._expire_boiler_override()
+        except Exception:  # pragma: no cover - ne jamais laisser la minuterie s'arrêter
+            _LOGGER.exception("FoxCat core watchdog error")
+
+    # MÉTHODE : FoxCatEnergyCoordinator._expire_boiler_override — Rend la main à l'EMS après une commande forcée trop longue (A-13)
+    def _expire_boiler_override(self) -> None:
+        state = str(self.core_state.get("boiler_user_override", "AUTO"))
+        if state == "AUTO":
+            return
+        since = self.core_state.get("boiler_override_since")
+        if not isinstance(since, datetime):
+            self.core_state["boiler_override_since"] = dt_util.now()
+            return
+        if rules.override_expired(since, dt_util.now(), self.settings.get("boiler_override_max_h")):
+            self.core_state["boiler_user_override"] = "AUTO"
+            self.core_state["boiler_override_since"] = None
+            self.reset_core(f"Commande forcée du boiler ({state}) expirée : retour à l'EMS automatique.")
 
     # MÉTHODE : FoxCatEnergyCoordinator._on_metronome_watchdog — On metronome watchdog
     @callback
@@ -1343,7 +1376,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self._watchdog()
         await self._check_end_solar()
         if bool(self.settings.get("regulation_active")):
-            await self._evaluate_high_load(self.snapshot())
+            await self._evaluate_high_load(self.snapshot(), periodic=True)
         await self._async_run_heating(self.snapshot(), "mise à jour périodique")
         await self.hass.async_add_executor_job(refresh_dashboard_cache, self.hass)
         return self._build_data()
@@ -2526,6 +2559,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if self._pri_task and not self._pri_task.done():
                     self._pri_task.cancel()
                 await self.async_release_pri_100("Régulation désactivée : onduleur libéré à 100 %.")
+                # A-26 : un V2H en décharge s'arrête avec la régulation.
+                await self._evaluate_v2h(self.snapshot())
 
         if key == "high_load_shed_enabled" and not value:
             self._high_load_since = None
@@ -2624,6 +2659,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Le PRI ne travaille pas en Manuel : repartir d'un point sûr à 100 % plutôt que de laisser un bridage automatique en place.
             if self.settings.get("pri_enabled") and self._rrcr_level() not in (100, -1):
                 await self.async_release_pri_100("Passage en Manuel : onduleur libéré à 100 %.")
+            # A-26 : le V2H ne travaille pas en Manuel : arrêt s'il était en décharge.
+            await self._evaluate_v2h(self.snapshot())
         else:
             self.core_state["last_reason"]=f"Comportement {canonical} actif."
             if self.settings.get("regulation_active"): await self.async_reconcile_machines()
@@ -2934,6 +2971,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # MÉTHODE : FoxCatEnergyCoordinator._core_process_frame — Core process frame
     async def _core_process_frame(self, snapshot: EnergySnapshot) -> None:
+        self._expire_boiler_override()
         if not snapshot.valid:
             self.reset_core("Mesures énergétiques invalides : aucune décision autorisée.")
             return
@@ -3103,7 +3141,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             str(self.settings.get("network_policy", NETWORK_POLICY_COMPENSATION)) == NETWORK_POLICY_COMPENSATION
             and intent.action == BOILER_STOP
             and snapshot.boiler_on
-            and ("achat réseau" in intent.reason.lower() or "hp" in intent.reason.lower())
+            and intent.energy_only
         ):
             intent = type(intent)(
                 BOILER_NONE,
@@ -3300,7 +3338,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 snap = self.snapshot()
                 climate = self.hass.states.get(self.config.get(CONF_BOILER_CLIMATE)) if self.config.get(CONF_BOILER_CLIMATE) else None
                 climate_state = climate.state if climate else "unavailable"
-                setpoint = float(climate.attributes.get("temperature", 0)) if climate else 0.0
+                # A-07 : l'attribut peut exister à None (thermostat éteint) : jamais float(None).
+                setpoint = rules.attr_float(climate.attributes.get("temperature")) if climate else 0.0
                 command_off = command.startswith("BOILER_OFF") or command == "ECS_MODULE_OFF"
                 command_boost = command in {"ECS_MODULE_ON_65", "ECS_MODULE_UPGRADE_65", "ECS_MODULE_SET_65"}
                 logical_ok = climate_state == "off" if command_off else climate_state == "heat"
@@ -3834,6 +3873,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if state not in {"FORCE_ON", "FORCE_OFF", "AUTO"}:
             return False
         self.core_state["boiler_user_override"] = state
+        self.core_state["boiler_override_since"] = None if state == "AUTO" else dt_util.now()
         now = dt_util.now()
         if state == "AUTO":
             self.reset_core("Utilisateur : Boiler rendu à l'EMS automatique.")
@@ -3921,10 +3961,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # démarrage automatique est bloqué en période défavorable.
             # Mode Backup : on lâche les freins, la prise reste alimentée (sauf protection du disjoncteur).
             backup_on = self.backup_active and not high_load_block
-            should_on = cycle_active or keep_running or backup_on or (
-                management and allowed and tariff_ok and not high_load_block
+            # A-23 : gestion automatique coupée = FoxCat rend la main (aucune commande),
+            # sauf pour couper une machine délestable pendant une urgence du disjoncteur.
+            service = rules.machine_socket_action(
+                management=management,
+                cycle_active=cycle_active,
+                keep_running=keep_running,
+                backup_on=backup_on,
+                high_load_block=high_load_block,
+                allowed=allowed,
+                tariff_ok=tariff_ok,
             )
-            service = "turn_on" if should_on else "turn_off"
+            if service is None:
+                continue
             try:
                 await self.hass.services.async_call("switch", service, {"entity_id": socket}, blocking=False)
             except Exception as err:  # pragma: no cover
@@ -4133,13 +4182,19 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 )
 
     # MÉTHODE : FoxCatEnergyCoordinator._evaluate_high_load — Délestage synchronisé sur chaque publication réseau
-    async def _evaluate_high_load(self, snapshot: EnergySnapshot) -> None:
+    async def _evaluate_high_load(self, snapshot: EnergySnapshot, periodic: bool = False) -> None:
         """Délestage synchronisé sur chaque publication réseau.
 
         Le nombre de trames et les seuils viennent de la configuration d'écrêtage.
         Une mesure maison invalide gèle l'état et n'est jamais assimilée à 0 W.
         """
         await self._evaluate_v2h(snapshot)
+        # A-24 : le rafraîchissement périodique ne compte pas de « trame » tant que les trames réseau
+        # arrivent normalement ; il ne sert de relais que si elles se sont arrêtées (pas d'état figé).
+        if periodic:
+            last_frame = self.core_state.get("last_frame")
+            if isinstance(last_frame, datetime) and (dt_util.now() - last_frame).total_seconds() < 60.0:
+                return
         if not snapshot.valid:
             self.load_shed_state["reason"] = "Bilan énergétique invalide : état de délestage conservé."
             self._high_load_high_frames = 0
@@ -4189,6 +4244,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         enabled = (
             self.config.get(CONF_EV_V2H_ENABLED) is True
             and bool(switch_entity)
+            and bool(self.settings.get("regulation_active"))
             and str(self.settings.get("mode")) != MODE_MANUAL
             and snapshot.valid
         )
@@ -4615,6 +4671,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_release_pri_100 — traitement asynchrone : release pri 100
     async def async_release_pri_100(self, reason: str) -> None:
+        # A-19 : une consigne PRI encore en attente ne doit pas s'appliquer juste après la libération.
+        self._pri_requested = None
         entities = [self.config.get(CONF_PRI_L1), self.config.get(CONF_PRI_L2), self.config.get(CONF_PRI_L3), self.config.get(CONF_PRI_L4)]
         if not all(entities):
             self.pri_state.update({"current_level": 100, "target_level": 100, "code": "0000", "last_reason": f"{reason} Relais PRI non configurés."})
@@ -4650,7 +4708,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # MÉTHODE : FoxCatEnergyCoordinator._update_pri_pv_comparator — Update pri pv comparator
     def _update_pri_pv_comparator(self, snapshot: EnergySnapshot, level: int) -> None:
-        max_w=float(self.settings.get("pri_step_w",400.0))*10.0
+        # A-04 : le plafond est la puissance de l'onduleur, pas dix fois le pas PRI.
+        max_w=float(self.settings.get("inverter_power_w",4000.0))
         limit=max_w*max(level,0)/100.0
         tol=float(self.settings.get("pri_pv_compare_tolerance_w",200.0))
         err=snapshot.pv_w-limit
@@ -4949,7 +5008,7 @@ Export compteur: {snap.export_w:.0f} W
 Import compteur: {snap.import_w:.0f} W
 Température boiler: {snap.boiler_temp_c:.1f} °C
 Confort minimal: {float(self.settings['boiler_temp_normal_c']):.0f} °C
-HC: 22:00-07:00 et 11:00-17:00. HP: 07:00-11:00 et 17:00-22:00.
+{rules.hp_hc_windows_text(self.settings)}
 Forecast maintenant: {st(CONF_FORECAST_NOW)}
 Cette heure: {st(CONF_FORECAST_THIS_HOUR)}
 Heure suivante: {st(CONF_FORECAST_NEXT_HOUR)}

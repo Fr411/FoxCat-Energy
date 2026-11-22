@@ -145,7 +145,7 @@ def config_from_settings(settings: Mapping[str, Any] | None) -> VirtualAssetsCon
             ),
             allow_export_arbitrage=(
                 values.get("tariff_regime") == "Dynamique"
-                or values.get("price_source") in {"dynamic", "integration"}
+                or values.get("price_source") in {"Dynamique Day-Ahead", "Intégration externe"}
             )
         ),
     )

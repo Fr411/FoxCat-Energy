@@ -483,14 +483,10 @@ def _evaluate_dynamic_market(
     amplitude = pmax - pmin
     index = 0.5 if amplitude <= 1e-9 else max(0.0, min(1.0, (current_buy - pmin) / amplitude))
     position_pct = index * 100.0
-    # Le nouveau seuil réglable 1.6.159 est strictement réservé au mode EMS
-    # Dynamique. Hors de ce mode, on conserve les bandes historiques 1.6.158.
-    if str(settings.get("mode")) == MODE_DYNAMIC:
-        low_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", 30.0))))
-        high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))))
-    else:
-        low_pct = DYNAMIC_POSITION_LOW * 100.0
-        high_pct = DYNAMIC_POSITION_HIGH * 100.0
+    # A-17 : cette fonction n'est appelée qu'en régime tarifaire Dynamique ; les seuils
+    # réglables s'appliquent donc toujours (le « mode » EMS n'est plus Dynamique depuis longtemps).
+    low_pct = max(5.0, min(60.0, float(settings.get("dynamic_favorable_position_pct", DYNAMIC_POSITION_LOW * 100.0))))
+    high_pct = max(low_pct, min(95.0, float(settings.get("dynamic_high_position_pct", DEFAULT_DYNAMIC_HIGH_POSITION_PCT))))
     low = low_pct / 100.0
     high = high_pct / 100.0
     if index <= low:

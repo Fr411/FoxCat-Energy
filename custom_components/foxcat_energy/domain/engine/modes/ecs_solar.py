@@ -36,7 +36,7 @@ def evaluate_ecs_solar(
     if snapshot.boiler_temp_c >= boost:
         return BoilerIntent(BOILER_STOP, "65 °C atteint : stockage thermique terminé.", "TEMPERATURE")
     if is_peak(now, settings) and snapshot.boiler_on and snapshot.import_w > 0:
-        return BoilerIntent(BOILER_STOP, "HP : achat réseau détecté, arrêt demandé.", "HP")
+        return BoilerIntent(BOILER_STOP, "HP : achat réseau détecté, arrêt demandé.", "HP", True)
 
     if snapshot.boiler_on and boiler_on_seconds < cycle_min:
         if snapshot.boiler_temp_c < normal:
@@ -120,7 +120,7 @@ def evaluate_ecs_solar(
     if not snapshot.boiler_on and snapshot.boiler_temp_c < normal and coverage_t0 >= 100 and coverage_now >= 100:
         return BoilerIntent(BOILER_HEAT_45, "HP : CHAUFFE_45 autorisée à 100 % solaire sur deux trames.", "ECS_SOLAR_45")
     if snapshot.boiler_on and snapshot.boiler_temp_c < normal and snapshot.import_w > 0:
-        return BoilerIntent(BOILER_STOP, "HP : apparition d'un achat réseau.", "HP")
+        return BoilerIntent(BOILER_STOP, "HP : apparition d'un achat réseau.", "HP", True)
     if snapshot.boiler_temp_c >= normal:
-        return BoilerIntent(BOILER_STOP, "HP : 45 °C atteint, aucun boost opportuniste.", "HP")
+        return BoilerIntent(BOILER_STOP, "HP : 45 °C atteint, aucun boost opportuniste.", "HP", True)
     return BoilerIntent(BOILER_NONE, "HP : aucune opportunité solaire exploitable.", "HP")
