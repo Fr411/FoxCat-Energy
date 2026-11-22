@@ -43,7 +43,7 @@ def evaluate_eco(
 
     # Le non-achat en HP reste prioritaire sur l'opportunisme solaire.
     if is_peak(now, settings) and snapshot.boiler_on and snapshot.import_w > 50:
-        return BoilerIntent(BOILER_STOP, "Économie énergie : achat réseau HP interdit pour le boiler.", "ECO")
+        return BoilerIntent(BOILER_STOP, "Économie énergie : achat réseau HP interdit pour le boiler.", "ECO", True)
 
     # Respect du cycle physique minimum lorsqu'il n'entre pas en conflit avec
     # la règle HP ci-dessus ni avec une sécurité.

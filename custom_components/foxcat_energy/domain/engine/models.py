@@ -29,6 +29,9 @@ class BoilerIntent:
     action: str
     reason: str
     origin: str = "AUCUNE"
+    # A-05 : arrêt dû à une contrainte purement énergétique (achat réseau en HP), reconnu par un
+    # indicateur et non plus en cherchant des mots dans le libellé de la raison.
+    energy_only: bool = False
 
 
 @dataclass(slots=True)

@@ -334,6 +334,8 @@ Mêmes champs que dans l'assistant, plus les réglages de comportement dans les 
 | Boiler autorisé en heures creuses | Autorise la chauffe réseau en HC | — |
 | Boiler : attendre le dernier failback en HC | Laisse la priorité au solaire avant de chauffer sur le réseau | Activé |
 | Marge de sécurité failback | Marge avant l'échéance | 30 min |
+| Vitesse de chauffe / de refroidissement du boiler | Servent à calculer le dernier moment pour démarrer en HC ; réduisez la vitesse de chauffe si votre ballon chauffe plus lentement | 10 / 0,5 °C/h |
+| Durée maximale d'une commande forcée du boiler | Au-delà, FoxCat reprend la main (retour en automatique) ; 0 = illimitée | 6 h |
 | Température reprise / confort / boost / sécurité | Seuils de chauffe | 43 / 45 / 65 / 68 °C |
 | Cycle minimum | Durée mini d'un cycle | 120 s |
 | Puissance chauffe-eau | Puissance nominale | 1 800 W |
@@ -363,7 +365,7 @@ Menu **Machines** : *Ajouter*, *Modifier*, *Supprimer*. Supprimer une machine la
 | **Prise / relais de commande** | Le switch qui coupe ou autorise la machine |
 | **Capteur de puissance** | Obligatoire pour un CVC ; recommandé sinon (comptabilité et détection de cycle) |
 
-Sections : **Automatisation** (gestion automatique, délestable, phase du réseau L1/L2/L3), **Cycle** (détection et protection du cycle), **Mesures**.
+Sections : **Automatisation** (gestion automatique, délestable, phase du réseau L1/L2/L3), **Cycle** (détection et protection du cycle), **Mesures**. Si la **gestion automatique est désactivée**, FoxCat n'envoie plus aucune commande à la prise (vous la pilotez vous-même) ; seule une machine « délestable » est encore coupée pendant un délestage du disjoncteur.
 
 Bon à savoir :
 
@@ -534,6 +536,9 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 | Les graphiques de prix sont vides | Prix dynamique non lu | Vérifiez les entités de **Tarification dynamique** et le capteur **Price Analyzer V2** |
 | Le boiler ne chauffe pas | Sécurité thermique, mode Manuel, gestion coupée | Contrôlez la température de la résistance, le mode EMS et « Boiler géré par FoxCat » |
 | Une machine reste à l'arrêt | Hors fenêtre, ou cycle protégé | Vérifiez la **fenêtre machines** et le statut de la machine |
+| Une machine ne se coupe plus ou ne démarre plus toute seule | Gestion automatique désactivée : FoxCat ne commande plus sa prise | Réactivez la gestion automatique de la machine, ou pilotez la prise à la main |
+| Le boiler redevient automatique tout seul après « Forcer » | La commande forcée expire (6 h par défaut) | Réglez « Durée maximale d'une commande forcée du boiler » (0 = illimitée) |
+| Le V2H s'arrête quand je coupe la régulation | Normal : la régulation coupée ou le mode Manuel arrête la décharge | Réactivez la régulation |
 | Le délestage oscille | Seuils trop proches | Écartez les seuils de déclenchement et de réarmement, ou allongez les trames de confirmation |
 | Les modifications du menu ont disparu | Fenêtre fermée sans enregistrer | Terminez toujours par **« Enregistrer et quitter »** |
 | Le dashboard n'apparaît pas | Dashboard non déclaré | Fusionnez `configuration.yaml.snippet` et redémarrez |

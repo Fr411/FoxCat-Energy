@@ -139,6 +139,13 @@ def _position(price: float, pmin: float, pmax: float) -> float:
     return max(0.0, min(100.0, (price - pmin) / (pmax - pmin) * 100.0))
 
 
+# FONCTION : _point_step — Pas réel de la série de prix (A-18 : 15 min ou 1 h)
+def _point_step(points: list[PricePoint]) -> timedelta:
+    """Plus petit écart positif entre deux points consécutifs, 1 h à défaut."""
+    gaps = [b.at - a.at for a, b in zip(points, points[1:]) if b.at > a.at]
+    return min(gaps) if gaps else timedelta(hours=1)
+
+
 # FONCTION : _group_price_zones — Group price zones
 def _group_price_zones(
     points: list[PricePoint],
@@ -165,7 +172,7 @@ def _group_price_zones(
                 break
         if not block:
             return None
-        end = block[-1].at + timedelta(hours=1)
+        end = block[-1].at + _point_step(future)
         return {
             "type": label,
             "start": block[0].at.isoformat(),

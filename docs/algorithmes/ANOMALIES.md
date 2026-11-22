@@ -9,7 +9,7 @@ Audit **sans correction** : chaque point est décrit, localisé et accompagné d
 | **Moyenne** | écart réel, mais limité à une configuration ou à un réglage |
 | **Basse** | dette technique, texte trompeur, cas rare |
 
-**Statut** : **A-22, A-16, A-01, A-14, A-03, A-29, A-30, A-32, A-33 et A-35 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30**, **A-32**, **A-33** et **A-35** (corrigées) et **A-31**, **A-34** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
+**Statut** : **A-04, A-05, A-07, A-08, A-12 (import), A-13, A-15, A-17, A-18, A-19, A-23, A-24, A-26, A-27, A-28 et A-34 sont corrigées** dans le lot « Non publié » du `CHANGELOG.md` (tests unitaires de la logique pure ; non essayées dans Home Assistant). **A-22, A-16, A-01, A-14, A-03, A-29, A-30, A-32, A-33 et A-35 sont corrigées** (un commit et des tests chacune) ; les autres points restent ouverts. **A-30**, **A-32**, **A-33** et **A-35** (corrigées) et **A-31**, **A-34** ont été trouvées ensuite, par les scénarios d'économie et en écrivant les alertes de panne.
 
 **Preuves** : les points marqués ✔ ont été **reproduits par un petit calcul** (cité). Les autres sont établis **par lecture du code** (fichier et fonction cités) ; je n'ai rien essayé dans Home Assistant.
 
@@ -131,7 +131,7 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition d'origine** : masquer ces entités ou les retirer ; corriger le README.
 
-## A-04 · Moyenne · Deux « puissances d'onduleur » incohérentes
+## A-04 · Moyenne · Deux « puissances d'onduleur » incohérentes — CORRIGÉE
 
 **Où** : `_update_pri_pv_comparator` calcule le plafond avec `pri_step_w × 10` (400 W × 10 = 4 000 W), alors que le moteur utilise `inverter_power_w` (4 000 W par défaut).
 
@@ -139,7 +139,7 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition** : utiliser `inverter_power_w` partout.
 
-## A-07 · Moyenne · Vérification du boiler : `float(None)`
+## A-07 · Moyenne · Vérification du boiler : `float(None)` — CORRIGÉE
 
 **Où** : `_verify_boiler_execution` (`setpoint = float(climate.attributes.get("temperature", 0))`).
 
@@ -159,7 +159,7 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition d'origine** : évaluer chaque prix à un instant situé dans sa propre période.
 
-## A-15 · Moyenne · « Contrat saisi » ignore « tout compris » et les composantes
+## A-15 · Moyenne · « Contrat saisi » ignore « tout compris » et les composantes — CORRIGÉE
 
 **Où** : `domain/tariff/legacy.py`, `tariff_from_settings`.
 
@@ -167,13 +167,13 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition** : reporter `all_in` et les composantes dans `adder_flat` / `all_in`.
 
-## A-17 · Moyenne · Seuils Day-Ahead réglables ignorés par la décision économique
+## A-17 · Moyenne · Seuils Day-Ahead réglables ignorés par la décision économique — CORRIGÉE
 
 **Où** : `_evaluate_dynamic_market` n'utilise les réglages utilisateur que si `mode == "Dynamique"` (A-02) ; sinon constantes 35 % / 70 %.
 
 **Conséquence** : la bande BAS/MEDIAN/HAUT, `charge_now`, `flexible_start` et donc les recommandations par machine ignorent `dynamic_favorable_position_pct` et `dynamic_high_position_pct`, alors que l'analyseur, le boiler dynamique et le planificateur Day-Ahead les respectent : deux échelles différentes pour un même réglage.
 
-## A-23 · Moyenne · Gestion machine désactivée : la prise est coupée (à confirmer)
+## A-23 · Moyenne · Gestion machine désactivée : la prise est coupée (à confirmer) — CORRIGÉE
 
 **Où** : `async_reconcile_machines` : `doit_être_ON = cycle_actif OU garder_allumée OU (gestion ET autorisée ET tarif OK ET pas de bloc)`.
 
@@ -181,7 +181,7 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Proposition** : si la gestion est désactivée, ne rien envoyer (ou laisser la prise allumée).
 
-## A-26 · Moyenne · V2H non arrêté quand on coupe la régulation
+## A-26 · Moyenne · V2H non arrêté quand on coupe la régulation — CORRIGÉE
 
 **Où** : `_evaluate_v2h` n'est appelée que depuis `_evaluate_high_load`, lui-même appelé uniquement si la régulation est active. `async_set_setting("regulation_active", False)` n'arrête pas le V2H.
 
@@ -191,22 +191,22 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 ## Gravité basse
 
-- **A-05** : `async_command_boiler`/cœur : l'ARRÊT « énergétique » est reconnu en cherchant `achat réseau` ou `hp` dans le **texte** de la raison (`_core_process_frame`). Un changement de libellé casse la règle ; utiliser un code d'origine.
+- **A-05** ✔ (corrigée : `BoilerIntent.energy_only`) : `async_command_boiler`/cœur : l'ARRÊT « énergétique » est reconnu en cherchant `achat réseau` ou `hp` dans le **texte** de la raison (`_core_process_frame`). Un changement de libellé casse la règle ; utiliser un code d'origine.
 - **A-06** : un ACK `NOK` du cœur EMS est consigné mais ne provoque ni nouvelle tentative ni pénalité.
-- **A-08** : `thermal_deadline` et `ecs_last_departure` supposent 10 °C/h de chauffe et 0,5 °C/h de refroidissement ; le modèle thermique (volume, puissance) n'est pas utilisé.
+- **A-08** ✔ (corrigée) : `thermal_deadline` et `ecs_last_departure` supposent 10 °C/h de chauffe et 0,5 °C/h de refroidissement ; le modèle thermique (volume, puissance) n'est pas utilisé.
 - **A-09** ✔ : « Injection non valorisée » et « Zéro injection » (et « Injection tarifée » avec valeur ≤ 0) exécutent le **même** algorithme PRI ; la différence passe uniquement par `export_value` (0 pour les deux premières). Vérifié par calcul : mêmes décisions sur 5 situations.
 - **A-10** : `_apply_rrcr_level` écrit les 4 relais séquentiellement ; l'onduleur peut lire un code intermédiaire (un autre niveau) pendant 1 à 2 s.
 - **A-11** : la logique « heures creuses » du boiler (démarrage réseau avec failback) s'applique à toutes les structures, y compris le mono-horaire, avec les plages HP par défaut (07–11 et 17–22).
 - **A-12** : `domain/engine/pri.py` (`decide_zero`, `decide_dynamic`, `house_target_level`) est importé par le coordinateur mais jamais appelé.
-- **A-13** : `boiler_user_override` (FORCE_ON / FORCE_OFF) n'expire jamais et n'est pas persisté ; un FORCE_OFF oublié maintient le boiler à l'arrêt.
-- **A-18** : `_group_price_zones` place la fin d'un bloc à « dernier point + 1 h » ; faux pour des points de 15 min.
-- **A-19** : `async_release_pri_100` n'annule pas une consigne en attente (`_pri_requested`) ; une consigne déjà demandée peut être appliquée juste après la libération.
+- **A-13** ✔ (corrigée) : `boiler_user_override` (FORCE_ON / FORCE_OFF) n'expire jamais et n'est pas persisté ; un FORCE_OFF oublié maintient le boiler à l'arrêt.
+- **A-18** ✔ (corrigée) : `_group_price_zones` place la fin d'un bloc à « dernier point + 1 h » ; faux pour des points de 15 min.
+- **A-19** ✔ (corrigée) : `async_release_pri_100` n'annule pas une consigne en attente (`_pri_requested`) ; une consigne déjà demandée peut être appliquée juste après la libération.
 - **A-20** : `_economic_view` est recalculée à chaque `_build_data`, à chaque `machine_states` (et pour chaque machine via `_tariff_start_favorable`) et dans le cœur EMS : plusieurs fois par trame.
 - **A-21** : `EnergyAccounting.process` appelle `view()` (4 copies profondes) à chaque trame pour valider.
-- **A-24** : `_evaluate_high_load` est appelée par chaque trame **et** par chaque rafraîchissement de 30 s ; les « trames hautes/basses » comptent donc aussi des passages sans nouvelle publication.
+- **A-24** ✔ (corrigée) : `_evaluate_high_load` est appelée par chaque trame **et** par chaque rafraîchissement de 30 s ; les « trames hautes/basses » comptent donc aussi des passages sans nouvelle publication.
 - **A-25** : le chauffage évalue chaque système avec le **même** surplus total (« surplus partagé » n'est pas réparti) ; deux PAC peuvent chacune prendre le décalage complet.
-- **A-27** : le prompt de l'agent IA contient « HC : 22:00-07:00 et 11:00-17:00 » écrit en dur.
-- **A-28** : `trading/virtual_assets/config.py` autorise l'arbitrage d'export si `price_source ∈ {"dynamic", "integration"}`, valeurs qui n'existent pas (les vraies sont « Dynamique Day-Ahead » et « Intégration externe ») ; seul `tariff_regime == "Dynamique"` fonctionne.
+- **A-27** ✔ (corrigée) : le prompt de l'agent IA contient « HC : 22:00-07:00 et 11:00-17:00 » écrit en dur.
+- **A-28** ✔ (corrigée) : `trading/virtual_assets/config.py` autorise l'arbitrage d'export si `price_source ∈ {"dynamic", "integration"}`, valeurs qui n'existent pas (les vraies sont « Dynamique Day-Ahead » et « Intégration externe ») ; seul `tariff_regime == "Dynamique"` fonctionne.
 
 ---
 
@@ -251,11 +251,11 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Correction** : voir `08_protection_chauffage.md` (B2). Appel à chaque trame, seulement si la fonction est activée ou à rétablir ; attributs `calcule_a` et `calcule_par` pour le vérifier ; message « baisse immédiate » affiché seulement quand il y a vraiment une baisse.
 
-## A-34 · Moyenne · La surveillance du cœur est privée du même déclencheur
+## A-34 · Moyenne · La surveillance du cœur est privée du même déclencheur — CORRIGÉE
 
 **Constat** : `_watchdog()` (phase du cœur invalide, accusés d'énergie expirés, réinitialisation après trame trop ancienne) n'est appelé que dans `_async_update_data`, pour la même raison que A-33 il peut ne jamais s'exécuter. La surveillance des trames du métronome (`_async_metronome_watchdog`, toutes les 2 s) est un mécanisme distinct et n'est pas touchée.
 
-**Proposition** : minuteur dédié (`async_track_time_interval`). Non fait : cela change le comportement du cœur pour toutes les installations (la réinitialisation sur trame ancienne se mettrait à fonctionner), à valider séparément.
+**Correction** : minuteur dédié de 15 s (`async_track_time_interval`, `_on_core_watchdog`). Conséquence assumée : la réinitialisation sur trame ancienne fonctionne désormais pour toutes les installations. Non essayée dans Home Assistant.
 
 ## A-35 · Haute · Décalage de consigne : la PAC alimentée par le réseau comptait comme surplus ✔ — CORRIGÉE
 
