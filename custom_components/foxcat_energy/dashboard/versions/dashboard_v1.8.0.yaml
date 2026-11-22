@@ -6164,30 +6164,63 @@ views:
             const MD = MOODS[moodKey];
             const star = (x, y, r, col, d, o) => `<path d="M${x} ${y - r} L${x + r * .28} ${y - r * .28} L${x + r} ${y} L${x + r * .28} ${y + r * .28} L${x} ${y + r} L${x - r * .28} ${y + r * .28} L${x - r} ${y} L${x - r * .28} ${y - r * .28} Z" fill="${col}" style="transform-box:fill-box;transform-origin:center;${AA('oc-twinkle', d, 'ease-in-out', o)}"/>`;
             const eyeX = [CX - 27, CX + 27], eyeY = CY - 40;
-            const eyeOpen = (r, pr) => eyeX.map(x => `<g class="eye"><circle cx="${x}" cy="${eyeY}" r="${r}" fill="#fff"/><circle cx="${x + lx}" cy="${eyeY + ly}" r="${pr}" fill="#0b1220"/></g>`).join('');
-            const eyeArc = (up) => eyeX.map(x => `<path d="M${x - 13} ${eyeY + (up ? 5 : -2)} Q${x} ${eyeY + (up ? -13 : 9)} ${x + 13} ${eyeY + (up ? 5 : -2)}" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>`).join('');
-            const brows = (inner, outer) => `<path d="M${CX - 41} ${eyeY - outer} L${CX - 15} ${eyeY - inner}" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/><path d="M${CX + 41} ${eyeY - outer} L${CX + 15} ${eyeY - inner}" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>`;
-            const MY = CY - 6;
-            const mouths = {
-              smile:   `<path d="M${CX - 20} ${MY} Q${CX} ${MY + 18} ${CX + 20} ${MY}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>`,
-              big:     `<path d="M${CX - 26} ${MY - 2} Q${CX} ${MY + 32} ${CX + 26} ${MY - 2} Z" fill="#0b1220" stroke="#fff" stroke-width="3.5" stroke-linejoin="round"/><path d="M${CX - 12} ${MY + 13} Q${CX} ${MY + 22} ${CX + 12} ${MY + 13} Q${CX} ${MY + 8} ${CX - 12} ${MY + 13} Z" fill="#fb7185"/>`,
-              small:   `<path d="M${CX - 12} ${MY + 2} Q${CX} ${MY + 11} ${CX + 12} ${MY + 2}" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`,
-              flat:    `<path d="M${CX - 12} ${MY + 4} L${CX + 12} ${MY + 4}" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>`,
-              frown:   `<path d="M${CX - 18} ${MY + 10} Q${CX} ${MY - 7} ${CX + 18} ${MY + 10}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>`,
-              wavy:    `<path d="M${CX - 22} ${MY + 6} q5.5 -7 11 0 t11 0 t11 0 t11 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>`,
-              open:    `<ellipse cx="${CX}" cy="${MY + 8}" rx="12" ry="${14}" fill="#0b1220" stroke="#fff" stroke-width="3.5" style="transform-box:fill-box;transform-origin:center;${AA('oc-pant', .5, 'ease-in-out')}"/>`
+            const mc = MD.c, LID = '#16233a';
+            const FD = `<defs>
+              <radialGradient id="oiris" cx="50%" cy="38%" r="65%"><stop offset="0" stop-color="${mc}" stop-opacity=".95"/><stop offset=".55" stop-color="${mc}"/><stop offset="1" stop-color="#0b1626"/></radialGradient>
+              <radialGradient id="osclera" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cbd5e1"/></radialGradient>
+              <radialGradient id="osheen" cx="30%" cy="18%" r="62%"><stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+              <radialGradient id="oshade" cx="50%" cy="50%" r="50%"><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".38"/></radialGradient>
+              <radialGradient id="oblush" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fb7185" stop-opacity=".75"/><stop offset="1" stop-color="#fb7185" stop-opacity="0"/></radialGradient>
+              <linearGradient id="odrop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0f2fe"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+              <linearGradient id="omouth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b0a14"/><stop offset="1" stop-color="#4a1426"/></linearGradient>
+              <clipPath id="oeL"><circle cx="${eyeX[0]}" cy="${eyeY}" r="19"/></clipPath><clipPath id="oeR"><circle cx="${eyeX[1]}" cy="${eyeY}" r="19"/></clipPath>
+            </defs>`;
+            const spots = [[-50, -56, 7], [54, -50, 5], [-18, -72, 4], [28, -70, 5.5], [-68, -14, 4.5], [68, -12, 5], [-60, 38, 5], [62, 34, 4.5]]
+              .map(([a, b, r]) => `<circle cx="${CX + a}" cy="${CY + b}" r="${r}" fill="${mc}" opacity=".16"/><circle cx="${CX + a}" cy="${CY + b}" r="${r}" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="1.2"/>`).join('');
+            const DECOR = FD + `<circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#oshade)"/>` + spots + `<circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#osheen)"/><path d="M${CX - 58} ${CY - 44} Q${CX - 44} ${CY - 66} ${CX - 20} ${CY - 74}" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".22"/>`;
+            const eyeFull = (side, r, pr, lid, slope, wet) => {
+              const x = eyeX[side], ir = r * .66, base = eyeY - r + 2 * r * lid;
+              const yL = side === 0 ? base + slope : base - slope, yR = side === 0 ? base - slope : base + slope;
+              const lidPath = (lid > 0 || slope) ? `<path d="M${x - r - 3} ${eyeY - r - 4} H${x + r + 3} V${yR} Q${x} ${base + 2} ${x - r - 3} ${yL} Z" fill="${LID}"/><path d="M${x - r - 3} ${yL} Q${x} ${base + 2} ${x + r + 3} ${yR}" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="2"/>` : '';
+              return `<g class="eye"><circle cx="${x}" cy="${eyeY}" r="${r + 2.5}" fill="#000" opacity=".22"/><circle cx="${x}" cy="${eyeY}" r="${r}" fill="url(#osclera)"/>
+                <g clip-path="url(#oe${side ? 'R' : 'L'})"><g style="${AA('oc-look', 7, 'ease-in-out', side * 1.7)}">
+                  <circle cx="${x + lx}" cy="${eyeY + ly}" r="${ir}" fill="url(#oiris)"/><circle cx="${x + lx}" cy="${eyeY + ly}" r="${pr}" fill="#05080f"/>
+                  <circle cx="${x + lx - ir * .32}" cy="${eyeY + ly - ir * .38}" r="${ir * .28}" fill="#fff"/><circle cx="${x + lx + ir * .3}" cy="${eyeY + ly + ir * .32}" r="${ir * .13}" fill="#fff" opacity=".85"/>
+                </g>${lidPath}</g>
+                ${wet ? `<path d="M${x - r * .75} ${eyeY + r * .62} Q${x} ${eyeY + r * 1.05} ${x + r * .75} ${eyeY + r * .62}" fill="none" stroke="#bae6fd" stroke-width="2.2" stroke-linecap="round" opacity=".85"/>` : ''}</g>`;
             };
-            const cheeks = `<ellipse cx="${CX - 52}" cy="${CY - 18}" rx="10" ry="6" fill="#fb7185" opacity=".45"/><ellipse cx="${CX + 52}" cy="${CY - 18}" rx="10" ry="6" fill="#fb7185" opacity=".45"/>`;
-            const drop = (x, y, d, o) => `<path d="M${x} ${y} q-7 11 0 16 q7 -5 0 -16 Z" fill="#7dd3fc" style="${AA('oc-drop', d, 'ease-in', o)}"/>`;
+            const eyes = (r, pr, lid = 0, slope = 0, wet = false) => eyeFull(0, r, pr, lid, slope, wet) + eyeFull(1, r, pr, lid, slope, wet);
+            const eyeArc2 = (up) => eyeX.map((x, i) => { const s = i ? 1 : -1; const y0 = eyeY + (up ? 5 : -2), y1 = eyeY + (up ? -13 : 9);
+              const lashes = up ? `<path d="M${x + s * 13} ${y0} l${s * 7} -4 M${x + s * 13} ${y0 - 4} l${s * 7} -7" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>` : `<path d="M${x + s * 13} ${y0} l${s * 6} 5 M${x + s * 10} ${y0 + 4} l${s * 5} 7" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>`;
+              return `<path d="M${x - 13} ${y0} Q${x} ${y1} ${x + 13} ${y0}" fill="none" stroke="#f8fafc" stroke-width="5.5" stroke-linecap="round"/>${lashes}`; }).join('');
+            const brow = (side, inner, outer, bend) => { const s = side ? 1 : -1, xi = CX + s * 15, xo = CX + s * 43; return `<path d="M${xo} ${eyeY - outer} Q${(xi + xo) / 2} ${eyeY - (inner + outer) / 2 - bend} ${xi} ${eyeY - inner}" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round"/>`; };
+            const brows = (inner, outer, bend = 4) => brow(0, inner, outer, bend) + brow(1, inner, outer, bend);
+            const MY = CY - 6;
+            const crease = `<path d="M${CX - 34} ${MY - 4} q-5 6 0 12 M${CX + 34} ${MY - 4} q5 6 0 12" stroke="#f8fafc" stroke-width="2.5" fill="none" opacity=".55" stroke-linecap="round"/>`;
+            const teeth = (w) => `<path d="M${CX - w} ${MY - 1} Q${CX} ${MY + 6} ${CX + w} ${MY - 1} L${CX + w - 2} ${MY + 5} Q${CX} ${MY + 11} ${CX - w + 2} ${MY + 5} Z" fill="#fff"/>`;
+            const mouths = {
+              smile:  `<path d="M${CX - 22} ${MY} Q${CX} ${MY + 20} ${CX + 22} ${MY}" fill="none" stroke="#f8fafc" stroke-width="4.5" stroke-linecap="round"/><path d="M${CX - 22} ${MY} q-4 -1 -6 -5 M${CX + 22} ${MY} q4 -1 6 -5" fill="none" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" opacity=".7"/>`,
+              big:    `<path d="M${CX - 28} ${MY - 3} Q${CX} ${MY + 36} ${CX + 28} ${MY - 3} Q${CX} ${MY + 3} ${CX - 28} ${MY - 3} Z" fill="url(#omouth)" stroke="#f8fafc" stroke-width="3.5" stroke-linejoin="round"/>${teeth(22)}<ellipse cx="${CX}" cy="${MY + 17}" rx="11" ry="6" fill="#fb7185"/><path d="M${CX} ${MY + 12} v10" stroke="#e11d48" stroke-width="1.6" opacity=".6"/>${crease}`,
+              small:  `<path d="M${CX - 13} ${MY + 2} Q${CX} ${MY + 12} ${CX + 13} ${MY + 2}" fill="none" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/><path d="M${CX - 13} ${MY + 2} q-3 0 -4 -3 M${CX + 13} ${MY + 2} q3 0 4 -3" fill="none" stroke="#f8fafc" stroke-width="2.4" stroke-linecap="round" opacity=".6"/>`,
+              flat:   `<path d="M${CX - 13} ${MY + 5} Q${CX} ${MY + 2} ${CX + 13} ${MY + 5}" fill="none" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>`,
+              frown:  `<g style="${AA('oc-tremble', 1.6, 'ease-in-out')}"><path d="M${CX - 19} ${MY + 11} Q${CX} ${MY - 8} ${CX + 19} ${MY + 11}" fill="none" stroke="#f8fafc" stroke-width="4.5" stroke-linecap="round"/><path d="M${CX - 8} ${MY + 15} Q${CX} ${MY + 19} ${CX + 8} ${MY + 15}" fill="none" stroke="#f8fafc" stroke-width="2.4" stroke-linecap="round" opacity=".5"/></g>`,
+              wavy:   `<g style="${AA('oc-wave', 1.2, 'ease-in-out')}"><path d="M${CX - 22} ${MY + 6} q5.5 -7 11 0 t11 0 t11 0 t11 0" fill="none" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/></g>`,
+              open:   `<g style="transform-box:fill-box;transform-origin:center;${AA('oc-pant', .5, 'ease-in-out')}"><ellipse cx="${CX}" cy="${MY + 8}" rx="13" ry="15" fill="url(#omouth)" stroke="#f8fafc" stroke-width="3.5"/><path d="M${CX - 9} ${MY - 2} Q${CX} ${MY + 3} ${CX + 9} ${MY - 2} L${CX + 8} ${MY + 3} Q${CX} ${MY + 7} ${CX - 8} ${MY + 3} Z" fill="#fff"/><ellipse cx="${CX}" cy="${MY + 17}" rx="7" ry="4" fill="#fb7185"/></g>`,
+              sleep:  `<ellipse cx="${CX}" cy="${MY + 6}" rx="5" ry="4" fill="#0b1220" stroke="#cbd5e1" stroke-width="2.5"/><g style="transform-box:fill-box;transform-origin:left center;${AA('oc-bubble', 4, 'ease-in-out')}"><circle cx="${CX + 9}" cy="${MY + 4}" r="9" fill="#bae6fd" fill-opacity=".22" stroke="#e0f2fe" stroke-width="1.6"/><circle cx="${CX + 6}" cy="${MY + 1}" r="2.2" fill="#fff" opacity=".8"/></g>`
+            };
+            const blush = [CX - 54, CX + 54].map(x => `<ellipse cx="${x}" cy="${CY - 16}" rx="14" ry="8" fill="url(#oblush)"/><path d="M${x - 7} ${CY - 18} l3 5 M${x - 1} ${CY - 18} l3 5 M${x + 5} ${CY - 18} l3 5" stroke="#fda4af" stroke-width="1.6" stroke-linecap="round" opacity=".8"/>`).join('');
+            const drop = (x, y, d, o) => `<g style="${AA('oc-drop', d, 'ease-in', o)}"><path d="M${x} ${y} q-8 12 0 18 q8 -6 0 -18 Z" fill="url(#odrop)" stroke="#e0f2fe" stroke-width=".8"/><circle cx="${x - 2}" cy="${y + 12}" r="1.6" fill="#fff"/></g>`;
+            const shock = [-1, 1].map(s => [0, 1, 2].map(k => `<path d="M${CX + s * (96 + k * 7)} ${CY - 30 + k * 14} q${s * 6} 7 0 14" fill="none" stroke="#fca5a5" stroke-width="3" stroke-linecap="round" style="${AA('oc-flick', .5, 'steps(2)', k * .15)}"/>`).join('')).join('');
+            const joyEye = (x) => `<circle cx="${x}" cy="${eyeY}" r="17" fill="#fde047" opacity=".18" style="${AA('oc-breath', 1.2, 'ease-in-out')}"/>` + star(x, eyeY, 14, '#fde047', 1.4, x) + star(x + 8, eyeY - 9, 4, '#fff', 1.1, x);
             const FACE = {
-              sleep:   eyeArc(false) + mouths.flat + `<text x="${CX + 62}" y="${CY - 52}" fill="#94a3b8" font-size="22" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out')}">z</text><text x="${CX + 80}" y="${CY - 72}" fill="#94a3b8" font-size="30" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out', 1.1)}">Z</text>`,
-              joy:     [eyeX.map(x => star(x, eyeY, 14, '#fde047', 1.4, x)).join(''), mouths.big, cheeks, star(CX - 96, CY - 70, 11, '#fde047', 1.6, 0), star(CX + 100, CY - 60, 9, '#34d399', 1.3, .5), star(CX + 70, CY - 98, 7, '#fff', 1.1, .9), star(CX - 70, CY - 100, 8, '#34d399', 1.5, .3)].join(''),
-              happy:   eyeArc(true) + mouths.smile + cheeks + star(CX + 92, CY - 76, 9, '#facc15', 2, 0),
-              content: eyeOpen(14, 6.5) + mouths.small,
-              calm:    eyeOpen(14, 6.5) + mouths.flat,
-              sad:     eyeOpen(14, 6) + brows(24, 16) + mouths.frown,
-              worried: eyeOpen(16, 4.5) + brows(28, 18) + mouths.wavy + drop(CX + 62, CY - 62, 2.2, 0),
-              panic:   eyeOpen(17, 3.2) + brows(32, 22) + mouths.open + drop(CX + 64, CY - 64, 1.3, 0) + drop(CX - 64, CY - 50, 1.5, .6)
+              sleep:   eyeArc2(false) + brows(16, 12, 3) + mouths.sleep + blush + `<text x="${CX + 62}" y="${CY - 52}" fill="#94a3b8" font-size="22" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out')}">z</text><text x="${CX + 80}" y="${CY - 72}" fill="#94a3b8" font-size="30" font-weight="800" style="${AA('oc-zzz', 3.2, 'ease-in-out', 1.1)}">Z</text>`,
+              joy:     joyEye(eyeX[0]) + joyEye(eyeX[1]) + brows(31, 26, 7) + mouths.big + blush + star(CX - 96, CY - 70, 11, '#fde047', 1.6, 0) + star(CX + 100, CY - 60, 9, '#34d399', 1.3, .5) + star(CX + 70, CY - 98, 7, '#fff', 1.1, .9) + star(CX - 70, CY - 100, 8, '#34d399', 1.5, .3),
+              happy:   eyeArc2(true) + brows(29, 24, 6) + mouths.smile + blush + star(CX + 92, CY - 76, 9, '#facc15', 2, 0),
+              content: eyes(14, 5.5) + brows(25, 22, 4) + mouths.small,
+              calm:    eyes(14, 5.5, .2) + brows(23, 23, 2) + mouths.flat,
+              sad:     eyes(14, 5.5, .3, 6, true) + brows(27, 14, 3) + mouths.frown + drop(eyeX[0] - 4, eyeY + 17, 2.6, 0),
+              worried: eyes(16, 4.8) + brows(31, 16, 6) + mouths.wavy + drop(CX + 62, CY - 62, 2.2, 0),
+              panic:   eyes(17.5, 3) + brows(37, 28, 10) + mouths.open + drop(CX + 64, CY - 64, 1.3, 0) + drop(CX - 64, CY - 50, 1.5, .6) + shock
             }[moodKey];
             const bodyAnim = { joy: AA('oc-bounce', 1.1, 'ease-in-out'), happy: AA('oc-bounce', 1.8, 'ease-in-out'), panic: AA('oc-shake', .22), worried: AA('oc-tremble', .9, 'ease-in-out'), sleep: AA('oc-breathe', 4.5, 'ease-in-out'), sad: AA('oc-breathe', 6, 'ease-in-out') }[moodKey] || '';
             const bar = (list) => list.filter(x => x.w > 0.5).map(x => `<i style="flex:${x.w};background:${x.c};box-shadow:0 0 8px ${x.c}77" title="${esc(x.n)}"></i>`).join('');
@@ -6237,6 +6270,10 @@ views:
               @keyframes oc-drop{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(34px);opacity:0}}
               @keyframes oc-zzz{0%{transform:translateY(8px);opacity:0}30%{opacity:1}100%{transform:translateY(-16px);opacity:0}}
               @keyframes oc-pant{0%,100%{transform:scaleY(.8)}50%{transform:scaleY(1.15)}}
+              @keyframes oc-look{0%,100%{transform:translate(0,0)}25%{transform:translate(2.2px,1px)}55%{transform:translate(-2.2px,.5px)}80%{transform:translate(.8px,-1.2px)}}
+              @keyframes oc-wave{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+              @keyframes oc-bubble{0%,100%{transform:scale(.55)}55%{transform:scale(1.25)}}
+              @keyframes oc-flick{0%{opacity:1}50%{opacity:.15}}
             </style>
             <div class="oc">
               <div class="ks">
@@ -6255,6 +6292,7 @@ views:
                   <g style="transform-origin:${CX}px ${CY}px;${bodyAnim}">
                     <circle cx="${CX}" cy="${CY}" r="${R0}" fill="url(#ohead)" stroke="${MD.c}" stroke-opacity=".55" stroke-width="2.5"/>
                     <circle cx="${CX}" cy="${CY}" r="${R0}" fill="${MD.c}" opacity=".10"/>
+                    ${DECOR}
                     ${FACE}
                   </g>
                 </svg>
