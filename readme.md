@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version de l'intégration | **1.7.7** |
+| Version de l'intégration | **1.7.700** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
@@ -305,7 +305,7 @@ Les tensions améliorent la précision du calcul ; elles **ne détectent pas** u
 
 ## 15. Entités, appareils et services
 
-Les entités sont rangées en **10 appareils** : Mesures et sources · Tarification · Onduleur · Boiler · Chauffage · Machines · Batterie et VE · Protection · Prévisions et IA · Système. Les `entity_id` et `unique_id` sont stables : dashboards et automatisations existants continuent de fonctionner.
+Les entités sont rangées en **13 appareils** : Mesures et sources · Tarification · **Planificateur** · Onduleur · Boiler · Chauffage · Machines · **Machine Learning** · Batterie et VE · Protection · Prévisions et IA · **Santé et alertes** · Système. Le Planificateur regroupe les planificateurs (charges flexibles, dynamique, bi-horaire), l'analyse de la courbe de prix (Day-Ahead, Price Analyzer, position et rang), l'optimiseur économique et leurs réglages ; Machine Learning, l'apprentissage passif des cycles ; Santé et alertes, les pannes, Internet, le mode Backup et le flux de prix. Les `entity_id` et `unique_id` sont stables : dashboards et automatisations existants continuent de fonctionner.
 
 **Réglages inactifs.** Une vingtaine d'entités de réglage (par exemple « Agressivité solaire Bihoraire », « Charge réseau si prix dynamique négatif », plusieurs seuils PRI) ne sont lues par aucune stratégie active. Elles restent pour ne pas casser les tableaux de bord et les profils, mais elles sont créées **désactivées**, rangées en diagnostic et portent l'attribut `statut: inactif`. La liste est dans `INACTIVE_SETTINGS` (`const.py`) et dans [`docs/algorithmes/ANOMALIES.md`](docs/algorithmes/ANOMALIES.md) (A-03).
 

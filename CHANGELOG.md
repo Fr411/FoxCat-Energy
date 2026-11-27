@@ -1,4 +1,8 @@
-# Changelog — FoxCat Energy V1.7.7
+# Changelog — FoxCat Energy V1.7.700
+
+## V1.7.700
+
+- **Appareils reclassés : 10 → 13.** Trois nouveaux appareils : **Planificateur** (planificateurs de charges flexibles, dynamique et bi-horaire, Day-Ahead, Price Analyzer, position/rang/tendance de la courbe, choix économique par machine, optimiseur économique, interrupteurs « … pilote les machines », « Prédictif prix dynamique » et tous leurs réglages : stabilité du plan, seuils favorable/pic, marge économique, horizon), **Machine Learning** (capteurs « Apprentissage » des machines, qui étaient rangés dans Système ; l'ancien appareil vide du même nom est réutilisé) et **Santé et alertes** (« Santé FoxCat », alerte de panne, Internet en ligne, mode Backup, flux de prix, et leurs réglages). Seul le rattachement aux appareils change : `entity_id` et `unique_id` conservés. Règles dans `devices_layout.py`, tests : `tests/test_devices_layout.py` (les tests sur les entités réelles sont **ignorés sans Home Assistant** : classement vérifié sur les clés, pas sur l'installation réelle).
 
 ## V1.7.7
 

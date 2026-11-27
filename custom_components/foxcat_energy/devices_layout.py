@@ -18,13 +18,16 @@ HUB_DEVICE = "system"
 DEVICE_NAMES: dict[str, str] = {
     "sources": "FoxCat Energy – Mesures et sources",
     "pricing": "FoxCat Energy – Tarification",
+    "planner": "FoxCat Energy – Planificateur",
     "pri": "FoxCat Energy – Onduleur",
     "boiler": "FoxCat Energy – Boiler",
     "heating": "FoxCat Energy – Chauffage",
     "machines": "FoxCat Energy – Machines",
+    "machine_learning": "FoxCat Energy – Machine Learning",
     "battery_ev": "FoxCat Energy – Batterie et VE",
     "protection": "FoxCat Energy – Protection",
     "ai": "FoxCat Energy – Prévisions et IA",
+    "health": "FoxCat Energy – Santé et alertes",
     "system": "FoxCat Energy – Système",
 }
 
@@ -40,6 +43,7 @@ LEGACY_TO_DEVICE: dict[str, str] = {
     "boiler": "boiler",
     "user_functions": "boiler",
     "machines": "machines",
+    "machine_learning": "machine_learning",
     "battery_ev": "battery_ev",
     "ai": "ai",
     "solar": "ai",
@@ -65,6 +69,21 @@ _PROTECTION_KEYS = frozenset(
 # Limites d'import / réinjection qui pilotent le PRI : elles vont avec l'onduleur.
 _PRI_PREFIXES = ("network_billed_",)
 
+# Planificateur : planificateurs (charges, dynamique, bi-horaire), analyse de la courbe de prix,
+# optimiseur économique et leurs réglages.
+_PLANNER_PREFIXES = (
+    "planificateur_", "planner_", "dynamic_", "bihoraire_planner_", "economic_", "economique_",
+    "day_ahead_", "price_analyzer_", "predictive_pricing_",
+    "position_courbe_dynamique", "rang_courbe_dynamique", "tendance_courbe_dynamique",
+)
+# Santé et alertes : pannes, connectivité, mode Backup, fraîcheur des prix.
+_HEALTH_PREFIXES = ("health_", "backup_")
+_HEALTH_KEYS = frozenset(
+    {"sante_foxcat", "alerte_foxcat", "internet_en_ligne", "mode_backup_actif", "flux_prix"}
+)
+# Machine Learning : apprentissage passif des cycles des machines.
+_LEARNING_PREFIXES = ("apprentissage_",)
+
 
 def resolve_device(key: str, legacy_device: str) -> str:
     """Retourne l'appareil actuel d'une entité (clé ``key``, ancien appareil ``legacy_device``)."""
@@ -76,6 +95,12 @@ def resolve_device(key: str, legacy_device: str) -> str:
         return "pricing"
     if key.startswith(_PRI_PREFIXES):
         return "pri"
+    if key.startswith(_LEARNING_PREFIXES) or legacy_device == "machine_learning":
+        return "machine_learning"
+    if key.startswith(_HEALTH_PREFIXES) or key in _HEALTH_KEYS:
+        return "health"
+    if key.startswith(_PLANNER_PREFIXES):
+        return "planner"
     if key.startswith("machine_") and legacy_device == "user_functions":
         return "machines"
     if key == "analyser_solaire":
