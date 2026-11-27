@@ -1417,7 +1417,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         now_ts = dt_util.utcnow().timestamp()
         presence = self._heating_presence(cfg.presence_entity) if cfg.only_when_empty else None
 
-        def inputs(guard_power_w: float | None = None) -> heating_logic.HeatingBoostInputs:
+        granted_all = sum(item.steps for item in self._heating_system_states.values())
+
+        def inputs(
+            guard_power_w: float | None = None, granted_steps: int | None = None
+        ) -> heating_logic.HeatingBoostInputs:
             return heating_logic.HeatingBoostInputs(
                 regulation_active=bool(self.settings.get("regulation_active")),
                 snapshot_valid=bool(snapshot.valid),
@@ -1426,6 +1430,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 presence=presence,
                 group_power_w=group_power,
                 guard_power_w=guard_power_w,
+                granted_steps=granted_steps,
             )
 
         result = heating_logic.evaluate(cfg, self._heating_boost_state, inputs(), now_ts)
@@ -1442,7 +1447,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             system_result = heating_logic.evaluate(
                 cfg,
                 self._heating_system_states.get(record["id"], heating_logic.HeatingBoostState()),
-                inputs(powers[record["id"]]),
+                inputs(powers[record["id"]], granted_all),
                 now_ts,
             )
             self._heating_system_states[record["id"]] = system_result.state

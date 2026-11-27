@@ -378,7 +378,7 @@ Bon à savoir :
 
 Menu **Chauffage** :
 
-*(Le « Surplus calculé » vaut (export − import) + puissance des PAC − marge de réserve : il peut être négatif, et une PAC alimentée par le réseau ne compte pas comme surplus. Le décalage est recalculé à chaque trame, seulement si la fonction est activée. Pour vérifier : l'attribut `calcule_a` du capteur « Statut » doit avancer d'environ 30 secondes à chaque trame.)*
+*(Le « Surplus calculé » vaut réinjection − import − marge de réserve + consommation déjà accordée aux pas en cours : il peut être négatif, et la consommation normale d'une PAC ne compte jamais comme surplus. Il faut donc une vraie réinjection pour obtenir un décalage. Le décalage est recalculé à chaque trame, seulement si la fonction est activée. Pour vérifier : l'attribut `calcule_a` du capteur « Statut » doit avancer d'environ 30 secondes à chaque trame.)*
 
 1. **Réglages du décalage de consigne** : activer la fonction (désactivée par défaut), « uniquement maison vide », entité de présence (`zone.home` par défaut), puissance et limite du groupe de climatisation, règles de calcul (décalage maximal 2 °C, pas 0,5 °C, surplus requis par pas, marge de réserve, délai anti-yoyo 300 s, import maximal 300 W).
 2. **Systèmes de chauffage** : ajoutez vos pompes à chaleur (groupe extérieur : puissance, tension, phase ; jusqu'à 5 unités intérieures pour une PAC air/air).

@@ -201,6 +201,9 @@ class HeatingBoostInputs:
     # Puissance du seul groupe concerné pour la garde de puissance ; ``None`` :
     # on utilise ``group_power_w`` (cas d'un groupe unique).
     guard_power_w: float | None = None
+    # Pas déjà accordés (tous systèmes confondus) dont la consommation supplémentaire est
+    # déjà prélevée sur la réinjection ; ``None`` : ceux de l'état évalué.
+    granted_steps: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,9 +258,12 @@ def evaluate(
     1. Retour à 0 si la fonction est désactivée, si la régulation FoxCat est
        inactive, si le snapshot est invalide, ou si « uniquement maison vide »
        est actif alors que quelqu'un est présent (présence inconnue = présent).
-    2. Surplus = (export − import) + puissance du groupe de clim − marge de réserve :
-       ce qui resterait à exporter si les PAC étaient éteintes. Une PAC alimentée
-       par le réseau n'est pas du surplus.
+    2. Surplus = réinjection − import − marge de réserve + consommation déjà accordée
+       (pas accordés × surplus par pas). Seule la **réinjection** mesurée compte comme
+       surplus libre : la consommation normale d'une PAC, même partiellement couverte
+       par le solaire, n'est pas du surplus. Les pas déjà accordés sont rajoutés, car
+       la consommation qu'ils provoquent réduit d'autant la réinjection : sans cela,
+       le pas accordé se retirerait lui-même (effet yoyo).
     3. Pas = ``floor(surplus / surplus_par_pas)``, borné à ``max_c / pas_c``.
     4. Hystérésis : un pas déjà accordé est conservé tant que le surplus reste
        au moins égal à 60 % de son seuil.
@@ -286,14 +292,15 @@ def evaluate(
     guard_w = _optional_number(inputs.guard_power_w)
     guard_w = max(guard_w, 0.0) if guard_w is not None else group_w
 
-    # 2) Surplus disponible = ce qui resterait à exporter si les PAC étaient éteintes :
-    #    (export - import) + puissance des PAC - marge. La puissance des PAC ne compte
-    #    que si elle est couverte par le solaire : une PAC alimentée par le réseau
-    #    (import > 0) n'est pas du surplus.
-    surplus = export_w - import_w + (group_w or 0.0) - cfg.reserve_w
+    # 2) Surplus basé sur la réinjection réelle : export - import - marge, plus la
+    #    consommation déjà accordée aux pas en cours (elle a déjà été prélevée sur
+    #    l'export). La consommation de base de la PAC n'est jamais comptée comme surplus.
+    max_steps = cfg.max_steps
+    granted = state.steps if inputs.granted_steps is None else inputs.granted_steps
+    granted_w = max(int(granted), 0) * cfg.surplus_per_step_w
+    surplus = export_w - import_w - cfg.reserve_w + granted_w
 
     # 3) Nombre de pas accordés par le surplus, borné au maximum.
-    max_steps = cfg.max_steps
     desired = min(int(math.floor(max(surplus, 0.0) / cfg.surplus_per_step_w + _EPSILON)), max_steps)
 
     current = min(max(int(state.steps), 0), max_steps)

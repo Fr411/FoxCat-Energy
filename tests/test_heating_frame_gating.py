@@ -53,11 +53,11 @@ class FrameByFrameTests(unittest.TestCase):
         cfg = hb.HeatingBoostConfig(enabled=True, only_when_empty=False, hold_s=0.0, surplus_per_step_w=500.0, step_c=1.0, max_c=2.0)
         state, now = hb.HeatingBoostState(), 1000.0
         trace = []
-        for export_w in (0.0, 700.0, 1300.0, 1300.0, 400.0):
-            result = hb.evaluate(cfg, state, inputs(export_w=export_w), now)
+        for export_w, import_w in ((0.0, 0.0), (700.0, 0.0), (1300.0, 0.0), (1300.0, 0.0), (0.0, 700.0)):
+            result = hb.evaluate(cfg, state, inputs(export_w=export_w, import_w=import_w), now)
             state, now = result.state, now + 30.0
             trace.append(result.steps)
-        self.assertEqual(trace, [0, 1, 2, 2, 1])      # 400 W : surplus 300 W = 60 % du seuil, le premier pas est conservé
+        self.assertEqual(trace, [0, 1, 2, 2, 0])      # dernière trame : plus de réinjection, 700 W importés
 
     def test_import_spike_drops_the_offset_on_the_very_next_frame(self):
         cfg = hb.HeatingBoostConfig(enabled=True, only_when_empty=False, hold_s=0.0, surplus_per_step_w=500.0, step_c=1.0)
