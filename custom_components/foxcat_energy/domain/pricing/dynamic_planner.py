@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from ...const import DEFAULT_SETTINGS
 from ..engine.models import EnergySnapshot, SolarForecast
@@ -40,6 +40,9 @@ BAND_PEAK = "PIC"
 
 # Rang (en % des créneaux connus, du moins cher au plus cher) qui borne chaque bande.
 _BAND_LIMITS = ((15.0, BAND_VERY_LOW), (35.0, BAND_LOW), (70.0, BAND_NORMAL), (90.0, BAND_HIGH))
+
+BAND_HC = "HC"
+BAND_HP = "HP"
 
 MAX_HORIZON_H = 36.0
 SOLAR_SHARE_CAP = 0.5  # une fenêtre solaire prévue ne couvre au plus que la moitié de la puissance
@@ -83,7 +86,12 @@ def classify(price: float, rank_pct: float) -> str:
     return BAND_PEAK
 
 
-def build_slots(points: list[PricePoint], now: datetime, horizon_end: datetime) -> list[Slot]:
+def build_slots(
+    points: list[PricePoint],
+    now: datetime,
+    horizon_end: datetime,
+    band_for: Callable[[datetime, float], str] | None = None,
+) -> list[Slot]:
     """Transforme la courbe en créneaux [début, fin[ classés par rang de prix."""
     ordered = sorted({p.at: p for p in points}.values(), key=lambda p: p.at)
     if not ordered:
@@ -104,7 +112,8 @@ def build_slots(points: list[PricePoint], now: datetime, horizon_end: datetime) 
         below = sum(1 for other in prices if other < price)
         equal = sum(1 for other in prices if other == price)
         rank = 100.0 * (below + 0.5 * equal) / count if count else 50.0
-        slots.append(Slot(start, end, price, rank, classify(price, rank)))
+        band = band_for(start, price) if band_for else classify(price, rank)
+        slots.append(Slot(start, end, price, rank, band))
     return slots
 
 
@@ -294,15 +303,19 @@ def build_dynamic_plan(
     previous: dict[str, str] | None = None,
     peak_shaving_active: bool = False,
     tomorrow_available: bool = False,
+    band_for: Callable[[datetime, float], str] | None = None,
 ) -> dict[str, Any]:
-    """Construit le plan des machines. ``previous`` : départs planifiés au calcul précédent (stabilité)."""
+    """Construit le plan des machines. ``previous`` : départs planifiés au calcul précédent (stabilité).
+
+    ``band_for`` remplace les bandes par rang (ex. HP/HC en bi-horaire).
+    """
     previous = previous or {}
     base = {"active": False, "ready": False, "machines": {}, "timeline": [], "slots": [], "state": {}}
     if not dynamic_active:
         return base | {"reason": "Planificateur dynamique réservé au tarif dynamique."}
 
     horizon_end = now + timedelta(hours=MAX_HORIZON_H)
-    slots = build_slots(import_points, now, horizon_end)
+    slots = build_slots(import_points, now, horizon_end, band_for)
     if not slots:
         return base | {"active": True, "reason": "Courbe de prix dynamique indisponible."}
 
@@ -341,8 +354,8 @@ def build_dynamic_plan(
             {"start": s.start.isoformat(), "price": round(s.price, 5), "band": s.band, "rank_pct": round(s.rank_pct, 1)}
             for s in slots[:96]
         ],
-        "next_valley": _next_block(slots, now, {BAND_NEGATIVE, BAND_VERY_LOW, BAND_LOW}),
-        "next_peak": _next_block(slots, now, {BAND_PEAK, BAND_HIGH}),
+        "next_valley": _next_block(slots, now, {BAND_HC} if band_for else {BAND_NEGATIVE, BAND_VERY_LOW, BAND_LOW}),
+        "next_peak": _next_block(slots, now, {BAND_HP} if band_for else {BAND_PEAK, BAND_HIGH}),
         "machines": {},
         "timeline": [],
     }
@@ -449,7 +462,11 @@ def build_dynamic_plan(
             best = immediate
         elif near_best:
             decision, allow = START_NOW, True
-            reason = f"Meilleur créneau = maintenant (bande {current.band}, rang {current.rank_pct:.0f} %)."
+            reason = (
+                f"Meilleur créneau = maintenant (période {current.band})."
+                if band_for else
+                f"Meilleur créneau = maintenant (bande {current.band}, rang {current.rank_pct:.0f} %)."
+            )
         elif saving < min_saving:
             decision, allow = START_NOW, True
             reason = f"Attendre ne gagnerait que {max(saving, 0):.3f} € (minimum {min_saving:.2f} €) : on démarre."

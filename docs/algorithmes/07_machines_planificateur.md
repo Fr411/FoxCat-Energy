@@ -150,3 +150,14 @@ Calculé à chaque trame en **tarif dynamique** ; sans l'interrupteur, il reste 
 7. **Sécurités** : cycle protégé → `CONTINUE` ; écrêtage → `SAFETY_OVERRIDE` ; gestion automatique coupée ou mode Manuel → `USER_CONTROL` ; courbe absente → `ATTENTE_PRIX`.
 
 Hypothèses à connaître : la part solaire future est une estimation prudente, pas une prévision de puissance ; le boiler n'est pas planifié ici.
+
+## 7. Planificateur bi-horaire (`build_bihoraire_plan`)
+
+> Source : `domain/pricing/bihoraire_planner.py` (s'appuie sur `dynamic_planner.py`), tests `tests/test_bihoraire_planner.py`. Capteur « Planificateur bi-horaire », interrupteur « Planificateur bi-horaire pilote les machines » (désactivé par défaut).
+
+Actif seulement en tarif **bi-horaire** (structure HP/HC, hors dynamique). Il construit une courbe de prix de 36 h au quart d'heure (prix HP/HC finaux, compléments inclus) selon les plages HP réglées, puis applique les règles du §6 avec des bandes `HP` / `HC` au lieu des rangs de prix.
+
+- Un cycle est placé **entièrement** dans une plage utilisateur ; ses minutes en HP sont payées au prix HP, donc un départ tardif en HC qui déborde sur les HP perd face à la HC suivante.
+- Report seulement si l'économie dépasse le minimum du mode ; HP ≈ HC : démarrage immédiat.
+- En observation, rien n'est commandé. Piloté (interrupteur actif, mode ≠ Manuel), son `allow_start_now` remplace la recommandation habituelle (« HC seulement » ou comparateur économique) pour les nouveaux départs.
+- Non couvert : jours de semaine / week-end différents, boiler (voir 02).

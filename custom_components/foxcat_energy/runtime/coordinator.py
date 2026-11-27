@@ -215,6 +215,7 @@ from ..domain.pricing.price_analyzer import analyze_price_curve
 from ..domain.pricing import price_buffer
 from ..domain.loads.flexible_load_planner import build_flexible_load_plan
 from ..domain.pricing.dynamic_planner import build_dynamic_plan
+from ..domain.pricing.bihoraire_planner import build_bihoraire_plan
 from ..trading.vpp import evaluate_trade, evaluate_v2h
 from ..dashboard.dashboard import cached_dashboard_status, refresh_dashboard_cache
 
@@ -407,6 +408,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._sensor_reset_active = False
         self._valid_frames_after_reset = 0
         self._dynamic_plan_state: dict[str, str] = {}
+        self._bihoraire_plan_state: dict[str, str] = {}
         self.load_shed_state: dict[str, Any] = {
             "active": False,
             "reason": "Inactif",
@@ -2312,6 +2314,39 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         if dynamic_plan.get("ready"):
             self._dynamic_plan_state = dict(dynamic_plan.get("state") or {})
+        # Planificateur bi-horaire : même principe (observation par défaut, interrupteur pour piloter).
+        bihoraire_active = bool(
+            tariff_dimensions(self.settings).structure == TARIFF_STRUCTURE_TOU
+            and not tariff_dimensions(self.settings).dynamic
+        )
+        bihoraire_plan = build_bihoraire_plan(
+            now=now,
+            snapshot=snap,
+            settings=self.settings,
+            bihoraire_active=bihoraire_active,
+            hp_price=tariff.get("hp_price") if isinstance(tariff.get("hp_price"), (int, float)) else None,
+            hc_price=tariff.get("hc_price") if isinstance(tariff.get("hc_price"), (int, float)) else None,
+            export_points=export_points,
+            machines=self.controllable_machines,
+            learning=learning,
+            cycles=cycles,
+            solar_forecast=self.solar_forecast,
+            previous=self._bihoraire_plan_state,
+            peak_shaving_active=peak_shaving_active,
+        )
+        if bihoraire_plan.get("ready"):
+            self._bihoraire_plan_state = dict(bihoraire_plan.get("state") or {})
+        bihoraire_plan["pilot"] = bool(
+            bihoraire_plan.get("ready")
+            and str(self.settings.get("mode")) != MODE_MANUAL
+            and self.settings.get("bihoraire_planner_enabled", False)
+        )
+        if bihoraire_plan["pilot"]:
+            for mid, plan_entry in (bihoraire_plan.get("machines") or {}).items():
+                rec = recommendations.setdefault(mid, {})
+                rec["allow_start"] = bool(plan_entry.get("allow_start_now", False))
+                rec["scheduler_decision"] = plan_entry.get("decision")
+                rec["scheduler_reason"] = plan_entry.get("reason")
         if dynamic_plan["pilot"]:
             planner["machines"] = {**(planner.get("machines") or {}), **dynamic_plan["machines"]}
             planner["timeline"] = dynamic_plan.get("timeline") or planner.get("timeline", [])
@@ -2345,6 +2380,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "price_analyzer": price_analysis,
             "planner": planner,
             "dynamic_planner": dynamic_plan,
+            "bihoraire_planner": bihoraire_plan,
             "vpp": vpp,
             "forecast": {
                 "import_points": len(import_points),
@@ -3535,9 +3571,16 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             tariff_dimensions(self.settings).dynamic
             and str(self.settings.get("mode")) != MODE_MANUAL
         )
+        bihoraire_pilot = bool(
+            self.settings.get("bihoraire_planner_enabled", False)
+            and str(self.settings.get("mode")) != MODE_MANUAL
+            and tariff_dimensions(self.settings).structure == TARIFF_STRUCTURE_TOU
+            and not tariff_dimensions(self.settings).dynamic
+        )
         if (
             not bool(self.settings.get("economic_optimizer_enabled", True))
             and not dynamic_planner_mode
+            and not bihoraire_pilot
         ):
             if regime == TARIFF_DYNAMIC:
                 current = prices.get("current")
