@@ -54,6 +54,26 @@ class LayoutRulesTests(unittest.TestCase):
             ("analyser_solaire", "solar"): "ai",
             ("bilan_revenu_injection_jour", "energy"): "pricing",
             ("economiser_foxcat_jour", "accounting"): "pricing",
+            ("planificateur_dynamique", "pricing"): "planner",
+            ("planificateur_bihoraire", "pricing"): "planner",
+            ("planificateur_charges_flexibles", "machines"): "planner",
+            ("dynamic_planner_enabled", "pricing"): "planner",
+            ("bihoraire_planner_enabled", "pricing"): "planner",
+            ("dynamic_planner_hysteresis_pct", "pricing"): "planner",
+            ("economic_optimizer_enabled", "pricing"): "planner",
+            ("predictive_pricing_enabled", "pricing"): "planner",
+            ("day_ahead_prochain_creux", "pricing"): "planner",
+            ("price_analyzer_etat", "pricing"): "planner",
+            ("economique_lave_linge_decision", "machines"): "planner",
+            ("apprentissage_lave_linge_cycles", "machine_learning"): "machine_learning",
+            ("sante_foxcat", "ems"): "health",
+            ("alerte_foxcat", "ems"): "health",
+            ("internet_en_ligne", "ems"): "health",
+            ("mode_backup_actif", "ems"): "health",
+            ("flux_prix", "pricing"): "health",
+            ("health_alerts_enabled", "ems"): "health",
+            ("backup_offline_delay_min", "ems"): "health",
+            ("solar_forecast_arbitrage", "ai"): "ai",
         }
         for (key, legacy), expected in cases.items():
             self.assertEqual(layout.resolve_device(key, legacy), expected, key)
@@ -62,7 +82,7 @@ class LayoutRulesTests(unittest.TestCase):
         for legacy, expected in (
             ("ems", "system"), ("energy_bus", "system"), ("diagnostic", "system"),
             ("energy", "sources"), ("metronome", "sources"), ("sources", "sources"),
-            ("inverter", "pri"), ("solar", "ai"), ("inconnu", "system"),
+            ("inverter", "pri"), ("solar", "ai"), ("machine_learning", "machine_learning"), ("inconnu", "system"),
         ):
             self.assertEqual(layout.resolve_device("une_cle", legacy), expected, legacy)
 

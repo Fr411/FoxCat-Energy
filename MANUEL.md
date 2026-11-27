@@ -181,7 +181,7 @@ Facultatif : un **agent IA** (AI Task) de Home Assistant et vos capteurs de **pr
 
 Avant de laisser FoxCat commander quoi que ce soit :
 
-1. Ouvrez **Paramètres → Appareils et services → FoxCat Energy**. Vous voyez **10 appareils** : Mesures et sources, Tarification, Onduleur, Boiler, Chauffage, Machines, Batterie et VE, Protection, Prévisions et IA, Système.
+1. Ouvrez **Paramètres → Appareils et services → FoxCat Energy**. Vous voyez **13 appareils** : Mesures et sources, Tarification, Planificateur, Onduleur, Boiler, Chauffage, Machines, Machine Learning, Batterie et VE, Protection, Prévisions et IA, Santé et alertes, Système. Les entités sont reclassées au premier redémarrage après la mise à jour ; leurs `entity_id` ne changent pas.
 2. Vérifiez que l'interrupteur **« Régulation FoxCat active »** est sur **OFF**.
 3. Dans l'appareil **Mesures et sources**, comparez les valeurs avec votre compteur :
    - la consommation de la maison est cohérente ;
