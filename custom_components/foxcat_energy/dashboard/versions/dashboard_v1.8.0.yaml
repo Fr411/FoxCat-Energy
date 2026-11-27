@@ -6496,7 +6496,7 @@ views:
             const relayOn = E.rl.map((id) => on(id));
             const hasRet = E.rr.some((id) => id && states[id]);
             const retOn = E.rr.map((id) => on(id));
-            const codeTxt = text(E.code, relayOn.map((b) => b ? '1' : '0').join(''));
+            const codeTxt = text(E.code, relayOn.map((b) => b ? '1' : '0').reverse().join(''));
             const curIdx = (() => { const k = TABLE.findIndex((r) => r[1] === codeTxt); if (k >= 0) return k; if (!hasPri) return -1; let best = 0, bd = 1e9; TABLE.forEach((r, j) => { const dd = Math.abs(r[0] - priCur); if (dd < bd) { bd = dd; best = j; } }); return best; })();
             const tgtIdx = (() => { let best = -1, bd = 1e9; TABLE.forEach((r, j) => { const dd = Math.abs(r[0] - priTgt); if (dd < bd) { bd = dd; best = j; } }); return has(E.tgt) ? best : -1; })();
             const relay = (i) => {
@@ -6567,7 +6567,7 @@ views:
               .iv .rl-f{display:flex;justify-content:space-between;padding:2px 4px;font-size:10px;color:#64748b}.iv .rl-f b{color:#e2e8f0}.iv .rl-f.bad b{color:#fb7185}
               .iv .code{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;padding:8px;border-radius:12px;background:#050b14;border:1px solid rgba(255,255,255,.07)}
               .iv .code span{font-size:9px;font-weight:800;letter-spacing:.16em;color:#64748b}.iv .code b{font-size:26px;color:#facc15;text-shadow:0 0 14px #facc1566;letter-spacing:.18em}
-              .iv .tbl{margin-top:10px;display:flex;flex-direction:column;gap:3px}
+              .iv .tbl{margin-top:10px;display:flex;flex-direction:column;gap:3px}.iv .cd{display:flex;gap:12px}.iv .cdd{text-align:center}.iv .cdd b{display:block;font-size:26px;color:#475569}.iv .cdd.on b{color:#facc15;text-shadow:0 0 14px #facc1566}.iv .cdd em{display:block;margin-top:1px;font-style:normal;font-size:9px;font-weight:800;letter-spacing:.12em;color:#64748b}.iv .cdd.on em{color:#facc15}
               .iv .th,.iv .tr{display:grid;grid-template-columns:50px minmax(0,1fr) 62px 46px 58px;align-items:center;gap:8px;padding:3px 8px;border-radius:9px;font-size:11px}
               .iv .th{font-size:9px;font-weight:800;letter-spacing:.12em;color:#64748b}
               .iv .tr{border:1px solid transparent;color:#94a3b8}.iv .tr b{color:#e2e8f0}
@@ -6655,8 +6655,8 @@ views:
                 <div class="bx">
                   <div class="bt"><span>RELAIS RRCR · L1–L4</span><small>${manual ? 'COMMANDE MANUELLE' : 'AUTOMATIQUE'}</small></div>
                   <div class="rls">${[0, 1, 2, 3].map(relay).join('')}</div>
-                  <div class="code"><span>CODE</span><b class="mono">${esc(codeTxt)}</b>${bits(codeTxt, false)}</div>
-                  <div class="tbl"><div class="th"><span>NIVEAU</span><span></span><span style="text-align:right">P.OUT MAX</span><span>L1-L4</span><span></span></div>${rows}</div>
+                  <div class="code"><span>CODE<br>L4 → L1</span><div class="cd">${String(codeTxt).split('').map((b, i) => `<div class="cdd ${b === '1' ? 'on' : ''}"><b class="mono">${esc(b)}</b><em>${['L4', 'L3', 'L2', 'L1'][i] || ''}</em></div>`).join('')}</div></div>
+                  <div class="tbl"><div class="th"><span>NIVEAU</span><span></span><span style="text-align:right">P.OUT MAX</span><span>L4-L1</span><span></span></div>${rows}</div>
                 </div>
                 <div class="bx">
                   <div class="bt"><span>MESURES ONDULEUR</span><small>${has(E.vendor) ? 'CODE VENDEUR ' + esc(text(E.vendor)) : ''}</small></div>
@@ -6709,144 +6709,449 @@ views:
       cards:
       - type: conditional
         conditions:
-        - entity: [[foxcat:ems.mode]]
-          state: Manuel
-        card:
-          type: custom:button-card
-          template: fc_panel
-          styles:
-            card:
-            - border-radius: 18px 18px 0 0
-          custom_fields:
-            c: |
-              [[[ return `<div class="p" style="padding:14px 18px"><div class="t" style="margin:0"><span class="gr">✅ Commande manuelle autorisée</span><small>Niveau PRI</small></div></div>`; ]]]
-      - type: conditional
-        conditions:
-        - entity: [[foxcat:ems.mode]]
+        - entity: '[[foxcat:ems.mode]]'
           state_not: Manuel
         card:
           type: custom:button-card
           template: fc_panel
           custom_fields:
             c: |
-              [[[ return `<div class="p"><div class="t"><span>🔒 Commande verrouillée</span></div><div class="k" style="font-size:12px;line-height:1.5">Passe l'EMS en <b style="color:#fff">Manuel</b> pour utiliser les boutons de niveau onduleur.</div></div>`; ]]]
+              [[[ return `<div class="p"><div class="t"><span>🔒 Commande manuelle verrouillée</span></div><div class="k" style="font-size:12px;line-height:1.5">Passe l'EMS en <b style="color:#fff">Manuel</b> (sélecteur Mode EMS) pour piloter les contacts RRCR et les niveaux. En mode automatique, FoxCat reprend la main et écraserait la commande.</div></div>`; ]]]
       - type: conditional
         conditions:
-        - entity: [[foxcat:ems.mode]]
+        - entity: '[[foxcat:ems.mode]]'
           state: Manuel
         card:
-          type: grid
-          columns: 4
-          square: false
+          type: vertical-stack
           cards:
           - type: custom:button-card
-            template: fc_btn
-            name: 100 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 100
-          - type: custom:button-card
-            template: fc_btn
-            name: 90 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 90
-          - type: custom:button-card
-            template: fc_btn
-            name: 80 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 80
-          - type: custom:button-card
-            template: fc_btn
-            name: 70 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 70
-          - type: custom:button-card
-            template: fc_btn
-            name: 60 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 60
-          - type: custom:button-card
-            template: fc_btn
-            name: 50 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 50
-          - type: custom:button-card
-            template: fc_btn
-            name: 40 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 40
-          - type: custom:button-card
-            template: fc_btn
-            name: 30 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 30
-          - type: custom:button-card
-            template: fc_btn
-            name: 20 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 20
-          - type: custom:button-card
-            template: fc_btn
-            name: 10 %
-            icon: mdi:solar-power
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 10
-          - type: custom:button-card
-            template: fc_btn
-            name: 0 %
-            icon: mdi:solar-power-off
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 0
-          - type: custom:button-card
-            template: fc_btn
-            name: Libérer
-            icon: mdi:lock-open-variant
-            tap_action:
-              action: call-service
-              service: script.pri_rrcr_forcer_un_niveau
-              data:
-                niveau: 100
+            template: fc_panel
+            styles:
+              card:
+              - border-radius: 18px 18px 0 0
+            custom_fields:
+              c: |
+                [[[
+                  const g = (id) => states[id]?.state;
+                  const R = ['[[foxcat:inverter.rrcr_l1]]', '[[foxcat:inverter.rrcr_l2]]', '[[foxcat:inverter.rrcr_l3]]', '[[foxcat:inverter.rrcr_l4]]'];
+                  const code = R.map((id) => g(id) === 'on' ? '1' : '0').reverse().join('');
+                  const T = { '0000': 100, '1001': 90, '1000': 80, '0111': 70, '0110': 60, '0101': 50, '0100': 40, '0011': 30, '0010': 20, '0001': 10, '1010': 0 };
+                  const lvl = T[code], ok = lvl !== undefined;
+                  const c = ok ? '#35e59d' : '#fb7185';
+                  const digits = code.split('').map((b, i) => `<span style="display:inline-block;width:34px;text-align:center;font:800 26px 'JetBrains Mono',ui-monospace,monospace;color:${b === '1' ? '#ffad42' : '#475569'}">${b}</span>`).join('');
+                  const labs = ['L4', 'L3', 'L2', 'L1'].map((l) => `<span style="display:inline-block;width:34px;text-align:center;font-size:9px;font-weight:800;letter-spacing:.12em;color:#64748b">${l}</span>`).join('');
+                  return `<div class="p">
+                    <div class="t"><span style="color:#35e59d">✅ Commande manuelle RRCR</span><small>Mode EMS : Manuel</small></div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                      <div style="padding:8px 14px;border-radius:12px;background:#050b14;border:1px solid rgba(255,255,255,.08)"><div>${digits}</div><div>${labs}</div></div>
+                      <div style="flex:1;min-width:240px;padding:10px 14px;border-radius:12px;font-size:12px;line-height:1.5;color:#cfe0f2;background:${c}12;border:1px solid ${c}44">
+                        <b style="color:${c}">${ok ? 'Combinaison valide : niveau ' + lvl + ' % (' + (lvl * 40) + ' W max)' : 'Combinaison hors table RRCR'}</b><br>
+                        ${ok ? 'Touchez un niveau pour envoyer la combinaison complète, vérifiée par FoxCat (relecture du code et ACK RRCR).' : 'Cette combinaison n\'existe pas dans la table : l\'onduleur peut l\'ignorer. Choisissez un niveau pour revenir à une combinaison valide.'}
+                      </div>
+                    </div>
+                    <div class="k" style="margin-top:10px;font-size:11px">Contacts : un appui ouvre ou ferme un relais (confirmation demandée). Niveaux : le plus sûr, il commande les 4 relais ensemble.</div>
+                  </div>`;
+                ]]]
+          - type: grid
+            columns: 4
+            square: false
+            cards:
+            - type: custom:button-card
+              entity: '[[foxcat:inverter.rrcr_l1]]'
+              name: Contact L1
+              icon: mdi:electric-switch
+              show_state: true
+              state_display: '[[[ return entity.state === ''on'' ? ''FERMÉ'' : ''OUVERT''; ]]]'
+              tap_action:
+                action: toggle
+                confirmation:
+                  text: Basculer le contact RRCR L1 ? Vérifiez que la combinaison obtenue existe dans la table.
+              hold_action:
+                action: more-info
+              state:
+              - value: 'on'
+                icon: mdi:electric-switch-closed
+                color: '#ffad42'
+                styles:
+                  card:
+                  - border: 1px solid rgba(255,173,66,.55)
+                  - background: rgba(255,173,66,.10)
+                  - box-shadow: 0 0 18px rgba(255,173,66,.18)
+                  state:
+                  - color: '#ffad42'
+              styles:
+                card:
+                - padding: 14px 6px
+                - border-radius: 14px
+                - background: rgba(255,255,255,.04)
+                - border: 1px solid rgba(255,255,255,.08)
+                - color: '#e8f1fb'
+                icon:
+                - width: 30px
+                - color: '#64748b'
+                name:
+                - font-size: 12px
+                - font-weight: '800'
+                state:
+                - font-size: 11px
+                - font-weight: '800'
+                - letter-spacing: .1em
+                - color: '#64748b'
+            - type: custom:button-card
+              entity: '[[foxcat:inverter.rrcr_l2]]'
+              name: Contact L2
+              icon: mdi:electric-switch
+              show_state: true
+              state_display: '[[[ return entity.state === ''on'' ? ''FERMÉ'' : ''OUVERT''; ]]]'
+              tap_action:
+                action: toggle
+                confirmation:
+                  text: Basculer le contact RRCR L2 ? Vérifiez que la combinaison obtenue existe dans la table.
+              hold_action:
+                action: more-info
+              state:
+              - value: 'on'
+                icon: mdi:electric-switch-closed
+                color: '#ffad42'
+                styles:
+                  card:
+                  - border: 1px solid rgba(255,173,66,.55)
+                  - background: rgba(255,173,66,.10)
+                  - box-shadow: 0 0 18px rgba(255,173,66,.18)
+                  state:
+                  - color: '#ffad42'
+              styles:
+                card:
+                - padding: 14px 6px
+                - border-radius: 14px
+                - background: rgba(255,255,255,.04)
+                - border: 1px solid rgba(255,255,255,.08)
+                - color: '#e8f1fb'
+                icon:
+                - width: 30px
+                - color: '#64748b'
+                name:
+                - font-size: 12px
+                - font-weight: '800'
+                state:
+                - font-size: 11px
+                - font-weight: '800'
+                - letter-spacing: .1em
+                - color: '#64748b'
+            - type: custom:button-card
+              entity: '[[foxcat:inverter.rrcr_l3]]'
+              name: Contact L3
+              icon: mdi:electric-switch
+              show_state: true
+              state_display: '[[[ return entity.state === ''on'' ? ''FERMÉ'' : ''OUVERT''; ]]]'
+              tap_action:
+                action: toggle
+                confirmation:
+                  text: Basculer le contact RRCR L3 ? Vérifiez que la combinaison obtenue existe dans la table.
+              hold_action:
+                action: more-info
+              state:
+              - value: 'on'
+                icon: mdi:electric-switch-closed
+                color: '#ffad42'
+                styles:
+                  card:
+                  - border: 1px solid rgba(255,173,66,.55)
+                  - background: rgba(255,173,66,.10)
+                  - box-shadow: 0 0 18px rgba(255,173,66,.18)
+                  state:
+                  - color: '#ffad42'
+              styles:
+                card:
+                - padding: 14px 6px
+                - border-radius: 14px
+                - background: rgba(255,255,255,.04)
+                - border: 1px solid rgba(255,255,255,.08)
+                - color: '#e8f1fb'
+                icon:
+                - width: 30px
+                - color: '#64748b'
+                name:
+                - font-size: 12px
+                - font-weight: '800'
+                state:
+                - font-size: 11px
+                - font-weight: '800'
+                - letter-spacing: .1em
+                - color: '#64748b'
+            - type: custom:button-card
+              entity: '[[foxcat:inverter.rrcr_l4]]'
+              name: Contact L4
+              icon: mdi:electric-switch
+              show_state: true
+              state_display: '[[[ return entity.state === ''on'' ? ''FERMÉ'' : ''OUVERT''; ]]]'
+              tap_action:
+                action: toggle
+                confirmation:
+                  text: Basculer le contact RRCR L4 ? Vérifiez que la combinaison obtenue existe dans la table.
+              hold_action:
+                action: more-info
+              state:
+              - value: 'on'
+                icon: mdi:electric-switch-closed
+                color: '#ffad42'
+                styles:
+                  card:
+                  - border: 1px solid rgba(255,173,66,.55)
+                  - background: rgba(255,173,66,.10)
+                  - box-shadow: 0 0 18px rgba(255,173,66,.18)
+                  state:
+                  - color: '#ffad42'
+              styles:
+                card:
+                - padding: 14px 6px
+                - border-radius: 14px
+                - background: rgba(255,255,255,.04)
+                - border: 1px solid rgba(255,255,255,.08)
+                - color: '#e8f1fb'
+                icon:
+                - width: 30px
+                - color: '#64748b'
+                name:
+                - font-size: 12px
+                - font-weight: '800'
+                state:
+                - font-size: 11px
+                - font-weight: '800'
+                - letter-spacing: .1em
+                - color: '#64748b'
+          - type: grid
+            columns: 4
+            square: false
+            cards:
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 100 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 100 %
+              state:
+              - value: 100 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 90 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 90 %
+              state:
+              - value: 90 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 80 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 80 %
+              state:
+              - value: 80 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 70 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 70 %
+              state:
+              - value: 70 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 60 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 60 %
+              state:
+              - value: 60 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 50 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 50 %
+              state:
+              - value: 50 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 40 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 40 %
+              state:
+              - value: 40 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 30 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 30 %
+              state:
+              - value: 30 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 20 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 20 %
+              state:
+              - value: 20 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 10 %
+              icon: mdi:solar-power
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 10 %
+              state:
+              - value: 10 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: 0 %
+              icon: mdi:solar-power-off
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 0 %
+              state:
+              - value: 0 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
+            - type: custom:button-card
+              template: fc_btn
+              entity: '[[foxcat:inverter.manual_level]]'
+              name: Libérer
+              icon: mdi:lock-open-variant
+              tap_action:
+                action: call-service
+                service: select.select_option
+                target:
+                  entity_id: '[[foxcat:inverter.manual_level]]'
+                data:
+                  option: 100 %
+              state:
+              - value: 100 %
+                styles:
+                  card:
+                  - border: 1px solid rgba(250,204,21,.65)
+                  - background: rgba(250,204,21,.12)
+                  - box-shadow: 0 0 16px rgba(250,204,21,.18)
 - type: panel
   title: Boiler ECS
   path: boiler
