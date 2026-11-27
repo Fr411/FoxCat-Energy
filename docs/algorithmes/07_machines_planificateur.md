@@ -134,3 +134,30 @@ Contexte enregistré avec chaque cycle : réseau, PV, maison, prix actif, pério
 ## 7. Couverture par les tests
 
 `tests/test_vpp.py` importe le planificateur et l'apprentissage ; `tests/test_peak_runtime.py` couvre le délestage des machines. **Non couverts** : le gestionnaire de cycles, la réconciliation des prises, et surtout `build_flexible_load_plan` avec un cycle protégé issu de `MachineCycleManager.snapshot` (A-22).
+
+## 6. Planificateur dynamique (`build_dynamic_plan`)
+
+> Source : `domain/pricing/dynamic_planner.py`, tests `tests/test_dynamic_planner.py`. Capteur « Planificateur dynamique », interrupteur « Planificateur dynamique pilote les machines » (désactivé par défaut), réglage « stabilité du plan ».
+
+Calculé à chaque trame en **tarif dynamique** ; sans l'interrupteur, il reste en **observation** (aucune commande). Avec l'interrupteur (et mode ≠ Manuel), son plan des machines remplace celui du planificateur de charges flexibles (§4) dans `_economic_view`.
+
+1. **Créneaux** : la courbe (15 min ou 1 h) est découpée en créneaux, classés par **rang** de prix : négatif (prix < 0), `TRES_BAS` ≤ 15 %, `BAS` ≤ 35 %, `NORMAL` ≤ 70 %, `ELEVE` ≤ 90 %, `PIC`. Horizon : fin de la courbe, 36 h au plus.
+2. **Candidats** (machine non interruptible) : maintenant, chaque début de créneau et chaque ouverture de plage, à condition que **le cycle entier** tienne dans une plage utilisateur, entre « disponible dès » et l'échéance (réglée, bornée par l'attente maximale du mode), sans dépasser la puissance parallèle maximale déjà réservée par les machines plus prioritaires.
+3. **Coût** = prix moyen pondéré sur la durée × puissance × durée, avec une part solaire valorisée à la valeur de réinjection (0 si inconnue) : surplus mesuré pour un départ immédiat, fenêtre de prévision solaire × confiance × 50 % au plus pour un départ futur.
+4. **Décision** : coût + attente × pénalité du mode. `START_NOW` si prix négatif, si le meilleur créneau est maintenant, ou si attendre économise moins que l'économie minimale du mode ; sinon `WAIT` avec `planned_start`.
+5. **Stabilité** : le départ planifié au calcul précédent est conservé s'il reste à moins de `max(0,005 €, stabilité % du coût)` du meilleur.
+6. **Interruptibles** : les créneaux les moins chers (dans les plages, avant l'échéance), dans le désordre ; départ si l'instant courant est dans l'un d'eux.
+7. **Sécurités** : cycle protégé → `CONTINUE` ; écrêtage → `SAFETY_OVERRIDE` ; gestion automatique coupée ou mode Manuel → `USER_CONTROL` ; courbe absente → `ATTENTE_PRIX`.
+
+Hypothèses à connaître : la part solaire future est une estimation prudente, pas une prévision de puissance ; le boiler n'est pas planifié ici.
+
+## 7. Planificateur bi-horaire (`build_bihoraire_plan`)
+
+> Source : `domain/pricing/bihoraire_planner.py` (s'appuie sur `dynamic_planner.py`), tests `tests/test_bihoraire_planner.py`. Capteur « Planificateur bi-horaire », interrupteur « Planificateur bi-horaire pilote les machines » (désactivé par défaut).
+
+Actif seulement en tarif **bi-horaire** (structure HP/HC, hors dynamique). Il construit une courbe de prix de 36 h au quart d'heure (prix HP/HC finaux, compléments inclus) selon les plages HP réglées, puis applique les règles du §6 avec des bandes `HP` / `HC` au lieu des rangs de prix.
+
+- Un cycle est placé **entièrement** dans une plage utilisateur ; ses minutes en HP sont payées au prix HP, donc un départ tardif en HC qui déborde sur les HP perd face à la HC suivante.
+- Report seulement si l'économie dépasse le minimum du mode ; HP ≈ HC : démarrage immédiat.
+- En observation, rien n'est commandé. Piloté (interrupteur actif, mode ≠ Manuel), son `allow_start_now` remplace la recommandation habituelle (« HC seulement » ou comparateur économique) pour les nouveaux départs.
+- Non couvert : jours de semaine / week-end différents, boiler (voir 02).

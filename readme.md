@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version de l'intégration | **1.7.6** |
+| Version de l'intégration | **1.7.7** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
@@ -254,7 +254,10 @@ Le **PRI** réduit la puissance de l'onduleur par quatre relais **RRCR** (L1 à 
 - **Fenêtre machines** : plage horaire pendant laquelle l'alimentation est autorisée.
 - **Détection et protection de cycle** : une machine en cycle n'est jamais coupée en plein programme.
 - **Apprentissage passif** : jusqu'à 30 cycles récents par machine mesurée.
-- **Planificateur de charges flexibles** : décide du démarrage selon le surplus solaire et les prix. Il reste seul décideur de l'autorisation de démarrer.
+- **Planificateur de charges flexibles** : décide du démarrage selon le surplus solaire et les prix. Il reste seul décideur de l'autorisation de démarrer, sauf si l'un des deux planificateurs ci-dessous est activé.
+- **Planificateur dynamique** (tarif dynamique) : place chaque cycle sur les créneaux les moins chers avant l'échéance, avec des bandes de prix par rang (négatif, très bas, bas, normal, élevé, pic), le surplus solaire, la puissance parallèle limitée et un plan stable (réglage « stabilité du plan »). Les machines interruptibles prennent les N créneaux les moins chers.
+- **Planificateur bi-horaire** (tarif HP/HC) : même moteur sur une courbe HP/HC de 36 h ; un cycle qui déborde sur les HP paie ses minutes HP, donc il attend les HC suivantes ; pas de report si HP et HC sont presque au même prix.
+- Les deux planificateurs sont en **observation** par défaut (capteurs « Planificateur dynamique » et « Planificateur bi-horaire ») ; leur interrupteur « … pilote les machines » leur confie l'autorisation de démarrage. Un cycle protégé continue toujours, l'écrêtage bloque les nouveaux départs, le mode Manuel donne une recommandation seule. Le boiler garde sa logique propre. Détail : [`docs/algorithmes/07_machines_planificateur.md`](docs/algorithmes/07_machines_planificateur.md).
 - **Phase du réseau** par machine (L1, L2, L3) pour le calcul de charge.
 - Une machine peut être marquée **délestable**.
 
@@ -297,7 +300,7 @@ Les tensions améliorent la précision du calcul ; elles **ne détectent pas** u
 
 - **Prévisions solaires** (Forecast.Solar et capteurs de prévision) et **agent IA Home Assistant** (AI Task) facultatif. Le module est consultatif ; sans IA, FoxCat garde un repli déterministe.
 - **Price Analyzer V2** : statistiques du jour et de demain, position et rang, fraîcheur et continuité des données, série complète exposée en attribut pour les graphiques.
-- **Planificateur de charges flexibles** (V1.7.1) : seul décideur de l'autorisation de démarrer.
+- **Planificateur de charges flexibles** (V1.7.1) : décideur de l'autorisation de démarrer par défaut ; remplacé par le **planificateur dynamique** ou **bi-horaire** quand leur interrupteur est activé (voir section 10).
 - **Optimiseur économique** et arbitrage de prévision solaire, activables séparément.
 
 ## 15. Entités, appareils et services
@@ -306,7 +309,7 @@ Les entités sont rangées en **10 appareils** : Mesures et sources · Tarificat
 
 **Réglages inactifs.** Une vingtaine d'entités de réglage (par exemple « Agressivité solaire Bihoraire », « Charge réseau si prix dynamique négatif », plusieurs seuils PRI) ne sont lues par aucune stratégie active. Elles restent pour ne pas casser les tableaux de bord et les profils, mais elles sont créées **désactivées**, rangées en diagnostic et portent l'attribut `statut: inactif`. La liste est dans `INACTIVE_SETTINGS` (`const.py`) et dans [`docs/algorithmes/ANOMALIES.md`](docs/algorithmes/ANOMALIES.md) (A-03).
 
-Principaux interrupteurs : Régulation FoxCat active, Boiler géré par FoxCat, Boiler autorisé en heures creuses, Réduction de puissance onduleur, Gestion de chaque machine, Délestage haute consommation, Analyse prédictive IA, Optimisation économique, Prédictif prix dynamique, Décalage de consigne solaire, Résumé EMS persistant.
+Principaux interrupteurs : Régulation FoxCat active, Boiler géré par FoxCat, Boiler autorisé en heures creuses, Réduction de puissance onduleur, Gestion de chaque machine, Délestage haute consommation, Analyse prédictive IA, Optimisation économique, Prédictif prix dynamique, Planificateur dynamique / bi-horaire pilote les machines, Décalage de consigne solaire, Résumé EMS persistant.
 
 Listes : Mode EMS, Politique réseau, Version du dashboard, et cinq listes de tarif : **Source du prix**, **Structure tarifaire**, **Régime Tarifaire**, **Profil distribution Belgique** et **Structure (Si Dynamique)**.
 

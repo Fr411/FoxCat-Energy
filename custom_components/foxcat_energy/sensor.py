@@ -181,6 +181,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         FoxCatDayAheadSensor(c),
         FoxCatPriceAnalyzerSensor(c),
         FoxCatPlannerSensor(c),
+        FoxCatDynamicPlannerSensor(c),
+        FoxCatBihorairePlannerSensor(c),
         FoxCatValueSensor(c,"price_analyzer_etat","Price Analyzer • État","mdi:chart-bell-curve","pricing",lambda d:d.get("economic",{}).get("price_analyzer",{}).get("state","INACTIF")),
         FoxCatNumericSensor(c,"price_analyzer_min_j","Price Analyzer • Minimum J","mdi:arrow-collapse-down","pricing",lambda d:(d.get("economic",{}).get("price_analyzer",{}).get("today") or {}).get("minimum"),"€/kWh"),
         FoxCatNumericSensor(c,"price_analyzer_min_j1","Price Analyzer • Minimum J+1","mdi:calendar-arrow-right","pricing",lambda d:(d.get("economic",{}).get("price_analyzer",{}).get("tomorrow") or {}).get("minimum"),"€/kWh"),
@@ -370,6 +372,46 @@ class FoxCatPlannerSensor(FoxCatEntity, SensorEntity):
     # MÉTHODE : FoxCatPlannerSensor.extra_state_attributes — Extra state attributes
     @property
     def extra_state_attributes(self): return dict(self.coordinator.data.get("economic",{}).get("planner",{}) or {})
+
+class FoxCatDynamicPlannerSensor(FoxCatEntity, SensorEntity):
+    """Planificateur dynamique : plan des machines sur la courbe de prix (mode observation ou pilote)."""
+
+    def __init__(self, c) -> None:
+        super().__init__(c, "planificateur_dynamique", "Planificateur dynamique", "mdi:calendar-clock", "pricing")
+
+    @property
+    def native_value(self) -> str:
+        plan = self.coordinator.data.get("economic", {}).get("dynamic_planner", {}) or {}
+        if not plan.get("active"):
+            return "INACTIF"
+        if not plan.get("ready"):
+            return "ATTENTE_PRIX"
+        return "PILOTE" if plan.get("pilot") else "OBSERVATION"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return dict(self.coordinator.data.get("economic", {}).get("dynamic_planner", {}) or {})
+
+
+class FoxCatBihorairePlannerSensor(FoxCatEntity, SensorEntity):
+    """Planificateur bi-horaire : plan des machines dans les heures creuses (observation ou pilote)."""
+
+    def __init__(self, c) -> None:
+        super().__init__(c, "planificateur_bihoraire", "Planificateur bi-horaire", "mdi:calendar-clock", "pricing")
+
+    @property
+    def native_value(self) -> str:
+        plan = self.coordinator.data.get("economic", {}).get("bihoraire_planner", {}) or {}
+        if not plan.get("active"):
+            return "INACTIF"
+        if not plan.get("ready"):
+            return "ATTENTE_PRIX"
+        return "PILOTE" if plan.get("pilot") else "OBSERVATION"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return dict(self.coordinator.data.get("economic", {}).get("bihoraire_planner", {}) or {})
+
 
 class FoxCatDayAheadSensor(FoxCatEntity, SensorEntity):
     """Synthèse du planificateur Day-Ahead, strictement Dynamique."""

@@ -375,6 +375,8 @@ Menu **Machines** : *Ajouter*, *Modifier*, *Supprimer*. Supprimer une machine la
 
 Sections : **Automatisation** (gestion automatique, délestable, phase du réseau L1/L2/L3), **Cycle** (détection et protection du cycle), **Mesures**. Si la **gestion automatique est désactivée**, FoxCat n'envoie plus aucune commande à la prise (vous la pilotez vous-même) ; seule une machine « délestable » est encore coupée pendant un délestage du disjoncteur.
 
+**Planificateurs dynamique et bi-horaire.** Deux capteurs de l'appareil Tarification, « Planificateur dynamique » et « Planificateur bi-horaire », montrent le plan de chaque machine (départ prévu, économie attendue, créneau choisi) sans rien commander (état `OBSERVATION`). Pour qu'ils décident du démarrage à la place du planificateur de charges flexibles, activez l'interrupteur « Planificateur dynamique pilote les machines » (tarif dynamique) ou « Planificateur bi-horaire pilote les machines » (tarif HP/HC) ; le capteur passe à `PILOTE`. Réglez aussi, pour chaque machine, ses plages, son échéance et « disponible dès » : un cycle doit tenir entièrement dans une plage et finir avant l'échéance. Le réglage « Planificateur dynamique : stabilité du plan » (5 % par défaut) évite de changer l'heure prévue pour un gain minime.
+
 Bon à savoir :
 
 - Une machine **en cycle n'est jamais coupée** en plein programme.
@@ -465,6 +467,7 @@ Procédez **progressivement**, en observant à chaque étape.
 | 7 | Activez **« Réduction de puissance onduleur »** | La puissance de l'onduleur suit les paliers, pas d'oscillation |
 | 8 | Activez le **délestage** et le **décalage de chauffage** si voulus | Le délestage réarme proprement |
 | 9 | Activez **Optimisation économique / Prédictif prix** | Les décisions sont cohérentes avec la courbe de prix |
+| 10 | Comparez quelques jours le capteur **Planificateur dynamique** ou **bi-horaire** (observation) avec ce que font vos machines, puis activez son interrupteur « … pilote les machines » | Départs différés vers les créneaux annoncés, jamais de cycle coupé |
 
 Le mode **Confort** applique la même stratégie boiler et la même réduction de l'onduleur qu'Éco, sécurités conservées (seul le planificateur de charges flexibles se montre moins patient). Le mode **Manuel** suspend le pilotage automatique du boiler, de l'onduleur et des machines (la sécurité thermique reste active) : utile pour reprendre la main.
 
@@ -571,7 +574,7 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 
 **En cas de doute, dans cet ordre :**
 
-1. Mettez **Régulation FoxCat active = OFF**.
+1. Mettez **Régulation FoxCat active = OFF**. Pour les machines seulement : coupez l'interrupteur « … pilote les machines » du planificateur dynamique ou bi-horaire, l'ancien planificateur reprend la décision.
 2. Appuyez sur **« Libérer l'onduleur à 100 % »**.
 3. Passez le **Mode EMS** sur **Manuel**.
 4. Si nécessaire, restaurez la version précédente de l'intégration (HACS) et rechargez un profil sauvegardé.
