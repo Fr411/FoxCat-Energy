@@ -6427,6 +6427,7 @@ views:
             const AA = (n, d, tf = 'linear', o = 0) => `animation:${n} ${d}s ${tf} ${ph(d, o)} infinite;`;
 
             /* ---------- mesures ---------- */
+            const PANELS = 22;
             const NOM = Math.max(500, scaled(E.nominal, 4000));
             const acW = Math.max(0, scaled(E.ac)), dcW = Math.max(0, scaled(E.dcW));
             const dcV = plain(E.dcV), dcA = plain(E.dcA);
@@ -6621,9 +6622,10 @@ views:
                 ${dcFlow}${houseFlow}${gridFlow}
                 <g>
                   <rect x="40" y="96" width="190" height="148" rx="12" fill="#0a1424" stroke="#ffad4244" stroke-width="2"/>
-                  ${[0, 1, 2].map((r) => [0, 1, 2, 3].map((c) => `<rect x="${52 + c * 44}" y="${108 + r * 44}" width="40" height="38" rx="4" fill="url(#ivcell)" stroke="rgba(255,255,255,.12)"/>`).join('')).join('')}
+                  ${Array.from({ length: PANELS }, (_, k) => `<rect x="${(50 + (k % 11) * 15.2).toFixed(1)}" y="${108 + Math.floor(k / 11) * 62}" width="13.4" height="58" rx="2" fill="url(#ivcell)" stroke="rgba(255,255,255,.14)"/>`).join('')}
                   ${dcW > 30 ? `<g clip-path="url(#ivpv)"><rect x="0" y="80" width="46" height="180" fill="#fde68a" opacity=".16" transform="skewX(-20)" style="${AA('iv-shine', 3.4, 'ease-in-out')}"/></g>` : ''}
-                  <text x="135" y="276" text-anchor="middle" class="t1">CHAMP PV · DC</text>
+                  <text x="135" y="270" text-anchor="middle" class="t1">CHAMP PV · ${PANELS} PANNEAUX</text>
+                        <text x="135" y="288" text-anchor="middle" class="t3">${dcW > 30 ? '≈ ' + Math.round(dcW / PANELS) + ' W par panneau' : 'au repos'}</text>
                   <text x="135" y="68" text-anchor="middle" class="t2" style="fill:#ffad42">${pw(dcW)}</text>
                   <text x="135" y="86" text-anchor="middle" class="t3">${nf(dcV, 0)} V · ${nf(dcA, 1)} A</text>
                 </g>
