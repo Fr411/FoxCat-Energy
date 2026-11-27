@@ -344,6 +344,8 @@ L'état du dashboard (version active, versions disponibles, dashboard personnali
 | [`docs/cartes/comparateur_tarifs.yaml`](docs/cartes/comparateur_tarifs.yaml) | Carte markdown du comparateur |
 | [`docs/automations/etage_decalage_vtherm.yaml`](docs/automations/etage_decalage_vtherm.yaml) | Automatisation du décalage de chauffage |
 
+> **Publier une release** : workflow GitHub Actions « Publier une release » (tag `V1.7.N` suivant calculé automatiquement, notes tirées du CHANGELOG), mode d'emploi dans [`docs/PUBLIER_UNE_RELEASE.md`](docs/PUBLIER_UNE_RELEASE.md).
+
 > **Détail des algorithmes** : pas à pas, seuils et sécurités de chaque module dans [`docs/algorithmes/`](docs/algorithmes/README.md), avec le [rapport d'anomalies](docs/algorithmes/ANOMALIES.md).
 
 ## 17. Sécurité et limites
