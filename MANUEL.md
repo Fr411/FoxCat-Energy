@@ -350,6 +350,14 @@ Mêmes champs que dans l'assistant, plus les réglages de comportement dans les 
 3. Si votre contrôleur renvoie l'état réel de ses relais (ex. LOGO), renseignez les quatre **« Retour réel L1 à L4 »**. Contrôlez ensuite dans l'appareil **Onduleur** : **« Onduleur • Disponibilité commande »** doit indiquer `DISPONIBLE` et **« ACK LOGO (retour relais) »** `OK` après une commande. `FAILED` : le relais n'a pas suivi la commande ; `INDISPONIBLE` ou `ABSENT` : le retour est illisible (contrôleur, Node-RED ou liaison coupés). Sans retour configuré, ces capteurs restent à `NON_CONFIGURE` et rien ne change. **Garde LOGO** : si le LOGO n'est pas `on` ou si le retour est illisible (`INDISPONIBLE`), FoxCat ne prend plus de décision PRI et n'envoie plus de commande (raison de garde `logo_indisponible`, statut de l'actionneur `BLOQUE_LOGO`) ; l'onduleur reste au dernier niveau atteint. Les commandes reprennent d'elles-mêmes dès que le retour redevient lisible. Un écart seul (`DEGRADE`) ne bloque rien. **Avant de renseigner un champ, vérifiez qu'il est bien `on`/`off` et non `unavailable`** : une entité indisponible bloque les commandes. Pour reprendre la main : « Libérer l'onduleur à 100 % » (non soumis à la garde) ou videz les champs « Retour réel » et « LOGO en ligne ».
 4. Activez **« Réduction de puissance onduleur »** seulement après vérification (étape 10).
 
+**Commande manuelle depuis le dashboard 1.8.0 (vue Onduleur).**
+
+1. Passez l'EMS en **Manuel** (sélecteur Mode EMS). Sinon la commande est verrouillée : FoxCat reprendrait la main et écraserait votre réglage.
+2. Les boutons **100 % à 0 %** et **Libérer** envoient la combinaison complète des quatre relais. FoxCat relit le code et publie l'**ACK RRCR** : c'est le moyen le plus sûr.
+3. Les **contacts L1 à L4** ouvrent ou ferment un relais (confirmation demandée). Un bandeau indique si la combinaison obtenue existe dans la table ; l'onduleur peut ignorer une combinaison hors table.
+4. Le code se lit **L4 L3 L2 L1** : `1000` veut dire L4 fermé, `0110` L3 et L2 fermés.
+5. Retour arrière : bouton **Libérer** (100 %), ou repassez l'EMS en Éco ou Confort.
+
 Le bouton **« Libérer l'onduleur à 100 % »** annule toute réduction : c'est votre retour arrière immédiat. Pour retirer le retour réel, videz les quatre champs « Retour réel » : FoxCat revient au comportement précédent.
 
 ### 7.3 Machines
@@ -490,6 +498,8 @@ Les fichiers existants **ne sont jamais écrasés** au démarrage.
 Installez (via HACS, catégorie Interface) : **`button-card`**, **`apexcharts-card`**, **`card-mod`**. Les dashboards 1.8.0 demandent en plus **`vertical-stack-in-card`** ; la version mobile demande aussi **`layout-card`** (masonry-layout) et **`html-template-card`**.
 
 ### Dashboards 1.8.0 (recommandés)
+
+La vue **Onduleur** de la tablette affiche la scène animée de l'onduleur, l'oscilloscope triphasé, les relais RRCR et la table des niveaux. Elle lit des capteurs **SolarEdge** propres à l'installation (courants, tensions, puissances) : s'ils n'existent pas chez vous, les valeurs affichent « — ». Le nombre de panneaux du champ PV (22 dans l'installation de développement) est écrit dans le dashboard (`PANELS`).
 
 À l'installation, FoxCat crée `dashboard.yaml` (tablette / PC) et `dashboardmob1.yaml` (mobile) en version **1.8.0**. Un fichier déjà présent n'est jamais remplacé : pour passer à la 1.8.0, choisissez la version dans la liste **Version du dashboard** puis utilisez **Régénérer le dashboard FoxCat** (sauvegarde `.bak`). Sur tablette : onglets Flux (Mina, la pieuvre), Boiler, Machines, Chauffage et **Délestage** dans la barre du bas. Entités propres à votre installation (machines, capteurs de charges) : à adapter dans le YAML. Vues de la 1.7.4 absentes de la 1.8.0 (Logger, Configuration, Coûts, Day-Ahead, Batterie+VE, Contrat) : choisissez la version 1.7.4 pour les retrouver. Retour arrière : sélecteur de version ou `.bak`.
 
