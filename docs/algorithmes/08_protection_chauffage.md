@@ -122,7 +122,7 @@ Appelée à chaque rafraîchissement de 30 s (`_async_update_data`). Entrées : 
 **Calcul** :
 
 ```text
-surplus = (export − import) + puissance du groupe − réserve          (ce qui resterait à exporter si les PAC étaient éteintes ; une PAC alimentée par le réseau n'est pas du surplus, A-35)
+surplus = export − import − réserve + pas_accordés × surplus_par_pas   (basé sur la réinjection réelle ; la consommation normale d'une PAC n'est jamais du surplus, A-35 puis A-36)
 désiré  = min( floor(max(surplus, 0) ÷ surplus_par_pas), max_pas )      max_pas = floor(décalage max ÷ pas)
 maintien = min(pas actuels, floor(max(surplus, 0) ÷ (surplus_par_pas × 0,60)))
 ```

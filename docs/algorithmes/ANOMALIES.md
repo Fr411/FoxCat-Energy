@@ -257,13 +257,19 @@ Le texte du README « avec un prix négatif, le boiler peut charger sur le rése
 
 **Correction** : minuteur dédié de 15 s (`async_track_time_interval`, `_on_core_watchdog`). Conséquence assumée : la réinitialisation sur trame ancienne fonctionne désormais pour toutes les installations. Non essayée dans Home Assistant.
 
+## A-36 · Haute · Décalage de consigne : la consommation normale de la PAC comptait comme surplus ✔ — CORRIGÉE
+
+**Constat** (historique de l'installation, 27/11 entre 12:15 et 12:51) : le décalage oscillait entre 0 et 1 °C toutes les 1 à 3 minutes. Pendant ces trames, la réinjection était de 0 W et l'import de 150 à 1 850 W, mais le « surplus calculé » restait à 600 à 780 W. La formule de A-35 (`export − import + puissance du groupe − réserve`) comptait la part solaire de la consommation normale de la PAC (≈ 1 200 W) comme surplus. Le pas était accordé sans aucune réinjection, la PAC consommait davantage, l'import dépassait 300 W et le pas retombait aussitôt : effet yoyo.
+
+**Correction** : `surplus = export − import − réserve + pas accordés × surplus par pas`. Seule la réinjection réelle est du surplus libre. Les pas déjà accordés sont ajoutés, car la consommation qu'ils provoquent a déjà réduit la réinjection (sinon le pas se retirerait lui-même). La puissance du groupe ne sert plus qu'à la garde de puissance. Rejeu de la séquence observée : le décalage passe à 2 pendant la réinjection, tombe à 0 dès que l'import apparaît et n'oscille plus.
+
 ## A-35 · Haute · Décalage de consigne : la PAC alimentée par le réseau comptait comme surplus ✔ — CORRIGÉE
 
 **Constat** (capture de l'utilisateur : solaire 0 W, import 1,10 kW, export 0 W, PAC à 641 W) : le statut affichait « surplus 541 W » et gardait un décalage de 1,0 °C. La formule était `surplus = export + puissance du groupe − réserve`. Elle comptait donc toute la consommation de la PAC comme surplus, quelle que soit son origine, et ignorait l'import : une PAC alimentée à 100 % par le réseau « créait » du surplus et conservait son décalage, c'est-à-dire qu'elle chauffait plus fort sur le réseau. La règle « baisse immédiate si import > 300 W » ne corrigeait rien : elle baisse seulement jusqu'au nombre de pas que le surplus erroné autorisait encore.
 
 **Preuve** ✔ : `heating_boost.evaluate` rejoué avec les mesures de la capture : surplus 541 W, 1 pas conservé.
 
-**Correction** : `surplus = (export − import) + puissance du groupe − réserve`, soit ce qui resterait à exporter si les PAC étaient éteintes. Avec la capture : −559 W, décalage ramené à 0. Une PAC entièrement couverte par le solaire (réseau à 0) garde son décalage ; une PAC partiellement couverte n'est comptée que pour la part solaire. Deux anciens tests utilisaient des mesures impossibles (export et import positifs en même temps) : ils sont rendus réalistes, avec quatre nouveaux tests dont la capture.
+**Correction** : `surplus = (export − import) + puissance du groupe − réserve`, soit ce qui resterait à exporter si les PAC étaient éteintes. *(Remplacée par A-36 : la puissance du groupe n'entre plus dans le surplus.)* Avec la capture : −559 W, décalage ramené à 0. Une PAC entièrement couverte par le solaire (réseau à 0) garde son décalage ; une PAC partiellement couverte n'est comptée que pour la part solaire. Deux anciens tests utilisaient des mesures impossibles (export et import positifs en même temps) : ils sont rendus réalistes, avec quatre nouveaux tests dont la capture.
 
 1. **A-22** : passer le vrai `MachineCycleManager.snapshot()` à `build_flexible_load_plan` ; couvrir aussi `machine_states()` en tarif dynamique.
 2. **A-16** : courbes de 96 quarts d'heure : position, bande, bloc consécutif, créneau de réservation.

@@ -107,10 +107,16 @@ class StepCalculationTests(unittest.TestCase):
         result = run(cfg(heating_boost_max_c=1.2), state(), inputs(export_w=9000.0))
         self.assertEqual((result.steps, result.offset_c), (2, 1.0))
 
-    def test_group_power_counts_as_surplus(self):
-        # Le groupe consomme déjà 1000 W : export 0 + 1000 - 100 = 900 W -> 1 pas.
+    def test_group_power_is_not_surplus(self):
+        # La consommation normale de la PAC n'est pas du surplus : seule la réinjection compte.
         result = run(cfg(), state(), inputs(export_w=0.0, group_power_w=1000.0))
-        self.assertEqual((result.steps, result.surplus_w), (1, 900.0))
+        self.assertEqual((result.steps, result.surplus_w), (0, -100.0))
+
+    def test_no_step_without_injection_even_if_the_pac_runs_on_solar(self):
+        # Cas observé : export 0 W, import 400 W, PAC à 1200 W. Aucune réinjection : aucun pas.
+        result = run(cfg(), state(), inputs(export_w=0.0, import_w=400.0, group_power_w=1200.0))
+        self.assertEqual(result.steps, 0)
+        self.assertLess(result.surplus_w, 0.0)
 
     def test_custom_step_and_power(self):
         config = cfg(heating_boost_step_c=0.25, heating_surplus_per_step_w=200.0, heating_boost_max_c=1.0)
@@ -120,10 +126,11 @@ class StepCalculationTests(unittest.TestCase):
 
 class HysteresisTests(unittest.TestCase):
     def test_granted_step_is_kept_down_to_sixty_percent_of_its_threshold(self):
-        # 2 pas accordés (seuil 1000 W) : conservés tant que surplus >= 600 W.
-        kept = run(cfg(), state(2, T0 - 1000), inputs(export_w=700.0))  # surplus 600 W
+        # 2 pas accordés (1000 W déjà consommés), marge 800 W : conservés tant que surplus >= 600 W.
+        config = cfg(heating_surplus_reserve_w=800.0)
+        kept = run(config, state(2, T0 - 1000), inputs(export_w=400.0))  # surplus 600 W
         self.assertEqual(kept.steps, 2)
-        dropped = run(cfg(), state(2, T0 - 1000), inputs(export_w=699.0))  # surplus 599 W
+        dropped = run(config, state(2, T0 - 1000), inputs(export_w=399.0))  # surplus 599 W
         self.assertEqual(dropped.steps, 1)
 
     def test_hysteresis_only_protects_granted_steps(self):
@@ -133,9 +140,9 @@ class HysteresisTests(unittest.TestCase):
         self.assertEqual(run(cfg(), state(0, T0 - 1000), inputs(export_w=500.0)).steps, 0)
 
     def test_decrease_by_hysteresis_is_not_delayed_by_hold(self):
-        result = run(cfg(), state(2, T0 - 5), inputs(export_w=0.0))
+        # 2 pas accordés (1000 W déjà consommés) mais grande marge : surplus 200 W < 60 % du seuil.
+        result = run(cfg(heating_surplus_reserve_w=800.0), state(2, T0 - 5), inputs(export_w=0.0))
         self.assertEqual(result.steps, 0)
-
 
 class AntiYoyoTests(unittest.TestCase):
     def test_increase_waits_for_hold_after_last_change(self):
@@ -155,15 +162,19 @@ class AntiYoyoTests(unittest.TestCase):
         self.assertEqual(run(config, state(1, T0 - 60), inputs(export_w=5000.0)).steps, 4)
 
     def test_import_forces_immediate_decrease_even_inside_hold(self):
+        # 3 pas accordés (1500 W) : import 301 W > 300 W, baisse immédiate au nombre de pas que le surplus permet.
         result = run(cfg(), state(3, T0 - 1), inputs(export_w=0.0, import_w=301.0))
-        self.assertEqual(result.steps, 0)
+        self.assertLess(result.steps, 3)
         self.assertIn("import", result.reason)
+        # Plus d'import, plus de pas : la baisse est complète.
+        result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=800.0))
+        self.assertEqual(result.steps, 0)
 
     def test_import_at_the_limit_does_not_force_the_decrease(self):
         # import 300 W n'est pas > 300 W : retour au comportement d'hystérésis.
-        # PAC à 1000 W : surplus = 0 - 300 + 1000 - 100 = 600 W, un pas.
-        result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=300.0, group_power_w=1000.0))
-        self.assertEqual(result.steps, 1)
+        # 2 pas accordés (1000 W) : surplus = 0 - 300 - 100 + 1000 = 600 W, les 2 pas sont conservés.
+        result = run(cfg(), state(2, T0 - 1), inputs(export_w=0.0, import_w=300.0))
+        self.assertEqual(result.steps, 2)
 
     def test_import_bypasses_hysteresis(self):
         # Surplus 0 - 400 + 900 - 100 = 400 W conserverait le pas 1 ; l'import > 300 W l'enlève tout de suite.
@@ -171,11 +182,10 @@ class AntiYoyoTests(unittest.TestCase):
         self.assertEqual(result.steps, 0)
 
     def test_change_timestamp_only_moves_when_steps_change(self):
-        stable = run(cfg(), state(2, T0 - 1000), inputs(export_w=1100.0))
+        stable = run(cfg(), state(2, T0 - 1000), inputs(export_w=100.0))  # surplus 1000 W = 2 pas
         self.assertEqual(stable.state, state(2, T0 - 1000))
-        changed = run(cfg(), state(2, T0 - 1000), inputs(export_w=0.0))
+        changed = run(cfg(heating_surplus_reserve_w=800.0), state(2, T0 - 1000), inputs(export_w=0.0))
         self.assertEqual(changed.state, state(0, T0))
-
 
 class GroupGuardTests(unittest.TestCase):
     def test_guard_power_of_one_group_is_independent_from_the_shared_surplus(self) -> None:
@@ -195,11 +205,11 @@ class GroupGuardTests(unittest.TestCase):
         self.assertEqual(allowed.steps, 4)
 
     def test_guard_never_blocks_a_decrease(self):
-        # Groupe à 2400 W (>= 2250 W) mais surplus réduit par une grande réserve :
-        # 0 - 400 + 2400 - 800 = 1200 W -> 2 pas demandés < 3 accordés, import > 300 W.
+        # Groupe à 2400 W (>= 2250 W) : la garde ne bloque que les augmentations.
+        # 3 pas accordés (1500 W), marge 800 W, import 400 W : surplus 300 W, import > 300 W -> 0 pas.
         config = cfg(heating_surplus_reserve_w=800.0)
         result = run(config, state(3, T0 - 1), inputs(export_w=0.0, import_w=400.0, group_power_w=2400.0))
-        self.assertEqual(result.steps, 2)
+        self.assertEqual(result.steps, 0)
 
     def test_guard_uses_configured_limit(self):
         config = cfg(heating_group_limit_w=1000.0)
@@ -466,19 +476,22 @@ class GridFedHeatingTests(unittest.TestCase):
         self.assertLess(result.surplus_w, 0)
 
     def test_pac_fully_covered_by_the_solar_keeps_its_offset(self):
-        # Solaire = maison + PAC : réseau à 0, la PAC (641 W) tourne sur le surplus.
+        # Réseau à 0 : la PAC consomme déjà le pas accordé (500 W). Surplus = 0 - 100 + 500 = 400 W,
+        # au-dessus de 60 % du seuil (300 W) : le pas est conservé.
         result = run(cfg(), state(1, T0 - 1), inputs(export_w=0.0, import_w=0.0, group_power_w=641.0))
         self.assertEqual(result.steps, 1)
-        self.assertAlmostEqual(result.surplus_w, 541.0)
-
-    def test_pac_only_partly_covered_by_the_solar_is_not_counted_in_full(self):
-        # La maison importe 400 W avec la PAC à 900 W : sans la PAC elle exporterait 500 W, donc 500 - 100 de marge = 400 W.
-        result = run(cfg(), state(0), inputs(export_w=0.0, import_w=400.0, group_power_w=900.0))
         self.assertAlmostEqual(result.surplus_w, 400.0)
 
-    def test_surplus_adds_export_and_pac_power_when_exporting(self):
+    def test_pac_fed_by_the_grid_is_not_surplus(self):
+        # La maison importe 400 W avec la PAC à 900 W : aucune réinjection, donc aucun surplus.
+        result = run(cfg(), state(0), inputs(export_w=0.0, import_w=400.0, group_power_w=900.0))
+        self.assertAlmostEqual(result.surplus_w, -500.0)
+        self.assertEqual(result.steps, 0)
+
+    def test_surplus_is_the_real_injection_minus_the_reserve(self):
         result = run(cfg(), state(0), inputs(export_w=800.0, import_w=0.0, group_power_w=500.0))
-        self.assertAlmostEqual(result.surplus_w, 1200.0)
+        self.assertAlmostEqual(result.surplus_w, 700.0)
+        self.assertEqual(result.steps, 1)
 
 
 if __name__ == "__main__":

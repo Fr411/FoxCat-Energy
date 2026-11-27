@@ -799,3 +799,48 @@ def test_dashboard_v180_delestage_card_uses_real_peak_values() -> None:
     assert "def _peak_view" in coordinator and "**self._peak_view(snap)" in coordinator
     for key in ("seuil_declenchement_w", "seuil_rearmement_w", "puissance_mesuree_w", "base_de_mesure", "trames_confirmation"):
         assert key in sensor
+
+
+def test_dashboard_v180_flux_mina_is_animated() -> None:
+    """Mina bouge : tentacules, sourcils, bouche, inclinaison et particules propres à chaque humeur."""
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    text = (root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8")
+    for token in ("oc-sway", "oc-tilt", "oc-blink2", "oc-laugh", "oc-rise", "oc-rain", "oc-puff", "oc-bang", "const PARTS", "const BROW"):
+        assert token in text
+
+
+def test_dashboard_v180_inverter_view_is_live_with_rrcr_relays() -> None:
+    """La vue Onduleur affiche l'oscilloscope triphasé, les relais L1-L4 et la table RRCR."""
+    import yaml
+
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    data = yaml.safe_load((root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8"))
+    view = next(v for v in data["views"] if v.get("path") == "onduleur")
+    cards = view["cards"][0]["cards"]
+    js = next(c["custom_fields"]["c"] for c in cards if "iv-wave" in str(c.get("custom_fields", {})))
+    for token in ("TABLE", "relayOn", "[[foxcat:inverter.rrcr_l1]]", "[[foxcat:inverter.rrcr_l4]]", "[[foxcat:inverter.rrcr_code]]", "animateMotion"):
+        assert token in js
+    for code in ("0000", "1001", "1000", "0111", "0110", "0101", "0100", "0011", "0010", "0001", "1010"):
+        assert f"'{code}'" in js
+    # Les boutons de niveau manuel restent disponibles sous la carte.
+    assert cards[-1]["type"] == "vertical-stack"
+
+
+def test_dashboard_v180_inverter_manual_command_is_native_and_ordered() -> None:
+    """La commande manuelle n'utilise plus le script hérité et le code se lit L4 → L1."""
+    import yaml
+
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    text = (root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8")
+    data = yaml.safe_load(text)
+    view = next(v for v in data["views"] if v.get("path") == "onduleur")
+    dumped = yaml.safe_dump(view, allow_unicode=True)
+    # Le script hérité testait input_select.ems_mode, qui n'existe plus : il refusait toute commande.
+    assert "script.pri_rrcr_forcer_un_niveau" not in dumped
+    assert "select.select_option" in dumped
+    assert "[[foxcat:inverter.manual_level]]" in dumped
+    for role in ("rrcr_l1", "rrcr_l2", "rrcr_l3", "rrcr_l4"):
+        assert f"[[foxcat:inverter.{role}]]" in dumped
+    assert "toggle" in dumped and "confirmation" in dumped
+    # Ordre des bits : le code RRCR se lit L4 L3 L2 L1 (voir RRCR_LEVEL_TO_CODE).
+    assert "L4 → L1" in dumped and "<span>L4-L1</span>" in dumped
