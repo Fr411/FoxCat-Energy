@@ -1,12 +1,12 @@
 name: Publier une release
 
 # Crée le tag et la release GitHub à la demande (Actions → « Publier une release » → Run workflow).
-# Sans numéro saisi, la version suivante de la série V1.7.N est calculée automatiquement.
+# Sans numéro saisi, la version suivante de la série V1.7.N est calculée à partir de la dernière release publiée.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Tag à créer (ex. V1.7.665). Vide : dernière version V1.7.N + 1"
+        description: "Tag à créer (ex. V1.7.665). Vide : dernière release V1.7.N + 1"
         required: false
         default: ""
       target:
@@ -42,23 +42,29 @@ jobs:
       - name: Calculer la version
         id: ver
         env:
+          GH_TOKEN: ${{ github.token }}
           REQUESTED: ${{ inputs.version }}
         run: |
           set -euo pipefail
           git fetch --tags --force
+          # Dernière release PUBLIÉE (pas le plus grand numéro de tag : d'anciens tags
+          # hors série, comme V1.7.4023, fausseraient le calcul).
+          PREVIOUS=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')
           if [ -n "$REQUESTED" ]; then
             VERSION="$REQUESTED"
           else
-            LAST=$(git tag --list 'V1.7.*' | sed -n 's/^V1\.7\.\([0-9]\+\)$/\1/p' | sort -n | tail -1)
-            VERSION="V1.7.$(( ${LAST:-0} + 1 ))"
+            if ! [[ "$PREVIOUS" =~ ^V1\.7\.([0-9]+)$ ]]; then
+              echo "Dernière release « $PREVIOUS » hors série V1.7.N : saisissez la version à la main." >&2
+              exit 1
+            fi
+            VERSION="V1.7.$(( ${BASH_REMATCH[1]} + 1 ))"
           fi
           if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
             echo "Le tag $VERSION existe déjà." >&2
             exit 1
           fi
-          PREVIOUS=$(git tag --list 'V1.7.*' | sed -n 's/^V1\.7\.\([0-9]\+\)$/\1 &/p' | sort -n | tail -1 | cut -d' ' -f2)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "previous=${PREVIOUS:-}" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
 
       - name: Préparer les notes
         env:
@@ -66,12 +72,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "## Contenu de $VERSION"
+            echo "Détail des changements : [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) · [JOURNAL_VERSIONS.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/JOURNAL_VERSIONS.md)"
             echo
-            # Section « Non publié » du CHANGELOG (jusqu'au titre suivant).
-            awk '/^## Non publié/{f=1; next} /^## /{f=0} f' CHANGELOG.md
-            echo
-            echo "Détail : [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) · [JOURNAL_VERSIONS.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/JOURNAL_VERSIONS.md)"
           } > notes.md
 
       - name: Créer le tag et la release
