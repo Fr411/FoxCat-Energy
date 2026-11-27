@@ -576,5 +576,6 @@ Sauvegardez vos réglages avant d'expérimenter. Dans **Outils de développement
 3. Passez le **Mode EMS** sur **Manuel**.
 4. Si nécessaire, restaurez la version précédente de l'intégration (HACS) et rechargez un profil sauvegardé.
 5. Pour le dashboard : restaurez `dashboard.yaml.bak`, ou choisissez la version précédente dans le sélecteur.
+6. Pour mainteneur : une release publiée par erreur se retire dans GitHub (Releases → Delete, puis Tags) ; voir [`docs/PUBLIER_UNE_RELEASE.md`](docs/PUBLIER_UNE_RELEASE.md).
 
 > FoxCat n'est pas un dispositif de sécurité certifié : gardez vos protections matérielles (disjoncteurs, thermostats de sécurité) en place.

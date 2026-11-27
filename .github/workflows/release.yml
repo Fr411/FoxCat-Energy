@@ -1,0 +1,89 @@
+name: Publier une release
+
+# Crée le tag et la release GitHub à la demande (Actions → « Publier une release » → Run workflow).
+# Sans numéro saisi, la version suivante de la série V1.7.N est calculée automatiquement.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag à créer (ex. V1.7.665). Vide : dernière version V1.7.N + 1"
+        required: false
+        default: ""
+      target:
+        description: "Branche ou commit à publier"
+        required: false
+        default: "main"
+      prerelease:
+        description: "Marquer comme pré-release"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.target }}
+
+      - name: Vérifier le manifeste
+        run: python3 -c "import json; json.load(open('custom_components/foxcat_energy/manifest.json'))"
+
+      - name: Calculer la version
+        id: ver
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if [ -n "$REQUESTED" ]; then
+            VERSION="$REQUESTED"
+          else
+            LAST=$(git tag --list 'V1.7.*' | sed -n 's/^V1\.7\.\([0-9]\+\)$/\1/p' | sort -n | tail -1)
+            VERSION="V1.7.$(( ${LAST:-0} + 1 ))"
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "Le tag $VERSION existe déjà." >&2
+            exit 1
+          fi
+          PREVIOUS=$(git tag --list 'V1.7.*' | sed -n 's/^V1\.7\.\([0-9]\+\)$/\1 &/p' | sort -n | tail -1 | cut -d' ' -f2)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous=${PREVIOUS:-}" >> "$GITHUB_OUTPUT"
+
+      - name: Préparer les notes
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Contenu de $VERSION"
+            echo
+            # Section « Non publié » du CHANGELOG (jusqu'au titre suivant).
+            awk '/^## Non publié/{f=1; next} /^## /{f=0} f' CHANGELOG.md
+            echo
+            echo "Détail : [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md) · [JOURNAL_VERSIONS.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/JOURNAL_VERSIONS.md)"
+          } > notes.md
+
+      - name: Créer le tag et la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          PREVIOUS: ${{ steps.ver.outputs.previous }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          ARGS=(--target "$(git rev-parse HEAD)" --title "Foxcat Energy $VERSION" --notes-file notes.md --generate-notes)
+          if [ -n "$PREVIOUS" ]; then ARGS+=(--notes-start-tag "$PREVIOUS"); fi
+          if [ "$PRERELEASE" = "true" ]; then ARGS+=(--prerelease); fi
+          gh release create "$VERSION" "${ARGS[@]}"
+          echo "Release $VERSION créée." >> "$GITHUB_STEP_SUMMARY"
