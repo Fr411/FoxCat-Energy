@@ -214,6 +214,7 @@ from ..domain.tariff.tariff_model import (
 from ..domain.pricing.price_analyzer import analyze_price_curve
 from ..domain.pricing import price_buffer
 from ..domain.loads.flexible_load_planner import build_flexible_load_plan
+from ..domain.pricing.dynamic_planner import build_dynamic_plan
 from ..trading.vpp import evaluate_trade, evaluate_v2h
 from ..dashboard.dashboard import cached_dashboard_status, refresh_dashboard_cache
 
@@ -405,6 +406,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._high_load_low_frames = 0
         self._sensor_reset_active = False
         self._valid_frames_after_reset = 0
+        self._dynamic_plan_state: dict[str, str] = {}
         self.load_shed_state: dict[str, Any] = {
             "active": False,
             "reason": "Inactif",
@@ -2285,6 +2287,35 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             tariff_dimensions(self.settings).dynamic
             and str(self.settings.get("mode")) != MODE_MANUAL
         )
+        # Planificateur dynamique : toujours calculé en tarif dynamique (observation) ; il ne remplace
+        # le plan des machines que si l'interrupteur « pilote les machines » est activé.
+        dynamic_plan = build_dynamic_plan(
+            now=now,
+            snapshot=snap,
+            settings=self.settings,
+            dynamic_active=bool(tariff_dimensions(self.settings).dynamic),
+            import_points=import_points,
+            export_points=export_points,
+            machines=self.controllable_machines,
+            learning=learning,
+            cycles=cycles,
+            solar_forecast=self.solar_forecast,
+            previous=self._dynamic_plan_state,
+            peak_shaving_active=peak_shaving_active,
+            tomorrow_available=tomorrow_available,
+        )
+        dynamic_plan["pilot"] = bool(
+            dynamic_plan.get("active")
+            and dynamic_plan.get("ready")
+            and dynamic_planner_is_authoritative
+            and self.settings.get("dynamic_planner_enabled", False)
+        )
+        if dynamic_plan.get("ready"):
+            self._dynamic_plan_state = dict(dynamic_plan.get("state") or {})
+        if dynamic_plan["pilot"]:
+            planner["machines"] = {**(planner.get("machines") or {}), **dynamic_plan["machines"]}
+            planner["timeline"] = dynamic_plan.get("timeline") or planner.get("timeline", [])
+            planner["loads"] = {**(planner.get("loads") or {}), **dynamic_plan["machines"]}
         for mid,plan in (planner.get("machines") or {}).items():
             rec = recommendations.setdefault(mid, {})
             if dynamic_planner_is_authoritative:
@@ -2313,6 +2344,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "day_ahead": day_ahead,
             "price_analyzer": price_analysis,
             "planner": planner,
+            "dynamic_planner": dynamic_plan,
             "vpp": vpp,
             "forecast": {
                 "import_points": len(import_points),
