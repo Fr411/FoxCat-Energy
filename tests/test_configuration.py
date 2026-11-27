@@ -807,3 +807,20 @@ def test_dashboard_v180_flux_mina_is_animated() -> None:
     text = (root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8")
     for token in ("oc-sway", "oc-tilt", "oc-blink2", "oc-laugh", "oc-rise", "oc-rain", "oc-puff", "oc-bang", "const PARTS", "const BROW"):
         assert token in text
+
+
+def test_dashboard_v180_inverter_view_is_live_with_rrcr_relays() -> None:
+    """La vue Onduleur affiche l'oscilloscope triphasé, les relais L1-L4 et la table RRCR."""
+    import yaml
+
+    root = Path(__file__).resolve().parents[1] / "custom_components" / "foxcat_energy"
+    data = yaml.safe_load((root / "dashboard" / "versions" / "dashboard_v1.8.0.yaml").read_text(encoding="utf-8"))
+    view = next(v for v in data["views"] if v.get("path") == "onduleur")
+    cards = view["cards"][0]["cards"]
+    js = next(c["custom_fields"]["c"] for c in cards if "iv-wave" in str(c.get("custom_fields", {})))
+    for token in ("TABLE", "relayOn", "[[foxcat:inverter.rrcr_l1]]", "[[foxcat:inverter.rrcr_l4]]", "[[foxcat:inverter.rrcr_code]]", "animateMotion"):
+        assert token in js
+    for code in ("0000", "1001", "1000", "0111", "0110", "0101", "0100", "0011", "0010", "0001", "1010"):
+        assert f"'{code}'" in js
+    # Les boutons de niveau manuel restent disponibles sous la carte.
+    assert cards[-1]["type"] == "vertical-stack"
