@@ -4,7 +4,8 @@ Une ligne par version : version, date, résumé en une phrase, lien vers la pull
 
 | Version | Date | Résumé | Pull request |
 |---|---|---|---|
-| 1.7.7 | 2026-11-27 | Planificateur dynamique (créneaux les moins chers, bandes par rang, plan stable, interruptibles) et planificateur bi-horaire (cycles placés en heures creuses), en observation par défaut avec interrupteurs pour piloter les machines. | [#84](https://github.com/Fr411/FoxCat-Energy/pull/84) |
+| 1.7.700 | 2026-11-27 | Appareils Home Assistant reclassés de 10 à 13 (Planificateur, Machine Learning, Santé et alertes). | [#85](https://github.com/Fr411/FoxCat-Energy/pull/85) |
+| 1.7.7 (release V1.7.4025) | 2026-11-27 | Planificateur dynamique (créneaux les moins chers, bandes par rang, plan stable, interruptibles) et planificateur bi-horaire (cycles placés en heures creuses), en observation par défaut avec interrupteurs pour piloter les machines. | [#84](https://github.com/Fr411/FoxCat-Energy/pull/84) |
 | Outillage | 2026-11-27 | Workflow « Publier une release » (tag et release à la demande, version calculée depuis la dernière release publiée). | [#82](https://github.com/Fr411/FoxCat-Energy/pull/82), [#83](https://github.com/Fr411/FoxCat-Energy/pull/83) |
 | Dashboards 1.8.0 (suite) | 2026-11-27 | Vue Onduleur refaite (scène animée, oscilloscope triphasé, relais RRCR, table des niveaux, commande manuelle réparée), animations de Mina, décalage de consigne chauffage basé sur la réinjection réelle (A-36). | [#81](https://github.com/Fr411/FoxCat-Energy/pull/81) |
 | Dashboards 1.8.0 | 2026-11-22 | Dashboards tablette/PC et mobile livrés à l'installation (vue Flux avec Mina, Boiler animé, Machines, Chauffage, Délestage haute consommation) ; carte Délestage alimentée par les valeurs réelles du délestage. | [#79](https://github.com/Fr411/FoxCat-Energy/pull/79) |
