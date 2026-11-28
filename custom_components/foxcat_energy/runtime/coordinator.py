@@ -216,6 +216,7 @@ from ..domain.pricing import price_buffer
 from ..domain.loads.flexible_load_planner import build_flexible_load_plan
 from ..domain.pricing.dynamic_planner import boiler_lane, build_dynamic_plan
 from ..domain.pricing.bihoraire_planner import build_bihoraire_plan
+from ..domain.pricing.boiler_plan import plan_boiler_hc
 from ..trading.vpp import evaluate_trade, evaluate_v2h
 from ..dashboard.dashboard import cached_dashboard_status, refresh_dashboard_cache
 
@@ -2307,7 +2308,10 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             tomorrow_available=tomorrow_available,
         )
         if dynamic_plan.get("ready"):
-            dynamic_plan["boiler"] = boiler_lane(planner.get("boiler"), None, source="PLANIFICATEUR_CHARGES")
+            dynamic_plan["boiler"] = boiler_lane(
+                planner.get("boiler"), None, source="PLANIFICATEUR_CHARGES",
+                heating_min=(boiler_thermal or {}).get("heating_duration_h") and round(float(boiler_thermal["heating_duration_h"]) * 60),
+            )
         dynamic_plan["pilot"] = bool(
             dynamic_plan.get("active")
             and dynamic_plan.get("ready")
@@ -2344,7 +2348,18 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if self.settings.get("boiler_allow_hc", True)
                 else []
             )
-            bihoraire_plan["boiler"] = boiler_lane(None, hc_windows, source="HEURES_CREUSES")
+            hc_ranges = [
+                (int(p["start_ts"]), int(p["end_ts"])) for p in bihoraire_plan.get("periods", []) if p["period"] == "HC"
+            ]
+            boiler_schedule = plan_boiler_hc(
+                now_ts=int(now.timestamp()),
+                settings=self.settings,
+                temp_c=snap.boiler_temp_c if getattr(snap, "boiler_temp_c", None) is not None else None,
+                boiler_on=bool(snap.boiler_on),
+                hc_windows=hc_ranges,
+                mode=str(self.settings.get("mode")),
+            )
+            bihoraire_plan["boiler"] = boiler_lane(None, hc_windows, source="HEURES_CREUSES", schedule=boiler_schedule)
         bihoraire_plan["pilot"] = bool(
             bihoraire_plan.get("ready")
             and str(self.settings.get("mode")) != MODE_MANUAL

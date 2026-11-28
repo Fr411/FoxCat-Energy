@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version de l'intégration | **1.7.701** |
+| Version de l'intégration | **1.7.702** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
