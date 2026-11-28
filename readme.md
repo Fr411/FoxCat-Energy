@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version de l'intégration | **1.7.702** |
+| Version de l'intégration | **1.7.703** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
@@ -257,7 +257,7 @@ Le **PRI** réduit la puissance de l'onduleur par quatre relais **RRCR** (L1 à 
 - **Planificateur de charges flexibles** : décide du démarrage selon le surplus solaire et les prix. Il reste seul décideur de l'autorisation de démarrer, sauf si l'un des deux planificateurs ci-dessous est activé.
 - **Planificateur dynamique** (tarif dynamique) : place chaque cycle sur les créneaux les moins chers avant l'échéance, avec des bandes de prix par rang (négatif, très bas, bas, normal, élevé, pic), le surplus solaire, la puissance parallèle limitée et un plan stable (réglage « stabilité du plan »). Les machines interruptibles prennent les N créneaux les moins chers.
 - **Planificateur bi-horaire** (tarif HP/HC) : même moteur sur une courbe HP/HC de 36 h ; un cycle qui déborde sur les HP paie ses minutes HP, donc il attend les HC suivantes ; pas de report si HP et HC sont presque au même prix.
-- Les deux planificateurs sont en **observation** par défaut (capteurs « Planificateur dynamique » et « Planificateur bi-horaire ») ; leur interrupteur « … pilote les machines » leur confie l'autorisation de démarrage. Un cycle protégé continue toujours, l'écrêtage bloque les nouveaux départs, le mode Manuel donne une recommandation seule. Le boiler garde sa logique propre. Détail : [`docs/algorithmes/07_machines_planificateur.md`](docs/algorithmes/07_machines_planificateur.md).
+- Les deux planificateurs sont en **observation** par défaut (capteurs « Planificateur dynamique » et « Planificateur bi-horaire ») ; leur interrupteur « … pilote les machines » leur confie l'autorisation de démarrage. Un cycle protégé continue toujours, l'écrêtage bloque les nouveaux départs, le mode Manuel donne une recommandation seule. **Synchronisation avec les prises** : dès que « départ autorisé », « plage ouverte » ou « gestion de la machine » change, FoxCat relance la réconciliation des prises (au plus une fois par minute, jamais en mode Manuel ; pas de scrutation, une prise allumée à la main n'est pas coupée sans changement du plan). Chaque machine du plan expose `socket_state`, `socket_expected` et `socket_sync` (`OK`, `ECART`, `INDISPONIBLE`, `HORS_PILOTE`, `NON_GERE`) ; ces attributs ne sont pas encore affichés dans les vues. Le boiler garde sa logique propre. Détail : [`docs/algorithmes/07_machines_planificateur.md`](docs/algorithmes/07_machines_planificateur.md).
 - **Phase du réseau** par machine (L1, L2, L3) pour le calcul de charge.
 - Une machine peut être marquée **délestable**.
 

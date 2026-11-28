@@ -62,6 +62,27 @@ def machine_socket_action(
     return SOCKET_ON if should_on else SOCKET_OFF
 
 
+def socket_should_be_on(*, management: bool, cycle_active: bool, allowed: bool, allow_start_now: bool) -> bool:
+    """Prise attendue allumée d'après le plan : cycle en cours, ou gestion active + plage ouverte + départ autorisé."""
+    return bool(cycle_active or (management and allowed and allow_start_now))
+
+
+def socket_sync_status(expected_on: bool, state: str | None) -> str:
+    """``OK`` si la prise est dans l'état attendu, ``ECART`` sinon, ``INDISPONIBLE`` si on ne la lit pas."""
+    if state in (None, "unavailable", "unknown"):
+        return "INDISPONIBLE"
+    return "OK" if (state == "on") == bool(expected_on) else "ECART"
+
+
+def socket_sync_signature(machine_states: list[dict[str, Any]]) -> dict[str, tuple[bool, bool, bool]]:
+    """Ce qui doit déclencher une réconciliation des prises : départ autorisé, plage ouverte, gestion active."""
+    return {
+        str(m["id"]): (bool(m.get("tariff_start_favorable")), bool(m.get("window_open")), bool(m.get("automatic")))
+        for m in machine_states
+        if m.get("switch")
+    }
+
+
 def _minutes(value: Any, default: str) -> int:
     raw = str(value or default).split(":")
     try:

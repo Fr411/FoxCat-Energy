@@ -165,3 +165,9 @@ Actif seulement en tarif **bi-horaire** (structure HP/HC, hors dynamique). Il co
 - Report seulement si l'économie dépasse le minimum du mode ; HP ≈ HC : démarrage immédiat.
 - En observation, rien n'est commandé. Piloté (interrupteur actif, mode ≠ Manuel), son `allow_start_now` remplace la recommandation habituelle (« HC seulement » ou comparateur économique) pour les nouveaux départs.
 - Non couvert : jours de semaine / week-end différents, boiler (voir 02).
+
+## Synchronisation avec les prises
+
+- Une prise est attendue allumée si un cycle est en cours, ou si la gestion de la machine est active, la plage ouverte et le départ autorisé par le plan (`allow_start_now`).
+- Dès que l'un de ces trois critères change pour une machine à prise, la coordination relance la réconciliation des prises (au plus une fois par minute ; jamais en mode Manuel ou régulation arrêtée). Aucune scrutation périodique.
+- Chaque machine du plan expose `socket_state`, `socket_expected` et `socket_sync` (`OK`, `ECART`, `INDISPONIBLE`, `HORS_PILOTE`, `NON_GERE`) pour repérer un écart entre le plan et la prise.

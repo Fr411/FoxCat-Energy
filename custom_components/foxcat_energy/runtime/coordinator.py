@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import logging
 import math
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -410,6 +411,9 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._valid_frames_after_reset = 0
         self._dynamic_plan_state: dict[str, str] = {}
         self._bihoraire_plan_state: dict[str, str] = {}
+        # Synchronisation plan ↔ prises : dernière signature vue et instant de la dernière réconciliation déclenchée.
+        self._socket_plan_prev: dict[str, tuple[bool, bool, bool]] | None = None
+        self._socket_sync_at: float = 0.0
         self.load_shed_state: dict[str, Any] = {
             "active": False,
             "reason": "Inactif",
@@ -2386,6 +2390,35 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if dynamic_planner_is_authoritative and not planner.get("active"):
             for machine in self.controllable_machines:
                 recommendations.setdefault(machine.machine_id, {})["allow_start"] = False
+
+        # Synchronisation plan ↔ prises : état réel de la prise face à ce que le plan attend.
+        regulating = bool(self.settings.get("regulation_active")) and str(self.settings.get("mode")) != MODE_MANUAL
+        for plan_obj in (dynamic_plan, bihoraire_plan):
+            if not plan_obj.get("ready"):
+                continue
+            for machine in self.controllable_machines:
+                entry = (plan_obj.get("machines") or {}).get(machine.machine_id)
+                if entry is None or not machine.switch_entity:
+                    continue
+                socket = self.hass.states.get(machine.switch_entity)
+                state = socket.state if socket is not None else None
+                management = bool(self.settings.get(machine.setting_key, machine.automatic_default)) and bool(
+                    self.settings.get("device_machines_enabled", True)
+                )
+                expected = rules.socket_should_be_on(
+                    management=management,
+                    cycle_active=bool((cycles.get(machine.machine_id) or {}).get("protected")),
+                    allowed=machine_allowed(machine, now),
+                    allow_start_now=bool(entry.get("allow_start_now")),
+                )
+                entry["socket_state"] = state
+                entry["socket_expected"] = "on" if expected else "off"
+                if not (management and regulating):
+                    entry["socket_sync"] = "NON_GERE"
+                elif not plan_obj.get("pilot"):
+                    entry["socket_sync"] = "HORS_PILOTE"
+                else:
+                    entry["socket_sync"] = rules.socket_sync_status(expected, state)
 
         future_export_prices = [point.price for point in export_points if point.at > now]
         vpp = evaluate_trade(
@@ -5206,6 +5239,30 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         self._comparison_cache = (now, result)
         return result
 
+    # MÉTHODE : FoxCatEnergyCoordinator._sync_sockets_with_plan — Réconcilie les prises quand le plan change
+    def _sync_sockets_with_plan(self, machine_states: list[dict[str, Any]]) -> None:
+        """Déclenche une réconciliation des prises dès que « départ autorisé », « plage ouverte » ou « gestion »
+        change pour une machine (au plus une fois par minute).
+
+        Sans cela, un départ planifié à une heure quelconque (début des heures creuses, créneau d'un planificateur)
+        n'allumait la prise qu'au prochain événement (changement de plage, de prix ou de réglage), parfois bien plus
+        tard. Pas de scrutation périodique : une prise allumée à la main n'est jamais coupée sans changement du plan.
+        """
+        signature = rules.socket_sync_signature(machine_states)
+        previous, self._socket_plan_prev = self._socket_plan_prev, signature
+        if previous is None or previous == signature:
+            return
+        if not bool(self.settings.get("regulation_active")) or str(self.settings.get("mode")) == MODE_MANUAL:
+            return
+        now_s = time.monotonic()
+        if now_s - self._socket_sync_at < 60.0:
+            # Trop tôt : on garde l'ancienne signature pour réessayer à la trame suivante.
+            self._socket_plan_prev = previous
+            return
+        self._socket_sync_at = now_s
+        _LOGGER.debug("Plan des machines modifié : réconciliation des prises.")
+        self.hass.async_create_task(self.async_reconcile_machines())
+
     # MÉTHODE : FoxCatEnergyCoordinator._build_data — Build data
     def _build_data(self, snapshot: EnergySnapshot | None = None) -> dict[str, Any]:
         snap = snapshot or self.snapshot()
@@ -5216,6 +5273,8 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
         prices = self.prices()
         economic = self._economic_view(snap, prices=prices)
         financial = self._financial_status_view({"economic": economic})
+        machines_view = self.machine_states(economic)
+        self._sync_sockets_with_plan(machines_view)
         return {
             "snapshot": snap,
             "settings": dict(self.settings),
@@ -5264,6 +5323,6 @@ Cherche une fenêtre solaire exploitable avant la prochaine échéance énergét
                 "boiler_surplus_available_w": boiler_surplus_before_load_w(snap),
                 "boiler_allowed": protected_cycle_boiler_allowed(snap, self.settings),
             },
-            "machines": self.machine_states(economic),
+            "machines": machines_view,
             "machine_window": {machine.machine_id: machine_allowed(machine, dt_util.now()) for machine in self.controllable_machines},
         }
