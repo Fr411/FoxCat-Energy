@@ -774,7 +774,7 @@ class DashboardAndProfileTests(unittest.TestCase):
         card = next(card for card in cards if card.get("type") == "custom:button-card")
         self.assertIs(card["variables"]["mobile"], True)
         code = card["custom_fields"]["c"]
-        for marker in ("pricing.dynamic_planner", "pricing.bihoraire_planner", "priority_rank", "windows", "MAINTENANT"):
+        for marker in ("pricing.dynamic_planner", "pricing.bihoraire_planner", "priority_rank", "windows", "DÉMARRAGE DU BOILER"):
             self.assertIn(marker, code, marker)
         self.assertTrue(any(card.get("type") == "entities" for card in cards))
         raw = (COMPONENT_PATH / "dashboard" / "versions" / "dashboard_mobile_v1.9.0.yaml").read_text(encoding="utf-8")

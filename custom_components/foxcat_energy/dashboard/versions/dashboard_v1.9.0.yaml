@@ -10046,8 +10046,6 @@ views:
             if (!Array.isArray(P.slots) || P.slots.length < 2) {
               return box(`<div style="display:flex;align-items:center;gap:12px;color:#8fa6bf"><ha-icon icon="mdi:update"></ha-icon><div><b style="color:#e8f1fb">${title} · données de la frise absentes</b><div style="font-size:12px;margin-top:3px">Le planificateur tourne (état ${esc(src.state)}) mais cette version de l'intégration n'envoie pas la courbe de prix ni les fenêtres. Mettez FoxCat Energy à jour (dashboard 1.9.0) et redémarrez Home Assistant.</div></div></div>`);
             }
-
-            // ---------- données ----------
             const COL = { dishwasher: '#34d399', washer: '#60a5fa', dryer: '#c4b5fd', boiler: '#fb923c' };
             const EXTRA = ['#f472b6', '#2dd4bf', '#facc15', '#a3e635'];
             const ICON = { dishwasher: 'mdi:dishwasher', washer: 'mdi:washing-machine', dryer: 'mdi:tumble-dryer', boiler: 'mdi:water-boiler' };
@@ -10056,32 +10054,27 @@ views:
               START_NOW: ['Démarrage autorisé', '#34d399'], WAIT: ['En attente du créneau', '#fbbf24'], CONTINUE: ['Cycle en cours', '#60a5fa'],
               HC: ['Heures creuses autorisées', '#34d399'], USER_CONTROL: ['Gestion manuelle', '#8fa6bf'], SAFETY_OVERRIDE: ['Sécurité active', '#f87171'], STOP_WHEN_SAFE: ['Besoin satisfait', '#8fa6bf'],
             };
+            const BSTAT = { PROGRAMME: ['Démarre à ', '#fb923c'], MAINTENANT: ['Démarre maintenant', '#fb923c'], EN_COURS: ['En chauffe', '#fb923c'], AUCUN_BESOIN: ['Aucune chauffe prévue', '#8fa6bf'], HC_DESACTIVE: ['Solaire seulement', '#8fa6bf'], MANUEL: ['Gestion manuelle', '#8fa6bf'], DESACTIVE: ['Non géré', '#8fa6bf'], SONDE_INDISPONIBLE: ['Sonde indisponible', '#f87171'], AUCUNE_HC: ['Aucune heure creuse', '#8fa6bf'] };
             const slots = P.slots.map(s => ({ t: s[0], p: Number(s[1]), b: s[2] })).filter(s => Number.isFinite(s.t) && Number.isFinite(s.p));
             const stepS = slots.length > 1 ? Math.max(300, slots[slots.length - 1].t - slots[slots.length - 2].t) : 3600;
             const t0 = slots[0].t, t1 = slots[slots.length - 1].t + stepS;
             const nowT = num(P.now_ts) ?? Math.floor(Date.now() / 1000);
-            // Mise en page mobile (téléphone) : frise plus étroite, nom du couloir au-dessus de la barre.
-            const MOB = !!(variables && variables.mobile) || (typeof window !== 'undefined' && window.innerWidth < 720);
-            const W = MOB ? 390 : 1000, X0 = MOB ? 34 : 168, X1 = W - (MOB ? 8 : 14), PW = X1 - X0;
-            const x = (t) => X0 + Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) * PW;
+            const pmin = Math.min(...slots.map(s => s.p)), pmax = Math.max(...slots.map(s => s.p));
+            const slotAt = (t) => slots.find(q => q.t <= t && t < q.t + stepS) || slots[0];
             const fmtT = (t) => new Date(t * 1000).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' });
             const fmtD = (t) => new Date(t * 1000).toLocaleDateString('fr-BE', { weekday: 'short', day: 'numeric', month: 'short' });
             const dayKey = (t) => new Date(t * 1000).toDateString();
             const fmtDT = (t) => (dayKey(t) === dayKey(nowT) ? '' : new Date(t * 1000).toLocaleDateString('fr-BE', { weekday: 'short' }) + ' ') + fmtT(t);
             const fmtP = (v) => v == null ? '—' : v.toFixed(3).replace('.', ',');
             const fmtE = (v) => v == null ? '—' : v.toFixed(2).replace('.', ',') + ' €';
-            const fmtDur = (sec) => { const mm = Math.round(sec / 60); return mm >= 60 ? Math.floor(mm / 60) + ' h' + (mm % 60 ? ' ' + String(mm % 60).padStart(2, '0') : '') : mm + ' min'; };
+            const fmtDur = (sec) => { const mm = Math.max(0, Math.round(sec / 60)); return mm >= 60 ? Math.floor(mm / 60) + ' h' + (mm % 60 ? ' ' + String(mm % 60).padStart(2, '0') : '') : mm + ' min'; };
             const iso = (s) => { const d = Date.parse(s); return Number.isFinite(d) ? Math.floor(d / 1000) : null; };
-
-            // ---------- couloirs : boiler (rang 1) puis machines par rang ----------
             const mergeRuns = (runs) => runs.filter(r => r[0] && r[1]).sort((p, q) => p[0] - q[0]).reduce((acc, r) => { const last = acc[acc.length - 1]; if (last && r[0] <= last[1] + 60) last[1] = Math.max(last[1], r[1]); else acc.push([r[0], r[1]]); return acc; }, []);
-            const lanes = [];
-            const BOILER_HC = 'HEURES_CREUSES';
             const bo = P.boiler;
-            const BSTAT = { PROGRAMME: ['Démarre à ', '#fb923c'], MAINTENANT: ['Démarre maintenant', '#fb923c'], EN_COURS: ['En chauffe', '#fb923c'], AUCUN_BESOIN: ['Aucune chauffe prévue', '#8fa6bf'], HC_DESACTIVE: ['Solaire seulement', '#8fa6bf'], MANUEL: ['Gestion manuelle', '#8fa6bf'], DESACTIVE: ['Non géré', '#8fa6bf'], SONDE_INDISPONIBLE: ['Sonde indisponible', '#f87171'], AUCUNE_HC: ['Aucune heure creuse', '#8fa6bf'] };
             const bst = bo && bo.status ? (BSTAT[bo.status] || [bo.status, '#8fa6bf']) : null;
             const bstText = bst ? (bo.status === 'PROGRAMME' && bo.start_ts ? bst[0] + fmtT(bo.start_ts) : bst[0]) : null;
-            if (bo) lanes.push({ id: 'boiler', rank: 1, name: 'Boiler', decText: bstText, decColor: bst ? bst[1] : null, dec: bo.source === BOILER_HC ? 'HC' : bo.decision, reason: bo.source === BOILER_HC ? (bo.windows && bo.windows.length ? 'Chauffe réseau limitée aux heures creuses ; le solaire reste prioritaire.' : 'Chauffe réseau non autorisée en heures creuses (réglage du boiler).') : bo.reason, windows: bo.windows, runs: mergeRuns((bo.segments || []).map(s => [s[0], s[1]])), isBoiler: true, bo });
+            const lanes = [];
+            if (bo) lanes.push({ id: 'boiler', rank: 1, name: 'Boiler', decText: bstText, decColor: bst ? bst[1] : null, dec: bo.source === 'HEURES_CREUSES' ? 'HC' : bo.decision, reason: bo.source === 'HEURES_CREUSES' && !bo.status ? 'Chauffe réseau limitée aux heures creuses ; le solaire reste prioritaire.' : bo.reason, windows: bo.windows, runs: mergeRuns((bo.segments || []).map(s => [s[0], s[1]])), isBoiler: true, bo });
             let extraIdx = 0;
             Object.entries(P.machines || {}).forEach(([id, m]) => {
               const a = iso(m.planned_start), b = iso(m.planned_end);
@@ -10090,167 +10083,103 @@ views:
               lanes.push({ id, rank: m.priority_rank || 9, name: m.name || id, dec: m.decision, reason: m.reason, windows: m.windows, runs, m, color: COL[id] || EXTRA[extraIdx++ % EXTRA.length] });
             });
             lanes.sort((p, q) => p.rank - q.rank);
-            lanes.forEach(l => { l.color = l.color || COL[l.id] || '#fb923c'; });
-
-            // ---------- géométrie ----------
-            const CH_TOP = 34, CH_H = MOB ? 84 : 118, CH_BOT = CH_TOP + CH_H;
-            const LANE_TOP = CH_BOT + 34, LANE_H = MOB ? 58 : 50, LANE_GAP = MOB ? 8 : 10;
-            const BAR_Y = MOB ? 22 : 8, BAR_H = MOB ? 28 : LANE_H - 16;
-            const H = LANE_TOP + lanes.length * (LANE_H + LANE_GAP) + 22;
-            const pmin = Math.min(0, ...slots.map(s => s.p)), pmax = Math.max(...slots.map(s => s.p));
-            const py = (p) => CH_BOT - ((p - pmin) / Math.max(pmax - pmin, 1e-6)) * (CH_H - 14);
-
-            let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;font-family:inherit" role="img" aria-label="${title}">`;
-            let defs = '';
-            Object.entries(BAND).forEach(([k, v]) => { defs += `<linearGradient id="gb_${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${v[0]}" stop-opacity="0.95"/><stop offset="1" stop-color="${v[0]}" stop-opacity="0.28"/></linearGradient>`; });
-            lanes.forEach((l, i) => { defs += `<linearGradient id="gl_${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${l.color}" stop-opacity="1"/><stop offset="1" stop-color="${l.color}" stop-opacity="0.72"/></linearGradient><filter id="fl_${i}" x="-20%" y="-40%" width="140%" height="180%"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="${l.color}" flood-opacity="0.55"/></filter>`; });
-            svg += `<defs>${defs}</defs>`;
-
-            // bandes de fond (superposées au graphique ET aux couloirs)
-            let ri = 0;
-            while (ri < slots.length) {
-              let rj = ri; while (rj + 1 < slots.length && slots[rj + 1].b === slots[ri].b) rj++;
-              const col = (BAND[slots[ri].b] || ['#8fa6bf'])[0];
-              const xa = x(slots[ri].t), xb = x(slots[rj].t + stepS);
-              svg += `<rect x="${xa.toFixed(1)}" y="${CH_TOP - 6}" width="${(xb - xa).toFixed(1)}" height="${(LANE_TOP + lanes.length * (LANE_H + LANE_GAP) - CH_TOP + 6)}" fill="${col}" opacity="0.07"/>`;
-              ri = rj + 1;
-            }
-            // grille horaire
-            for (let t = Math.ceil(t0 / 3600) * 3600; t < t1; t += 3600) {
-              const d = new Date(t * 1000), h = d.getHours();
-              if (h % (MOB ? 12 : 3)) continue;
-              const xx = x(t).toFixed(1), mid = h === 0;
-              if (!mid && new Date((t + 10800) * 1000).getHours() === 0 && x(t + 10800) > X1 - 26) continue;
-              svg += `<line x1="${xx}" y1="${CH_TOP - 6}" x2="${xx}" y2="${H - 22}" stroke="#fff" stroke-opacity="${mid ? 0.28 : 0.09}" stroke-dasharray="${mid ? '' : '3 4'}"/>`;
-              svg += `<text x="${xx}" y="${H - 8}" fill="#8fa6bf" font-size="${MOB ? 9.5 : 11}" text-anchor="${x(t) > X1 - 26 ? 'end' : 'middle'}">${mid ? fmtD(t) : String(h).padStart(2, '0') + ' h'}</text>`;
-            }
-            // courbe de prix : barres par créneau + trait
-            [0, 0.5, 1].forEach(f => { const yy = py(pmin + (pmax - pmin) * f); svg += `<line x1="${X0}" y1="${yy.toFixed(1)}" x2="${X1}" y2="${yy.toFixed(1)}" stroke="#fff" stroke-opacity="0.07"/>`; });
-            slots.forEach(s => {
-              const xa = x(s.t), xb = x(s.t + stepS), y = py(s.p), y0 = py(0);
-              const tip = `${fmtT(s.t)} → ${fmtT(s.t + stepS)} · ${fmtP(s.p)} €/kWh · ${(BAND[s.b] || ['', s.b])[1]}`;
-              svg += `<rect x="${xa.toFixed(1)}" y="${Math.min(y, y0).toFixed(1)}" width="${Math.max(xb - xa - (xb - xa > 7 ? 0.6 : 0), 0.6).toFixed(1)}" height="${Math.max(Math.abs(y0 - y), 1.5).toFixed(1)}" fill="url(#gb_${BAND[s.b] ? s.b : 'NORMAL'})" rx="1.5"><title>${esc(tip)}</title></rect>`;
-            });
-            const path = slots.map((s, i) => `${i ? 'L' : 'M'}${x(s.t).toFixed(1)},${py(s.p).toFixed(1)} L${x(s.t + stepS).toFixed(1)},${py(s.p).toFixed(1)}`).join(' ');
-            svg += `<path d="${path}" fill="none" stroke="#e8f1fb" stroke-width="1.6" stroke-opacity="0.9" stroke-linejoin="round"/>`;
-            const lo = slots.reduce((m, s) => s.p < m.p ? s : m, slots[0]), hi = slots.reduce((m, s) => s.p > m.p ? s : m, slots[0]);
-            const tag = (s, up) => { const xx = Math.min(Math.max(x(s.t + stepS / 2), X0 + 30), X1 - 30), yy = Math.max(py(s.p) - 7, CH_TOP + 6); return `<text x="${xx.toFixed(1)}" y="${yy.toFixed(1)}" fill="${up ? '#fca5a5' : '#86efac'}" font-size="${MOB ? 9 : 10.5}" font-weight="700" text-anchor="middle" paint-order="stroke" stroke="#080d16" stroke-width="3">${up ? '▲' : '▼'} ${fmtP(s.p)} · ${fmtT(s.t)}</text>`; };
-            if (!MOB && !isBi && hi.p - lo.p > 1e-4) { svg += tag(hi, true); svg += tag(lo, false); }
-            svg += `<text x="${X0 - (MOB ? 3 : 10)}" y="${py(pmax) + 4}" fill="#8fa6bf" font-size="${MOB ? 9 : 11}" text-anchor="end">${fmtP(pmax)}</text>`;
-            svg += `<text x="${X0 - (MOB ? 3 : 10)}" y="${py(pmin) + 4}" fill="#8fa6bf" font-size="${MOB ? 9 : 11}" text-anchor="end">${fmtP(pmin)}</text>`;
-            if (MOB) svg += `<text x="${X0 + 6}" y="${CH_TOP + 10}" fill="#e8f1fb" font-size="10.5" font-weight="700" paint-order="stroke" stroke="#080d16" stroke-width="3">Tarif · €/kWh</text>`;
-            else svg += `<text x="12" y="${CH_TOP + 12}" fill="#e8f1fb" font-size="13" font-weight="700">Tarif</text><text x="12" y="${CH_TOP + 27}" fill="#8fa6bf" font-size="11">€/kWh</text>`;
-            if (pmin < 0) svg += `<line x1="${X0}" y1="${py(0).toFixed(1)}" x2="${X1}" y2="${py(0).toFixed(1)}" stroke="#fff" stroke-opacity="0.35"/>`;
-
-            // couloirs
-            svg += `<text x="${MOB ? 4 : 12}" y="${LANE_TOP - 12}" fill="#8fa6bf" font-size="${MOB ? 9.5 : 11}" letter-spacing=".06em">${MOB ? 'PRIORITÉ · FENÊTRES · DÉPART' : 'PRIORITÉ · FENÊTRES AUTORISÉES · DÉPART PLANIFIÉ'}</text>`;
-            lanes.forEach((l, i) => {
-              const y = LANE_TOP + i * (LANE_H + LANE_GAP), c = l.color;
-              svg += `<rect x="${X0}" y="${y}" width="${PW}" height="${LANE_H}" rx="10" fill="#fff" opacity="0.035"/>`;
-              if (MOB) {
-                svg += `<circle cx="17" cy="${y + LANE_H / 2}" r="11" fill="${c}" opacity="0.18" stroke="${c}" stroke-opacity="0.8"/>`;
-                svg += `<text x="17" y="${y + LANE_H / 2 + 4.5}" fill="${c}" font-size="12" font-weight="800" text-anchor="middle">${l.rank}</text>`;
-                svg += `<text x="${X0 + 7}" y="${y + 15}" fill="#e8f1fb" font-size="10.5" font-weight="700" paint-order="stroke" stroke="#080d16" stroke-width="3">${esc(l.name)}</text>`;
-              } else {
-                svg += `<circle cx="26" cy="${y + LANE_H / 2}" r="13" fill="${c}" opacity="0.18" stroke="${c}" stroke-opacity="0.8"/>`;
-                svg += `<text x="26" y="${y + LANE_H / 2 + 5}" fill="${c}" font-size="14" font-weight="800" text-anchor="middle">${l.rank}</text>`;
-                svg += `<text x="48" y="${y + LANE_H / 2 - 3}" fill="#e8f1fb" font-size="13" font-weight="700">${esc(l.name)}</text>`;
-                const d = DEC[l.dec] || [l.dec || '—', '#8fa6bf'];
-                svg += `<text x="48" y="${y + LANE_H / 2 + 13}" fill="${l.decColor || d[1]}" font-size="10.5">${esc(l.decText || d[0])}</text>`;
-              }
-              // fenêtres autorisées
-              const wins = l.windows == null ? [[t0, t1]] : l.windows;
-              wins.forEach(w => {
-                const xa = x(w[0]), xb = x(w[1]);
-                if (xb - xa < 1) return;
-                svg += `<rect x="${xa.toFixed(1)}" y="${y + 4}" width="${(xb - xa).toFixed(1)}" height="${LANE_H - 8}" rx="8" fill="${c}" opacity="0.16" stroke="${c}" stroke-opacity="0.55" stroke-dasharray="4 3"/>`;
-              });
-              if (l.windows != null && l.windows.length === 0) svg += `<text x="${X0 + 12}" y="${y + (MOB ? 40 : LANE_H / 2 + 4)}" fill="#8fa6bf" font-size="11">Aucune fenêtre autorisée</text>`;
-              // départs planifiés
-              l.runs.forEach((r, k) => {
-                const xa = x(r[0]), xb = x(r[1]), wd = Math.max(xb - xa, 3);
-                if (k === 0) {
-              const sl = slots.find(q => q.t <= r[0] && r[0] < q.t + stepS) || slots[0];
-              svg += `<line x1="${xa.toFixed(1)}" y1="${py(sl.p).toFixed(1)}" x2="${xa.toFixed(1)}" y2="${y + BAR_Y}" stroke="${c}" stroke-opacity="0.7" stroke-dasharray="2 3"/><circle cx="${xa.toFixed(1)}" cy="${py(sl.p).toFixed(1)}" r="3.4" fill="${c}" stroke="#080d16" stroke-width="1.5"><title>${esc(l.name)} · départ ${fmtT(r[0])} · ${fmtP(sl.p)} €/kWh</title></circle>`;
-            }
-            svg += `<rect x="${xa.toFixed(1)}" y="${y + BAR_Y}" width="${wd.toFixed(1)}" height="${BAR_H}" rx="8" fill="url(#gl_${i})" filter="url(#fl_${i})"><title>${esc(l.name)} · ${fmtT(r[0])} → ${fmtT(r[1])} · ${fmtDur(r[1] - r[0])}</title></rect>`;
-                const prof = l.m && Array.isArray(l.m.profile) && l.runs.length === 1 ? l.m.profile : null;
-                if (prof && wd > 40) {
-                  const mx = Math.max(...prof, 1e-6), bw = wd / prof.length;
-                  prof.forEach((v, q) => { const hh = Math.max(1.5, (BAR_H - 10) * v / mx); svg += `<rect x="${(xa + q * bw + 0.5).toFixed(1)}" y="${(y + BAR_Y + BAR_H - 5 - hh).toFixed(1)}" width="${Math.max(bw - 1, 1).toFixed(1)}" height="${hh.toFixed(1)}" rx="1.5" fill="#0b1220" opacity="0.38"/>`; });
-                }
-                if (wd > (MOB ? 84 : 92) && (k === 0 || l.runs.length === 1)) svg += `<text x="${(xa + wd / 2).toFixed(1)}" y="${y + BAR_Y + BAR_H / 2 + 4}" fill="#0b1220" font-size="11.5" font-weight="800" text-anchor="middle">${l.isBoiler && bo && bo.start_ts ? '⏻ ' : ''}${fmtT(r[0])} → ${fmtT(r[1])}${wd > (MOB ? 170 : 190) ? ' · ' + fmtDur(r[1] - r[0]) : ''}</text>`;
-                else if (k === 0) svg += `<text x="${(xb + 6 > X1 - 70 ? Math.max(xa - 6, X0 + 2) : xb + 6).toFixed(1)}" text-anchor="${xb + 6 > X1 - 70 ? 'end' : 'start'}" y="${y + BAR_Y + BAR_H / 2 + 4}" fill="${c}" font-size="11.5" font-weight="700">${l.isBoiler && bo && bo.start_ts ? '⏻ ' : ''}${fmtT(r[0])} → ${fmtT(r[1])}</text>`;
-              });
-            });
-            // maintenant
-            const xn = x(nowT).toFixed(1);
-            svg += `<line x1="${xn}" y1="${CH_TOP - 12}" x2="${xn}" y2="${H - 22}" stroke="#19d8ff" stroke-width="2"/>`;
-            svg += `<rect x="${Math.max(2, x(nowT) - 38).toFixed(1)}" y="${CH_TOP - 24}" width="76" height="16" rx="8" fill="#19d8ff"/><text x="${Math.max(2, x(nowT) - 38) + 38}" y="${CH_TOP - 12}" fill="#06202b" font-size="10.5" font-weight="800" text-anchor="middle">MAINTENANT</text>`;
-            {
-              const cur = slots.find(q => q.t <= nowT && nowT < q.t + stepS) || slots[0];
-              svg += `<circle cx="${xn}" cy="${py(cur.p).toFixed(1)}" r="4" fill="#19d8ff"><animate attributeName="r" values="4;10;4" dur="2.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0;0.9" dur="2.2s" repeatCount="indefinite"/></circle><circle cx="${xn}" cy="${py(cur.p).toFixed(1)}" r="4" fill="#19d8ff" stroke="#080d16" stroke-width="1.5"/>`;
-            }
-            svg += `</svg>`;
-
-            // ---------- en-tête ----------
-            const chip = (txt, col) => `<span style="display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.04em;color:${col};background:${col}22;border:1px solid ${col}66">${txt}</span>`;
+            lanes.forEach(l => { l.color = l.color || COL[l.id] || '#fb923c'; l.first = l.runs[0] || null; l.until = l.first ? l.first[0] - nowT : null; });
+            const decOf = (l) => { const d = DEC[l.dec] || [l.dec || '—', '#8fa6bf']; return [l.decText || d[0], l.decColor || d[1]]; };
+            const countdownOf = (l) => l.dec === 'CONTINUE' ? 'cycle en cours' : (l.until == null ? '' : (l.until <= 300 ? 'maintenant' : 'dans ' + fmtDur(l.until)));
+            const learnOf = (l) => { const m = l.m || {}; const learned = m.duration_source === 'APPRENTISSAGE_10_CYCLES'; const h = m.duration_h != null ? fmtDur(m.duration_h * 3600) : '—'; const e = m.energy_kwh != null ? Number(m.energy_kwh).toFixed(2).replace('.', ',') + ' kWh' : '—'; return { learned, text: `${learned ? 'Appris sur ' + (m.learning_cycles || '?') + ' cycles' : 'Réglages (apprentissage insuffisant)'} · ${h} · ${e}${m.profile ? ' · forme apprise' : ''}` }; };
             const pilot = src.state === 'PILOTE';
             const curB = BAND[isBi ? P.period : P.current_band] || ['#8fa6bf', P.current_band || '—'];
-            const stat = (k, v, sub, icon, col) => `<div style="padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-left:3px solid ${col || '#19d8ff'}"><div class="k" style="font-size:11px;display:flex;align-items:center;gap:6px"><ha-icon icon="${icon || 'mdi:information-outline'}" style="--mdc-icon-size:14px;color:${col || '#19d8ff'}"></ha-icon>${k}</div><div style="font-size:${MOB ? 16 : 18}px;font-weight:800;line-height:1.3;font-variant-numeric:tabular-nums">${v}</div>${sub ? `<div class="k" style="font-size:11px;line-height:1.3">${sub}</div>` : ''}</div>`;
+            const curP = num(P.current_price_eur_kwh);
             const valley = isBi ? P.next_hc : P.next_valley;
             const peak = isBi ? P.next_hp : P.next_peak;
             const rng = (b) => b ? `${fmtDT(iso(b.start))} → ${fmtDT(iso(b.end))}` : '—';
             const saving = num(P.total_expected_saving_eur);
-            const boilerTile = (() => {
-              if (!bo || !bo.status) return '';
-              const col = '#fb923c', st = bo.status;
-              const temp = bo.temp_c != null ? Number(bo.temp_c).toFixed(1).replace('.', ',') : null, tgt = bo.target_c != null ? Number(bo.target_c).toFixed(0) : null;
-              let v, sub;
-              if (st === 'PROGRAMME' && bo.start_ts) { v = fmtDT(bo.start_ts); sub = `dans ${fmtDur(bo.start_ts - nowT)}${bo.heating_min ? ' · chauffe ' + bo.heating_min + ' min' : ''}${temp ? ' · ' + temp + ' → ' + tgt + ' °C' : ''}`; }
-              else if (st === 'MAINTENANT') { v = 'Maintenant'; sub = `chauffe ${bo.heating_min || '?'} min${temp ? ' · ' + temp + ' → ' + tgt + ' °C' : ''}`; }
-              else if (st === 'EN_COURS') { v = 'En chauffe'; sub = temp ? `${temp} → ${tgt} °C` : ''; }
-              else if (st === 'AUCUN_BESOIN') { v = 'Pas de chauffe'; sub = temp ? `eau à ${temp} °C` : ''; }
-              else if (bo.start_ts) { v = fmtDT(bo.start_ts); sub = 'créneau le moins cher'; }
-              else { v = (BSTAT[st] || [st])[0]; sub = ''; }
-              return stat('Boiler · démarrage', v, `${sub}${bo.source === BOILER_HC && st === 'PROGRAMME' ? '<br>au plus tard · le solaire peut chauffer avant' : ''}`, 'mdi:water-boiler', col);
+            const bTemp = bo && bo.temp_c != null ? Number(bo.temp_c).toFixed(1).replace('.', ',') : null, bTgt = bo && bo.target_c != null ? Number(bo.target_c).toFixed(0) : null;
+            const boilerKpi = (() => {
+              if (!bo || !bo.status) return null;
+              const st = bo.status;
+              if (st === 'PROGRAMME' && bo.start_ts) return { v: fmtDT(bo.start_ts), sub: `dans ${fmtDur(bo.start_ts - nowT)}${bo.heating_min ? ' · chauffe ' + bo.heating_min + ' min' : ''}${bTemp ? ' · ' + bTemp + ' → ' + bTgt + ' °C' : ''}`, note: bo.source === 'HEURES_CREUSES' ? 'au plus tard · le solaire peut chauffer avant' : '' };
+              if (st === 'MAINTENANT') return { v: 'Maintenant', sub: `chauffe ${bo.heating_min || '?'} min${bTemp ? ' · ' + bTemp + ' → ' + bTgt + ' °C' : ''}`, note: '' };
+              if (st === 'EN_COURS') return { v: 'En chauffe', sub: bTemp ? `${bTemp} → ${bTgt} °C` : '', note: '' };
+              if (st === 'AUCUN_BESOIN') return { v: 'Pas de chauffe', sub: bTemp ? `eau à ${bTemp} °C` : '', note: '' };
+              if (bo.start_ts) return { v: fmtDT(bo.start_ts), sub: 'créneau le moins cher', note: '' };
+              return { v: (BSTAT[st] || [st])[0], sub: '', note: '' };
             })();
-            const head = `
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><ha-icon icon="mdi:calendar-clock" style="color:#19d8ff"></ha-icon><div style="font-size:16px;font-weight:800">${title}</div>${chip(pilot ? 'PILOTE LES MACHINES' : 'OBSERVATION', pilot ? '#34d399' : '#fbbf24')}</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(${MOB ? 150 : 200}px,1fr));gap:10px;margin-bottom:14px">
-              ${stat('Prix actuel', `${fmtP(num(P.current_price_eur_kwh))} <span style="font-size:11px;font-weight:600">€/kWh</span>`, `<span style="color:${curB[0]};font-weight:700">${esc(curB[1])}</span>${isBi ? ` · HP ${fmtP(num(P.hp_price_eur_kwh))} / HC ${fmtP(num(P.hc_price_eur_kwh))}` : ''}`, 'mdi:currency-eur', curB[0])}
-              ${stat(isBi ? 'Prochaines heures creuses' : 'Prochaine vallée', rng(valley), valley && !isBi ? `moy. ${fmtP(num(valley.average_price_eur_kwh))} €/kWh` : (isBi && P.spread_eur_kwh != null ? `écart HP–HC ${fmtP(num(P.spread_eur_kwh))} €/kWh` : ''), 'mdi:trending-down', '#34d399')}
-              ${stat(isBi ? 'Prochaines heures pleines' : 'Prochain pic', rng(peak), peak && !isBi ? `moy. ${fmtP(num(peak.average_price_eur_kwh))} €/kWh` : '', 'mdi:trending-up', '#fb923c')}
-              ${stat('Économie attendue', saving != null ? fmtE(saving) : '—', 'en décalant les cycles en attente', 'mdi:piggy-bank-outline', '#fbbf24')}
-              ${boilerTile}
-            </div>`;
+            const W = 1060, X0 = 176, X1 = W - 8, PW = X1 - X0;
+            const x = (t) => X0 + Math.min(1, Math.max(0, (t - t0) / (t1 - t0))) * PW;
+            const SP_TOP = 22, SP_H = 46, HEAT_Y = SP_TOP + SP_H + 10, HEAT_H = 11;
+            const LANE_TOP = HEAT_Y + HEAT_H + 14, ROW = 46, BAR_H = 24;
+            const H = LANE_TOP + lanes.length * ROW + 26;
+            const sy = (p) => SP_TOP + SP_H - ((p - pmin) / Math.max(pmax - pmin, 1e-6)) * (SP_H - 4);
+            const bandColor = (b) => (BAND[b] || ['#8fa6bf'])[0];
+            let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;font-family:inherit;font-variant-numeric:tabular-nums" role="img" aria-label="${title}">`;
+            svg += `<defs>${lanes.map((l, i) => `<pattern id="hz_${i}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="${l.color || '#fb923c'}" stroke-opacity=".22" stroke-width="2"/></pattern>`).join('')}</defs>`;
+            for (let t = Math.ceil(t0 / 3600) * 3600; t < t1; t += 3600) {
+              const h = new Date(t * 1000).getHours();
+              if (h % 3) continue;
+              const xx = x(t).toFixed(1);
+              svg += `<line x1="${xx}" y1="${HEAT_Y + HEAT_H + 6}" x2="${xx}" y2="${H - 20}" stroke="#fff" stroke-opacity="${h ? 0.06 : 0.22}"/>`;
+              svg += `<text x="${xx}" y="${H - 6}" fill="#6b7a90" font-size="10.5" text-anchor="${x(t) > X1 - 24 ? 'end' : 'middle'}">${String(h).padStart(2, '0')}:00</text>`;
+            }
+            svg += `<text x="0" y="${SP_TOP + 10}" fill="#6b7a90" font-size="10" letter-spacing="1.4" font-weight="600">TARIF €/KWH</text>`;
+            svg += `<text x="0" y="${HEAT_Y + 9}" fill="#8fa6bf" font-size="11">${fmtP(pmin)} — ${fmtP(pmax)}</text>`;
+            svg += `<path d="${slots.map((s, i) => `${i ? 'L' : 'M'}${x(s.t).toFixed(1)},${sy(s.p).toFixed(1)} L${x(s.t + stepS).toFixed(1)},${sy(s.p).toFixed(1)}`).join(' ')}" fill="none" stroke="#e8f1fb" stroke-width="1.4" stroke-linejoin="round"/>`;
+            slots.forEach(s => {
+              const xa = x(s.t), xb = x(s.t + stepS);
+              const tip = `${fmtT(s.t)} → ${fmtT(s.t + stepS)} · ${fmtP(s.p)} €/kWh · ${(BAND[s.b] || ['', s.b])[1]}`;
+              svg += `<rect x="${xa.toFixed(1)}" y="${HEAT_Y}" width="${Math.max(xb - xa + 0.4, 0.8).toFixed(1)}" height="${HEAT_H}" fill="${bandColor(s.b)}" opacity="0.85"><title>${esc(tip)}</title></rect>`;
+            });
+            lanes.forEach((l, i) => {
+              const y = LANE_TOP + i * ROW, c = l.color, d = decOf(l);
+              svg += `<text x="0" y="${y + 17}" fill="#e8f1fb" font-size="12.5" font-weight="600">${l.rank}&#160;&#160;${esc(l.name)}</text>`;
+              svg += `<text x="0" y="${y + 31}" fill="${d[1]}" font-size="10.5">${esc(d[0])}</text>`;
+              (l.windows == null ? [[t0, t1]] : l.windows).forEach(w => {
+                const xa = x(w[0]), xb = x(w[1]);
+                if (xb - xa < 1) return;
+                svg += `<rect x="${xa.toFixed(1)}" y="${y + 3}" width="${(xb - xa).toFixed(1)}" height="${BAR_H + 4}" rx="3" fill="url(#hz_${i})" stroke="${c}" stroke-opacity=".45"/>`;
+              });
+              if (l.windows != null && l.windows.length === 0) svg += `<text x="${X0 + 10}" y="${y + 21}" fill="#6b7a90" font-size="11">Aucune fenêtre autorisée</text>`;
+              l.runs.forEach((r, k) => {
+                const xa = x(r[0]), xb = x(r[1]), wd = Math.max(xb - xa, 4);
+                const sl = slotAt(r[0]);
+                const tip = `${l.name} · ${fmtT(r[0])} → ${fmtT(r[1])} · ${fmtDur(r[1] - r[0])} · ${fmtP(sl.p)} €/kWh au départ`;
+                svg += `<rect x="${xa.toFixed(1)}" y="${y + 5}" width="${wd.toFixed(1)}" height="${BAR_H}" rx="3" fill="${c}"><title>${esc(tip)}</title></rect>`;
+                if (k === 0) {
+                  const flip = xb + 150 > X1;
+                  svg += `<text x="${(flip ? xa - 8 : xb + 8).toFixed(1)}" text-anchor="${flip ? 'end' : 'start'}" y="${y + 22}" fill="${c}" font-size="12" font-weight="600">${l.isBoiler && l.bo && l.bo.start_ts ? '⏻ ' : ''}${fmtT(r[0])} – ${fmtT(r[1])}</text>`;
+                }
+              });
+            });
+            const xn = x(nowT).toFixed(1);
+            svg += `<line x1="${xn}" y1="2" x2="${xn}" y2="${H - 20}" stroke="#19d8ff" stroke-width="1.5"/><text x="${(+xn + 6).toFixed(1)}" y="12" fill="#19d8ff" font-size="10.5" font-weight="700" letter-spacing="1.2">MAINTENANT ${fmtT(nowT)}</text>`;
+            svg += `</svg>`;
+            const lbl = (t, col) => `<div style="font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600;color:${col || '#6b7a90'}">${t}</div>`;
+            const kpi = (label, value, sub, col, first) => `<div style="padding:0 20px;${first ? "padding-left:0;" : "border-left:1px solid #1b2230;"}flex:1 1 auto">${lbl(label, col && col !== '#e8f1fb' ? col : null)}<div style="font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-.02em;color:${col || '#e8f1fb'};font-variant-numeric:tabular-nums">${value}</div><div style="font-size:12px;margin-top:3px;color:#8fa6bf;line-height:1.35">${sub || ''}</div></div>`;
+            const kpis = [
+              kpi('Prix actuel', `${fmtP(curP)} <span style="font-size:12px;color:#8fa6bf;font-weight:500">€/kWh</span>`, `<span style="color:${curB[0]};font-weight:600">${esc(curB[1])}</span>${isBi ? ` · HP ${fmtP(num(P.hp_price_eur_kwh))} / HC ${fmtP(num(P.hc_price_eur_kwh))}` : ''}`, '#e8f1fb', true),
+              kpi(isBi ? 'Prochaines heures creuses' : 'Prochaine vallée', rng(valley), valley && !isBi ? `moy. ${fmtP(num(valley.average_price_eur_kwh))} €/kWh` : (isBi && P.spread_eur_kwh != null ? `écart HP–HC ${fmtP(num(P.spread_eur_kwh))} €/kWh` : ''), '#34d399'),
+              kpi(isBi ? 'Prochaines heures pleines' : 'Prochain pic', rng(peak), peak && !isBi ? `moy. ${fmtP(num(peak.average_price_eur_kwh))} €/kWh` : '', '#fb923c'),
+              kpi('Économie attendue', saving != null ? fmtE(saving) : '—', 'cycles décalés', '#fbbf24'),
+            ];
+            if (boilerKpi) kpis.push(kpi('⏻ Boiler · démarrage', boilerKpi.v, `${boilerKpi.sub}${boilerKpi.note ? '<br><span style="color:#6b7a90">' + boilerKpi.note + '</span>' : ''}`, '#fb923c'));
             const legendKeys = isBi ? ['HC', 'HP'] : ['NEGATIF', 'TRES_BAS', 'BAS', 'NORMAL', 'ELEVE', 'PIC'];
-            const legend = `<div style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 2px;font-size:11px;color:#8fa6bf">${legendKeys.map(k => `<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:3px;background:${BAND[k][0]};opacity:.75"></i>${BAND[k][1]}</span>`).join('')}<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:18px;height:11px;border-radius:4px;border:1px dashed #cbd5e1;opacity:.8"></i>Fenêtre autorisée</span><span style="display:inline-flex;align-items:center;gap:6px"><i style="width:18px;height:11px;border-radius:4px;background:#cbd5e1"></i>Cycle planifié</span></div>`;
-
-            // ---------- cartes par couloir ----------
-            const cards = lanes.map(l => {
-              const d = DEC[l.dec] || [l.dec || '—', '#8fa6bf'];
-              const m = l.m || {};
-              const run = l.runs[0];
-              const when = run ? `${fmtD(run[0])} · ${fmtT(run[0])} → ${fmtT(l.runs[l.runs.length - 1][1])}` : (l.isBoiler ? (l.decText || (isBi ? 'Selon le solaire et les heures creuses' : 'Décision du boiler dynamique')) : '—');
-              const sav = num(m.expected_saving_eur), pct = num(m.expected_saving_pct);
-              const until = run ? run[0] - nowT : null;
-              const countdown = l.dec === 'CONTINUE' ? 'cycle en cours' : (until == null ? '' : (until <= 300 ? 'maintenant' : 'dans ' + fmtDur(until)));
-              const fmtH = (h) => { const mm = Math.round(h * 60); return Math.floor(mm / 60) + ' h ' + String(mm % 60).padStart(2, '0'); };
-              const learned = m.duration_source === 'APPRENTISSAGE_10_CYCLES';
-              const learnLine = l.isBoiler ? '' : `<div class="k" style="font-size:11.5px;margin-top:6px;display:flex;align-items:center;gap:6px"><ha-icon icon="mdi:brain" style="--mdc-icon-size:15px;color:${learned ? '#a78bfa' : '#64748b'}"></ha-icon><span>${learned ? `Appris sur <b style="color:#e8f1fb">${m.learning_cycles || '?'} cycles</b>` : 'Réglages (apprentissage insuffisant)'} · ${m.duration_h != null ? fmtH(m.duration_h) : '—'} · ${m.energy_kwh != null ? Number(m.energy_kwh).toFixed(2).replace('.', ',') + ' kWh' : '—'}${m.profile ? ' · forme de consommation apprise' : ''}</span></div>`;
-              return `<div style="flex:1 1 ${MOB ? '100%' : '220px'};min-width:${MOB ? 0 : 220}px;padding:12px 14px;border-radius:14px;background:linear-gradient(160deg,${l.color}14,rgba(255,255,255,.03) 55%);border:1px solid ${l.color}33;border-left:3px solid ${l.color}">
-                <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:${l.color}22;color:${l.color};font-weight:800;border:1px solid ${l.color}99">${l.rank}</span>
-                  <ha-icon icon="${ICON[l.id] || 'mdi:flash'}" style="color:${l.color};--mdc-icon-size:20px"></ha-icon><b style="font-size:14px">${esc(l.name)}</b></div>
-                <div style="margin:8px 0 6px">${chip(esc(l.decText || d[0]), l.decColor || d[1])}</div>
-                <div style="font-size:13px;font-weight:700;font-variant-numeric:tabular-nums">${when}${countdown ? ` <span style="font-weight:600;color:${l.color}">· ${countdown}</span>` : ''}</div>
-                ${sav != null ? `<div class="k" style="font-size:12px;margin-top:3px">Économie attendue <b style="color:#34d399">${fmtE(sav)}</b>${pct != null ? ` (${Math.round(pct)} %)` : ''}${m.estimated_cost_eur != null ? ` · coût du cycle ${fmtE(num(m.estimated_cost_eur))}` : ''}</div>` : ''}
-                ${learnLine}
-                <div class="k" style="font-size:11.5px;margin-top:5px;line-height:1.35">${esc(l.reason || '')}</div>
-              </div>`;
+            const legend = `<div style="display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 0;font-size:11px;color:#6b7a90">${legendKeys.map(k => `<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:2px;background:${BAND[k][0]};opacity:.85"></i>${BAND[k][1]}</span>`).join('')}<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:16px;height:10px;border-radius:2px;border:1px solid #8fa6bf;background:repeating-linear-gradient(45deg,#8fa6bf44 0 2px,transparent 2px 5px)"></i>Fenêtre autorisée</span><span style="display:inline-flex;align-items:center;gap:6px"><i style="width:16px;height:10px;border-radius:2px;background:#cbd5e1"></i>Cycle planifié</span></div>`;
+            const rows = lanes.map(l => {
+              const d = decOf(l), lr = l.isBoiler ? null : learnOf(l), cd = countdownOf(l);
+              const when = l.first ? `${l.isBoiler && l.bo && l.bo.start_ts ? '⏻ ' : ''}${fmtT(l.first[0])} → ${fmtT(l.runs[l.runs.length - 1][1])}` : '—';
+              const sav = l.m ? num(l.m.expected_saving_eur) : null;
+              return `<div style="display:grid;grid-template-columns:16px 168px 1fr 150px 120px;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #131a26;font-size:13px">
+                <span style="width:8px;height:8px;border-radius:50%;background:${l.color}"></span>
+                <span><b style="font-weight:600">${l.rank}&#160;&#160;${esc(l.name)}</b><br><span style="font-size:11px;color:${d[1]}">${esc(d[0])}</span></span>
+                <span style="font-size:12px;color:#8fa6bf;line-height:1.4">${esc(l.reason || '')}${lr ? `<br><span style="color:${lr.learned ? '#a78bfa' : '#6b7a90'}">${esc(lr.text)}</span>` : ''}${sav ? ` <span style="color:#34d399">· économie ${fmtE(sav)}</span>` : ''}</span>
+                <span style="font-variant-numeric:tabular-nums">${when}</span>
+                <span style="text-align:right;font-variant-numeric:tabular-nums;color:${l.color}">${cd}</span></div>`;
             }).join('');
-
-            return `<div class="p" style="padding:16px 18px">${head}${svg}${legend}<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:14px">${cards}</div></div>`;
+            return `<div class="p" style="padding:26px 30px;font-feature-settings:'tnum'">
+              <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:22px;flex-wrap:wrap"><div style="font-size:17px;font-weight:600">${title}</div><div style="font-size:13px;color:#8fa6bf">${isBi ? 'Tarif bi-horaire' : 'Tarif dynamique'} · ${pilot ? '<span style="color:#34d399;font-weight:600">pilote les machines</span>' : '<span style="color:#fbbf24;font-weight:600">observation</span>'}</div><div style="margin-left:auto;font-size:12px;color:#8fa6bf">${fmtD(nowT)} · ${fmtT(nowT)}</div></div>
+              <div style="display:flex;flex-wrap:wrap;row-gap:16px;margin-bottom:26px">${kpis.join('')}</div>
+              ${svg}${legend}
+              <div style="margin-top:18px;border-top:1px solid #1b2230">${rows}</div></div>`;
           ]]]
     - type: entities
       title: Réglages des planificateurs
