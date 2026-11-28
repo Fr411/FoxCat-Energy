@@ -24,6 +24,7 @@ from .const import (
     TARIFF_DYNAMIC,
     TARIFF_REGIMES,
 )
+from .domain.loads.machine_mode import MACHINE_MODE_MANUAL, MACHINE_MODES, manual_since_key, manual_until
 from .domain.tariff.tariff_model import distribution_profile, tariff_dimensions
 from .runtime.coordinator import FoxCatEnergyCoordinator
 from .entity import FoxCatEntity
@@ -49,8 +50,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             FoxCatNetworkPolicySelect(coordinator),
             FoxCatPriManualLevelSelect(coordinator),
             FoxCatDashboardVersionSelect(coordinator),
+            *[FoxCatMachineModeSelect(coordinator, machine) for machine in coordinator.controllable_machines],
         ]
     )
+
+
+class FoxCatMachineModeSelect(FoxCatEntity, SelectEntity):
+    """Mode d'une machine : Automatique (planificateur), Manuel (prise commandée à la main, 24 h) ou Arrêt."""
+
+    _attr_options = list(MACHINE_MODES)
+
+    # MÉTHODE : FoxCatMachineModeSelect.__init__ — méthode spéciale __init__
+    def __init__(self, coordinator: FoxCatEnergyCoordinator, machine) -> None:
+        self.machine = machine
+        super().__init__(coordinator, f"machine_{machine.machine_id}_mode", f"Mode {machine.name}", "mdi:state-machine", "machines")
+
+    # MÉTHODE : FoxCatMachineModeSelect.current_option — Mode courant
+    @property
+    def current_option(self) -> str:
+        return self.coordinator.machine_mode(self.machine)
+
+    # MÉTHODE : FoxCatMachineModeSelect.extra_state_attributes — Retour automatique prévu
+    @property
+    def extra_state_attributes(self) -> dict[str, str | None]:
+        since = self.coordinator.settings.get(manual_since_key(self.machine.machine_id))
+        return {"retour_automatique_le": manual_until(since) if self.current_option == MACHINE_MODE_MANUAL else None}
+
+    # MÉTHODE : FoxCatMachineModeSelect.async_select_option — Choix du mode
+    async def async_select_option(self, option: str) -> None:
+        await self.coordinator.async_set_machine_mode(self.machine.machine_id, option)
 
 
 class FoxCatDescribedSelect:

@@ -187,6 +187,7 @@ from ..domain.pricing.economic_optimizer import (
     merge_price_points,
     recommend_flexible_load,
 )
+from ..domain.loads import machine_mode as mmode
 from ..domain.loads.machines import MachineDefinition, machine_allowed, machine_definitions, schedule_boundaries
 from ..domain.loads.machine_cycle import MachineCycleManager
 from ..domain.loads.machine_learning import MachineLearningRecorder
@@ -695,6 +696,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Les trois clés historiques restent utilisées pour les appareils migrés.
         for machine in self.controllable_machines:
             self.settings.setdefault(machine.setting_key, machine.automatic_default)
+        self._normalize_machine_modes()
 
         self.settings["mode"] = MODE_ALIASES.get(str(self.settings.get("mode")), str(self.settings.get("mode")))
         self.metronome_state["period_s"] = float(self.settings.get("metronome_period_s", 30.0))
@@ -827,6 +829,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # a sa propre minuterie : le rafraîchissement de 30 s est repoussé par chaque publication.
         self._unsubs.append(
             async_track_time_interval(self.hass, self._on_core_watchdog, timedelta(seconds=15))
+        )
+
+        # Modes des machines : retour automatique du mode Manuel après 24 h, coupure des prises en mode Arrêt.
+        self._unsubs.append(
+            async_track_time_interval(self.hass, self._on_machine_mode_check, timedelta(minutes=1))
         )
 
         # Coupure Internet : un sondage toutes les 30 s, avec anti-rebond.
@@ -2412,8 +2419,11 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     allow_start_now=bool(entry.get("allow_start_now")),
                 )
                 entry["socket_state"] = state
+                entry["machine_mode"] = self.machine_mode(machine)
                 entry["socket_expected"] = "on" if expected else "off"
-                if not (management and regulating):
+                if self.machine_mode(machine) == mmode.MACHINE_MODE_OFF:
+                    entry["socket_sync"] = "ARRET"
+                elif not (management and regulating):
                     entry["socket_sync"] = "NON_GERE"
                 elif not plan_obj.get("pilot"):
                     entry["socket_sync"] = "HORS_PILOTE"
@@ -2748,6 +2758,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         was_pri_enabled = bool(self.settings.get("pri_enabled"))
         was_boiler_on = self.snapshot().boiler_on
         self.settings.update(values)
+        self._normalize_machine_modes()
         if not bool(self.settings.get("device_meter_enabled", True)):
             self.settings["regulation_active"] = False
         if not bool(self.settings.get("device_inverter_enabled", True)):
@@ -3886,6 +3897,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "foxcat_cycle_state": self.machine_cycle_manager.state_for(machine.machine_id).state,
                 "foxcat_cycle_origin": self.machine_cycle_manager.state_for(machine.machine_id).origin,
                 "automatic": bool(self.settings.get(machine.setting_key, machine.automatic_default)) if machine.controllable else False,
+                "mode": self.machine_mode(machine) if machine.controllable else None,
                 "sheddable": machine.sheddable if machine.controllable else False,
                 "window_open": machine_allowed(machine, now) if machine.controllable else False,
                 "tariff_period": tariff_period(now, self.settings),
@@ -3898,10 +3910,67 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         machine = next((item for item in self.controllable_machines if item.machine_id == machine_id), None)
         if machine is None:
             return
-        self.settings[machine.setting_key] = bool(enabled)
+        await self.async_set_machine_mode(
+            machine_id, mmode.MACHINE_MODE_AUTO if enabled else mmode.MACHINE_MODE_MANUAL
+        )
+
+    # MÉTHODE : FoxCatEnergyCoordinator.machine_mode — Mode courant d'une machine
+    def machine_mode(self, machine: MachineDefinition) -> str:
+        enabled = bool(self.settings.get(machine.setting_key, machine.automatic_default))
+        return mmode.reconcile_mode(self.settings.get(mmode.mode_key(machine.machine_id)), enabled)
+
+    # MÉTHODE : FoxCatEnergyCoordinator._normalize_machine_modes — Aligne mode et booléen historique
+    def _normalize_machine_modes(self) -> None:
+        """Après un chargement, un profil ou un ancien interrupteur : le mode suit le booléen de gestion."""
+        now_iso = dt_util.now().isoformat()
+        for machine in self.controllable_machines:
+            mode = self.machine_mode(machine)
+            key = mmode.mode_key(machine.machine_id)
+            since = mmode.manual_since_key(machine.machine_id)
+            if self.settings.get(key) != mode:
+                self.settings[key] = mode
+                if mode == mmode.MACHINE_MODE_MANUAL:
+                    self.settings[since] = now_iso
+            if mode != mmode.MACHINE_MODE_MANUAL:
+                self.settings.pop(since, None)
+            elif since not in self.settings:
+                self.settings[since] = now_iso
+
+    # MÉTHODE : FoxCatEnergyCoordinator.async_set_machine_mode — Choix du mode d'une machine
+    async def async_set_machine_mode(self, machine_id: str, mode: str) -> None:
+        machine = next((item for item in self.controllable_machines if item.machine_id == machine_id), None)
+        if machine is None or mode not in mmode.MACHINE_MODES:
+            return
+        self.settings[mmode.mode_key(machine_id)] = mode
+        self.settings[machine.setting_key] = mode == mmode.MACHINE_MODE_AUTO
+        if mode == mmode.MACHINE_MODE_MANUAL:
+            self.settings[mmode.manual_since_key(machine_id)] = dt_util.now().isoformat()
+        else:
+            self.settings.pop(mmode.manual_since_key(machine_id), None)
         await self._async_save()
         await self.async_reconcile_machines()
         self.async_set_updated_data(self._build_data())
+
+    # MÉTHODE : FoxCatEnergyCoordinator._on_machine_mode_check — Retour auto après 24 h, prise coupée en Arrêt
+    async def _on_machine_mode_check(self, now: datetime | None = None) -> None:
+        now = dt_util.now()
+        expired = [
+            machine for machine in self.controllable_machines
+            if mmode.manual_expired(
+                self.machine_mode(machine), self.settings.get(mmode.manual_since_key(machine.machine_id)), now
+            )
+        ]
+        for machine in expired:
+            _LOGGER.info("Machine %s : 24 h en mode Manuel, retour en mode Automatique.", machine.name)
+            await self.async_set_machine_mode(machine.machine_id, mmode.MACHINE_MODE_AUTO)
+        # Mode Arrêt : une prise rallumée à la main est recoupée (sauf cycle en cours).
+        for machine in self.controllable_machines:
+            if self.machine_mode(machine) != mmode.MACHINE_MODE_OFF or not machine.switch_entity:
+                continue
+            socket = self.hass.states.get(machine.switch_entity)
+            if socket is not None and socket.state == STATE_ON:
+                await self.async_reconcile_machines()
+                break
 
     # MÉTHODE : FoxCatEnergyCoordinator.async_set_device_enabled — traitement asynchrone : set device enabled
     async def async_set_device_enabled(self, device_id: str, enabled: bool) -> None:
@@ -4108,6 +4177,7 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 high_load_block=high_load_block,
                 allowed=allowed,
                 tariff_ok=tariff_ok,
+                stopped=self.machine_mode(machine) == mmode.MACHINE_MODE_OFF,
             )
             if service is None:
                 continue
