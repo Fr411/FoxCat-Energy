@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 DOMAIN = "foxcat_energy"
-VERSION = "1.7.700"
+VERSION = "1.7.701"
 PLATFORMS = ["sensor", "binary_sensor", "switch", "select", "number", "time", "button"]
 DEFAULT_DYNAMIC_HIGH_POSITION_PCT = 70.0
 
