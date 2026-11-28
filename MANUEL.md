@@ -301,7 +301,7 @@ En Backup, le **boiler est coupé** : l'eau chaude n'est plus chauffée tant qu'
 
 Les alertes sont actives par défaut, sans réglage.
 
-1. Dans l'appareil **Système**, le capteur **« Santé FoxCat (alertes de panne) »** vaut `OK`, `MAJEUR` ou `CRITIQUE`. Ses attributs listent chaque alerte avec sa cause et l'heure de début.
+1. Dans l'appareil **Système**, le capteur **« Santé FoxCat (alertes de panne) »** vaut `OK`, `MAJEUR` ou `CRITIQUE`. Ses attributs listent chaque alerte avec sa cause et l'heure de début. Dans le dashboard mobile 1.9.0, la tuile « Santé FoxCat » affiche pour chaque alerte son titre puis sa cause (jusqu'à 4 alertes) ; après la mise à jour, régénérez le dashboard pour la voir.
 2. Home Assistant affiche une notification (cloche) par alerte, retirée quand la panne est levée.
 3. Pour recevoir un message sur le téléphone : importez `docs/automations/alerte_panne_foxcat.yaml` dans Paramètres → Automatisations, et remplacez `notify.mobile_app_mon_telephone` par votre service de notification.
 4. Pour couper les notifications : interrupteur **« Alertes de panne FoxCat (notifications) »**. Les capteurs restent.

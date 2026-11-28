@@ -1,4 +1,8 @@
-# Changelog — FoxCat Energy V1.7.704
+# Changelog — FoxCat Energy V1.7.705
+
+## V1.7.705
+
+- **Dashboard mobile 1.9.0 : la santé FoxCat affiche la cause des alertes.** La tuile « Santé FoxCat » (Accueil) et la page Configuration n'affichaient que le titre de l'alerte ; elles affichent maintenant le titre en gras puis son détail (cause et action), déjà fourni par l'attribut `alertes` du capteur. Le dashboard tablette n'affiche pas les alertes de santé (inchangé). Vérifié par tests, **pas dans Home Assistant** ; un dashboard déjà installé garde l'ancien affichage tant qu'on ne le régénère pas.
 
 ## V1.7.704
 
