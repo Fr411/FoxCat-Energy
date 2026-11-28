@@ -348,11 +348,14 @@ def boiler_lane(
     windows: list[list[int]] | None = None,
     *,
     source: str,
+    schedule: dict[str, Any] | None = None,
+    heating_min: float | None = None,
 ) -> dict[str, Any]:
-    """Couloir du boiler (rang 1) pour la vue : informatif, la décision reste celle du boiler dynamique.
+    """Couloir du boiler (rang 1) pour la vue : informatif, la décision reste celle du boiler.
 
-    ``windows`` : plages où la chauffe est permise (``None`` = à toute heure). Les segments viennent du
-    planificateur de charges flexibles (créneaux les moins chers) quand il en fournit.
+    ``windows`` : plages où la chauffe est permise (``None`` = à toute heure). ``schedule`` : démarrage
+    prévu calculé par ``boiler_plan.plan_boiler_hc`` (bi-horaire). Sans lui, les segments viennent du
+    planificateur de charges flexibles (créneaux les moins chers) et le premier donne l'heure de départ.
     """
     plan = boiler_plan or {}
     segments = []
@@ -364,7 +367,7 @@ def boiler_lane(
             ])
         except (KeyError, TypeError, ValueError):
             continue
-    return {
+    lane: dict[str, Any] = {
         "name": "Boiler",
         "priority_rank": 1,
         "decision": plan.get("decision"),
@@ -372,7 +375,24 @@ def boiler_lane(
         "windows": windows,
         "segments": segments,
         "source": source,
+        "status": None,
+        "start_ts": None,
+        "end_ts": None,
+        "heating_min": heating_min,
     }
+    if schedule:
+        lane.update(
+            status=schedule.get("status"), reason=schedule.get("reason"), start_ts=schedule.get("start_ts"),
+            end_ts=schedule.get("end_ts"), heating_min=schedule.get("heating_min"), temp_c=schedule.get("temp_c"),
+            target_c=schedule.get("target_c"), start_temp_c=schedule.get("start_temp_c"),
+        )
+        lane["segments"] = (
+            [[schedule["start_ts"], schedule["end_ts"]]] if schedule.get("start_ts") and schedule.get("end_ts") else []
+        )
+    elif segments:
+        lane.update(status="PROGRAMME" if plan.get("decision") != "START_NOW" else "MAINTENANT",
+                    start_ts=segments[0][0], end_ts=segments[-1][1])
+    return lane
 
 
 def _machine_entry(machine: MachineDefinition, decision: str, allow: bool, reason: str, **extra: Any) -> dict[str, Any]:

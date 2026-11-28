@@ -151,6 +151,8 @@ Calculé à chaque trame en **tarif dynamique** ; sans l'interrupteur, il reste 
 
 **Machine Learning dans le planificateur.** La durée et la puissance moyenne viennent des 10 derniers cycles appris, à partir de 3 cycles mesurés (sinon réglages). La **forme de consommation** (12 tranches, part d'énergie par tranche, `profile_shape_10`) pondère le coût : chaque tranche est payée au prix de son créneau, ce qui place les pics de la machine (chauffe, essorage) sur les créneaux les moins chers. Attributs exposés : `energy_kwh`, `energy_source`, `learning_cycles`, `profile`.
 
+**Démarrage du boiler affiché** (`domain/pricing/boiler_plan.py`). En bi-horaire, la vue montre l'heure à laquelle le boiler démarrera sur le réseau en heures creuses, calculée comme la règle réelle (`eco.py`, `ecs_last_departure`) : sous le seuil de démarrage, au dernier failback (fin des HC − durée de chauffe − marge), le solaire pouvant chauffer plus tôt. En dynamique, c'est le premier créneau retenu par le planificateur de charges (indicatif). La décision réelle reste celle du boiler.
+
 Hypothèses à connaître : la part solaire future est une estimation prudente, pas une prévision de puissance ; le boiler n'est pas planifié ici.
 
 ## 7. Planificateur bi-horaire (`build_bihoraire_plan`)

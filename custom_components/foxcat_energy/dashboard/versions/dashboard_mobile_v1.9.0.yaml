@@ -12775,7 +12775,10 @@ views:
             const lanes = [];
             const BOILER_HC = 'HEURES_CREUSES';
             const bo = P.boiler;
-            if (bo) lanes.push({ id: 'boiler', rank: 1, name: 'Boiler', dec: bo.source === BOILER_HC ? 'HC' : bo.decision, reason: bo.source === BOILER_HC ? (bo.windows && bo.windows.length ? 'Chauffe réseau limitée aux heures creuses ; le solaire reste prioritaire.' : 'Chauffe réseau non autorisée en heures creuses (réglage du boiler).') : bo.reason, windows: bo.windows, runs: mergeRuns((bo.segments || []).map(s => [s[0], s[1]])), isBoiler: true });
+            const BSTAT = { PROGRAMME: ['Démarre à ', '#fb923c'], MAINTENANT: ['Démarre maintenant', '#fb923c'], EN_COURS: ['En chauffe', '#fb923c'], AUCUN_BESOIN: ['Aucune chauffe prévue', '#8fa6bf'], HC_DESACTIVE: ['Solaire seulement', '#8fa6bf'], MANUEL: ['Gestion manuelle', '#8fa6bf'], DESACTIVE: ['Non géré', '#8fa6bf'], SONDE_INDISPONIBLE: ['Sonde indisponible', '#f87171'], AUCUNE_HC: ['Aucune heure creuse', '#8fa6bf'] };
+            const bst = bo && bo.status ? (BSTAT[bo.status] || [bo.status, '#8fa6bf']) : null;
+            const bstText = bst ? (bo.status === 'PROGRAMME' && bo.start_ts ? bst[0] + fmtT(bo.start_ts) : bst[0]) : null;
+            if (bo) lanes.push({ id: 'boiler', rank: 1, name: 'Boiler', decText: bstText, decColor: bst ? bst[1] : null, dec: bo.source === BOILER_HC ? 'HC' : bo.decision, reason: bo.source === BOILER_HC ? (bo.windows && bo.windows.length ? 'Chauffe réseau limitée aux heures creuses ; le solaire reste prioritaire.' : 'Chauffe réseau non autorisée en heures creuses (réglage du boiler).') : bo.reason, windows: bo.windows, runs: mergeRuns((bo.segments || []).map(s => [s[0], s[1]])), isBoiler: true, bo });
             let extraIdx = 0;
             Object.entries(P.machines || {}).forEach(([id, m]) => {
               const a = iso(m.planned_start), b = iso(m.planned_end);
@@ -12850,7 +12853,7 @@ views:
                 svg += `<text x="26" y="${y + LANE_H / 2 + 5}" fill="${c}" font-size="14" font-weight="800" text-anchor="middle">${l.rank}</text>`;
                 svg += `<text x="48" y="${y + LANE_H / 2 - 3}" fill="#e8f1fb" font-size="13" font-weight="700">${esc(l.name)}</text>`;
                 const d = DEC[l.dec] || [l.dec || '—', '#8fa6bf'];
-                svg += `<text x="48" y="${y + LANE_H / 2 + 13}" fill="${d[1]}" font-size="10.5">${esc(d[0])}</text>`;
+                svg += `<text x="48" y="${y + LANE_H / 2 + 13}" fill="${l.decColor || d[1]}" font-size="10.5">${esc(l.decText || d[0])}</text>`;
               }
               // fenêtres autorisées
               const wins = l.windows == null ? [[t0, t1]] : l.windows;
@@ -12873,8 +12876,8 @@ views:
                   const mx = Math.max(...prof, 1e-6), bw = wd / prof.length;
                   prof.forEach((v, q) => { const hh = Math.max(1.5, (BAR_H - 10) * v / mx); svg += `<rect x="${(xa + q * bw + 0.5).toFixed(1)}" y="${(y + BAR_Y + BAR_H - 5 - hh).toFixed(1)}" width="${Math.max(bw - 1, 1).toFixed(1)}" height="${hh.toFixed(1)}" rx="1.5" fill="#0b1220" opacity="0.38"/>`; });
                 }
-                if (wd > (MOB ? 84 : 92) && (k === 0 || l.runs.length === 1)) svg += `<text x="${(xa + wd / 2).toFixed(1)}" y="${y + BAR_Y + BAR_H / 2 + 4}" fill="#0b1220" font-size="11.5" font-weight="800" text-anchor="middle">${fmtT(r[0])} → ${fmtT(r[1])}${wd > (MOB ? 170 : 190) ? ' · ' + fmtDur(r[1] - r[0]) : ''}</text>`;
-                else if (k === 0) svg += `<text x="${(xb + 6 > X1 - 70 ? Math.max(xa - 6, X0 + 2) : xb + 6).toFixed(1)}" text-anchor="${xb + 6 > X1 - 70 ? 'end' : 'start'}" y="${y + BAR_Y + BAR_H / 2 + 4}" fill="${c}" font-size="11.5" font-weight="700">${fmtT(r[0])} → ${fmtT(r[1])}</text>`;
+                if (wd > (MOB ? 84 : 92) && (k === 0 || l.runs.length === 1)) svg += `<text x="${(xa + wd / 2).toFixed(1)}" y="${y + BAR_Y + BAR_H / 2 + 4}" fill="#0b1220" font-size="11.5" font-weight="800" text-anchor="middle">${l.isBoiler && bo && bo.start_ts ? '⏻ ' : ''}${fmtT(r[0])} → ${fmtT(r[1])}${wd > (MOB ? 170 : 190) ? ' · ' + fmtDur(r[1] - r[0]) : ''}</text>`;
+                else if (k === 0) svg += `<text x="${(xb + 6 > X1 - 70 ? Math.max(xa - 6, X0 + 2) : xb + 6).toFixed(1)}" text-anchor="${xb + 6 > X1 - 70 ? 'end' : 'start'}" y="${y + BAR_Y + BAR_H / 2 + 4}" fill="${c}" font-size="11.5" font-weight="700">${l.isBoiler && bo && bo.start_ts ? '⏻ ' : ''}${fmtT(r[0])} → ${fmtT(r[1])}</text>`;
               });
             });
             // maintenant
@@ -12896,6 +12899,19 @@ views:
             const peak = isBi ? P.next_hp : P.next_peak;
             const rng = (b) => b ? `${fmtDT(iso(b.start))} → ${fmtDT(iso(b.end))}` : '—';
             const saving = num(P.total_expected_saving_eur);
+            const boilerTile = (() => {
+              if (!bo || !bo.status) return '';
+              const col = '#fb923c', st = bo.status;
+              const temp = bo.temp_c != null ? Number(bo.temp_c).toFixed(1).replace('.', ',') : null, tgt = bo.target_c != null ? Number(bo.target_c).toFixed(0) : null;
+              let v, sub;
+              if (st === 'PROGRAMME' && bo.start_ts) { v = fmtDT(bo.start_ts); sub = `dans ${fmtDur(bo.start_ts - nowT)}${bo.heating_min ? ' · chauffe ' + bo.heating_min + ' min' : ''}${temp ? ' · ' + temp + ' → ' + tgt + ' °C' : ''}`; }
+              else if (st === 'MAINTENANT') { v = 'Maintenant'; sub = `chauffe ${bo.heating_min || '?'} min${temp ? ' · ' + temp + ' → ' + tgt + ' °C' : ''}`; }
+              else if (st === 'EN_COURS') { v = 'En chauffe'; sub = temp ? `${temp} → ${tgt} °C` : ''; }
+              else if (st === 'AUCUN_BESOIN') { v = 'Pas de chauffe'; sub = temp ? `eau à ${temp} °C` : ''; }
+              else if (bo.start_ts) { v = fmtDT(bo.start_ts); sub = 'créneau le moins cher'; }
+              else { v = (BSTAT[st] || [st])[0]; sub = ''; }
+              return stat('Boiler · démarrage', v, `${sub}${bo.source === BOILER_HC && st === 'PROGRAMME' ? '<br>au plus tard · le solaire peut chauffer avant' : ''}`, 'mdi:water-boiler', col);
+            })();
             const head = `
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><ha-icon icon="mdi:calendar-clock" style="color:#19d8ff"></ha-icon><div style="font-size:16px;font-weight:800">${title}</div>${chip(pilot ? 'PILOTE LES MACHINES' : 'OBSERVATION', pilot ? '#34d399' : '#fbbf24')}</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(${MOB ? 150 : 200}px,1fr));gap:10px;margin-bottom:14px">
@@ -12903,6 +12919,7 @@ views:
               ${stat(isBi ? 'Prochaines heures creuses' : 'Prochaine vallée', rng(valley), valley && !isBi ? `moy. ${fmtP(num(valley.average_price_eur_kwh))} €/kWh` : (isBi && P.spread_eur_kwh != null ? `écart HP–HC ${fmtP(num(P.spread_eur_kwh))} €/kWh` : ''), 'mdi:trending-down', '#34d399')}
               ${stat(isBi ? 'Prochaines heures pleines' : 'Prochain pic', rng(peak), peak && !isBi ? `moy. ${fmtP(num(peak.average_price_eur_kwh))} €/kWh` : '', 'mdi:trending-up', '#fb923c')}
               ${stat('Économie attendue', saving != null ? fmtE(saving) : '—', 'en décalant les cycles en attente', 'mdi:piggy-bank-outline', '#fbbf24')}
+              ${boilerTile}
             </div>`;
             const legendKeys = isBi ? ['HC', 'HP'] : ['NEGATIF', 'TRES_BAS', 'BAS', 'NORMAL', 'ELEVE', 'PIC'];
             const legend = `<div style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 2px;font-size:11px;color:#8fa6bf">${legendKeys.map(k => `<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:3px;background:${BAND[k][0]};opacity:.75"></i>${BAND[k][1]}</span>`).join('')}<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:18px;height:11px;border-radius:4px;border:1px dashed #cbd5e1;opacity:.8"></i>Fenêtre autorisée</span><span style="display:inline-flex;align-items:center;gap:6px"><i style="width:18px;height:11px;border-radius:4px;background:#cbd5e1"></i>Cycle planifié</span></div>`;
@@ -12912,7 +12929,7 @@ views:
               const d = DEC[l.dec] || [l.dec || '—', '#8fa6bf'];
               const m = l.m || {};
               const run = l.runs[0];
-              const when = run ? `${fmtD(run[0])} · ${fmtT(run[0])} → ${fmtT(l.runs[l.runs.length - 1][1])}` : (l.isBoiler ? (isBi ? 'Selon le solaire et les heures creuses' : 'Décision du boiler dynamique') : '—');
+              const when = run ? `${fmtD(run[0])} · ${fmtT(run[0])} → ${fmtT(l.runs[l.runs.length - 1][1])}` : (l.isBoiler ? (l.decText || (isBi ? 'Selon le solaire et les heures creuses' : 'Décision du boiler dynamique')) : '—');
               const sav = num(m.expected_saving_eur), pct = num(m.expected_saving_pct);
               const until = run ? run[0] - nowT : null;
               const countdown = l.dec === 'CONTINUE' ? 'cycle en cours' : (until == null ? '' : (until <= 300 ? 'maintenant' : 'dans ' + fmtDur(until)));
@@ -12922,7 +12939,7 @@ views:
               return `<div style="flex:1 1 ${MOB ? '100%' : '220px'};min-width:${MOB ? 0 : 220}px;padding:12px 14px;border-radius:14px;background:linear-gradient(160deg,${l.color}14,rgba(255,255,255,.03) 55%);border:1px solid ${l.color}33;border-left:3px solid ${l.color}">
                 <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:${l.color}22;color:${l.color};font-weight:800;border:1px solid ${l.color}99">${l.rank}</span>
                   <ha-icon icon="${ICON[l.id] || 'mdi:flash'}" style="color:${l.color};--mdc-icon-size:20px"></ha-icon><b style="font-size:14px">${esc(l.name)}</b></div>
-                <div style="margin:8px 0 6px">${chip(esc(d[0]), d[1])}</div>
+                <div style="margin:8px 0 6px">${chip(esc(l.decText || d[0]), l.decColor || d[1])}</div>
                 <div style="font-size:13px;font-weight:700;font-variant-numeric:tabular-nums">${when}${countdown ? ` <span style="font-weight:600;color:${l.color}">· ${countdown}</span>` : ''}</div>
                 ${sav != null ? `<div class="k" style="font-size:12px;margin-top:3px">Économie attendue <b style="color:#34d399">${fmtE(sav)}</b>${pct != null ? ` (${Math.round(pct)} %)` : ''}${m.estimated_cost_eur != null ? ` · coût du cycle ${fmtE(num(m.estimated_cost_eur))}` : ''}</div>` : ''}
                 ${learnLine}
