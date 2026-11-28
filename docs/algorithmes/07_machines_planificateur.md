@@ -171,3 +171,10 @@ Actif seulement en tarif **bi-horaire** (structure HP/HC, hors dynamique). Il co
 - Une prise est attendue allumée si un cycle est en cours, ou si la gestion de la machine est active, la plage ouverte et le départ autorisé par le plan (`allow_start_now`).
 - Dès que l'un de ces trois critères change pour une machine à prise, la coordination relance la réconciliation des prises (au plus une fois par minute ; jamais en mode Manuel ou régulation arrêtée). Aucune scrutation périodique.
 - Chaque machine du plan expose `socket_state`, `socket_expected` et `socket_sync` (`OK`, `ECART`, `INDISPONIBLE`, `HORS_PILOTE`, `NON_GERE`) pour repérer un écart entre le plan et la prise.
+
+## Mode par machine (Automatique, Manuel, Arrêt)
+
+- **Automatique** : le planificateur commande la prise (règles ci-dessus).
+- **Manuel** : aucune commande FoxCat sur la prise ; retour en Automatique après 24 h (minuterie d'une minute, `domain/loads/machine_mode.py`).
+- **Arrêt** : prise coupée, aucun départ ; cycle en cours jamais interrompu ; prise rallumée à la main recoupée (priorité sur le mode Backup).
+- Le booléen historique « gestion automatique » vaut vrai seulement en Automatique ; un profil qui le modifie met le mode à jour.

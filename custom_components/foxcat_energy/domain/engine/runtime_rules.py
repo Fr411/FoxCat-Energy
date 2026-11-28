@@ -48,12 +48,17 @@ def machine_socket_action(
     high_load_block: bool,
     allowed: bool,
     tariff_ok: bool,
+    stopped: bool = False,
 ) -> str | None:
     """Retourne ``turn_on``, ``turn_off`` ou ``None`` (ne rien envoyer).
+
+    Mode Arrêt (``stopped``) : la prise est coupée, sauf cycle en cours (jamais interrompu).
 
     Gestion automatique coupée : FoxCat rend la main et n'envoie rien, sauf pour
     couper une machine délestable pendant une urgence du disjoncteur (sécurité).
     """
+    if stopped:
+        return None if cycle_active else SOCKET_OFF
     if not management and not high_load_block:
         return None
     should_on = cycle_active or keep_running or backup_on or (

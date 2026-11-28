@@ -4,6 +4,7 @@ Une ligne par version : version, date, résumé en une phrase, lien vers la pull
 
 | Version | Date | Résumé | Pull request |
 |---|---|---|---|
+| 1.7.704 | 2026-11-28 | Mode par machine (Automatique, Manuel avec retour auto après 24 h, Arrêt) et outil de mise à jour dans Home Assistant (`/maj-ha`). | [#89](https://github.com/Fr411/FoxCat-Energy/pull/89) |
 | 1.7.703 | 2026-11-28 | Planificateur ↔ prises : la réconciliation des prises est relancée dès que le départ autorisé, la plage ouverte ou la gestion d'une machine change (plus d'attente du prochain événement) ; les plans exposent l'état attendu et réel de la prise. | [#88](https://github.com/Fr411/FoxCat-Energy/pull/88) |
 | 1.7.702 | 2026-11-28 | Vue Planificateur : nouveau design (tablette « Minimal pro », mobile « Bento verre »), démarrage du boiler visible en bi-horaire (règle réelle des heures creuses reproduite : seuil, dernier failback, marge) et message distinct quand la frise n'a pas ses données. | [#87](https://github.com/Fr411/FoxCat-Energy/pull/87) |
 | 1.7.701 | 2026-11-28 | Vue Planificateur dans les dashboards tablette et mobile 1.9.0 (tarif, fenêtres autorisées et cycles planifiés par priorité Boiler, lave-vaisselle, lave-linge, sèche-linge), Machine Learning dans les planificateurs (durée, énergie et forme de consommation apprises, seuil de 3 cycles). | [#86](https://github.com/Fr411/FoxCat-Energy/pull/86) |
