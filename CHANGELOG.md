@@ -1,6 +1,6 @@
-# Changelog — FoxCat Energy V1.7.702
+# Changelog — FoxCat Energy V1.7.703
 
-## Non publié
+## V1.7.703
 
 - **Planificateur ↔ prises synchronisés.** Avant, un départ décidé par le planificateur (début des heures creuses, créneau d'un tarif dynamique à une heure quelconque) n'allumait la prise qu'au prochain événement (changement de plage, de prix ou de réglage). Désormais, dès que « départ autorisé », « plage ouverte » ou « gestion de la machine » change pour une machine à prise, la coordination déclenche une réconciliation des prises (au plus une fois par minute, jamais en mode Manuel ni régulation arrêtée). Pas de scrutation périodique : une prise allumée à la main n'est pas coupée sans changement du plan. Chaque machine des deux planificateurs expose en plus `socket_state` (état réel de la prise), `socket_expected` (`on`/`off` attendu) et `socket_sync` (`OK`, `ECART`, `INDISPONIBLE`, `HORS_PILOTE` en observation, `NON_GERE`). Tests : `tests/test_machine_socket_sync.py` (règles pures). Le déclenchement dans la coordination n'est **pas testé dans Home Assistant**. Non fait : affichage de l'état de la prise dans les vues.
 
