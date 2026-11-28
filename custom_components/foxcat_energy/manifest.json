@@ -1,7 +1,7 @@
 {
   "domain": "foxcat_energy",
   "name": "FoxCat Energy",
-  "version": "1.7.705",
+  "version": "1.7.706",
   "config_flow": true,
   "iot_class": "local_push",
   "requirements": [],
