@@ -1,6 +1,6 @@
-# Changelog — FoxCat Energy V1.7.701
+# Changelog — FoxCat Energy V1.7.702
 
-## Non publié
+## V1.7.702
 
 - **Vue Planificateur : nouveau design.** Tablette : **« Minimal pro »** (indicateurs sans boîtes séparés par des filets, tarif en filet fin et bande de chaleur par bande de prix, fenêtres autorisées hachurées, cycles en barres pleines, tableau compact avec compte à rebours). Mobile : **« Bento verre »** (cartes en verre dépoli sur fond lumineux, prix actuel en grand avec jauge de position, tuile « ⏻ Démarrage du boiler » en évidence, courbe lissée avec bande de prix, pastilles lumineuses pour les cycles, cartes par appareil). Les deux lisent les mêmes données ; remplace le visuel précédent (qui n'avait pas été publié). Aperçus : `docs/PREVIEW_PLANIFICATEUR_*.png`. Rendu vérifié dans un navigateur de test, **pas dans Home Assistant**.
 
