@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version de l'intégration | **1.7.703** |
+| Version de l'intégration | **1.7.704** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
@@ -309,7 +309,7 @@ Les entités sont rangées en **13 appareils** : Mesures et sources · Tarificat
 
 **Réglages inactifs.** Une vingtaine d'entités de réglage (par exemple « Agressivité solaire Bihoraire », « Charge réseau si prix dynamique négatif », plusieurs seuils PRI) ne sont lues par aucune stratégie active. Elles restent pour ne pas casser les tableaux de bord et les profils, mais elles sont créées **désactivées**, rangées en diagnostic et portent l'attribut `statut: inactif`. La liste est dans `INACTIVE_SETTINGS` (`const.py`) et dans [`docs/algorithmes/ANOMALIES.md`](docs/algorithmes/ANOMALIES.md) (A-03).
 
-Principaux interrupteurs : Régulation FoxCat active, Boiler géré par FoxCat, Boiler autorisé en heures creuses, Réduction de puissance onduleur, Gestion de chaque machine, Délestage haute consommation, Analyse prédictive IA, Optimisation économique, Prédictif prix dynamique, Planificateur dynamique / bi-horaire pilote les machines, Décalage de consigne solaire, Résumé EMS persistant.
+**Mode par machine** : chaque machine à prise a un sélecteur « Mode <machine> » : *Automatique* (le planificateur commande la prise), *Manuel* (FoxCat ne commande rien, vous allumez et éteignez la prise depuis Home Assistant ; retour automatique en Automatique après 24 h, attribut `retour_automatique_le`), *Arrêt* (prise coupée, aucun départ ; un cycle en cours n'est jamais interrompu ; une prise rallumée est recoupée dans la minute). L'ancien interrupteur de gestion reste synchronisé (activé = Automatique, coupé = Manuel). **Mise à jour dans Home Assistant** : la compétence `/maj-ha` (`.claude/skills/maj-ha/SKILL.md`) guide la sauvegarde, l'installation et le redémarrage. Principaux interrupteurs : Régulation FoxCat active, Boiler géré par FoxCat, Boiler autorisé en heures creuses, Réduction de puissance onduleur, Gestion de chaque machine, Délestage haute consommation, Analyse prédictive IA, Optimisation économique, Prédictif prix dynamique, Planificateur dynamique / bi-horaire pilote les machines, Décalage de consigne solaire, Résumé EMS persistant.
 
 Listes : Mode EMS, Politique réseau, Version du dashboard, et cinq listes de tarif : **Source du prix**, **Structure tarifaire**, **Régime Tarifaire**, **Profil distribution Belgique** et **Structure (Si Dynamique)**.
 

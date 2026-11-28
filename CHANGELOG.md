@@ -1,6 +1,8 @@
-# Changelog — FoxCat Energy V1.7.703
+# Changelog — FoxCat Energy V1.7.704
 
-## Non publié
+## V1.7.704
+
+- **Outil de mise à jour dans Home Assistant** : compétence `/maj-ha` (`.claude/skills/maj-ha/SKILL.md`) qui compare la dernière release à la version installée, sauvegarde, installe via l'entité `update.*` et prépare le redémarrage (jamais sans demande). Elle ne contourne pas l'avertissement HACS/Marketplace, que l'utilisateur doit accepter. Procédure non exécutée de bout en bout.
 
 - **Mode par machine : Automatique, Manuel, Arrêt.** Nouveau sélecteur « Mode <machine> » (appareil Machines) pour chaque machine à prise. **Automatique** : le planificateur commande la prise. **Manuel** : FoxCat ne commande plus rien, la prise s'allume et s'éteint depuis Home Assistant ; **retour automatique en Automatique après 24 h** (compté depuis le passage en Manuel, que la prise soit allumée ou non ; l'attribut `retour_automatique_le` indique l'heure). **Arrêt** : la prise est coupée et aucun départ n'est autorisé ; un cycle en cours n'est jamais interrompu (la prise est coupée à sa fin) et une prise rallumée à la main est recoupée dans la minute. Le mode est la source de vérité ; l'ancien interrupteur de gestion est conservé et reste synchronisé (activé = Automatique, coupé = Manuel). Un profil de réglages ou l'ancien interrupteur qui coupe la gestion donne le mode Manuel (donc retour automatique après 24 h : une machine coupée ainsi ne le reste plus indéfiniment). Les plans exposent `machine_mode` et `socket_sync = ARRET`. Tests : règles pures (`tests/test_machine_socket_sync.py`). **Non vérifié dans Home Assistant** : sélecteur, chaîne de réconciliation et minuterie d'une minute. Non fait : affichage du mode dans les dashboards.
 
