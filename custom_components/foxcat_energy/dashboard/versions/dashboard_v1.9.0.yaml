@@ -688,6 +688,35 @@ views:
           ]]]
     - type: custom:button-card
       template: fc_navbar
+    - type: conditional
+      conditions:
+      - entity: sensor.foxcat_energy_systeme_sante_foxcat_alertes_de_panne
+        state_not: OK
+      - entity: sensor.foxcat_energy_systeme_sante_foxcat_alertes_de_panne
+        state_not: unavailable
+      - entity: sensor.foxcat_energy_systeme_sante_foxcat_alertes_de_panne
+        state_not: unknown
+      card:
+        type: custom:button-card
+        template: fc_panel
+        entity: sensor.foxcat_energy_systeme_sante_foxcat_alertes_de_panne
+        styles:
+          card:
+          - border-radius: 0
+        custom_fields:
+          c: |
+            [[[
+              const esc=(t)=>String(t??'').replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+              const st=entity.state;
+              const col={MAJEUR:'#fbbf24',CRITIQUE:'#fb7185'}[st]||'#94a3b8';
+              let al=entity.attributes?.alertes||[]; if(!Array.isArray(al)) al=[al];
+              const rows=al.slice(0,6).map(a=>{
+                const o=typeof a==='object'?a:{titre:String(a)};
+                const c=o.severite==='CRITIQUE'?'#fb7185':'#fbbf24';
+                return `<div style="padding:6px 10px;border-radius:10px;border:1px solid ${c}55;background:${c}18;margin-top:6px"><div style="font-weight:700;color:${c}">${esc(o.titre||o.message||o.code)}</div>${o.detail?`<div style="font-size:12px;line-height:1.4;color:#cbd5e1">${esc(o.detail)}</div>`:''}</div>`;
+              }).join('');
+              return `<div class="p" style="padding:10px 20px"><div class="k" style="color:${col}">SANTÉ FOXCAT · ${esc(st)}</div>${rows}</div>`;
+            ]]]
     - type: custom:button-card
       template: fc_panel
       styles:
