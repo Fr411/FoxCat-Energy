@@ -12737,8 +12737,11 @@ views:
             const isBi = !dynS;
             const P = src.attributes || {};
             const title = isBi ? 'Planificateur bi-horaire' : 'Planificateur dynamique';
-            if (src.state === 'ATTENTE_PRIX' || !Array.isArray(P.slots) || P.slots.length < 2) {
+            if (src.state === 'ATTENTE_PRIX') {
               return box(`<div style="display:flex;align-items:center;gap:12px;color:#8fa6bf"><ha-icon icon="mdi:timer-sand"></ha-icon><div><b style="color:#e8f1fb">${title} · en attente des prix</b><div style="font-size:12px;margin-top:3px">${esc(P.reason || 'Courbe de prix indisponible.')}</div></div></div>`);
+            }
+            if (!Array.isArray(P.slots) || P.slots.length < 2) {
+              return box(`<div style="display:flex;align-items:center;gap:12px;color:#8fa6bf"><ha-icon icon="mdi:update"></ha-icon><div><b style="color:#e8f1fb">${title} · données de la frise absentes</b><div style="font-size:12px;margin-top:3px">Le planificateur tourne (état ${esc(src.state)}) mais cette version de l'intégration n'envoie pas la courbe de prix ni les fenêtres. Mettez FoxCat Energy à jour (dashboard 1.9.0) et redémarrez Home Assistant.</div></div></div>`);
             }
 
             // ---------- données ----------
