@@ -654,10 +654,12 @@ class DashboardAndProfileTests(unittest.TestCase):
         self.assertIn("1.7.4", available_dashboard_versions(versions_directory, "mobile"))
         self.assertIn("1.8.0", available_dashboard_versions(versions_directory))
         self.assertIn("1.8.0", available_dashboard_versions(versions_directory, "mobile"))
-        self.assertEqual(recommended_dashboard_version(versions_directory), "1.8.0")
+        self.assertIn("1.9.0", available_dashboard_versions(versions_directory))
+        self.assertEqual(recommended_dashboard_version(versions_directory), "1.9.0")
+        self.assertIn("1.9.0", available_dashboard_versions(versions_directory, "mobile"))
         self.assertEqual(
             recommended_dashboard_version(versions_directory, "mobile"),
-            "1.8.0",
+            "1.9.0",
         )
 
     def test_dashboard_v180_tablet_and_mobile_are_portable(self) -> None:
@@ -676,10 +678,14 @@ class DashboardAndProfileTests(unittest.TestCase):
             and node.args
             and isinstance(node.args[0], ast.Constant)
         }
+        # Les rôles « settings.* » sont générés par des boucles du registre (réglages et interrupteurs).
+        roles |= {f"settings.{key}" for key in (*NUMBER_DEFINITIONS, *SWITCH_DEFINITIONS)}
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         for filename, variant, minimum_views in (
             ("dashboard_v1.8.0.yaml", "tablet", 10),
+            ("dashboard_v1.9.0.yaml", "tablet", 13),
             ("dashboard_mobile_v1.8.0.yaml", "mobile", 9),
+            ("dashboard_mobile_v1.9.0.yaml", "mobile", 10),
         ):
             text = (versions_directory / filename).read_text(encoding="utf-8")
             dashboard = yaml.safe_load(text)
@@ -695,14 +701,12 @@ class DashboardAndProfileTests(unittest.TestCase):
                 (
                     versions_directory
                     / (
-                        "manifest_v1.8.0.json"
-                        if variant == "tablet"
-                        else "manifest_mobile_v1.8.0.json"
+                        filename.replace("dashboard_", "manifest_").replace(".yaml", ".json")
                     )
                 ).read_text(encoding="utf-8")
             )
             self.assertEqual(manifest["variant"], variant)
-            self.assertEqual(manifest["dashboard_version"], "1.8.0")
+            self.assertEqual(manifest["dashboard_version"], filename.rsplit("_v", 1)[1][:-5])
             self.assertIs(manifest["recommended"], True)
 
     def test_dashboard_v180_has_delestage_view_with_navbar_access(self) -> None:
@@ -729,6 +733,61 @@ class DashboardAndProfileTests(unittest.TestCase):
         code = view["cards"][0]["cards"][3]["custom_fields"]["c"]
         for step in ("Surveillance", "Seuil dépassé", "Délestage", "Réarmement"):
             self.assertIn(step, code)
+
+    def test_dashboard_v190_has_planner_view_with_navbar_access(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.9.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        paths = [view["path"] for view in dashboard["views"]]
+        self.assertIn("planificateur", paths)
+        navbar = dashboard["button_card_templates"]["fc_navbar"]["custom_fields"]
+        targets = {
+            item["card"]["variables"]["path"]: item["card"]["name"]
+            for item in navbar.values()
+        }
+        self.assertEqual(sorted(set(targets) - set(paths)), [])
+        self.assertEqual(targets["planificateur"], "Planificateur")
+        areas = dashboard["button_card_templates"]["fc_navbar"]["styles"]["grid"][0][
+            "grid-template-areas"
+        ]
+        self.assertEqual(len(areas.strip('"').split()), len(navbar))
+        view = next(view for view in dashboard["views"] if view["path"] == "planificateur")
+        card = next(item for item in view["cards"][0]["cards"] if item.get("template") == "fc_panel" and "custom_fields" in item and "priority_rank" in item["custom_fields"].get("c", ""))
+        code = card["custom_fields"]["c"]
+        for marker in (
+            "pricing.dynamic_planner", "pricing.bihoraire_planner", "priority_rank",
+            "windows", "planned_start", "MAINTENANT", "Heures creuses",
+        ):
+            self.assertIn(marker, code, marker)
+
+    def test_dashboard_v190_mobile_has_planner_view_and_home_tile(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_mobile_v1.9.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        view = next(view for view in dashboard["views"] if view.get("path") == "planificateur")
+        self.assertIs(view["subview"], True)
+        cards = view["sections"][0]["cards"]
+        card = next(card for card in cards if card.get("type") == "custom:button-card")
+        self.assertIs(card["variables"]["mobile"], True)
+        code = card["custom_fields"]["c"]
+        for marker in ("pricing.dynamic_planner", "pricing.bihoraire_planner", "priority_rank", "windows", "MAINTENANT"):
+            self.assertIn(marker, code, marker)
+        self.assertTrue(any(card.get("type") == "entities" for card in cards))
+        raw = (COMPONENT_PATH / "dashboard" / "versions" / "dashboard_mobile_v1.9.0.yaml").read_text(encoding="utf-8")
+        self.assertIn("[[foxcat:settings.dynamic_planner_enabled]]", raw)
+        tiles = [
+            tile
+            for section in dashboard["views"][0]["sections"]
+            for grid in section.get("cards", [])
+            if grid.get("type") == "grid"
+            for tile in grid.get("cards", [])
+        ]
+        planner_tile = next(tile for tile in tiles if tile.get("name") == "Planificateur")
+        self.assertIn("planificateur", planner_tile["tap_action"]["navigation_path"])
 
     def test_dashboard_v180_flux_octopus_is_named_mina(self) -> None:
         dashboard = yaml.safe_load(

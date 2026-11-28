@@ -145,9 +145,36 @@ def _price_at(points: list[PricePoint], at: datetime) -> float | None:
     return chosen
 
 
+# En dessous de ce nombre de cycles mesurés, l'apprentissage est jugé trop mince : on garde les réglages.
+MIN_LEARNED_CYCLES = 3
+
+
+def _learned_stats(machine: MachineDefinition, learning: dict[str, Any]) -> dict[str, Any]:
+    """Statistiques d'apprentissage de la machine, ou rien si elles reposent sur trop peu de cycles."""
+    stats = learning.get(machine.machine_id, {}) if isinstance(learning, dict) else {}
+    cycles = stats.get("retained_cycles")
+    if isinstance(cycles, (int, float)) and cycles < MIN_LEARNED_CYCLES:
+        return {}
+    return stats
+
+
+def _learned_shape(machine: MachineDefinition, learning: dict[str, Any]) -> list[float] | None:
+    """Forme apprise de la consommation (part d'énergie par tranche de cycle, somme 1), si elle est fiable."""
+    stats = _learned_stats(machine, learning)
+    shape = stats.get("profile_shape_10")
+    if not isinstance(shape, list) or len(shape) < 2 or not stats.get("average_energy_wh_10"):
+        return None
+    try:
+        values = [max(float(v), 0.0) for v in shape]
+    except (TypeError, ValueError):
+        return None
+    total = sum(values)
+    return [v / total for v in values] if total > 0 else None
+
+
 def _profile(machine: MachineDefinition, learning: dict[str, Any]) -> tuple[float, float, str]:
     """Durée (h), puissance moyenne (W) et origine : apprentissage sur 10 cycles, sinon réglages."""
-    stats = learning.get(machine.machine_id, {}) if isinstance(learning, dict) else {}
+    stats = _learned_stats(machine, learning)
     duration_s = stats.get("average_duration_s_10")
     energy_wh = stats.get("average_energy_wh_10")
     if isinstance(duration_s, (int, float)) and duration_s > 0:
@@ -222,15 +249,25 @@ def _candidate_cost(
     duration_h: float,
     power_w: float,
     share: float,
+    shape: list[float] | None = None,
 ) -> float | None:
-    end = start + timedelta(hours=duration_h)
-    grid_price = interval_cost(slots, start, end)
-    if grid_price is None:
-        return None
+    """Coût d'un cycle commencé à ``start``.
+
+    Avec ``shape`` (consommation apprise par tranche), chaque tranche est payée au prix de son propre
+    créneau : une chauffe en début de cycle pèse sur le prix du début, pas sur la moyenne du cycle.
+    """
     export_price = _price_at(export_points, start) if export_points else None
     solar_price = export_price if export_price is not None else 0.0
-    unit = (1.0 - share) * grid_price + share * solar_price
-    return unit * power_w / 1000.0 * duration_h
+    energy_kwh = power_w / 1000.0 * duration_h
+    parts = shape or [1.0]
+    step = timedelta(hours=duration_h) / len(parts)
+    cost = 0.0
+    for index, part in enumerate(parts):
+        grid_price = interval_cost(slots, start + step * index, start + step * (index + 1))
+        if grid_price is None:
+            return None
+        cost += ((1.0 - share) * grid_price + share * solar_price) * energy_kwh * part
+    return cost
 
 
 def _contiguous_starts(
@@ -282,6 +319,60 @@ def _plan_interruptible(
         return None
     chosen.sort(key=lambda seg: seg.start)
     return chosen
+
+
+# Ordre de repli quand les priorités sont égales (réglage d'origine : toutes à 50) : lave-vaisselle,
+# lave-linge, sèche-linge. Le boiler, qui n'est pas planifié ici, reste toujours le rang 1.
+_DEFAULT_ORDER = {"dishwasher": 0, "washer": 1, "dryer": 2}
+
+
+def _order_key(machine: MachineDefinition) -> tuple[int, int, str]:
+    return (-int(machine.priority), _DEFAULT_ORDER.get(machine.machine_id, 99), machine.machine_id)
+
+
+def _decorate(plan: dict[str, Any], ordered: list[MachineDefinition], now: datetime, horizon_end: datetime) -> None:
+    """Rang de priorité (le boiler est le rang 1) et plages autorisées, pour la vue du dashboard."""
+    for index, machine in enumerate(ordered):
+        entry = plan["machines"].get(machine.machine_id)
+        if entry is None:
+            continue
+        entry["priority"] = int(machine.priority)
+        entry["priority_rank"] = index + 2
+        entry["windows"] = [
+            [int(w.start.timestamp()), int(w.end.timestamp())] for w in _machine_windows(machine, now, horizon_end)
+        ]
+
+
+def boiler_lane(
+    boiler_plan: dict[str, Any] | None,
+    windows: list[list[int]] | None = None,
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """Couloir du boiler (rang 1) pour la vue : informatif, la décision reste celle du boiler dynamique.
+
+    ``windows`` : plages où la chauffe est permise (``None`` = à toute heure). Les segments viennent du
+    planificateur de charges flexibles (créneaux les moins chers) quand il en fournit.
+    """
+    plan = boiler_plan or {}
+    segments = []
+    for item in plan.get("segments") or []:
+        try:
+            segments.append([
+                int(datetime.fromisoformat(item["start"]).timestamp()),
+                int(datetime.fromisoformat(item["end"]).timestamp()),
+            ])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return {
+        "name": "Boiler",
+        "priority_rank": 1,
+        "decision": plan.get("decision"),
+        "reason": plan.get("reason"),
+        "windows": windows,
+        "segments": segments,
+        "source": source,
+    }
 
 
 def _machine_entry(machine: MachineDefinition, decision: str, allow: bool, reason: str, **extra: Any) -> dict[str, Any]:
@@ -350,35 +441,37 @@ def build_dynamic_plan(
         "horizon_hours": round((horizon_end - now).total_seconds() / 3600.0, 2),
         "price_step_minutes": int(step.total_seconds() // 60),
         "tomorrow_available": bool(tomorrow_available),
-        "slots": [
-            {"start": s.start.isoformat(), "price": round(s.price, 5), "band": s.band, "rank_pct": round(s.rank_pct, 1)}
-            for s in slots[:96]
-        ],
+        # Courbe compacte : [début (epoch s), prix €/kWh, bande], 144 créneaux au plus.
+        "slots": [[int(s.start.timestamp()), round(s.price, 5), s.band] for s in slots[:144]],
+        "now_ts": int(now.timestamp()),
         "next_valley": _next_block(slots, now, {BAND_HC} if band_for else {BAND_NEGATIVE, BAND_VERY_LOW, BAND_LOW}),
         "next_peak": _next_block(slots, now, {BAND_HP} if band_for else {BAND_PEAK, BAND_HIGH}),
         "machines": {},
         "timeline": [],
     }
 
+    ordered = sorted(machines, key=_order_key)
     if peak_shaving_active:
         plan["safety_override"] = True
         plan["machines"] = {
             m.machine_id: _machine_entry(m, SAFETY_OVERRIDE, False, "Écrêtage : nouveau démarrage suspendu") for m in machines
         }
         plan["state"] = dict(previous)
+        _decorate(plan, ordered, now, horizon_end)
         return plan
 
     reservations: list[dict[str, Any]] = []
     new_state: dict[str, str] = {}
     total_saving = 0.0
 
-    for machine in sorted(machines, key=lambda m: -int(m.priority)):
+    for machine in ordered:
         mid = machine.machine_id
         if not settings.get(machine.setting_key, machine.automatic_default):
             plan["machines"][mid] = _machine_entry(machine, USER_CONTROL, False, "Gestion automatique désactivée")
             continue
         cycle = cycles.get(mid, {})
         duration_h, power_w, source = _profile(machine, learning)
+        shape = _learned_shape(machine, learning)
         duration = timedelta(hours=duration_h)
         if cycle.get("protected"):
             end = _as_datetime(cycle.get("expected_end_at"), now + duration)
@@ -397,6 +490,10 @@ def build_dynamic_plan(
             "duration_h": round(duration_h, 3),
             "duration_source": source,
             "average_power_w": round(power_w, 1),
+            "energy_kwh": round(power_w / 1000.0 * duration_h, 3),
+            "energy_source": "APPRENTISSAGE_10_CYCLES" if _learned_stats(machine, learning).get("average_energy_wh_10") else "PUISSANCE_NOMINALE",
+            "learning_cycles": int(_learned_stats(machine, learning).get("retained_cycles") or 0),
+            "profile": [round(v, 3) for v in shape] if shape else None,
             "deadline": deadline.isoformat(),
             "interruptible": bool(machine.interruptible),
         }
@@ -427,7 +524,7 @@ def build_dynamic_plan(
                 solar_window=solar_window, confidence_pct=confidence, near=near,
             )
             cost = _candidate_cost(
-                slots=slots, export_points=export_points, start=start, duration_h=duration_h, power_w=power_w, share=share,
+                slots=slots, export_points=export_points, start=start, duration_h=duration_h, power_w=power_w, share=share, shape=shape,
             )
             if cost is None:
                 continue
@@ -502,6 +599,7 @@ def build_dynamic_plan(
         if entry.get("planned_start")
     ]
     plan["state"] = new_state
+    _decorate(plan, ordered, now, horizon_end)
     return plan
 
 

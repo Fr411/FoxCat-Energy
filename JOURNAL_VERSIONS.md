@@ -4,6 +4,7 @@ Une ligne par version : version, date, résumé en une phrase, lien vers la pull
 
 | Version | Date | Résumé | Pull request |
 |---|---|---|---|
+| 1.7.701 | 2026-11-28 | Vue Planificateur dans les dashboards tablette et mobile 1.9.0 (tarif, fenêtres autorisées et cycles planifiés par priorité Boiler, lave-vaisselle, lave-linge, sèche-linge), Machine Learning dans les planificateurs (durée, énergie et forme de consommation apprises, seuil de 3 cycles). | [#86](https://github.com/Fr411/FoxCat-Energy/pull/86) |
 | 1.7.700 | 2026-11-27 | Appareils Home Assistant reclassés de 10 à 13 (Planificateur, Machine Learning, Santé et alertes). | [#85](https://github.com/Fr411/FoxCat-Energy/pull/85) |
 | 1.7.7 (release V1.7.4025) | 2026-11-27 | Planificateur dynamique (créneaux les moins chers, bandes par rang, plan stable, interruptibles) et planificateur bi-horaire (cycles placés en heures creuses), en observation par défaut avec interrupteurs pour piloter les machines. | [#84](https://github.com/Fr411/FoxCat-Energy/pull/84) |
 | Outillage | 2026-11-27 | Workflow « Publier une release » (tag et release à la demande, version calculée depuis la dernière release publiée). | [#82](https://github.com/Fr411/FoxCat-Energy/pull/82), [#83](https://github.com/Fr411/FoxCat-Energy/pull/83) |

@@ -18,11 +18,15 @@ class MachineLearningRecorder:
     MIN_POINT_INTERVAL_S = 10.0
     MAX_INTEGRATION_GAP_S = 3600.0
     PERIODIC_SAVE_S = 300.0
+    PROFILE_BINS = 12
+    PROFILE_MIN_POINTS = 6
 
     # MÉTHODE : MachineLearningRecorder.__init__ — méthode spéciale __init__
     def __init__(self) -> None:
         self._machines: dict[str, dict[str, Any]] = {}
         self._last_save_at: datetime | None = None
+        # Forme moyenne des cycles, recalculée seulement quand l'historique change.
+        self._shape_cache: dict[str, tuple[tuple[int, int], list[float] | None, int]] = {}
 
     # MÉTHODE : MachineLearningRecorder.restore — Restaure uniquement l'historique terminé
     def restore(self, raw: Any) -> None:
@@ -319,6 +323,65 @@ class MachineLearningRecorder:
         rec["candidate_at"] = None
         rec["low_since"] = None
 
+    # MÉTHODE : MachineLearningRecorder.cycle_shape — Part de l'énergie d'un cycle dans chacune de ses tranches
+    @classmethod
+    def cycle_shape(cls, cycle: dict[str, Any], bins: int | None = None) -> list[float] | None:
+        """Découpe un cycle en ``bins`` tranches de durée égale et rend la part d'énergie de chacune (somme 1).
+
+        Sert à savoir *quand* une machine consomme (chauffe de l'eau au début, essorage à la fin…).
+        ``None`` si le cycle n'a pas assez de points ou aucune énergie.
+        """
+        bins = bins or cls.PROFILE_BINS
+        raw = cycle.get("points")
+        duration = float(cycle.get("duration_s", 0.0) or 0.0)
+        if not isinstance(raw, list) or duration <= 0:
+            return None
+        pts = sorted(
+            (float(p["t_s"]), max(float(p["p_w"]), 0.0))
+            for p in raw
+            if isinstance(p, dict) and isinstance(p.get("t_s"), (int, float)) and isinstance(p.get("p_w"), (int, float))
+        )
+        if len(pts) < cls.PROFILE_MIN_POINTS:
+            return None
+
+        def power_at(t: float) -> float:
+            if t <= pts[0][0]:
+                return pts[0][1]
+            if t >= pts[-1][0]:
+                return pts[-1][1]
+            for (t_a, p_a), (t_b, p_b) in zip(pts, pts[1:]):
+                if t_a <= t <= t_b:
+                    return p_a if t_b == t_a else p_a + (p_b - p_a) * (t - t_a) / (t_b - t_a)
+            return 0.0
+
+        width = duration / bins
+        sub = 6
+        energy = []
+        for k in range(bins):
+            mean = sum(power_at((k + (i + 0.5) / sub) * width) for i in range(sub)) / sub
+            energy.append(mean)
+        total = sum(energy)
+        if total <= 0:
+            return None
+        return [value / total for value in energy]
+
+    # MÉTHODE : MachineLearningRecorder._average_shape — Forme moyenne des 10 derniers cycles exploitables
+    def _average_shape(self, machine_id: str, cycles: list[dict[str, Any]]) -> tuple[list[float] | None, int]:
+        key = (int(self._machines.get(machine_id, {}).get("total_cycles", 0)), len(cycles))
+        cached = self._shape_cache.get(machine_id)
+        if cached and cached[0] == key:
+            return cached[1], cached[2]
+        shapes = [shape for c in cycles[-10:] if (shape := self.cycle_shape(c)) is not None]
+        if shapes:
+            bins = len(shapes[0])
+            mean = [sum(shape[k] for shape in shapes) / len(shapes) for k in range(bins)]
+            total = sum(mean)
+            result: list[float] | None = [value / total for value in mean] if total > 0 else None
+        else:
+            result = None
+        self._shape_cache[machine_id] = (key, result, len(shapes))
+        return result, len(shapes)
+
     # MÉTHODE : MachineLearningRecorder.view — View
     def view(self) -> dict[str, Any]:
         result: dict[str, Any] = {}
@@ -327,6 +390,7 @@ class MachineLearningRecorder:
             recent = cycles[-10:] if isinstance(cycles, list) else []
             durations = [float(c.get("duration_s", 0.0)) for c in recent if float(c.get("duration_s", 0.0)) > 0]
             energies = [float(c.get("energy_wh", 0.0)) for c in recent if float(c.get("energy_wh", 0.0)) >= 0]
+            shape, shape_cycles = self._average_shape(machine_id, cycles if isinstance(cycles, list) else [])
             current = rec.get("current")
             current_view = None
             if isinstance(current, dict):
@@ -348,6 +412,9 @@ class MachineLearningRecorder:
                 "last_cycle": deepcopy(cycles[-1]) if cycles else None,
                 "average_duration_s_10": (sum(durations) / len(durations)) if durations else None,
                 "average_energy_wh_10": (sum(energies) / len(energies)) if energies else None,
+                # Part d'énergie par tranche de cycle (somme 1) et nombre de cycles qui l'ont produite.
+                "profile_shape_10": [round(v, 4) for v in shape] if shape else None,
+                "profile_shape_cycles": shape_cycles,
             }
         return result
 
