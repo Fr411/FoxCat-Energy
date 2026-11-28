@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version de l'intégration | **1.7.705** |
+| Version de l'intégration | **1.7.706** |
 | Home Assistant minimal | **2025.1.0** |
 | Domaine | `foxcat_energy` |
 | Langue de configuration | Français |
@@ -175,7 +175,7 @@ FoxCat surveille sa propre santé et notifie ce qui ne fonctionne pas. **Critiqu
 
 **Sonde du boiler indisponible** : FoxCat n'assimile jamais l'absence de mesure à 0 °C. Dès que la sonde de température du boiler est illisible, toute commande de chauffe est refusée (y compris celle de l'utilisateur) et un boiler en train de chauffer est arrêté ; la chauffe reprend 60 secondes après le retour continu de la sonde. Au démarrage de Home Assistant, elle attend donc la première lecture.
 
-Sorties : capteur **« Santé FoxCat »** (`OK`, `MAJEUR`, `CRITIQUE`, avec la liste), capteur binaire **« Alerte de panne FoxCat »**, une **notification** dans Home Assistant par alerte, et l'événement `foxcat_energy_alert` pour envoyer un message sur téléphone (exemple : `docs/automations/alerte_panne_foxcat.yaml`). Le dashboard mobile 1.9.0 affiche le titre et la cause de chaque alerte (le dashboard tablette ne les affiche pas). Catalogue complet : [santé et alertes](docs/algorithmes/10_sante_alertes.md).
+Sorties : capteur **« Santé FoxCat »** (`OK`, `MAJEUR`, `CRITIQUE`, avec la liste), capteur binaire **« Alerte de panne FoxCat »**, une **notification** dans Home Assistant par alerte, et l'événement `foxcat_energy_alert` pour envoyer un message sur téléphone (exemple : `docs/automations/alerte_panne_foxcat.yaml`). Les dashboards 1.9.0 affichent le titre et la cause de chaque alerte : tuile Santé sur mobile, bandeau d'Accueil sur tablette. Catalogue complet : [santé et alertes](docs/algorithmes/10_sante_alertes.md).
 
 ### Publication des prix
 

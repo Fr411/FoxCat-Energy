@@ -1,4 +1,8 @@
-# Changelog — FoxCat Energy V1.7.705
+# Changelog — FoxCat Energy V1.7.706
+
+## V1.7.706
+
+- **Dashboard tablette 1.9.0 : bandeau des alertes de santé.** Sur l'Accueil, sous la barre de navigation, un bandeau (carte conditionnelle) apparaît seulement quand « Santé FoxCat » n'est pas `OK` : titre et cause de chaque alerte (6 au plus), orange pour MAJEUR, rouge pour CRITIQUE. Vérifié par tests et YAML valide, **pas dans Home Assistant** (button-card) ; un dashboard déjà installé garde l'ancien affichage tant qu'on ne le régénère pas.
 
 ## V1.7.705
 
