@@ -214,7 +214,7 @@ from ..domain.tariff.tariff_model import (
 from ..domain.pricing.price_analyzer import analyze_price_curve
 from ..domain.pricing import price_buffer
 from ..domain.loads.flexible_load_planner import build_flexible_load_plan
-from ..domain.pricing.dynamic_planner import build_dynamic_plan
+from ..domain.pricing.dynamic_planner import boiler_lane, build_dynamic_plan
 from ..domain.pricing.bihoraire_planner import build_bihoraire_plan
 from ..trading.vpp import evaluate_trade, evaluate_v2h
 from ..dashboard.dashboard import cached_dashboard_status, refresh_dashboard_cache
@@ -2306,6 +2306,8 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             peak_shaving_active=peak_shaving_active,
             tomorrow_available=tomorrow_available,
         )
+        if dynamic_plan.get("ready"):
+            dynamic_plan["boiler"] = boiler_lane(planner.get("boiler"), None, source="PLANIFICATEUR_CHARGES")
         dynamic_plan["pilot"] = bool(
             dynamic_plan.get("active")
             and dynamic_plan.get("ready")
@@ -2336,6 +2338,13 @@ class FoxCatEnergyCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         if bihoraire_plan.get("ready"):
             self._bihoraire_plan_state = dict(bihoraire_plan.get("state") or {})
+        if bihoraire_plan.get("ready"):
+            hc_windows = (
+                [[p["start_ts"], p["end_ts"]] for p in bihoraire_plan.get("periods", []) if p["period"] == "HC"]
+                if self.settings.get("boiler_allow_hc", True)
+                else []
+            )
+            bihoraire_plan["boiler"] = boiler_lane(None, hc_windows, source="HEURES_CREUSES")
         bihoraire_plan["pilot"] = bool(
             bihoraire_plan.get("ready")
             and str(self.settings.get("mode")) != MODE_MANUAL

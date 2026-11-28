@@ -284,6 +284,60 @@ def _plan_interruptible(
     return chosen
 
 
+# Ordre de repli quand les priorités sont égales (réglage d'origine : toutes à 50) : lave-vaisselle,
+# lave-linge, sèche-linge. Le boiler, qui n'est pas planifié ici, reste toujours le rang 1.
+_DEFAULT_ORDER = {"dishwasher": 0, "washer": 1, "dryer": 2}
+
+
+def _order_key(machine: MachineDefinition) -> tuple[int, int, str]:
+    return (-int(machine.priority), _DEFAULT_ORDER.get(machine.machine_id, 99), machine.machine_id)
+
+
+def _decorate(plan: dict[str, Any], ordered: list[MachineDefinition], now: datetime, horizon_end: datetime) -> None:
+    """Rang de priorité (le boiler est le rang 1) et plages autorisées, pour la vue du dashboard."""
+    for index, machine in enumerate(ordered):
+        entry = plan["machines"].get(machine.machine_id)
+        if entry is None:
+            continue
+        entry["priority"] = int(machine.priority)
+        entry["priority_rank"] = index + 2
+        entry["windows"] = [
+            [int(w.start.timestamp()), int(w.end.timestamp())] for w in _machine_windows(machine, now, horizon_end)
+        ]
+
+
+def boiler_lane(
+    boiler_plan: dict[str, Any] | None,
+    windows: list[list[int]] | None = None,
+    *,
+    source: str,
+) -> dict[str, Any]:
+    """Couloir du boiler (rang 1) pour la vue : informatif, la décision reste celle du boiler dynamique.
+
+    ``windows`` : plages où la chauffe est permise (``None`` = à toute heure). Les segments viennent du
+    planificateur de charges flexibles (créneaux les moins chers) quand il en fournit.
+    """
+    plan = boiler_plan or {}
+    segments = []
+    for item in plan.get("segments") or []:
+        try:
+            segments.append([
+                int(datetime.fromisoformat(item["start"]).timestamp()),
+                int(datetime.fromisoformat(item["end"]).timestamp()),
+            ])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return {
+        "name": "Boiler",
+        "priority_rank": 1,
+        "decision": plan.get("decision"),
+        "reason": plan.get("reason"),
+        "windows": windows,
+        "segments": segments,
+        "source": source,
+    }
+
+
 def _machine_entry(machine: MachineDefinition, decision: str, allow: bool, reason: str, **extra: Any) -> dict[str, Any]:
     return {"name": machine.name, "decision": decision, "allow_start_now": allow, "reason": reason, **extra}
 
@@ -350,29 +404,30 @@ def build_dynamic_plan(
         "horizon_hours": round((horizon_end - now).total_seconds() / 3600.0, 2),
         "price_step_minutes": int(step.total_seconds() // 60),
         "tomorrow_available": bool(tomorrow_available),
-        "slots": [
-            {"start": s.start.isoformat(), "price": round(s.price, 5), "band": s.band, "rank_pct": round(s.rank_pct, 1)}
-            for s in slots[:96]
-        ],
+        # Courbe compacte : [début (epoch s), prix €/kWh, bande], 144 créneaux au plus.
+        "slots": [[int(s.start.timestamp()), round(s.price, 5), s.band] for s in slots[:144]],
+        "now_ts": int(now.timestamp()),
         "next_valley": _next_block(slots, now, {BAND_HC} if band_for else {BAND_NEGATIVE, BAND_VERY_LOW, BAND_LOW}),
         "next_peak": _next_block(slots, now, {BAND_HP} if band_for else {BAND_PEAK, BAND_HIGH}),
         "machines": {},
         "timeline": [],
     }
 
+    ordered = sorted(machines, key=_order_key)
     if peak_shaving_active:
         plan["safety_override"] = True
         plan["machines"] = {
             m.machine_id: _machine_entry(m, SAFETY_OVERRIDE, False, "Écrêtage : nouveau démarrage suspendu") for m in machines
         }
         plan["state"] = dict(previous)
+        _decorate(plan, ordered, now, horizon_end)
         return plan
 
     reservations: list[dict[str, Any]] = []
     new_state: dict[str, str] = {}
     total_saving = 0.0
 
-    for machine in sorted(machines, key=lambda m: -int(m.priority)):
+    for machine in ordered:
         mid = machine.machine_id
         if not settings.get(machine.setting_key, machine.automatic_default):
             plan["machines"][mid] = _machine_entry(machine, USER_CONTROL, False, "Gestion automatique désactivée")
@@ -502,6 +557,7 @@ def build_dynamic_plan(
         if entry.get("planned_start")
     ]
     plan["state"] = new_state
+    _decorate(plan, ordered, now, horizon_end)
     return plan
 
 

@@ -165,3 +165,38 @@ class DynamicPlannerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlannerViewDataTests(unittest.TestCase):
+    def test_default_priority_order_is_dishwasher_washer_dryer(self):
+        ms = [machine(machine_id=i, name=i) for i in ("dryer", "washer", "dishwasher")]
+        result = plan(DAY + timedelta(hours=1), PRICES, machines=ms)
+        ranks = {k: v["priority_rank"] for k, v in result["machines"].items()}
+        self.assertEqual(ranks, {"dishwasher": 2, "washer": 3, "dryer": 4})
+
+    def test_explicit_priority_wins_over_default_order(self):
+        ms = [machine(machine_id="dishwasher", name="a", priority=10), machine(machine_id="dryer", name="b", priority=90)]
+        result = plan(DAY + timedelta(hours=1), PRICES, machines=ms)
+        self.assertEqual(result["machines"]["dryer"]["priority_rank"], 2)
+        self.assertEqual(result["machines"]["dishwasher"]["priority_rank"], 3)
+
+    def test_windows_and_compact_slots_are_exposed(self):
+        m = machine(on_1="22:00", off_1="07:00", on_2="00:00", off_2="00:00")
+        result = plan(DAY + timedelta(hours=12), PRICES, machines=[m])
+        windows = result["machines"]["wash"]["windows"]
+        self.assertTrue(windows and all(len(w) == 2 and w[1] > w[0] for w in windows))
+        self.assertEqual(len(result["slots"][0]), 3)
+        self.assertLessEqual(len(result["slots"]), 144)
+        self.assertEqual(result["now_ts"], int((DAY + timedelta(hours=12)).timestamp()))
+
+    def test_boiler_lane(self):
+        from foxcat_energy.domain.pricing.dynamic_planner import boiler_lane
+
+        lane = boiler_lane(
+            {"decision": "WAIT", "reason": "x", "segments": [{"start": "2026-11-16T01:00:00+00:00", "end": "2026-11-16T02:00:00+00:00"}, {"start": "oops"}]},
+            None, source="PLANIFICATEUR_CHARGES",
+        )
+        self.assertEqual(lane["priority_rank"], 1)
+        self.assertEqual(len(lane["segments"]), 1)
+        self.assertIsNone(lane["windows"])
+        self.assertEqual(boiler_lane(None, [], source="HEURES_CREUSES")["windows"], [])

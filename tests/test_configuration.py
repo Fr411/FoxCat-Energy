@@ -654,7 +654,8 @@ class DashboardAndProfileTests(unittest.TestCase):
         self.assertIn("1.7.4", available_dashboard_versions(versions_directory, "mobile"))
         self.assertIn("1.8.0", available_dashboard_versions(versions_directory))
         self.assertIn("1.8.0", available_dashboard_versions(versions_directory, "mobile"))
-        self.assertEqual(recommended_dashboard_version(versions_directory), "1.8.0")
+        self.assertIn("1.9.0", available_dashboard_versions(versions_directory))
+        self.assertEqual(recommended_dashboard_version(versions_directory), "1.9.0")
         self.assertEqual(
             recommended_dashboard_version(versions_directory, "mobile"),
             "1.8.0",
@@ -679,6 +680,7 @@ class DashboardAndProfileTests(unittest.TestCase):
         versions_directory = COMPONENT_PATH / "dashboard" / "versions"
         for filename, variant, minimum_views in (
             ("dashboard_v1.8.0.yaml", "tablet", 10),
+            ("dashboard_v1.9.0.yaml", "tablet", 13),
             ("dashboard_mobile_v1.8.0.yaml", "mobile", 9),
         ):
             text = (versions_directory / filename).read_text(encoding="utf-8")
@@ -695,14 +697,12 @@ class DashboardAndProfileTests(unittest.TestCase):
                 (
                     versions_directory
                     / (
-                        "manifest_v1.8.0.json"
-                        if variant == "tablet"
-                        else "manifest_mobile_v1.8.0.json"
+                        filename.replace("dashboard_", "manifest_").replace(".yaml", ".json")
                     )
                 ).read_text(encoding="utf-8")
             )
             self.assertEqual(manifest["variant"], variant)
-            self.assertEqual(manifest["dashboard_version"], "1.8.0")
+            self.assertEqual(manifest["dashboard_version"], filename.rsplit("_v", 1)[1][:-5])
             self.assertIs(manifest["recommended"], True)
 
     def test_dashboard_v180_has_delestage_view_with_navbar_access(self) -> None:
@@ -729,6 +729,33 @@ class DashboardAndProfileTests(unittest.TestCase):
         code = view["cards"][0]["cards"][3]["custom_fields"]["c"]
         for step in ("Surveillance", "Seuil dépassé", "Délestage", "Réarmement"):
             self.assertIn(step, code)
+
+    def test_dashboard_v190_has_planner_view_with_navbar_access(self) -> None:
+        dashboard = yaml.safe_load(
+            (
+                COMPONENT_PATH / "dashboard" / "versions" / "dashboard_v1.9.0.yaml"
+            ).read_text(encoding="utf-8")
+        )
+        paths = [view["path"] for view in dashboard["views"]]
+        self.assertIn("planificateur", paths)
+        navbar = dashboard["button_card_templates"]["fc_navbar"]["custom_fields"]
+        targets = {
+            item["card"]["variables"]["path"]: item["card"]["name"]
+            for item in navbar.values()
+        }
+        self.assertEqual(sorted(set(targets) - set(paths)), [])
+        self.assertEqual(targets["planificateur"], "Planificateur")
+        areas = dashboard["button_card_templates"]["fc_navbar"]["styles"]["grid"][0][
+            "grid-template-areas"
+        ]
+        self.assertEqual(len(areas.strip('"').split()), len(navbar))
+        view = next(view for view in dashboard["views"] if view["path"] == "planificateur")
+        code = view["cards"][0]["cards"][-1]["custom_fields"]["c"]
+        for marker in (
+            "pricing.dynamic_planner", "pricing.bihoraire_planner", "priority_rank",
+            "windows", "planned_start", "MAINTENANT", "Heures creuses",
+        ):
+            self.assertIn(marker, code, marker)
 
     def test_dashboard_v180_flux_octopus_is_named_mina(self) -> None:
         dashboard = yaml.safe_load(

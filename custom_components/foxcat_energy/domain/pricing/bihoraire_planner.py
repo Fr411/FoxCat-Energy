@@ -36,7 +36,13 @@ def _periods(points: list[PricePoint], now: datetime, settings: dict[str, Any]) 
     for index, run in enumerate(runs):
         run["end"] = runs[index + 1]["start"] if index + 1 < len(runs) else points[-1].at
     return [
-        {**run, "start": run["start"].isoformat(), "end": run["end"].isoformat()}
+        {
+            **run,
+            "start": run["start"].isoformat(),
+            "end": run["end"].isoformat(),
+            "start_ts": int(run["start"].timestamp()),
+            "end_ts": int(run["end"].timestamp()),
+        }
         for run in runs
         if run["end"] > now
     ]
@@ -88,7 +94,7 @@ def build_bihoraire_plan(
         next_hc=next((p for p in periods if p["period"] == BAND_HC), None),
         next_hp=next((p for p in periods if p["period"] == BAND_HP), None),
     )
-    for key in ("slots", "next_valley", "next_peak", "current_rank_pct", "tomorrow_available"):
+    for key in ("next_valley", "next_peak", "current_rank_pct", "tomorrow_available"):
         plan.pop(key, None)
     if spread <= 0:
         plan["note"] = "HP et HC au même prix (ou HC plus cher) : aucun report n'est rentable."

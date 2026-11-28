@@ -500,7 +500,11 @@ Les fichiers existants **ne sont jamais écrasés** au démarrage.
 
 Installez (via HACS, catégorie Interface) : **`button-card`**, **`apexcharts-card`**, **`card-mod`**. Les dashboards 1.8.0 demandent en plus **`vertical-stack-in-card`** ; la version mobile demande aussi **`layout-card`** (masonry-layout) et **`html-template-card`**.
 
-### Dashboards 1.8.0 (recommandés)
+### Dashboard 1.9.0 : vue Planificateur (tablette)
+
+Choisissez la version **1.9.0 • Tablette** dans la liste « Version du dashboard » (une version personnalisée n'est jamais écrasée). L'onglet **Planificateur** de la barre montre : en haut le prix actuel, les prochaines heures creuses (ou la prochaine vallée) et l'économie attendue ; au centre la frise 36 h avec le tarif, puis un couloir par appareil dans l'ordre de priorité (1 Boiler, 2 Lave-vaisselle, 3 Lave-linge, 4 Sèche-linge) ; en bas une carte par appareil avec la décision, le départ prévu et la raison. Zones pointillées = fenêtres autorisées de la machine ; barres pleines = cycle planifié. Le capteur affiche « OBSERVATION » tant que l'interrupteur « … pilote les machines » est coupé. La vue est vide (« Planificateur inactif ») avec un contrat à prix fixe. Pour changer l'ordre de priorité, réglez la priorité de chaque machine dans Équipements → Machines (plus la valeur est haute, plus la machine passe tôt).
+
+### Dashboards 1.8.0
 
 La vue **Onduleur** de la tablette affiche la scène animée de l'onduleur, l'oscilloscope triphasé, les relais RRCR et la table des niveaux. Elle lit des capteurs **SolarEdge** propres à l'installation (courants, tensions, puissances) : s'ils n'existent pas chez vous, les valeurs affichent « — ». Le nombre de panneaux du champ PV (22 dans l'installation de développement) est écrit dans le dashboard (`PANELS`).
 
