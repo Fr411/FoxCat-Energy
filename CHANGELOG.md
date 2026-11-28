@@ -1,5 +1,9 @@
 # Changelog — FoxCat Energy V1.7.701
 
+## Non publié
+
+- **Vue Planificateur : visuel amélioré** (dashboards tablette et mobile 1.9.0). Tuiles d'indicateurs à liseré coloré avec icônes ; courbe de tarif en barres à dégradé, repères de prix à trois niveaux, étiquettes **▼ prix minimum / ▲ prix maximum** avec leur heure (dynamique, tablette) ; **info-bulle** au survol de chaque créneau (heure, prix, bande) et de chaque cycle (heures, durée) ; barres de cycle à dégradé avec halo et durée affichée ; **connecteur pointillé** reliant le départ de chaque cycle au prix de la courbe à cet instant ; point pulsant sur la courbe à l'heure actuelle ; cartes par appareil avec liseré, dégradé et **compte à rebours** (« dans 10 h 50 », « maintenant », « cycle en cours »). Sur téléphone, les repères min/max sont masqués et l'axe n'affiche que minuit et midi pour rester lisible. Le code est le même dans `dashboard_v1.9.0.yaml` et `dashboard_mobile_v1.9.0.yaml` (une version déjà installée garde l'ancien visuel tant qu'on ne la régénère pas). Aperçus mis à jour dans `docs/PREVIEW_PLANIFICATEUR_*.png` ; rendu vérifié dans un navigateur de test, **pas dans Home Assistant**.
+
 ## V1.7.701
 
 - **Vue « Planificateur » du dashboard mobile 1.9.0** (`dashboard_mobile_v1.9.0.yaml`, recommandé) : même carte que sur tablette, en mise en page téléphone (frise étroite, nom du couloir au-dessus de la barre, cartes en colonne), ouverte par la tuile « Planificateur » de l'Accueil (sous-vue avec retour). La vue des deux tableaux de bord ajoute une carte de **réglages** : interrupteurs « … pilote les machines », stabilité du plan et état des deux planificateurs. La carte détecte le téléphone (`variables.mobile` ou écran de moins de 720 px). Aperçu : `docs/PREVIEW_PLANIFICATEUR_MOBILE.png`. Pour un dashboard personnel (« Tab Dash »), la vue se copie depuis `dashboard_v1.9.0.yaml` (vue `planificateur` et bouton `l` de `fc_navbar`).
