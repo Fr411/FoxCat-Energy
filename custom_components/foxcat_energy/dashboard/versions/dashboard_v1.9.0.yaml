@@ -10145,6 +10145,11 @@ views:
               l.runs.forEach((r, k) => {
                 const xa = x(r[0]), xb = x(r[1]), wd = Math.max(xb - xa, 3);
                 svg += `<rect x="${xa.toFixed(1)}" y="${y + 8}" width="${wd.toFixed(1)}" height="${LANE_H - 16}" rx="8" fill="${c}" opacity="0.92"/>`;
+                const prof = l.m && Array.isArray(l.m.profile) && l.runs.length === 1 ? l.m.profile : null;
+                if (prof && wd > 40) {
+                  const mx = Math.max(...prof, 1e-6), bw = wd / prof.length;
+                  prof.forEach((v, q) => { const hh = Math.max(1.5, (LANE_H - 26) * v / mx); svg += `<rect x="${(xa + q * bw + 0.5).toFixed(1)}" y="${(y + LANE_H - 12 - hh).toFixed(1)}" width="${Math.max(bw - 1, 1).toFixed(1)}" height="${hh.toFixed(1)}" rx="1.5" fill="#0b1220" opacity="0.38"/>`; });
+                }
                 if (wd > 92 && (k === 0 || l.runs.length === 1)) svg += `<text x="${(xa + wd / 2).toFixed(1)}" y="${y + LANE_H / 2 + 4}" fill="#0b1220" font-size="11.5" font-weight="800" text-anchor="middle">${fmtT(r[0])} → ${fmtT(r[1])}</text>`;
                 else if (k === 0) svg += `<text x="${(xb + 6).toFixed(1)}" y="${y + LANE_H / 2 + 4}" fill="${c}" font-size="11.5" font-weight="700">${fmtT(r[0])} → ${fmtT(r[1])}</text>`;
               });
@@ -10182,12 +10187,16 @@ views:
               const run = l.runs[0];
               const when = run ? `${fmtD(run[0])} · ${fmtT(run[0])} → ${fmtT(l.runs[l.runs.length - 1][1])}` : (l.isBoiler ? (isBi ? 'Selon le solaire et les heures creuses' : 'Décision du boiler dynamique') : '—');
               const sav = num(m.expected_saving_eur), pct = num(m.expected_saving_pct);
+              const fmtH = (h) => { const mm = Math.round(h * 60); return Math.floor(mm / 60) + ' h ' + String(mm % 60).padStart(2, '0'); };
+              const learned = m.duration_source === 'APPRENTISSAGE_10_CYCLES';
+              const learnLine = l.isBoiler ? '' : `<div class="k" style="font-size:11.5px;margin-top:6px;display:flex;align-items:center;gap:6px"><ha-icon icon="mdi:brain" style="--mdc-icon-size:15px;color:${learned ? '#a78bfa' : '#64748b'}"></ha-icon><span>${learned ? `Appris sur <b style="color:#e8f1fb">${m.learning_cycles || '?'} cycles</b>` : 'Réglages (apprentissage insuffisant)'} · ${m.duration_h != null ? fmtH(m.duration_h) : '—'} · ${m.energy_kwh != null ? Number(m.energy_kwh).toFixed(2).replace('.', ',') + ' kWh' : '—'}${m.profile ? ' · forme de consommation apprise' : ''}</span></div>`;
               return `<div style="flex:1 1 220px;min-width:220px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid ${l.color}44">
                 <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:${l.color}22;color:${l.color};font-weight:800;border:1px solid ${l.color}99">${l.rank}</span>
                   <ha-icon icon="${ICON[l.id] || 'mdi:flash'}" style="color:${l.color};--mdc-icon-size:20px"></ha-icon><b style="font-size:14px">${esc(l.name)}</b></div>
                 <div style="margin:8px 0 6px">${chip(esc(d[0]), d[1])}</div>
                 <div style="font-size:13px;font-weight:700">${when}</div>
                 ${sav != null ? `<div class="k" style="font-size:12px;margin-top:3px">Économie attendue <b style="color:#34d399">${fmtE(sav)}</b>${pct != null ? ` (${Math.round(pct)} %)` : ''}${m.estimated_cost_eur != null ? ` · coût du cycle ${fmtE(num(m.estimated_cost_eur))}` : ''}</div>` : ''}
+                ${learnLine}
                 <div class="k" style="font-size:11.5px;margin-top:5px;line-height:1.35">${esc(l.reason || '')}</div>
               </div>`;
             }).join('');

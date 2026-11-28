@@ -200,3 +200,72 @@ class PlannerViewDataTests(unittest.TestCase):
         self.assertEqual(len(lane["segments"]), 1)
         self.assertIsNone(lane["windows"])
         self.assertEqual(boiler_lane(None, [], source="HEURES_CREUSES")["windows"], [])
+
+
+class LearningTests(unittest.TestCase):
+    """Le planificateur exploite durée, énergie et forme de consommation apprises."""
+
+    CURVE = [0.10, 0.30, 0.30, 0.10] + [0.50] * 32  # départ à 0 h ou à 2 h : même moyenne sur 2 h
+
+    def _plan(self, learning, hour=0):
+        return plan(DAY + timedelta(hours=hour), self.CURVE, learning=learning)["machines"]["wash"]
+
+    @staticmethod
+    def _stats(shape, cycles=6):
+        return {"wash": {"retained_cycles": cycles, "average_duration_s_10": 7200.0, "average_energy_wh_10": 2000.0, "profile_shape_10": shape}}
+
+    def test_without_shape_the_earlier_tied_start_wins(self):
+        entry = self._plan(self._stats(None))
+        self.assertEqual(entry["decision"], START_NOW)
+
+    def test_back_loaded_cycle_is_shifted_to_cheap_end(self):
+        back = [0.0] * 6 + [1 / 6] * 6  # toute l'énergie dans la 2e moitié (essorage, chauffe finale)
+        entry = self._plan(self._stats(back))
+        self.assertEqual(entry["decision"], WAIT)
+        self.assertTrue(entry["planned_start"].startswith("2026-11-16T02:00"))
+        self.assertEqual(entry["profile"][0], 0.0)
+
+    def test_front_loaded_cycle_starts_now(self):
+        front = [1 / 6] * 6 + [0.0] * 6
+        entry = self._plan(self._stats(front))
+        self.assertEqual(entry["decision"], START_NOW)
+
+    def test_energy_and_sources_are_reported(self):
+        entry = self._plan(self._stats(None))
+        self.assertEqual(entry["energy_kwh"], 2.0)
+        self.assertEqual(entry["energy_source"], "APPRENTISSAGE_10_CYCLES")
+        self.assertEqual(entry["duration_source"], "APPRENTISSAGE_10_CYCLES")
+        self.assertEqual(entry["learning_cycles"], 6)
+
+    def test_too_few_learned_cycles_fall_back_to_settings(self):
+        entry = self._plan(self._stats([1 / 12] * 12, cycles=2))
+        self.assertEqual(entry["duration_source"], "DUREE_CONFIGUREE")
+        self.assertEqual(entry["energy_source"], "PUISSANCE_NOMINALE")
+        self.assertIsNone(entry["profile"])
+
+
+class RecorderShapeTests(unittest.TestCase):
+    def test_cycle_shape_locates_the_heating_phase(self):
+        from foxcat_energy.domain.loads.machine_learning import MachineLearningRecorder as R
+
+        cycle = {"duration_s": 600, "points": [{"t_s": t, "p_w": 2000 if t < 200 else 100} for t in range(0, 601, 20)]}
+        shape = R.cycle_shape(cycle)
+        self.assertAlmostEqual(sum(shape), 1.0, places=6)
+        self.assertGreater(sum(shape[:4]), 0.85)
+
+    def test_cycle_shape_needs_enough_points(self):
+        from foxcat_energy.domain.loads.machine_learning import MachineLearningRecorder as R
+
+        self.assertIsNone(R.cycle_shape({"duration_s": 600, "points": [{"t_s": 0, "p_w": 5}]}))
+        self.assertIsNone(R.cycle_shape({"duration_s": 0, "points": []}))
+
+    def test_view_exposes_average_shape_and_caches_it(self):
+        from foxcat_energy.domain.loads.machine_learning import MachineLearningRecorder as R
+
+        rec = R()
+        cycle = {"duration_s": 600.0, "energy_wh": 500.0, "points": [{"t_s": t, "p_w": 2000 if t < 200 else 100} for t in range(0, 601, 20)]}
+        rec.restore({"machines": {"wash": {"name": "Lave-linge", "total_cycles": 3, "cycles": [dict(cycle), dict(cycle), dict(cycle)]}}})
+        first = rec.view()["wash"]
+        self.assertEqual(first["profile_shape_cycles"], 3)
+        self.assertAlmostEqual(sum(first["profile_shape_10"]), 1.0, places=2)
+        self.assertEqual(rec.view()["wash"]["profile_shape_10"], first["profile_shape_10"])
