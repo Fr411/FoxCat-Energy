@@ -697,7 +697,7 @@ views:
                 <div class="run-c">${running.length ? running.map((a, i) => `<span class="ra" style="--c:${a.col}"><ha-icon icon="${a.icon}"></ha-icon>${a.name}<b class="mono">${Ws(a.w)}</b></span>`).join('') : '<span class="none">Aucun appareil piloté en marche</span>'}</div>
               </div>
 
-              <div class="hs-wrap">${(()=>{const H='sensor.foxcat_energy_systeme_sante_foxcat_alertes_de_panne';const st=(i)=>states[i]?.state;const hs=(st(H)&&!['unknown','unavailable'].includes(st(H)))?st(H):'INCONNU';const hc={OK:'#35e59d',MAJEUR:'#fbbf24',CRITIQUE:'#fb7185'}[hs]||'#94a3b8';const n=Number(states[H]?.attributes?.nombre_alertes||0);let al=states[H]?.attributes?.alertes||[];if(!Array.isArray(al))al=[al];const tx=al.map(a=>typeof a==='object'?(a.message||a.titre||a.nom||JSON.stringify(a)):a);const feed=st('sensor.foxcat_energy_tarification_flux_de_prix_en_ligne_tampon_local')||'—';const fcol={EN_LIGNE:'#35e59d',TAMPON:'#fbbf24',DEGRADE:'#fb923c',LOCAL:'#19d8ff'}[feed]||'#94a3b8';const net=st('binary_sensor.foxcat_energy_systeme_internet_en_ligne')==='on';const bak=st('binary_sensor.foxcat_energy_systeme_mode_backup_actif')==='on';const D=[['Internet',net?'#35e59d':'#fb7185'],['Backup',bak?'#fbbf24':'#64748b'],['Prix '+feed,fcol]];return `<div class="hs" style="--c:${hc}"><div class="hr"><div class="hi"><ha-icon icon="mdi:heart-pulse"></ha-icon></div><div><div class="k">SANTÉ FOXCAT</div><div class="hv">${esc(hs)}</div></div><div class="hd2">${D.map(([l,c])=>`<span style="--c:${c}"><i></i>${esc(l)}</span>`).join('')}</div></div>${n>0?`<div class="hal">${tx.slice(0,4).map(t=>`<div>${esc(t)}</div>`).join('')}</div>`:''}</div>`;})()}</div>
+              <div class="hs-wrap">${(()=>{const H='sensor.foxcat_energy_systeme_sante_foxcat_alertes_de_panne';const st=(i)=>states[i]?.state;const hs=(st(H)&&!['unknown','unavailable'].includes(st(H)))?st(H):'INCONNU';const hc={OK:'#35e59d',MAJEUR:'#fbbf24',CRITIQUE:'#fb7185'}[hs]||'#94a3b8';const n=Number(states[H]?.attributes?.nombre_alertes||0);let al=states[H]?.attributes?.alertes||[];if(!Array.isArray(al))al=[al];const tx=al.map(a=>typeof a==='object'?(a.message||(a.titre?`<b>${esc(a.titre)}</b>`+(a.detail?`<br>${esc(a.detail)}`:''):(a.nom||JSON.stringify(a)))):esc(a));const feed=st('sensor.foxcat_energy_tarification_flux_de_prix_en_ligne_tampon_local')||'—';const fcol={EN_LIGNE:'#35e59d',TAMPON:'#fbbf24',DEGRADE:'#fb923c',LOCAL:'#19d8ff'}[feed]||'#94a3b8';const net=st('binary_sensor.foxcat_energy_systeme_internet_en_ligne')==='on';const bak=st('binary_sensor.foxcat_energy_systeme_mode_backup_actif')==='on';const D=[['Internet',net?'#35e59d':'#fb7185'],['Backup',bak?'#fbbf24':'#64748b'],['Prix '+feed,fcol]];return `<div class="hs" style="--c:${hc}"><div class="hr"><div class="hi"><ha-icon icon="mdi:heart-pulse"></ha-icon></div><div><div class="k">SANTÉ FOXCAT</div><div class="hv">${esc(hs)}</div></div><div class="hd2">${D.map(([l,c])=>`<span style="--c:${c}"><i></i>${esc(l)}</span>`).join('')}</div></div>${n>0?`<div class="hal">${tx.slice(0,4).map(t=>`<div>${t}</div>`).join('')}</div>`:''}</div>`;})()}</div>
 
               <div class="pan today">
                 <div class="ph"><div class="pt"><ha-icon icon="mdi:calendar-today" style="color:#22d3ee"></ha-icon>AUJOURD’HUI</div><span class="k">BILAN ÉNERGÉTIQUE & FINANCIER</span></div>
@@ -8413,7 +8413,7 @@ views:
           const hc={OK:'#35e59d',MAJEUR:'#fbbf24',CRITIQUE:'#fb7185'}[hs]||'#94a3b8';
           const n=Number(A(H,'nombre_alertes')||0);
           let al=A(H,'alertes')||[]; if(!Array.isArray(al)) al=[al];
-          const alTxt=al.map(a=>typeof a==='object'?(a.message||a.titre||a.nom||JSON.stringify(a)):a);
+          const alTxt=al.map(a=>typeof a==='object'?(a.message||(a.titre?`<b>${esc(a.titre)}</b>`+(a.detail?`<br>${esc(a.detail)}`:''):(a.nom||JSON.stringify(a)))):esc(a));
           const on=(id)=>states[id]?.state==='on';
           const feed=S(FEED);
           const fc={EN_LIGNE:'#35e59d',TAMPON:'#fbbf24',DEGRADE:'#fb923c',LOCAL:'#19d8ff'}[feed]||'#94a3b8';
@@ -8426,7 +8426,7 @@ views:
           const tiles=T.map(([i,l,v,c])=>`
             <div class="tl" style="--c:${c}"><ha-icon icon="${i}"></ha-icon>
             <div class="v">${esc(v)}</div><div class="l">${l}</div></div>`).join('');
-          const alerts=n>0?`<div class="al">${alTxt.slice(0,4).map(t=>`<div>${esc(t)}</div>`).join('')}</div>`:'';
+          const alerts=n>0?`<div class="al">${alTxt.slice(0,4).map(t=>`<div>${t}</div>`).join('')}</div>`:'';
           return `
           <style>
            .hl{font-family:Inter,'Segoe UI',system-ui,sans-serif;color:#f8fafc;padding:10px 2px 0}
